@@ -1,0 +1,9 @@
+version: 0.1
+entities:
+- id: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192
+  label: Booking
+  description: ''
+  position:
+    x: 260.24871940993216
+    y: 313.7138581945465
+relationships: []

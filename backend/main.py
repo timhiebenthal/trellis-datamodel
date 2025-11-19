@@ -20,13 +20,52 @@ app.add_middleware(
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# dbt-ontology/backend/../../dbt/target/manifest.json -> root/dbt/target/manifest.json
-MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/manifest.json"))
-# dbt-ontology/backend/../ontology.yml -> dbt-ontology/ontology.yml
-ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
+# dbt-ontology/config.yaml
+CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yaml"))
 
+# Default values
+MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/manifest.json"))
+ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
+DBT_MODEL_PATHS = ["3-entity"]
+
+def load_config():
+    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r') as f:
+                config = yaml.safe_load(f) or {}
+                
+            # Update paths if present
+            if "dbt_manifest_path" in config:
+                # If path is relative, resolve it relative to backend/ directory for consistency
+                # or relative to the config file location (which is BASE_DIR/..)
+                # Let's assume relative to dbt-ontology/ backend (BASE_DIR) for now
+                p = config["dbt_manifest_path"]
+                if not os.path.isabs(p):
+                    MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+                else:
+                    MANIFEST_PATH = p
+            
+            if "ontology_file" in config:
+                p = config["ontology_file"]
+                # Resolve relative path from dbt-ontology/ (config location)
+                if not os.path.isabs(p):
+                    ONTOLOGY_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), p))
+                else:
+                    ONTOLOGY_PATH = p
+            
+            if "dbt_model_paths" in config:
+                DBT_MODEL_PATHS = config["dbt_model_paths"]
+                
+        except Exception as e:
+            print(f"Error loading config: {e}")
+
+load_config()
+
+print(f"Using Config: {CONFIG_PATH}")
 print(f"Looking for manifest at: {MANIFEST_PATH}")
 print(f"Looking for ontology at: {ONTOLOGY_PATH}")
+print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
 
 @app.get("/api/manifest")
 async def get_manifest():
@@ -42,6 +81,19 @@ async def get_manifest():
     models = []
     for key, node in data.get("nodes", {}).items():
         if node.get("resource_type") == "model":
+            # Filter by path
+            original_path = node.get("original_file_path", "")
+            
+            # If DBT_MODEL_PATHS is set, require at least one match
+            if DBT_MODEL_PATHS:
+                match = False
+                for pattern in DBT_MODEL_PATHS:
+                    if pattern in original_path:
+                        match = True
+                        break
+                if not match:
+                    continue
+                
             columns = []
             for col_name, col_data in node.get("columns", {}).items():
                 columns.append({
