@@ -35,7 +35,11 @@
                 id: `e${r.source}-${r.target}`,
                 source: r.source,
                 target: r.target,
-                label: r.label
+                type: 'custom',
+                data: {
+                    label: r.label || 'name me',
+                    type: r.type || 'one_to_many'
+                }
             })) as Edge[];
             
             lastSavedState = JSON.stringify({ nodes: $nodes, edges: $edges });
@@ -77,7 +81,8 @@
                     relationships: currentEdges.map(e => ({
                         source: e.source,
                         target: e.target,
-                        label: e.label || ''
+                        label: e.data?.label || '',
+                        type: e.data?.type || 'one_to_many'
                     }))
                 };
                 

@@ -7,18 +7,33 @@
         MiniMap,
         addEdge,
         type Node,
-        type Connection
+        type Connection,
+        type Edge
     } from '@xyflow/svelte';
     
     import { nodes, edges } from '$lib/stores';
     import EntityNode from './EntityNode.svelte';
+    import CustomEdge from './CustomEdge.svelte';
     
     const nodeTypes = {
         entity: EntityNode
     };
     
+    const edgeTypes = {
+        custom: CustomEdge
+    };
+    
     function onConnect(connection: Connection) {
-        $edges = addEdge(connection, $edges);
+        const edge: Edge = {
+            ...connection,
+            id: `e${connection.source}-${connection.target}`,
+            type: 'custom',
+            data: {
+                label: 'name me',
+                type: 'one_to_many'
+            }
+        };
+        $edges = addEdge(edge, $edges);
     }
     
     function addEntity() {
@@ -44,6 +59,7 @@
         bind:nodes={$nodes}
         bind:edges={$edges}
         {nodeTypes}
+        {edgeTypes}
         onconnect={onConnect}
         fitView
         class="bg-gray-50"
@@ -62,4 +78,3 @@
         </div>
     </SvelteFlow>
 </div>
-
