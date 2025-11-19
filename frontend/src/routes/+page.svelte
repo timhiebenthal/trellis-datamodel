@@ -129,6 +129,23 @@ function startSidebarResize(event: PointerEvent) {
             }
         }, 1000); // 1s debounce
     });
+
+    // Auto-expand entities when switching to physical view
+    $effect(() => {
+        if ($viewMode === 'physical') {
+            // Only update nodes if there are actually collapsed ones
+            const hasCollapsed = $nodes.some(node => node.data?.collapsed === true);
+            if (hasCollapsed) {
+                $nodes = $nodes.map(node => ({
+                    ...node,
+                    data: {
+                        ...node.data,
+                        collapsed: false
+                    }
+                }));
+            }
+        }
+    });
 </script>
 
 <div class="flex flex-col h-screen overflow-hidden font-sans text-gray-900">
