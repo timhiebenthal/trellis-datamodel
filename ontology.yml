@@ -2,18 +2,26 @@ version: 0.1
 entities:
 - id: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192
   label: Booking
-  description: ''
+  description: 'The booking entity represents booked hours on projects by employees.  It
+    also contains the allocated hours initially planned or "allocated" to the project,
+    making it easy to calculate the delivery rate of a project. Foundation for Elmo-Reporting.
+
+    '
   dbt_model: entity_booking
   position:
-    x: -196.43329390216263
-    y: 388.3714172549129
+    x: -197.2624975492709
+    y: 437.2697505073197
+  width: 280
+  panel_height: 351.8546447753906
 - id: 436ebccd-014f-4239-80fa-532e359f58b5
   label: Employee
   description: ''
   dbt_model: entity_employee
   position:
-    x: 311.40709682456696
-    y: 64.85991062931652
+    x: 173.1036655976866
+    y: 107.92186351948169
+  width: 280
+  panel_height: 200
 relationships:
 - source: 436ebccd-014f-4239-80fa-532e359f58b5
   target: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192

@@ -169,7 +169,7 @@ function startSidebarResize(event: PointerEvent) {
     </header>
     
     <main class="flex-1 flex overflow-hidden relative">
-        <Sidebar {sidebarWidth} />
+        <Sidebar width={sidebarWidth} />
         <div 
             class="resize-handle h-full" 
             class:active={resizingSidebar}
@@ -181,7 +181,7 @@ function startSidebarResize(event: PointerEvent) {
 
 <style>
     .resize-handle {
-        width: 6px;
+        width: 8px;
         height: 100%;
         cursor: col-resize;
         background: transparent;
@@ -189,10 +189,12 @@ function startSidebarResize(event: PointerEvent) {
         pointer-events: auto;
         touch-action: none;
         flex-shrink: 0;
+        position: relative;
+        z-index: 10;
     }
 
     .resize-handle:hover,
     .resize-handle.active {
-        background: rgba(148, 163, 184, 0.6);
+        background: rgba(148, 163, 184, 0.8);
     }
 </style>
