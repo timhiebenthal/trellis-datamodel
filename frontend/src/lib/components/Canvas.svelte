@@ -29,7 +29,7 @@
             id: `e${connection.source}-${connection.target}`,
             type: 'custom',
             data: {
-                label: 'name me',
+                label: '',
                 type: 'one_to_many'
             }
         };

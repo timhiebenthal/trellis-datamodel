@@ -37,7 +37,7 @@
                 target: r.target,
                 type: 'custom',
                 data: {
-                    label: r.label || 'name me',
+                    label: r.label || '',
                     type: r.type || 'one_to_many'
                 }
             })) as Edge[];
@@ -81,8 +81,8 @@
                     relationships: currentEdges.map(e => ({
                         source: e.source,
                         target: e.target,
-                        label: e.data?.label || '',
-                        type: e.data?.type || 'one_to_many'
+                        label: (e.data?.label as string) || '',
+                        type: (e.data?.type as string) || 'one_to_many'
                     }))
                 };
                 

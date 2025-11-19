@@ -1,11 +1,11 @@
 <script lang="ts">
   import { 
     BaseEdge, 
-    EdgeLabelRenderer, 
+    EdgeLabel,
     getBezierPath,
-    type EdgeProps,
-    useSvelteFlow
+    type EdgeProps
   } from '@xyflow/svelte';
+  import { edges } from '$lib/stores';
 
   type $$Props = EdgeProps;
 
@@ -22,8 +22,6 @@
     data 
   } = $props<$$Props>();
 
-  const { updateEdgeData } = useSvelteFlow();
-
   let [edgePath, labelX, labelY] = $derived(getBezierPath({
     sourceX,
     sourceY,
@@ -33,39 +31,65 @@
     targetPosition
   }));
 
-  let label = $derived(data?.label as string || 'name me');
+  // Use raw data.label for input value, default to empty
+  let label = $derived(data?.label as string || '');
   let type = $derived(data?.type as string || 'one_to_many');
 
-  function onLabelChange(e: Event) {
-    updateEdgeData(id, { label: (e.target as HTMLInputElement).value });
+  function updateEdge(partial: Record<string, unknown>) {
+    edges.update((list) =>
+      list.map((edge) =>
+        edge.id === id
+          ? {
+              ...edge,
+              data: {
+                ...(edge.data || {}),
+                ...partial
+              }
+            }
+          : edge
+      )
+    );
   }
 
-  function toggleType() {
+  function onLabelChange(e: Event) {
+    updateEdge({ label: (e.target as HTMLInputElement).value });
+  }
+
+  function toggleType(e: MouseEvent) {
+    // Explicitly stop propagation at all levels
+    e.stopPropagation();
+    e.stopImmediatePropagation();
     const nextType = type === 'one_to_many' ? 'one_to_one' : 'one_to_many';
-    updateEdgeData(id, { type: nextType });
+    updateEdge({ type: nextType });
   }
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} {style} />
 
-<EdgeLabelRenderer>
+<EdgeLabel
+  x={labelX}
+  y={labelY}
+>
   <div
-    style:transform="translate(-50%, -50%) translate({labelX}px, {labelY}px)"
-    class="absolute pointer-events-auto bg-white px-2 py-1 rounded border border-gray-300 shadow-sm flex flex-col items-center min-w-[100px]"
+    class="pointer-events-auto nodrag nopan bg-white px-1 py-0.5 rounded shadow-sm flex flex-col items-center w-auto"
+    onmousedown={(e) => e.stopPropagation()}
+    click={(e) => e.stopPropagation()}
+    role="presentation"
   >
     <input
       value={label}
       oninput={onLabelChange}
-      class="text-xs font-medium text-center focus:outline-none focus:bg-gray-50 w-full bg-transparent"
+      onchange={onLabelChange}
+      class="text-xs font-medium text-center focus:outline-none focus:bg-gray-50 w-20 bg-transparent"
       placeholder="name me"
     />
     <button 
-        class="text-[9px] text-gray-500 mt-0.5 hover:text-blue-600 hover:underline cursor-pointer bg-transparent border-none p-0"
+        class="text-[9px] text-gray-500 hover:text-blue-600 hover:underline cursor-pointer bg-transparent border-none p-0 relative z-50"
         onclick={toggleType}
         title="Click to toggle type"
+        type="button"
     >
         ({type})
     </button>
   </div>
-</EdgeLabelRenderer>
-
+</EdgeLabel>
