@@ -2,7 +2,7 @@
   import { 
     BaseEdge, 
     EdgeLabel,
-    getBezierPath,
+    getSmoothStepPath,
     type EdgeProps
   } from '@xyflow/svelte';
   import { edges, nodes } from '$lib/stores';
@@ -24,7 +24,7 @@
     data 
   } = $props<$$Props>();
 
-  let [edgePath, labelX, labelY] = $derived(getBezierPath({
+  let [edgePath, labelX, labelY] = $derived(getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,

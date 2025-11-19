@@ -30,13 +30,13 @@
     <div class="flex-1 overflow-y-auto pr-1 space-y-1.5">
         {#each filteredModels as model (model.name)}
             <div 
-                class="px-2 py-1.5 bg-white rounded cursor-move hover:shadow border border-gray-200 hover:border-blue-400 transition-all select-none"
+                class="px-2 py-1 bg-white rounded cursor-move hover:shadow border border-gray-200 hover:border-blue-400 transition-all select-none text-xs font-medium text-gray-900 truncate"
                 draggable="true"
                 ondragstart={(e) => onDragStart(e, model)}
                 role="listitem"
+                title={`${model.name} (${model.schema}.${model.table})`}
             >
-                <div class="font-medium text-sm text-gray-900 truncate" title={model.name}>{model.name}</div>
-                <div class="text-[11px] text-gray-500 truncate">{model.schema}.{model.table}</div>
+                {model.name}
             </div>
         {/each}
         {#if filteredModels.length === 0}

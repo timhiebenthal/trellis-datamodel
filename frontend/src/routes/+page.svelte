@@ -186,6 +186,9 @@ function startSidebarResize(event: PointerEvent) {
         cursor: col-resize;
         background: transparent;
         transition: background 0.2s ease;
+        pointer-events: auto;
+        touch-action: none;
+        flex-shrink: 0;
     }
 
     .resize-handle:hover,
