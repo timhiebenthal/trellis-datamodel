@@ -5,7 +5,6 @@
         Background, 
         BackgroundVariant, 
         MiniMap,
-        addEdge,
         type Node,
         type Connection,
         type Edge
@@ -26,14 +25,14 @@
     function onConnect(connection: Connection) {
         const edge: Edge = {
             ...connection,
-            id: `e${connection.source}-${connection.target}`,
+            id: crypto.randomUUID(),
             type: 'custom',
             data: {
                 label: '',
                 type: 'one_to_many'
             }
         };
-        $edges = addEdge(edge, $edges);
+        $edges = [...$edges, edge];
     }
     
     function addEntity() {

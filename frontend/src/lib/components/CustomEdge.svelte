@@ -5,12 +5,14 @@
     getBezierPath,
     type EdgeProps
   } from '@xyflow/svelte';
-  import { edges } from '$lib/stores';
+  import { edges, nodes } from '$lib/stores';
 
   type $$Props = EdgeProps;
 
   let { 
-    id, 
+    id,
+    source,
+    target,
     sourceX, 
     sourceY, 
     targetX, 
@@ -32,8 +34,33 @@
   }));
 
   // Use raw data.label for input value, default to empty
-  let label = $derived(data?.label as string || '');
-  let type = $derived(data?.type as string || 'one_to_many');
+  let label = $derived((data?.label as string) || '');
+  let type = $derived((data?.type as string) || 'one_to_many');
+  // Cardinality text map
+  const cardinalityText = $derived({
+    'one_to_many': 'one → many',
+    'many_to_one': 'many → one',
+    'one_to_one': 'one → one'
+  }[type] || 'one → many');
+
+  const descriptors = $derived(
+    {
+      one_to_many: { source: 'one', target: 'many' },
+      many_to_one: { source: 'many', target: 'one' },
+      one_to_one: { source: 'one', target: 'one' }
+    }[type] || { source: 'one', target: 'many' }
+  );
+
+  const sourceNode = $derived($nodes.find((node) => node.id === source));
+  const targetNode = $derived($nodes.find((node) => node.id === target));
+
+  const sourceName = $derived(sourceNode?.data?.label || 'Source');
+  const targetName = $derived(targetNode?.data?.label || 'Target');
+  const actionText = $derived(label?.trim() || 'relates to');
+
+  const relationText = $derived(
+    `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
+  );
 
   function updateEdge(partial: Record<string, unknown>) {
     edges.update((list) =>
@@ -59,7 +86,13 @@
     // Explicitly stop propagation at all levels
     e.stopPropagation();
     e.stopImmediatePropagation();
-    const nextType = type === 'one_to_many' ? 'one_to_one' : 'one_to_many';
+    
+    // Cycle: one_to_many -> many_to_one -> one_to_one -> one_to_many
+    let nextType = 'one_to_many';
+    if (type === 'one_to_many') nextType = 'many_to_one';
+    else if (type === 'many_to_one') nextType = 'one_to_one';
+    else nextType = 'one_to_many';
+    
     updateEdge({ type: nextType });
   }
 </script>
@@ -71,25 +104,30 @@
   y={labelY}
 >
   <div
-    class="pointer-events-auto nodrag nopan bg-white px-1 py-0.5 rounded shadow-sm flex flex-col items-center w-auto"
+    class="pointer-events-auto nodrag nopan bg-white px-2 py-1 rounded shadow border border-gray-200 flex flex-col gap-1 min-w-[180px]"
     onmousedown={(e) => e.stopPropagation()}
     click={(e) => e.stopPropagation()}
     role="presentation"
   >
-    <input
-      value={label}
-      oninput={onLabelChange}
-      onchange={onLabelChange}
-      class="text-xs font-medium text-center focus:outline-none focus:bg-gray-50 w-20 bg-transparent"
-      placeholder="name me"
-    />
-    <button 
-        class="text-[9px] text-gray-500 hover:text-blue-600 hover:underline cursor-pointer bg-transparent border-none p-0 relative z-50"
-        onclick={toggleType}
-        title="Click to toggle type"
-        type="button"
-    >
-        ({type})
-    </button>
+    <div class="flex items-center gap-2">
+      <input
+        value={label}
+        oninput={onLabelChange}
+        onchange={onLabelChange}
+        class="text-xs font-medium focus:outline-none focus:bg-gray-50 flex-1 bg-transparent border border-gray-200 rounded px-1 py-0.5"
+        placeholder="relationship..."
+      />
+      <button 
+          class="text-[10px] font-semibold text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded px-2 py-0.5 cursor-pointer bg-transparent border border-gray-300"
+          onclick={toggleType}
+          title="Click to toggle type"
+          type="button"
+      >
+          {cardinalityText}
+      </button>
+    </div>
+    <div class="text-[10px] text-gray-500 text-center whitespace-nowrap">
+      {relationText}
+    </div>
   </div>
 </EdgeLabel>

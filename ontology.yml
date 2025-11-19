@@ -12,9 +12,14 @@ entities:
   description: ''
   dbt_model: entity_employee
   position:
-    x: 386.0215857061234
-    y: 134.05772321524202
+    x: 311.40709682456696
+    y: 64.85991062931652
 relationships:
 - source: 436ebccd-014f-4239-80fa-532e359f58b5
   target: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192
-  label: ''
+  label: are created by
+  type: one_to_many
+- source: 436ebccd-014f-4239-80fa-532e359f58b5
+  target: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192
+  label: are created by
+  type: one_to_many
