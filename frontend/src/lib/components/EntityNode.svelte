@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Handle, Position, useSvelteFlow, type NodeProps } from '@xyflow/svelte';
-    import { viewMode, dbtModels } from '$lib/stores';
+    import { viewMode, dbtModels, nodes, edges } from '$lib/stores';
     import type { DbtModel } from '$lib/types';
 
     type $$Props = NodeProps;
@@ -23,14 +23,68 @@
     let columnPanelHeight = $derived(data.panelHeight ?? DEFAULT_PANEL_HEIGHT);
 
     
-    // Find model details
+    // Find model details by unique_id (e.g. "model.elmo.entity_booking")
     let modelDetails = $derived(
-        isBound ? $dbtModels.find(m => m.name === boundModelName) : null
+        isBound ? $dbtModels.find(m => m.unique_id === boundModelName) : null
     );
 
+    function generateSlug(label: string, currentId: string): string {
+        // Convert to lowercase and replace spaces/special chars with underscores
+        let slug = label.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, ''); // trim leading/trailing underscores
+        
+        // If empty after cleaning, use a default
+        if (!slug) slug = 'entity';
+        
+        // Ensure uniqueness by checking existing node IDs (excluding current node)
+        let finalSlug = slug;
+        let counter = 1;
+        while ($nodes.some(node => node.id === finalSlug && node.id !== currentId)) {
+            finalSlug = `${slug}_${counter}`;
+            counter++;
+        }
+        
+        return finalSlug;
+    }
+    
     function updateLabel(e: Event) {
         const label = (e.target as HTMLInputElement).value;
+        // Just update the label without changing ID (for real-time typing)
         updateNodeData(id, { label });
+    }
+    
+    function updateIdFromLabel(e: Event) {
+        // Called on blur - update the ID based on final label
+        const label = (e.target as HTMLInputElement).value;
+        const newId = generateSlug(label, id);
+        
+        // If ID changes, update the node and all relationships
+        if (newId !== id) {
+            // Update all edges that reference this node
+            $edges = $edges.map(edge => {
+                let updatedEdge = { ...edge };
+                if (edge.source === id) {
+                    updatedEdge.source = newId;
+                }
+                if (edge.target === id) {
+                    updatedEdge.target = newId;
+                }
+                // Update edge ID if it was based on source-target pattern
+                if (updatedEdge.source !== edge.source || updatedEdge.target !== edge.target) {
+                    updatedEdge.id = `e${updatedEdge.source}-${updatedEdge.target}`;
+                }
+                return updatedEdge;
+            });
+            
+            // Update the node itself with new ID
+            $nodes = $nodes.map(node => {
+                if (node.id === id) {
+                    return { ...node, id: newId, data: { ...node.data, label } };
+                }
+                return node;
+            });
+        }
     }
     
     function updateDescription(e: Event) {
@@ -50,7 +104,8 @@
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
         
-        const updates: Record<string, unknown> = { dbt_model: model.name };
+        // Store the full unique_id (e.g. "model.elmo.entity_booking")
+        const updates: Record<string, unknown> = { dbt_model: model.unique_id };
         const hasDescription = (data.description || '').trim().length > 0;
         if (!hasDescription && (model.description || '').trim().length > 0) {
             updates.description = model.description;
@@ -147,6 +202,7 @@
             <input 
                 value={data.label} 
                 oninput={updateLabel}
+                onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}
                 class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded px-1 text-sm"
                 placeholder="Entity Name"

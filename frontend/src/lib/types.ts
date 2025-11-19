@@ -4,6 +4,7 @@ export interface DbtColumn {
 }
 
 export interface DbtModel {
+    unique_id: string; // e.g. "model.elmo.entity_booking"
     name: string;
     schema: string;
     table: string;
@@ -15,9 +16,10 @@ export interface DbtModel {
 export interface EntityData {
     label: string;
     description?: string;
-    dbt_model?: string; // name of the bound model
+    dbt_model?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
     width?: number;
     panelHeight?: number;
+    collapsed?: boolean;
 }
 
 // We'll use Svelte Flow types for nodes/edges in the actual components, 

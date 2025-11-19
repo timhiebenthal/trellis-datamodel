@@ -35,8 +35,26 @@
         $edges = [...$edges, edge];
     }
     
+    function generateSlug(label: string): string {
+        // Convert to lowercase and replace spaces/special chars with underscores
+        let slug = label.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, ''); // trim leading/trailing underscores
+        
+        // Ensure uniqueness by checking existing node IDs
+        let finalSlug = slug;
+        let counter = 1;
+        while ($nodes.some(node => node.id === finalSlug)) {
+            finalSlug = `${slug}_${counter}`;
+            counter++;
+        }
+        
+        return finalSlug;
+    }
+    
     function addEntity() {
-        const id = crypto.randomUUID();
+        const label = 'New Entity';
+        const id = generateSlug(label);
         const newNode: Node = {
             id,
             type: 'entity',
@@ -45,7 +63,7 @@
                 y: 100 + Math.random() * 200 
             },
             data: { 
-                label: 'New Entity', 
+                label, 
                 description: '',
                 width: 280,
                 panelHeight: 200,

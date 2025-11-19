@@ -144,6 +144,7 @@ async def get_manifest():
             materialized = config.get("materialized", "view")
             
             models.append({
+                "unique_id": node.get("unique_id"),  # e.g. "model.elmo.entity_booking"
                 "name": node.get("name"),
                 "schema": node.get("schema"),
                 "table": node.get("alias", node.get("name")),
