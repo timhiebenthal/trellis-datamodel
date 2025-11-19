@@ -25,11 +25,12 @@ CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yaml"))
 
 # Default values
 MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/manifest.json"))
+CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/catalog.json"))
 ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
 DBT_MODEL_PATHS = ["3-entity"]
 
 def load_config():
-    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS
+    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS, CATALOG_PATH
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, 'r') as f:
@@ -53,6 +54,13 @@ def load_config():
                     ONTOLOGY_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), p))
                 else:
                     ONTOLOGY_PATH = p
+
+            if "dbt_catalog_path" in config:
+                p = config["dbt_catalog_path"]
+                if not os.path.isabs(p):
+                    CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+                else:
+                    CATALOG_PATH = p
             
             if "dbt_model_paths" in config:
                 DBT_MODEL_PATHS = config["dbt_model_paths"]
@@ -64,8 +72,20 @@ load_config()
 
 print(f"Using Config: {CONFIG_PATH}")
 print(f"Looking for manifest at: {MANIFEST_PATH}")
+print(f"Looking for catalog at: {CATALOG_PATH}")
 print(f"Looking for ontology at: {ONTOLOGY_PATH}")
 print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
+
+
+def load_catalog():
+    if not os.path.exists(CATALOG_PATH):
+        return None
+    try:
+        with open(CATALOG_PATH, "r") as f:
+            return json.load(f)
+    except Exception as exc:
+        print(f"Warning: failed to read catalog at {CATALOG_PATH}: {exc}")
+        return None
 
 @app.get("/api/manifest")
 async def get_manifest():
@@ -77,6 +97,9 @@ async def get_manifest():
             data = json.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading manifest: {str(e)}")
+
+    catalog = load_catalog()
+    catalog_nodes = (catalog or {}).get("nodes", {})
 
     models = []
     for key, node in data.get("nodes", {}).items():
@@ -94,18 +117,39 @@ async def get_manifest():
                 if not match:
                     continue
                 
-            columns = []
-            for col_name, col_data in node.get("columns", {}).items():
-                columns.append({
-                    "name": col_name,
-                    "type": col_data.get("type")
-                })
+            def catalog_columns():
+                unique_id = node.get("unique_id")
+                catalog_node = catalog_nodes.get(unique_id)
+                if not catalog_node:
+                    return None
+                cols = []
+                for col in catalog_node.get("columns", {}).values():
+                    cols.append({
+                        "name": col.get("name"),
+                        "type": col.get("type") or col.get("data_type")
+                    })
+                return cols
+
+            columns = catalog_columns()
+            if not columns:
+                columns = []
+                for col_name, col_data in node.get("columns", {}).items():
+                    columns.append({
+                        "name": col_name,
+                        "type": col_data.get("type")
+                    })
+            
+            # Extract materialization from config (defaults to "view" if not specified)
+            config = node.get("config", {})
+            materialized = config.get("materialized", "view")
             
             models.append({
                 "name": node.get("name"),
                 "schema": node.get("schema"),
                 "table": node.get("alias", node.get("name")),
-                "columns": columns
+                "columns": columns,
+                "description": node.get("description"),
+                "materialization": materialized
             })
     
     models.sort(key=lambda x: x["name"])

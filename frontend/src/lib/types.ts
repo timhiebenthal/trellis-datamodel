@@ -8,12 +8,16 @@ export interface DbtModel {
     schema: string;
     table: string;
     columns: DbtColumn[];
+    description?: string;
+    materialization?: string;
 }
 
 export interface EntityData {
     label: string;
     description?: string;
     dbt_model?: string; // name of the bound model
+    width?: number;
+    panelHeight?: number;
 }
 
 // We'll use Svelte Flow types for nodes/edges in the actual components, 

@@ -5,8 +5,8 @@ entities:
   description: ''
   dbt_model: entity_booking
   position:
-    x: -0.24869759757422116
-    y: 352.2578348505857
+    x: -196.43329390216263
+    y: 388.3714172549129
 - id: 436ebccd-014f-4239-80fa-532e359f58b5
   label: Employee
   description: ''

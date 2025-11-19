@@ -1,14 +1,42 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { nodes, edges, dbtModels, viewMode } from '$lib/stores';
-    import { getManifest, getOntology, saveOntology } from '$lib/api';
-    import Sidebar from '$lib/components/Sidebar.svelte';
-    import Canvas from '$lib/components/Canvas.svelte';
-    import { type Node, type Edge } from '@xyflow/svelte';
+import { onMount } from 'svelte';
+import { nodes, edges, dbtModels, viewMode } from '$lib/stores';
+import { getManifest, getOntology, saveOntology } from '$lib/api';
+import Sidebar from '$lib/components/Sidebar.svelte';
+import Canvas from '$lib/components/Canvas.svelte';
+import { type Node, type Edge } from '@xyflow/svelte';
 
-    let loading = $state(true);
-    let saving = $state(false);
-    let lastSavedState = "";
+let loading = $state(true);
+let saving = $state(false);
+let lastSavedState = "";
+let sidebarWidth = $state(280);
+let resizingSidebar = $state(false);
+let resizeStartX = 0;
+let resizeStartWidth = 0;
+const MIN_SIDEBAR = 200;
+const MAX_SIDEBAR = 420;
+
+function onSidebarPointerMove(event: PointerEvent) {
+    if (!resizingSidebar) return;
+    const delta = event.clientX - resizeStartX;
+    sidebarWidth = Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, resizeStartWidth + delta));
+}
+
+function stopSidebarResize() {
+    if (!resizingSidebar) return;
+    resizingSidebar = false;
+    window.removeEventListener('pointermove', onSidebarPointerMove);
+    window.removeEventListener('pointerup', stopSidebarResize);
+}
+
+function startSidebarResize(event: PointerEvent) {
+    event.preventDefault();
+    resizingSidebar = true;
+    resizeStartX = event.clientX;
+    resizeStartWidth = sidebarWidth;
+    window.addEventListener('pointermove', onSidebarPointerMove);
+    window.addEventListener('pointerup', stopSidebarResize, { once: true });
+}
 
     onMount(async () => {
         try {
@@ -27,7 +55,9 @@
                 data: {
                     label: e.label,
                     description: e.description,
-                    dbt_model: e.dbt_model
+                    dbt_model: e.dbt_model,
+                    width: e.width ?? 280,
+                    panelHeight: e.panel_height ?? e.panelHeight ?? 200
                 }
             })) as Node[];
             
@@ -76,7 +106,9 @@
                         label: n.data.label,
                         description: n.data.description,
                         dbt_model: n.data.dbt_model,
-                        position: n.position
+                        position: n.position,
+                        width: n.data?.width,
+                        panel_height: n.data?.panelHeight
                     })),
                     relationships: currentEdges.map(e => ({
                         source: e.source,
@@ -121,7 +153,7 @@
                 class:text-gray-600={$viewMode !== 'concept'}
                 onclick={() => $viewMode = 'concept'}
             >
-                Concept
+                Conceptual
             </button>
             <button 
                 class="px-4 py-1.5 text-sm rounded transition-all duration-200 font-medium"
@@ -137,7 +169,27 @@
     </header>
     
     <main class="flex-1 flex overflow-hidden relative">
-        <Sidebar />
+        <Sidebar {sidebarWidth} />
+        <div 
+            class="resize-handle h-full" 
+            class:active={resizingSidebar}
+            onpointerdown={startSidebarResize}
+        ></div>
         <Canvas />
     </main>
 </div>
+
+<style>
+    .resize-handle {
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        background: transparent;
+        transition: background 0.2s ease;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.active {
+        background: rgba(148, 163, 184, 0.6);
+    }
+</style>

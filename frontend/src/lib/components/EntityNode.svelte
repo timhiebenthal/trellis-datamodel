@@ -12,6 +12,15 @@
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
     let isBound = $derived(!!boundModelName);
+    const DEFAULT_WIDTH = 280;
+    const DEFAULT_PANEL_HEIGHT = 200;
+    const MIN_WIDTH = 220;
+    const MAX_WIDTH = 560;
+    const MIN_PANEL_HEIGHT = 120;
+    const MAX_PANEL_HEIGHT = 480;
+    let nodeWidth = $derived(data.width ?? DEFAULT_WIDTH);
+    let columnPanelHeight = $derived(data.panelHeight ?? DEFAULT_PANEL_HEIGHT);
+
     
     // Find model details
     let modelDetails = $derived(
@@ -40,7 +49,13 @@
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
         
-        updateNodeData(id, { dbt_model: model.name });
+        const updates: Record<string, unknown> = { dbt_model: model.name };
+        const hasDescription = (data.description || '').trim().length > 0;
+        if (!hasDescription && (model.description || '').trim().length > 0) {
+            updates.description = model.description;
+        }
+        
+        updateNodeData(id, updates);
     }
     
     function onDragOver(event: DragEvent) {
@@ -58,6 +73,36 @@
     function onDragLeave(event: DragEvent) {
         isDragOver = false;
     }
+
+    function startDimensionResize(event: PointerEvent, type: 'width' | 'height') {
+        event.stopPropagation();
+        event.preventDefault();
+
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const initialWidth = nodeWidth;
+        const initialHeight = columnPanelHeight;
+
+        function onMove(moveEvent: PointerEvent) {
+            if (type === 'width') {
+                const delta = moveEvent.clientX - startX;
+                const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, initialWidth + delta));
+                updateNodeData(id, { width: next });
+            } else {
+                const delta = moveEvent.clientY - startY;
+                const next = Math.min(MAX_PANEL_HEIGHT, Math.max(MIN_PANEL_HEIGHT, initialHeight + delta));
+                updateNodeData(id, { panelHeight: next });
+            }
+        }
+
+        function onUp() {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        }
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    }
     
     function unbind() {
         updateNodeData(id, { dbt_model: null });
@@ -65,12 +110,13 @@
 </script>
 
 <div 
-    class="rounded-md border-2 bg-white min-w-[220px] shadow-sm transition-all hover:shadow-md"
+    class="rounded-md border-2 bg-white shadow-sm transition-all hover:shadow-md relative"
     class:border-green-500={isBound}
     class:border-blue-500={isDragOver}
     class:border-gray-300={!isBound && !isDragOver}
     class:ring-2={isDragOver}
     class:ring-blue-200={isDragOver}
+    style={`width:${nodeWidth}px`}
     ondrop={onDrop}
     ondragover={onDragOver}
     ondragenter={onDragEnter}
@@ -99,7 +145,15 @@
                 <div class="font-mono text-gray-600 mb-2 bg-gray-100 p-1 rounded break-all">
                     {modelDetails.schema}.{modelDetails.table}
                 </div>
-                <div class="max-h-40 overflow-y-auto border rounded bg-gray-50 p-1 scrollbar-thin">
+                {#if modelDetails.materialization}
+                    <div class="mb-2 text-gray-500">
+                        <span class="font-medium">Materialization:</span> 
+                        <span class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-semibold uppercase">
+                            {modelDetails.materialization}
+                        </span>
+                    </div>
+                {/if}
+                <div class="overflow-y-auto border rounded bg-gray-50 p-1 scrollbar-thin" style={`max-height:${columnPanelHeight}px`}>
                     {#each modelDetails.columns as col}
                         <div class="flex justify-between py-1 border-b border-gray-200 last:border-0">
                             <span class="font-medium text-gray-700 truncate pr-2" title={col.name}>{col.name}</span>
@@ -136,5 +190,46 @@
     </div>
 
     <Handle type="source" position={Position.Bottom} class="!bg-gray-400 !w-3 !h-3" />
+
+    <div 
+        class="width-resize-handle"
+        onpointerdown={(event) => startDimensionResize(event, 'width')}
+        title="Drag to resize width"
+    ></div>
+
+    {#if $viewMode === 'physical'}
+        <div 
+            class="height-resize-handle"
+            onpointerdown={(event) => startDimensionResize(event, 'height')}
+            title="Drag to show more columns"
+        ></div>
+    {/if}
 </div>
+
+<style>
+    .width-resize-handle {
+        position: absolute;
+        top: 0;
+        right: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        border-radius: 999px;
+    }
+
+    .width-resize-handle:hover,
+    .height-resize-handle:hover {
+        background: rgba(59, 130, 246, 0.3);
+    }
+
+    .height-resize-handle {
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        width: 100%;
+        height: 6px;
+        cursor: row-resize;
+        border-radius: 999px;
+    }
+</style>
 

@@ -46,7 +46,9 @@
             },
             data: { 
                 label: 'New Entity', 
-                description: '' 
+                description: '',
+                width: 280,
+                panelHeight: 200,
             }
         };
         $nodes = [...$nodes, newNode];
