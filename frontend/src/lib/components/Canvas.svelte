@@ -23,15 +23,28 @@
     };
     
     function onConnect(connection: Connection) {
+        // Check if a relationship already exists between these two nodes
+        const relationshipExists = $edges.some(edge => 
+            (edge.source === connection.source && edge.target === connection.target) ||
+            (edge.source === connection.target && edge.target === connection.source)
+        );
+        
+        if (relationshipExists) {
+            console.log('Relationship already exists between these nodes');
+            return; // Don't create duplicate
+        }
+        
         const edge: Edge = {
-            ...connection,
-            id: crypto.randomUUID(),
+            id: `e${connection.source}-${connection.target}`,
+            source: connection.source!,
+            target: connection.target!,
             type: 'custom',
             data: {
                 label: '',
                 type: 'one_to_many'
             }
         };
+        console.log('Creating edge:', edge);
         $edges = [...$edges, edge];
     }
     
@@ -81,6 +94,7 @@
         {nodeTypes}
         {edgeTypes}
         onconnect={onConnect}
+        defaultEdgeOptions={{ type: 'custom' }}
         fitView
         class="bg-gray-50"
     >

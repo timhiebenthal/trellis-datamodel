@@ -13,36 +13,43 @@ entities:
     y: 437.2697505073197
   width: 280
   panel_height: 351.8546447753906
+  collapsed: true
 - id: employee
   label: Employee
   description: ''
   dbt_model: model.elmo.entity_employee
   position:
-    x: 173.1036655976866
-    y: 107.92186351948169
+    x: 118.1022314633554
+    y: 275.3706741062232
   width: 280
   panel_height: 200
+  collapsed: true
 - id: client
   label: Client
   description: ''
   dbt_model: model.elmo.entity_client
   position:
-    x: 182.2865063365138
-    y: 661.7470709976252
+    x: -70.72009068140953
+    y: 600.6343664039239
   width: 280
   panel_height: 200
-- id: account
-  label: New Entity
-  description: Represents Accounts, which are companies or organizations. Data is
-    mostly from Salesforce.
-  dbt_model: model.elmo.entity_account
+  collapsed: true
+- id: lead
+  label: Lead
+  description: Current Salesforce leads.
+  dbt_model: model.elmo.entity_lead
   position:
-    x: 594.6001768203673
-    y: 275.33127727788525
+    x: 464.2854127598727
+    y: 366.2958818009747
   width: 280
   panel_height: 200
+  collapsed: true
 relationships:
 - source: employee
   target: booking
   label: are created by
   type: one_to_many
+- source: booking
+  target: client
+  label: involves
+  type: many_to_one
