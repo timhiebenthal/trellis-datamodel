@@ -3,7 +3,18 @@ entities:
 - id: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192
   label: Booking
   description: ''
+  dbt_model: entity_booking
   position:
-    x: 260.24871940993216
-    y: 313.7138581945465
-relationships: []
+    x: -0.24869759757422116
+    y: 352.2578348505857
+- id: 436ebccd-014f-4239-80fa-532e359f58b5
+  label: Employee
+  description: ''
+  dbt_model: entity_employee
+  position:
+    x: 386.0215857061234
+    y: 134.05772321524202
+relationships:
+- source: 436ebccd-014f-4239-80fa-532e359f58b5
+  target: 8ffddbbf-4bf4-49f9-aa08-c6df92dbe192
+  label: ''

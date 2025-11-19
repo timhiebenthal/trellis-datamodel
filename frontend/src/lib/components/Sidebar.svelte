@@ -12,7 +12,7 @@
         if (!event.dataTransfer) return;
         // Set data to identify the drag source and payload
         event.dataTransfer.setData('application/dbt-model', JSON.stringify(model));
-        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.effectAllowed = 'all';
     }
 </script>
 

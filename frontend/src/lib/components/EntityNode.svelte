@@ -28,9 +28,14 @@
         updateNodeData(id, { description });
     }
 
+    let isDragOver = $state(false);
+
     function onDrop(event: DragEvent) {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopPropagation(); // Stop bubbling to canvas
+        event.stopImmediatePropagation();
+        isDragOver = false;
+        
         const json = event.dataTransfer?.getData('application/dbt-model');
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
@@ -39,10 +44,19 @@
     }
     
     function onDragOver(event: DragEvent) {
-        event.preventDefault();
+        event.preventDefault(); // Essential to allow drop
         if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = 'link';
+            event.dataTransfer.dropEffect = 'copy';
         }
+    }
+    
+    function onDragEnter(event: DragEvent) {
+        event.preventDefault();
+        isDragOver = true;
+    }
+
+    function onDragLeave(event: DragEvent) {
+        isDragOver = false;
     }
     
     function unbind() {
@@ -53,9 +67,14 @@
 <div 
     class="rounded-md border-2 bg-white min-w-[220px] shadow-sm transition-all hover:shadow-md"
     class:border-green-500={isBound}
-    class:border-gray-300={!isBound}
+    class:border-blue-500={isDragOver}
+    class:border-gray-300={!isBound && !isDragOver}
+    class:ring-2={isDragOver}
+    class:ring-blue-200={isDragOver}
     ondrop={onDrop}
     ondragover={onDragOver}
+    ondragenter={onDragEnter}
+    ondragleave={onDragLeave}
     role="presentation"
 >
     <Handle type="target" position={Position.Top} class="!bg-gray-400 !w-3 !h-3" />
