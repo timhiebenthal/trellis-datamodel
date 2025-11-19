@@ -57,7 +57,8 @@ function startSidebarResize(event: PointerEvent) {
                     description: e.description,
                     dbt_model: e.dbt_model,
                     width: e.width ?? 280,
-                    panelHeight: e.panel_height ?? e.panelHeight ?? 200
+                    panelHeight: e.panel_height ?? e.panelHeight ?? 200,
+                    collapsed: e.collapsed ?? false
                 }
             })) as Node[];
             
@@ -108,7 +109,8 @@ function startSidebarResize(event: PointerEvent) {
                         dbt_model: n.data.dbt_model,
                         position: n.position,
                         width: n.data?.width,
-                        panel_height: n.data?.panelHeight
+                        panel_height: n.data?.panelHeight,
+                        collapsed: n.data?.collapsed ?? false
                     })),
                     relationships: currentEdges.map(e => ({
                         source: e.source,

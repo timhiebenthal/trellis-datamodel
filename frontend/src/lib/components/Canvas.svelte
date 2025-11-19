@@ -49,6 +49,7 @@
                 description: '',
                 width: 280,
                 panelHeight: 200,
+                collapsed: false
             }
         };
         $nodes = [...$nodes, newNode];

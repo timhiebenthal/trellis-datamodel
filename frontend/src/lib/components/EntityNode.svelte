@@ -12,6 +12,7 @@
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
     let isBound = $derived(!!boundModelName);
+    let isCollapsed = $derived(data.collapsed ?? false);
     const DEFAULT_WIDTH = 280;
     const DEFAULT_PANEL_HEIGHT = 200;
     const MIN_WIDTH = 220;
@@ -107,6 +108,14 @@
     function unbind() {
         updateNodeData(id, { dbt_model: null });
     }
+    
+    function toggleCollapse(event: MouseEvent) {
+        // Only toggle if clicking on the header background, not on the input
+        if ((event.target as HTMLElement).tagName === 'INPUT') {
+            return;
+        }
+        updateNodeData(id, { collapsed: !isCollapsed });
+    }
 </script>
 
 <div 
@@ -126,19 +135,30 @@
     <Handle type="target" position={Position.Top} class="!bg-gray-400 !w-3 !h-3" />
     
     <!-- Header -->
-    <div class="p-2 border-b border-gray-100 bg-gray-50 rounded-t-md flex justify-between items-center">
-        <input 
-            value={data.label} 
-            oninput={updateLabel}
-            class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded px-1 text-sm"
-            placeholder="Entity Name"
-        />
+    <div 
+        class="p-2 border-b border-gray-100 bg-gray-50 rounded-t-md flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+        onclick={toggleCollapse}
+        title={isCollapsed ? "Click to expand" : "Click to collapse"}
+    >
+        <div class="flex items-center gap-1 flex-1 min-w-0">
+            <span class="text-gray-500 text-xs flex-shrink-0 select-none transition-transform" style={`transform: rotate(${isCollapsed ? 0 : 90}deg)`}>
+                ▶
+            </span>
+            <input 
+                value={data.label} 
+                oninput={updateLabel}
+                onclick={(e) => e.stopPropagation()}
+                class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded px-1 text-sm"
+                placeholder="Entity Name"
+            />
+        </div>
         {#if isBound}
             <div class="w-2 h-2 rounded-full bg-green-500 ml-2 flex-shrink-0" title="Bound to {boundModelName}"></div>
         {/if}
     </div>
 
     <!-- Body -->
+    {#if !isCollapsed}
     <div class="p-2">
         {#if $viewMode === 'physical' && isBound && modelDetails}
             <div class="text-xs">
@@ -188,6 +208,7 @@
             {/if}
         {/if}
     </div>
+    {/if}
 
     <Handle type="source" position={Position.Bottom} class="!bg-gray-400 !w-3 !h-3" />
 
