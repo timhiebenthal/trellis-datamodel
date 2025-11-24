@@ -1,10 +1,13 @@
 # Configuration for dbt-ontology
 
-# Path to the dbt manifest.json (relative to backend/ or absolute)
-dbt_manifest_path: "../dbt/target/manifest.json"
+# Path to the dbt project directory (relative to this config file or absolute)
+dbt_project_path: "../dbt"
 
-# Path to the dbt catalog.json (relative to backend/ or absolute)
-dbt_catalog_path: "../dbt/target/catalog.json"
+# Path to the dbt manifest.json (relative to dbt_project_path or absolute)
+dbt_manifest_path: "target/manifest.json"
+
+# Path to the dbt catalog.json (relative to dbt_project_path or absolute)
+dbt_catalog_path: "target/catalog.json"
 
 # Path where the ontology YAML will be saved (relative to repo root or absolute)
 ontology_file: "ontology.yaml"

@@ -38,3 +38,17 @@ export async function saveOntology(ontology: Ontology): Promise<void> {
     if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`);
 }
 
+export async function getConfigStatus(): Promise<any> {
+    try {
+        const res = await fetch(`${API_BASE}/config-status`);
+        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching config status:", e);
+        return {
+            config_present: false,
+            error: "Failed to connect to backend"
+        };
+    }
+}
+

@@ -30,3 +30,14 @@ export interface Ontology {
     relationships: any[];
 }
 
+export interface ConfigStatus {
+    config_present: boolean;
+    dbt_project_path: string;
+    manifest_path: string;
+    catalog_path: string;
+    manifest_exists: boolean;
+    catalog_exists: boolean;
+    ontology_exists: boolean;
+    error?: string;
+}
+

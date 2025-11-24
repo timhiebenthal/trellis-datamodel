@@ -1,7 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
-import { nodes, edges, dbtModels, viewMode } from '$lib/stores';
-import { getManifest, getOntology, saveOntology } from '$lib/api';
+import { nodes, edges, dbtModels, viewMode, configStatus } from '$lib/stores';
+import { getManifest, getOntology, saveOntology, getConfigStatus } from '$lib/api';
 import Sidebar from '$lib/components/Sidebar.svelte';
 import Canvas from '$lib/components/Canvas.svelte';
 import { type Node, type Edge } from '@xyflow/svelte';
@@ -40,6 +40,10 @@ function startSidebarResize(event: PointerEvent) {
 
     onMount(async () => {
         try {
+            // Check Config Status
+            const status = await getConfigStatus();
+            $configStatus = status;
+
             // Load Manifest
             const models = await getManifest();
             $dbtModels = models;

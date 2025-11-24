@@ -6,4 +6,5 @@ export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
 export const dbtModels = writable<DbtModel[]>([]);
 export const viewMode = writable<'concept' | 'physical'>('concept');
+export const configStatus = writable<any>(null);
 

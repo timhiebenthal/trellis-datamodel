@@ -24,32 +24,57 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yaml"))
 
 # Default values
-MANIFEST_PATH = os.path.abspath(
-    os.path.join(BASE_DIR, "../../dbt/target/manifest.json")
-)
-CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/catalog.json"))
+MANIFEST_PATH = ""
+CATALOG_PATH = ""
 ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yaml"))
+DBT_PROJECT_PATH = ""
 DBT_MODEL_PATHS = ["3-entity"]
 
 
 def load_config():
-    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS, CATALOG_PATH
+    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r") as f:
                 config = yaml.safe_load(f) or {}
 
-            # Update paths if present
-            if "dbt_manifest_path" in config:
-                # If path is relative, resolve it relative to backend/ directory for consistency
-                # or relative to the config file location (which is BASE_DIR/..)
-                # Let's assume relative to dbt-ontology/ backend (BASE_DIR) for now
-                p = config["dbt_manifest_path"]
+            # 1. Get dbt_project_path (Required for resolving other paths)
+            if "dbt_project_path" in config:
+                p = config["dbt_project_path"]
                 if not os.path.isabs(p):
-                    MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+                    # Resolve relative to config file location
+                    DBT_PROJECT_PATH = os.path.abspath(
+                        os.path.join(os.path.dirname(CONFIG_PATH), p)
+                    )
                 else:
-                    MANIFEST_PATH = p
+                    DBT_PROJECT_PATH = p
+            else:
+                # Fallback or error? Plan said "Require dbt_project_path"
+                # But for now let's just leave it empty and let status check fail
+                DBT_PROJECT_PATH = ""
 
+            # 2. Resolve Manifest
+            if "dbt_manifest_path" in config:
+                p = config["dbt_manifest_path"]
+                if not os.path.isabs(p) and DBT_PROJECT_PATH:
+                    MANIFEST_PATH = os.path.abspath(os.path.join(DBT_PROJECT_PATH, p))
+                elif os.path.isabs(p):
+                    MANIFEST_PATH = p
+                else:
+                     # Fallback for legacy or missing project path (though we said no backwards compat, safe to keep simple)
+                     MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+
+            # 3. Resolve Catalog
+            if "dbt_catalog_path" in config:
+                p = config["dbt_catalog_path"]
+                if not os.path.isabs(p) and DBT_PROJECT_PATH:
+                    CATALOG_PATH = os.path.abspath(os.path.join(DBT_PROJECT_PATH, p))
+                elif os.path.isabs(p):
+                    CATALOG_PATH = p
+                else:
+                    CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+
+            # 4. Resolve Ontology
             if "ontology_file" in config:
                 p = config["ontology_file"]
                 # Resolve relative path from dbt-ontology/ (config location)
@@ -59,13 +84,6 @@ def load_config():
                     )
                 else:
                     ONTOLOGY_PATH = p
-
-            if "dbt_catalog_path" in config:
-                p = config["dbt_catalog_path"]
-                if not os.path.isabs(p):
-                    CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
-                else:
-                    CATALOG_PATH = p
 
             if "dbt_model_paths" in config:
                 DBT_MODEL_PATHS = config["dbt_model_paths"]
@@ -77,10 +95,38 @@ def load_config():
 load_config()
 
 print(f"Using Config: {CONFIG_PATH}")
+print(f"dbt Project Path: {DBT_PROJECT_PATH}")
 print(f"Looking for manifest at: {MANIFEST_PATH}")
 print(f"Looking for catalog at: {CATALOG_PATH}")
 print(f"Looking for ontology at: {ONTOLOGY_PATH}")
 print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
+
+
+@app.get("/api/config-status")
+async def get_config_status():
+    config_present = os.path.exists(CONFIG_PATH)
+    manifest_exists = os.path.exists(MANIFEST_PATH) if MANIFEST_PATH else False
+    catalog_exists = os.path.exists(CATALOG_PATH) if CATALOG_PATH else False
+    ontology_exists = os.path.exists(ONTOLOGY_PATH) if ONTOLOGY_PATH else False
+    
+    error = None
+    if not config_present:
+        error = "Config file not found."
+    elif not DBT_PROJECT_PATH:
+        error = "dbt_project_path not set in config."
+    elif not manifest_exists:
+        error = f"Manifest not found at {MANIFEST_PATH}"
+
+    return {
+        "config_present": config_present,
+        "dbt_project_path": DBT_PROJECT_PATH,
+        "manifest_path": MANIFEST_PATH,
+        "catalog_path": CATALOG_PATH,
+        "manifest_exists": manifest_exists,
+        "catalog_exists": catalog_exists,
+        "ontology_exists": ontology_exists,
+        "error": error
+    }
 
 
 def load_catalog():
