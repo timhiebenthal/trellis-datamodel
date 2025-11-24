@@ -4,12 +4,11 @@ A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implement
 
 ## Prerequisites
 - **Node.js 22+ (or 20.19+) & npm**  
-  - **Already configured**: If you have nvm installed and configured in your shell (check with `nvm --version`), you're all set!
-  - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
-  - If you don't have nvm yet: Install via [nvm](https://github.com/nvm-sh/nvm), then run `nvm install 22`.
+  - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
   - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
+  - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
 - **Python 3.10+ & [uv](https://github.com/astral-sh/uv)**  
-  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it's on your `$PATH`.
+  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
 
 ## Quick Start
@@ -39,7 +38,6 @@ Run these once per machine (or when dependencies change).
 2. **Frontend**
    ```bash
    cd frontend
-   nvm use  # Ensure you're using the correct Node version
    npm install
    ```
 
@@ -56,12 +54,9 @@ Backend serves the API at http://localhost:8000.
 **Terminal 2 – Frontend**
 ```bash
 cd frontend
-nvm use  # Ensure you're using the correct Node version
 npm run dev
 ```
 Frontend runs at http://localhost:5173.
-
-**Preview**: Open **http://localhost:5173** in your browser.
 
 ## Running (Production-style)
 Build the frontend once, then serve via the backend.
