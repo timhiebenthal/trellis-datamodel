@@ -4,12 +4,29 @@ A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implement
 
 ## Prerequisites
 - **Node.js 22+ (or 20.19+) & npm**  
-  - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
-  - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
+  - **Already configured**: If you have nvm installed and configured in your shell (check with `nvm --version`), you're all set!
   - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
+  - If you don't have nvm yet: Install via [nvm](https://github.com/nvm-sh/nvm), then run `nvm install 22`.
+  - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
 - **Python 3.10+ & [uv](https://github.com/astral-sh/uv)**  
-  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
+  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it's on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
+
+## Quick Start
+The fastest way to get up and running:
+
+```bash
+# 1. Install dependencies (first time only)
+cd backend && uv sync && cd ../frontend && npm install && cd ..
+
+# 2. Start backend (Terminal 1)
+cd backend && uv run python main.py
+
+# 3. Start frontend (Terminal 2 - open a new terminal)
+cd frontend && npm run dev
+```
+
+Then open **http://localhost:5173** in your browser to preview the application.
 
 ## Install Dependencies
 Run these once per machine (or when dependencies change).
@@ -22,6 +39,7 @@ Run these once per machine (or when dependencies change).
 2. **Frontend**
    ```bash
    cd frontend
+   nvm use  # Ensure you're using the correct Node version
    npm install
    ```
 
@@ -38,9 +56,12 @@ Backend serves the API at http://localhost:8000.
 **Terminal 2 – Frontend**
 ```bash
 cd frontend
+nvm use  # Ensure you're using the correct Node version
 npm run dev
 ```
 Frontend runs at http://localhost:5173.
+
+**Preview**: Open **http://localhost:5173** in your browser.
 
 ## Running (Production-style)
 Build the frontend once, then serve via the backend.
