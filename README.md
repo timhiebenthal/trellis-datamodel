@@ -2,54 +2,62 @@
 
 A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implementation.
 
-## Setup
+## Prerequisites
+- **Node.js 18+ & npm**  
+  - On WSL/Ubuntu: `sudo apt-get install nodejs npm` (or use NodeSource for newer versions).
+- **Python 3.10+ & [uv](https://github.com/astral-sh/uv)**  
+  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
+- **Make** (optional) for convenience targets defined in the `Makefile`.
 
-1. **Backend**:
+## Install Dependencies
+Run these once per machine (or when dependencies change).
+
+1. **Backend**
    ```bash
-   cd dbt-ontology
+   cd backend
    uv sync
    ```
-2. **Frontend**:
+2. **Frontend**
    ```bash
-   cd dbt-ontology/frontend
+   cd frontend
    npm install
    ```
 
-## Running
+## Running (Development)
+Run backend and frontend in separate terminals for hot reload.
 
-### Development Mode (Recommended)
-Run frontend and backend separately for hot reload.
-
-**Terminal 1 (Backend):**
+**Terminal 1 – Backend**
 ```bash
-cd dbt-ontology/backend
-# or from root: uv run backend/main.py
+cd backend
 uv run python main.py
 ```
-API available at http://localhost:8000
+Backend serves the API at http://localhost:8000.
 
-**Terminal 2 (Frontend):**
+**Terminal 2 – Frontend**
 ```bash
-cd dbt-ontology/frontend
+cd frontend
 npm run dev
 ```
-UI available at http://localhost:5173
+Frontend runs at http://localhost:5173.
 
-### Production Mode (Single Server)
-Build frontend and serve via backend.
+## Running (Production-style)
+Build the frontend once, then serve via the backend.
 
 ```bash
-# Build Frontend
-cd dbt-ontology/frontend
+cd frontend
 npm run build
 
-# Run Backend (which serves frontend)
 cd ../backend
 uv run python main.py
 ```
-Access application at http://localhost:8000
+The backend hosts the compiled frontend at http://localhost:8000.
+
+## dbt Metadata
+- The repo ships with an empty `dbt/target/` scaffold. Drop `manifest.json` and `catalog.json` there (or point `config.yaml` to a full dbt project) to power the ERD modeller.
+- Without these artifacts, the UI loads but shows no dbt models.
 
 ## Configuration
-- **Manifest Path**: Defaults to `../../dbt/target/manifest.json` relative to backend.
-- **Ontology File**: Saved to `../ontology.yml` relative to backend (root of dbt-ontology).
+- `dbt_manifest_path`: defaults to `../dbt/target/manifest.json` (relative to `backend/`).
+- `dbt_catalog_path`: defaults to `../dbt/target/catalog.json` (relative to `backend/`).
+- `ontology_file`: saved as `ontology.yml` in the repo root.
 
