@@ -3,8 +3,10 @@
 A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implementation.
 
 ## Prerequisites
-- **Node.js 18+ & npm**  
-  - On WSL/Ubuntu: `sudo apt-get install nodejs npm` (or use NodeSource for newer versions).
+- **Node.js 22+ (or 20.19+) & npm**  
+  - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
+  - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
+  - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
 - **Python 3.10+ & [uv](https://github.com/astral-sh/uv)**  
   - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
