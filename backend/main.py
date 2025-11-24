@@ -26,7 +26,7 @@ CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yaml"))
 # Default values
 MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/manifest.json"))
 CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../dbt/target/catalog.json"))
-ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
+ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yaml"))
 DBT_MODEL_PATHS = ["3-entity"]
 
 def load_config():
