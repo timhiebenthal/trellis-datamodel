@@ -31,7 +31,7 @@ def _(pd, teams):
 def _(pd):
     def save_endpoint_data(endpoint, file_name):
         df = pd.DataFrame(endpoint)
-        df.to_csv(f"nba-data/data/{file_name}.csv", index=False)
+        df.to_csv(f"nba-data/{file_name}.csv", index=False)
         print(f"saved {len(df):,.0f} records for '{file_name}'")
         return df
     return (save_endpoint_data,)
