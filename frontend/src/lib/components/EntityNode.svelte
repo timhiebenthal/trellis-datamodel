@@ -2,12 +2,14 @@
     import { Handle, Position, useSvelteFlow, type NodeProps } from '@xyflow/svelte';
     import { viewMode, dbtModels, nodes, edges } from '$lib/stores';
     import type { DbtModel } from '$lib/types';
+    import DeleteConfirmModal from './DeleteConfirmModal.svelte';
 
     type $$Props = NodeProps;
 
     let { data, id } = $props<$$Props>();
     
     const { updateNodeData } = useSvelteFlow();
+    let showDeleteModal = $state(false);
     
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
@@ -171,6 +173,33 @@
         }
         updateNodeData(id, { collapsed: !isCollapsed });
     }
+
+    function handleDeleteClick(event: MouseEvent) {
+        event.stopPropagation(); // Prevent collapse toggle
+        showDeleteModal = true;
+    }
+
+    function deleteEntity() {
+        try {
+            // Remove all edges that reference this node
+            edges.update(list => list.filter(edge => 
+                edge.source !== id && edge.target !== id
+            ));
+            
+            // Remove the node itself
+            nodes.update(list => list.filter(node => node.id !== id));
+            
+            showDeleteModal = false;
+        } catch (error) {
+            console.error('Failed to delete entity:', error);
+            alert('Failed to delete entity. Please try again.');
+            showDeleteModal = false;
+        }
+    }
+
+    function cancelDelete() {
+        showDeleteModal = false;
+    }
 </script>
 
 <div 
@@ -208,9 +237,19 @@
                 placeholder="Entity Name"
             />
         </div>
-        {#if isBound}
-            <div class="w-2 h-2 rounded-full bg-green-500 ml-2 flex-shrink-0" title="Bound to {boundModelName}"></div>
-        {/if}
+        <div class="flex items-center gap-1 flex-shrink-0">
+            {#if isBound}
+                <div class="w-2 h-2 rounded-full bg-green-500" title="Bound to {boundModelName}"></div>
+            {/if}
+            <button
+                onclick={handleDeleteClick}
+                aria-label="Delete entity {data.label}"
+                class="text-gray-400 hover:text-red-600 transition-colors px-1 py-0.5 rounded hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500"
+                title="Delete entity"
+            >
+                ×
+            </button>
+        </div>
     </div>
 
     <!-- Body -->
@@ -249,7 +288,7 @@
              <textarea 
                 value={data.description || ''} 
                 oninput={updateDescription}
-                class="w-full text-xs text-gray-600 resize-y min-h-[60px] focus:outline-none focus:bg-gray-50 focus:ring-1 focus:ring-blue-300 rounded p-1"
+                class="w-full text-xs text-gray-600 resize-y min-h-[60px] bg-gray-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded p-1"
                 placeholder="Description..."
             ></textarea>
             {#if isBound}
@@ -282,6 +321,13 @@
         ></div>
     {/if}
 </div>
+
+<DeleteConfirmModal
+    open={showDeleteModal}
+    entityLabel={data.label || 'Entity'}
+    onConfirm={deleteEntity}
+    onCancel={cancelDelete}
+/>
 
 <style>
     .width-resize-handle {

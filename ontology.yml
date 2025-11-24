@@ -9,8 +9,8 @@ entities:
     '
   dbt_model: model.elmo.entity_booking
   position:
-    x: -197.2624975492709
-    y: 437.2697505073197
+    x: -398.2827139248019
+    y: 130.6777658194594
   width: 280
   panel_height: 351.8546447753906
   collapsed: false
@@ -31,16 +31,6 @@ entities:
   position:
     x: -70.72009068140953
     y: 600.6343664039239
-  width: 280
-  panel_height: 200
-  collapsed: false
-- id: lead
-  label: Lead
-  description: Current Salesforce leads.
-  dbt_model: model.elmo.entity_lead
-  position:
-    x: 464.2854127598727
-    y: 366.2958818009747
   width: 280
   panel_height: 200
   collapsed: false
