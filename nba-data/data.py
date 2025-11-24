@@ -22,7 +22,6 @@ def _():
 @app.cell
 def _(pd, teams):
     teams_df = pd.DataFrame(teams.get_teams())
-    teams_df.to_csv("nba-data/teams.csv", index=False)
     teams_df.head()
     return
 
@@ -59,7 +58,14 @@ def _():
 
 @app.cell
 def _(leaguegamefinder):
-    seasons_to_fetch = ['2025-26', '2024-25']
+    seasons_to_fetch = [
+        #'2025-26', 
+        '2024-25'
+    ]
+
+    ## cut off dates
+    START_DATE = '2025-01-01'
+    END_DATE = '2025-04-30'
 
     def get_season_games():
         all_games = []
@@ -69,6 +75,7 @@ def _(leaguegamefinder):
 
             gamefinder = leaguegamefinder.LeagueGameFinder(
                 season_nullable=season,
+                season_type_nullable="Regular Season",
                 player_or_team_abbreviation='T' 
             )
 
@@ -76,6 +83,7 @@ def _(leaguegamefinder):
                 .drop_duplicates()
                 [["GAME_DATE", "GAME_ID"]]
                 .assign(season=season)
+                .query(f"GAME_DATE >= @START_DATE and GAME_DATE <= @END_DATE")
                 .to_dict(orient="records")
                   )
 
@@ -163,7 +171,7 @@ def _():
 def _(all_games, get_gamestats, pd, t, tqdm):
     def get_all_gamestats():
         all_stats = []
-        for game in tqdm(all_games[500:]):
+        for game in tqdm(all_games[:]):
             game_data = get_gamestats(game["GAME_ID"])
             all_stats.append(game_data)
             t.sleep(0.8)
@@ -196,11 +204,6 @@ def _(all_stats_df, get_season_games, players, save_endpoint_data, teams):
         save_endpoint_data(endpoint=e[0], file_name=e[1])
         #time.sleep(1)
         print("---")
-    return
-
-
-@app.cell
-def _():
     return
 
 
