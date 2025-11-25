@@ -78,3 +78,15 @@ export async function inferRelationships(): Promise<any[]> {
         return [];
     }
 }
+
+export async function syncDbtTests(): Promise<{ status: string; message: string; files: string[] }> {
+    const res = await fetch(`${API_BASE}/sync-dbt-tests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+        const error = await res.text();
+        throw new Error(`Failed to sync dbt tests: ${error}`);
+    }
+    return await res.json();
+}

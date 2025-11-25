@@ -13,6 +13,7 @@
         saveOntology,
         getConfigStatus,
         inferRelationships,
+        syncDbtTests,
     } from "$lib/api";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
@@ -20,7 +21,24 @@
 
     let loading = $state(true);
     let saving = $state(false);
+    let syncing = $state(false);
+    let syncMessage = $state<string | null>(null);
     let lastSavedState = "";
+    
+    async function handleSyncDbt() {
+        syncing = true;
+        syncMessage = null;
+        try {
+            const result = await syncDbtTests();
+            syncMessage = `✓ ${result.message}`;
+            setTimeout(() => { syncMessage = null; }, 3000);
+        } catch (e) {
+            syncMessage = `✗ ${e instanceof Error ? e.message : 'Sync failed'}`;
+            setTimeout(() => { syncMessage = null; }, 5000);
+        } finally {
+            syncing = false;
+        }
+    }
     let sidebarWidth = $state(280);
     let resizingSidebar = $state(false);
     let resizeStartX = 0;
@@ -230,6 +248,27 @@
                 onclick={() => ($viewMode = "physical")}
             >
                 Physical
+            </button>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            {#if syncMessage}
+                <span class="text-xs" class:text-green-600={syncMessage.startsWith('✓')} class:text-red-600={syncMessage.startsWith('✗')}>
+                    {syncMessage}
+                </span>
+            {/if}
+            <button
+                onclick={handleSyncDbt}
+                disabled={syncing || loading}
+                class="px-4 py-1.5 text-sm rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title="Sync relationship tests to dbt yml files"
+            >
+                {#if syncing}
+                    <span class="animate-spin">⟳</span>
+                {:else}
+                    🔄
+                {/if}
+                Sync to dbt
             </button>
         </div>
     </header>

@@ -12,3 +12,9 @@ models:
     data_type: text
   - name: draft_year
     data_type: text
+  - name: current_team_id
+    data_type: text
+    data_tests:
+    - relationships:
+        to: ref('team')
+        field: team_id

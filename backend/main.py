@@ -306,11 +306,11 @@ async def save_dbt_schema(request: DbtSchemaRequest):
                 "name": field["name"],
                 "data_type": field["datatype"],
             }
-            
+
             # Add description if available
             if field.get("description"):
                 column_dict["description"] = field["description"]
-            
+
             # Add relationship test if fk_link is present
             if field.get("fk_link"):
                 fk_link = field["fk_link"]
@@ -322,14 +322,14 @@ async def save_dbt_schema(request: DbtSchemaRequest):
                         }
                     }
                 ]
-            
+
             columns.append(column_dict)
-        
+
         model_dict = {
             "name": request.model_name,
             "columns": columns,
         }
-        
+
         # Add description if available
         if entity_description:
             model_dict["description"] = entity_description
@@ -362,6 +362,162 @@ async def save_dbt_schema(request: DbtSchemaRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error saving dbt schema: {str(e)}"
+        )
+
+
+@app.post("/api/sync-dbt-tests")
+async def sync_dbt_tests():
+    """Sync relationship tests from ontology to dbt yml files"""
+    try:
+        if not DBT_PROJECT_PATH:
+            raise HTTPException(
+                status_code=400,
+                detail="dbt_project_path is not configured. Please set it in config.yml",
+            )
+
+        # Load ontology
+        if not ONTOLOGY_PATH or not os.path.exists(ONTOLOGY_PATH):
+            raise HTTPException(status_code=404, detail="Ontology file not found")
+
+        with open(ONTOLOGY_PATH, "r") as f:
+            ontology = yaml.safe_load(f) or {}
+
+        entities = ontology.get("entities", [])
+        relationships = ontology.get("relationships", [])
+
+        # Build entity lookup
+        entity_map = {e["id"]: e for e in entities}
+
+        # Group relationships by target entity (the one with the FK)
+        # For one_to_many: source has PK, target has FK
+        # For many_to_one: source has FK, target has PK
+        fk_by_entity = {}  # entity_id -> list of {fk_field, ref_entity, ref_field}
+
+        for rel in relationships:
+            source_id = rel.get("source")
+            target_id = rel.get("target")
+            rel_type = rel.get("type", "one_to_many")
+            source_field = rel.get("source_field")
+            target_field = rel.get("target_field")
+
+            if not source_field or not target_field:
+                continue  # Skip relationships without field mappings
+
+            # FK is on the "many" side: target for one_to_many, source otherwise
+            fk_on_target = rel_type == "one_to_many"
+
+            fk_entity = target_id if fk_on_target else source_id
+            fk_field = target_field if fk_on_target else source_field
+            ref_entity = source_id if fk_on_target else target_id
+            ref_field = source_field if fk_on_target else target_field
+
+            fk_by_entity.setdefault(fk_entity, []).append(
+                {
+                    "fk_field": fk_field,
+                    "ref_entity": ref_entity,
+                    "ref_field": ref_field,
+                }
+            )
+
+        # Determine models directory
+        if DBT_MODEL_PATHS and len(DBT_MODEL_PATHS) > 0:
+            models_subdir = DBT_MODEL_PATHS[0]
+        else:
+            models_subdir = "models"
+
+        models_dir = os.path.abspath(
+            os.path.join(DBT_PROJECT_PATH, "models", models_subdir)
+        )
+
+        updated_files = []
+
+        # Update yml files for entities with FK relationships
+        for entity_id, fk_list in fk_by_entity.items():
+            entity = entity_map.get(entity_id)
+            if not entity:
+                continue
+
+            # Find or create yml file
+            yml_path = os.path.join(models_dir, f"{entity_id}.yml")
+
+            if os.path.exists(yml_path):
+                # Load existing yml
+                with open(yml_path, "r") as f:
+                    schema = yaml.safe_load(f) or {"version": 2, "models": []}
+            else:
+                # Create new yml structure
+                schema = {"version": 2, "models": []}
+
+            # Find or create model entry
+            models_list = schema.get("models", [])
+            model_entry = None
+            for m in models_list:
+                if m.get("name") == entity_id or m.get("name") == entity.get("label"):
+                    model_entry = m
+                    break
+
+            if not model_entry:
+                model_entry = {"name": entity_id, "columns": []}
+                models_list.append(model_entry)
+                schema["models"] = models_list
+
+            # Ensure columns list exists
+            if "columns" not in model_entry:
+                model_entry["columns"] = []
+
+            # Add/update relationship tests for each FK
+            for fk_info in fk_list:
+                fk_field = fk_info["fk_field"]
+                ref_entity = fk_info["ref_entity"]
+                ref_field = fk_info["ref_field"]
+
+                # Find or create column entry
+                col_entry = None
+                for col in model_entry["columns"]:
+                    if col.get("name") == fk_field:
+                        col_entry = col
+                        break
+
+                if not col_entry:
+                    col_entry = {"name": fk_field, "data_type": "text"}
+                    model_entry["columns"].append(col_entry)
+
+                # Add/update relationship test
+                rel_test = {
+                    "relationships": {
+                        "to": f"ref('{ref_entity}')",
+                        "field": ref_field,
+                    }
+                }
+
+                # Check if data_tests exists and update
+                data_tests = col_entry.get("data_tests", [])
+
+                # Remove any existing relationship test for this column
+                data_tests = [t for t in data_tests if "relationships" not in t]
+                data_tests.append(rel_test)
+                col_entry["data_tests"] = data_tests
+
+            # Write updated yml
+            with open(yml_path, "w") as f:
+                yaml.dump(schema, f, default_flow_style=False, sort_keys=False)
+
+            updated_files.append(yml_path)
+
+        return {
+            "status": "success",
+            "message": f"Updated {len(updated_files)} file(s)",
+            "files": updated_files,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Error syncing dbt tests: {str(e)}"
         )
 
 
@@ -403,29 +559,29 @@ async def infer_relationships():
                 print(f"Warning: Could not load ontology for entity mapping: {e}")
 
         relationships = []
-        
+
         # Scan all yml files in the models directory
         for filename in os.listdir(models_dir):
             if not filename.endswith((".yml", ".yaml")):
                 continue
-            
+
             filepath = os.path.join(models_dir, filename)
             try:
                 with open(filepath, "r") as f:
                     schema_data = yaml.safe_load(f) or {}
-                
+
                 models_list = schema_data.get("models", [])
                 for model in models_list:
                     model_name = model.get("name")
                     if not model_name:
                         continue
-                    
+
                     # Try to find entity ID - first try filename (without extension)
                     entity_id = os.path.splitext(filename)[0]
                     if entity_id not in entity_id_map:
                         # Fallback: use model name as entity id
                         entity_id = model_name
-                    
+
                     columns = model.get("columns", [])
                     for column in columns:
                         data_tests = column.get("data_tests", [])
@@ -435,33 +591,45 @@ async def infer_relationships():
                                 # Extract target model from ref('model_name') or just 'model_name'
                                 to_ref = rel_test.get("to", "")
                                 target_field = rel_test.get("field", "")
-                                
+
                                 # Parse ref('model_name') -> model_name
                                 target_model = to_ref
                                 if to_ref.startswith("ref('") and to_ref.endswith("')"):
                                     target_model = to_ref[5:-2]
-                                elif to_ref.startswith("ref(\"") and to_ref.endswith("\")"):
+                                elif to_ref.startswith('ref("') and to_ref.endswith(
+                                    '")'
+                                ):
                                     target_model = to_ref[5:-2]
-                                
+
                                 # Find target entity ID
                                 target_entity_id = target_model
                                 # Check if we have a yml file for this model
-                                target_yml_path = os.path.join(models_dir, f"{target_model}.yml")
+                                target_yml_path = os.path.join(
+                                    models_dir, f"{target_model}.yml"
+                                )
                                 if not os.path.exists(target_yml_path):
-                                    target_yml_path = os.path.join(models_dir, f"{target_model}.yaml")
+                                    target_yml_path = os.path.join(
+                                        models_dir, f"{target_model}.yaml"
+                                    )
                                 if os.path.exists(target_yml_path):
-                                    target_entity_id = os.path.splitext(os.path.basename(target_yml_path))[0]
-                                
+                                    target_entity_id = os.path.splitext(
+                                        os.path.basename(target_yml_path)
+                                    )[0]
+
                                 # Create relationship (one_to_many by default, as FK implies many side)
                                 # Include field mappings
-                                relationships.append({
-                                    "source": target_entity_id,  # The referenced entity
-                                    "target": entity_id,  # The entity with the FK
-                                    "label": "",  # Empty label, can be filled later
-                                    "type": "one_to_many",  # FK on many side = one_to_many from referenced entity
-                                    "source_field": target_field,  # The field in the referenced entity (PK)
-                                    "target_field": column.get("name"),  # The FK field in the current entity
-                                })
+                                relationships.append(
+                                    {
+                                        "source": target_entity_id,  # The referenced entity
+                                        "target": entity_id,  # The entity with the FK
+                                        "label": "",  # Empty label, can be filled later
+                                        "type": "one_to_many",  # FK on many side = one_to_many from referenced entity
+                                        "source_field": target_field,  # The field in the referenced entity (PK)
+                                        "target_field": column.get(
+                                            "name"
+                                        ),  # The FK field in the current entity
+                                    }
+                                )
             except Exception as e:
                 print(f"Warning: Could not parse {filename}: {e}")
                 continue
@@ -481,6 +649,7 @@ async def infer_relationships():
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Error inferring relationships: {str(e)}"
