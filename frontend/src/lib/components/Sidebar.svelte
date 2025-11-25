@@ -2,7 +2,10 @@
     import { dbtModels, configStatus } from "$lib/stores";
     import type { DbtModel } from "$lib/types";
 
-    const { width = 260 } = $props<{ width?: number }>();
+    const { width = 260, loading = false } = $props<{
+        width?: number;
+        loading?: boolean;
+    }>();
 
     let searchTerm = $state("");
 
@@ -29,34 +32,6 @@
 >
     <h2 class="text-base font-semibold mb-3 text-gray-800">dbt Models</h2>
 
-    {#if $configStatus}
-        {#if !$configStatus.config_present}
-            <div
-                class="bg-red-50 border border-red-200 rounded p-2 mb-3 text-xs text-red-700"
-            >
-                <strong>Config Missing</strong><br />
-                No <code>config.yaml</code> found.
-            </div>
-        {:else if !$configStatus.dbt_project_path}
-            <div
-                class="bg-yellow-50 border border-yellow-200 rounded p-2 mb-3 text-xs text-yellow-700"
-            >
-                <strong>Config Warning</strong><br />
-                <code>dbt_project_path</code> is not set.
-            </div>
-        {:else if !$configStatus.manifest_exists}
-            <div
-                class="bg-red-50 border border-red-200 rounded p-2 mb-3 text-xs text-red-700"
-            >
-                <strong>Manifest Not Found</strong><br />
-                Checked at: <br />
-                <span class="font-mono text-[10px] break-all"
-                    >{$configStatus.manifest_path}</span
-                >
-            </div>
-        {/if}
-    {/if}
-
     <input
         type="text"
         placeholder="Search models..."
@@ -77,11 +52,49 @@
             </div>
         {/each}
         {#if filteredModels.length === 0}
-            <div class="text-gray-500 text-sm text-center mt-10 italic">
-                {$dbtModels.length === 0
-                    ? "Loading or no models..."
-                    : "No matches found"}
-            </div>
+            {#if loading}
+                <div class="text-center mt-10">
+                    <div
+                        class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mb-2"
+                    ></div>
+                    <div class="text-gray-500 text-sm italic">
+                        Loading models...
+                    </div>
+                </div>
+            {:else if $dbtModels.length === 0}
+                <div class="text-center mt-10 px-2">
+                    <div class="text-gray-500 text-sm mb-4">
+                        No models found
+                    </div>
+                    {#if $configStatus && (!$configStatus.config_present || !$configStatus.dbt_project_path || !$configStatus.manifest_exists)}
+                        <div
+                            class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-700 text-left"
+                        >
+                            <strong>📍 Configuration Info</strong><br />
+                            {#if !$configStatus.config_present}
+                                No <code>config.yaml</code> found.
+                            {:else if !$configStatus.dbt_project_path}
+                                Set <code>dbt_project_path</code> in
+                                <code>config.yaml</code> to load your dbt models.
+                            {:else if !$configStatus.manifest_exists}
+                                Manifest not found at:<br />
+                                <span class="font-mono text-[10px] break-all"
+                                    >{$configStatus.manifest_path}</span
+                                ><br />
+                                <span class="text-[10px] mt-1 block"
+                                    >Please verify your <code
+                                        >dbt_project_path</code
+                                    > points to the correct location.</span
+                                >
+                            {/if}
+                        </div>
+                    {/if}
+                </div>
+            {:else}
+                <div class="text-gray-500 text-sm text-center mt-10 italic">
+                    No matches found
+                </div>
+            {/if}
         {/if}
     </div>
 </aside>
