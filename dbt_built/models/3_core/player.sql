@@ -5,3 +5,4 @@ select
     cast(draft_year as text) as draft_year
 from {{ ref('prep_players') }}
 
+

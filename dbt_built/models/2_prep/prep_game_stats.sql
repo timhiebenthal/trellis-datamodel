@@ -15,3 +15,4 @@ select
     "stats.freeThrowsMade" as free_throws_made
 from {{ ref('clean_game_stats') }}
 
+

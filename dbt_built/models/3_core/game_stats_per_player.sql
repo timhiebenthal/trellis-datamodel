@@ -16,3 +16,4 @@ select
     cast(free_throws_made as text) as free_throws_made
 from {{ ref('prep_game_stats') }}
 
+

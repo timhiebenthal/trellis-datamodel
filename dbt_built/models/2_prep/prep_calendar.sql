@@ -4,3 +4,4 @@ select distinct
     cast(strftime(GAME_DATE, '%Y-%m') as text) as year_month
 from {{ ref('clean_games') }}
 
+

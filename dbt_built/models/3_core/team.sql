@@ -5,3 +5,4 @@ select
     abbrevation
 from {{ ref('prep_teams') }}
 
+

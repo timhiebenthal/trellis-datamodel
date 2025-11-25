@@ -5,3 +5,4 @@ select
     null as draft_year     -- TODO: add if available in source
 from {{ ref('clean_players') }}
 
+

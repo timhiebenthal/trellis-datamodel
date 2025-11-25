@@ -16,3 +16,4 @@ select
 from {{ ref('clean_games') }} g
 left join game_teams gt on g.GAME_ID = gt.game_id
 
+

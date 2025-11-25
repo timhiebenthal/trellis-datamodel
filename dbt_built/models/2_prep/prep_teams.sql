@@ -5,3 +5,4 @@ select
     abbreviation as abbrevation
 from {{ ref('clean_teams') }}
 
+
