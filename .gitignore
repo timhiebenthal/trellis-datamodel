@@ -2,3 +2,4 @@ nba-data/__marimo__/session/data.py.json
 nba-data/data/*
 backend/__pycache__/main.cpython-312.pyc
 backend/backend.log
+nba-data/__marimo__/session/pull_data.py.json

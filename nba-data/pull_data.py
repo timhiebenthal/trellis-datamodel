@@ -22,16 +22,15 @@ def _():
 @app.cell
 def _(pd, teams):
     teams_df = pd.DataFrame(teams.get_teams())
-    teams_df.to_csv("nba-data/teams.csv", index=False)
     teams_df.head()
     return
 
 
 @app.cell
 def _(pd):
-    def save_endpoint_data(endpoint, file_name):
-        df = pd.DataFrame(endpoint)
-        df.to_csv(f"nba-data/{file_name}.csv", index=False)
+    def save_endpoint_data(data, file_name):
+        df = pd.DataFrame(data)
+        df.to_csv(f"nba-data/data/{file_name}.csv", index=False)
         print(f"saved {len(df):,.0f} records for '{file_name}'")
         return df
     return (save_endpoint_data,)
@@ -58,8 +57,14 @@ def _():
 
 
 @app.cell
-def _(leaguegamefinder):
-    seasons_to_fetch = ['2025-26', '2024-25']
+def _(leaguegamefinder, pd):
+    seasons_to_fetch = [
+        #'2025-26', 
+        '2024-25'
+    ]
+
+    START_DATE = '2025-01-01'
+    END_DATE = '2025-03-31'
 
     def get_season_games():
         all_games = []
@@ -69,6 +74,7 @@ def _(leaguegamefinder):
 
             gamefinder = leaguegamefinder.LeagueGameFinder(
                 season_nullable=season,
+                season_type_nullable='Regular Season',
                 player_or_team_abbreviation='T' 
             )
 
@@ -76,6 +82,7 @@ def _(leaguegamefinder):
                 .drop_duplicates()
                 [["GAME_DATE", "GAME_ID"]]
                 .assign(season=season)
+                .query("GAME_DATE >= @START_DATE and GAME_DATE <= @END_DATE")
                 .to_dict(orient="records")
                   )
 
@@ -83,14 +90,36 @@ def _(leaguegamefinder):
             print(f"Found {len(season_games)} unique games for the season ...")
 
         print(f"Completed iteration for total of {len(all_games)} games")
-        return all_games
+        return pd.DataFrame(all_games)
     return (get_season_games,)
 
 
 @app.cell
 def _(get_season_games):
-    all_games = get_season_games()
-    return (all_games,)
+    all_games_df = get_season_games()
+    return (all_games_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Loop & Save data
+    """)
+    return
+
+
+@app.cell
+def _(all_games_df, players, save_endpoint_data, teams):
+    endpoints = [
+        (teams.get_teams(), "teams"),
+        (players.get_players(), "players"),
+        (all_games_df, "games")
+    ]
+
+    for e in endpoints:
+        save_endpoint_data(data=e[0], file_name=e[1])
+        print("---")
+    return
 
 
 @app.cell(hide_code=True)
@@ -153,54 +182,30 @@ def _(get_gamestats):
 
 
 @app.cell
-def _():
+def _(all_games_df, get_gamestats, pd, save_endpoint_data):
     from tqdm import tqdm
-    import time as t
-    return t, tqdm
+    import time
+
+    # iterate over games in monthly chunks
+    all_games_monthly_df = all_games_df.assign(month = lambda x: x.GAME_DATE.str[:7])
 
 
-@app.cell
-def _(all_games, get_gamestats, pd, t, tqdm):
-    def get_all_gamestats():
-        all_stats = []
-        for game in tqdm(all_games[500:]):
-            game_data = get_gamestats(game["GAME_ID"])
-            all_stats.append(game_data)
-            t.sleep(0.8)
+    for selected_month in all_games_monthly_df["month"].unique():
+        all_month_stats = []
+        print(f"working on stats for month '{selected_month}' ...")
 
-        return pd.json_normalize(all_stats, record_path="player_stats", meta="game_id")
+        chunk_df = all_games_monthly_df.query("month == @selected_month")
+        for index, row in tqdm(chunk_df.iterrows(), total=chunk_df.shape[0]):
+            game_data = get_gamestats(row["GAME_ID"])
+            all_month_stats.append(game_data)
 
-    all_stats_df = get_all_gamestats()
-    return (all_stats_df,)
+            # add small pause between iteration to avoid timeouts/rate-limits
+            time.sleep(2)
 
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Loop & Save data
-    """)
-    return
-
-
-@app.cell
-def _(all_stats_df, get_season_games, players, save_endpoint_data, teams):
-
-    endpoints = [
-        (teams.get_teams(), "teams"),
-        (players.get_players(), "players"),
-        (get_season_games(), "games"),
-        (all_stats_df, "game_stats")
-    ]
-
-    for e in endpoints:
-        save_endpoint_data(endpoint=e[0], file_name=e[1])
-        #time.sleep(1)
-        print("---")
-    return
-
-
-@app.cell
-def _():
+        # expand data to player-grain and save as monthly .csv
+        month_df = pd.json_normalize(all_month_stats, record_path="player_stats", meta="game_id")
+        save_endpoint_data(month_df, f"game_stats_{selected_month}")
+        time.sleep(1)
     return
 
 
