@@ -16,5 +16,5 @@ ontology_file: "ontology.yml"
 # List of path patterns to include (filters dbt models by original_file_path)
 # If empty, all models are included.
 dbt_model_paths:
-  - "3-entity"
+  - "3_core"
 
