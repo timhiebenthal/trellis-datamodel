@@ -1,0 +1,19 @@
+version: 2
+models:
+- name: Game
+  columns:
+  - name: game_id
+    data_type: text
+  - name: game_day
+    data_type: text
+  - name: game_time
+    data_type: text
+    description: 'tbd: need to check timezone'
+  - name: home_team_id
+    data_type: text
+  - name: away_team_id
+    data_type: text
+  - name: matchup
+    data_type: text
+    description: '"{home_team_abbrevation} - {away_team_abbrevation}" syntax (like
+      "LAC - PHX"'

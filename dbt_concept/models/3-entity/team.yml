@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: team
+- name: Team
   columns:
   - name: team_id
     data_type: text

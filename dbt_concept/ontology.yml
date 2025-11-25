@@ -17,46 +17,113 @@ entities:
     datatype: text
     description: 3-letter abbrevation (e.g. LAC)
   position:
-    x: 347.94889343481924
-    y: -98.87699214287917
+    x: -37.60480007619039
+    y: -252.26932181930235
   width: 338.060546875
   panel_height: 480
-  collapsed: true
+  collapsed: false
 - id: player
   label: Player
   description: The players competing in the NBA
+  drafted_fields:
+  - name: player_id
+    datatype: text
+    description: unique ID
+  - name: full_name
+    datatype: text
+  - name: current_team
+    datatype: text
+  - name: draft_year
+    datatype: text
   position:
-    x: 251.2858870451367
-    y: 351.64084900444914
+    x: 1.7826225462227399
+    y: 622.8663623807272
   width: 280
-  panel_height: 200
+  panel_height: 293.09088134765625
   collapsed: false
 - id: game
   label: Game
   description: A game where two teams compete
+  drafted_fields:
+  - name: game_id
+    datatype: text
+  - name: game_day
+    datatype: text
+  - name: game_time
+    datatype: text
+    description: 'tbd: need to check timezone'
+  - name: home_team_id
+    datatype: text
+  - name: away_team_id
+    datatype: text
+  - name: matchup
+    datatype: text
+    description: '"{home_team_abbrevation} - {away_team_abbrevation}" syntax (like
+      "LAC - PHX"'
   position:
-    x: 757.1496200441215
-    y: 145.58567529713415
+    x: 747.0491586082898
+    y: -76.65370801301539
   width: 280
-  panel_height: 200
+  panel_height: 324.1211853027344
   collapsed: false
 - id: calendar
   label: Calendar
   description: ''
+  drafted_fields:
+  - name: calendar_date
+    datatype: text
+  - name: calender_week
+    datatype: text
+    description: ISO week number
+  - name: year_month
+    datatype: text
+    description: yyyy-MM syntax
   position:
-    x: 1425.1367534312217
-    y: 308.3132621556553
-  width: 280
-  panel_height: 200
-  collapsed: true
+    x: 1332.6780428740874
+    y: 453.82205254065354
+  width: 314.06060791015625
+  panel_height: 344.48480224609375
+  collapsed: false
 - id: game_stats_per_player
   label: Game Stats per Player
   description: ''
+  drafted_fields:
+  - name: game_player_id
+    datatype: text
+    description: surrogate-key from game_id and player_id
+  - name: player_id
+    datatype: text
+  - name: game_id
+    datatype: text
+  - name: minutes_played
+    datatype: text
+  - name: field_goals_attempted
+    datatype: text
+  - name: field_goals_made
+    datatype: text
+  - name: points
+    datatype: text
+  - name: assists
+    datatype: text
+  - name: total_rebounds
+    datatype: text
+  - name: offensive_rebounds
+    datatype: text
+  - name: defensive_rebounds
+    datatype: text
+  - name: 3pt_attempted
+    datatype: text
+  - name: 3pt_made
+    datatype: text
+  - name: free_throws_attempted
+    datatype: text
+  - name: free_throws_made
+    datatype: text
   position:
-    x: 922.2917436153347
-    y: 623.5843512151973
+    x: 951.7389853707155
+    y: 630.4939156150361
   width: 280
-  panel_height: 200
+  panel_height: 480
   collapsed: false
 relationships:
 - source: team

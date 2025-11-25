@@ -1,0 +1,13 @@
+version: 2
+models:
+- name: Player
+  columns:
+  - name: player_id
+    data_type: text
+    description: unique ID
+  - name: full_name
+    data_type: text
+  - name: current_team
+    data_type: text
+  - name: draft_year
+    data_type: text
