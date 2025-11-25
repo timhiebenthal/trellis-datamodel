@@ -142,8 +142,3 @@
     </SvelteFlow>
 </div>
 
-<style>
-    :global(.svelte-flow__pane) {
-        cursor: default !important;
-    }
-</style>

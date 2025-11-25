@@ -300,7 +300,7 @@
 </script>
 
 <div
-    class="rounded-md border-2 bg-white shadow-sm hover:shadow-md relative cursor-default"
+    class="rounded-md border-2 bg-white shadow-sm hover:shadow-md relative"
     class:border-green-500={isBound}
     class:border-blue-500={isDragOver}
     class:border-gray-300={!isBound && !isDragOver}
