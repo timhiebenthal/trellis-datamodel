@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: nba_source
+    schema: main
+    tables:
+      - name: games
+        description: "NBA games data"
+        meta:
+          external_location: "../nba-data/data/games.csv"
+      - name: players
+        description: "NBA players data"
+        meta:
+          external_location: "../nba-data/data/players.csv"
+      - name: teams
+        description: "NBA teams data"
+        meta:
+          external_location: "../nba-data/data/teams.csv"
+      - name: game_stats
+        description: "NBA game stats data"
+        meta:
+          external_location: "../nba-data/data/game_stats_*.csv"
