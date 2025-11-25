@@ -22,29 +22,40 @@
         custom: CustomEdge,
     };
 
-    function onConnect(connection: Connection) {
-        // Check if a relationship already exists between these two nodes
-        const relationshipExists = $edges.some(
-            (edge) =>
-                (edge.source === connection.source &&
-                    edge.target === connection.target) ||
-                (edge.source === connection.target &&
-                    edge.target === connection.source),
-        );
+    function getParallelOffset(index: number): number {
+        if (index === 0) return 0;
+        const level = Math.ceil(index / 2);
+        const offset = level * 20;
+        return index % 2 === 1 ? offset : -offset;
+    }
 
-        if (relationshipExists) {
-            console.log("Relationship already exists between these nodes");
-            return; // Don't create duplicate
+    function onConnect(connection: Connection) {
+        // Generate unique edge ID (allow multiple edges between same entities)
+        const baseId = `e${connection.source}-${connection.target}`;
+        let edgeId = baseId;
+        let counter = 1;
+        while ($edges.some((e) => e.id === edgeId)) {
+            edgeId = `${baseId}-${counter}`;
+            counter++;
         }
 
+        const existingBetweenPair = $edges.filter(
+            (e) =>
+                (e.source === connection.source && e.target === connection.target) ||
+                (e.source === connection.target && e.target === connection.source),
+        ).length;
+
         const edge: Edge = {
-            id: `e${connection.source}-${connection.target}`,
+            id: edgeId,
             source: connection.source!,
             target: connection.target!,
             type: "custom",
             data: {
                 label: "",
                 type: "one_to_many",
+                parallelOffset: getParallelOffset(existingBetweenPair),
+                label_dx: 0,
+                label_dy: 0,
             },
         };
         console.log("Creating edge:", edge);
@@ -89,6 +100,31 @@
         };
         $nodes = [...$nodes, newNode];
     }
+
+    function onEdgesDelete(deletedEdges: Edge[]) {
+        // When an edge is deleted, delete all other edges between the same two entities
+        const pairsToCheck = deletedEdges.map((e) => ({
+            source: e.source,
+            target: e.target,
+        }));
+
+        const edgesToRemove = $edges.filter((e) =>
+            pairsToCheck.some(
+                (pair) =>
+                    (e.source === pair.source && e.target === pair.target) ||
+                    (e.source === pair.target && e.target === pair.source),
+            ),
+        );
+
+        if (edgesToRemove.length > 0) {
+            const idsToRemove = new Set(edgesToRemove.map((e) => e.id));
+            // Ensure we also remove the ones explicitly deleted (though Svelte Flow might handle them)
+            deletedEdges.forEach((e) => idsToRemove.add(e.id));
+
+            // Update store
+            $edges = $edges.filter((e) => !idsToRemove.has(e.id));
+        }
+    }
 </script>
 
 <div class="flex-1 h-full relative w-full">
@@ -98,6 +134,7 @@
         {nodeTypes}
         {edgeTypes}
         onconnect={onConnect}
+        onedgesdelete={onEdgesDelete}
         defaultEdgeOptions={{ type: "custom" }}
         fitView
         class="bg-gray-50"

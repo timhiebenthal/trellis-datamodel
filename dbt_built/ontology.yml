@@ -1,17 +1,21 @@
 version: 0.1
 entities:
-- id: players
-  label: Players
+- id: player
+  label: Player
   description: Players competing in the NBA
-  dbt_model: model.nba_analytics.player
+  dbt_model: null
   drafted_fields:
   - name: player_id
     datatype: text
   - name: current_team_id
     datatype: text
+    fk_link:
+      sourceColumn: current_team_id
+      targetEntity: team
+      targetColumn: team_id
   position:
-    x: 173.89731592713088
-    y: 237.88171978777652
+    x: 215.340788965465
+    y: -0.24249502070844642
   width: 460.363525390625
   panel_height: 480
   collapsed: false
@@ -27,15 +31,43 @@ entities:
       targetEntity: players
       targetColumn: current_team_id
   position:
-    x: -76.42301185291514
-    y: 756.267529388211
+    x: -331.1518025967639
+    y: 550.4859287453091
+  width: 280
+  panel_height: 200
+  collapsed: false
+- id: game
+  label: Game
+  description: A game where two teams compete
+  dbt_model: model.nba_analytics.game
+  position:
+    x: 408.481078345333
+    y: 696.7209411684725
   width: 280
   panel_height: 200
   collapsed: false
 relationships:
-- source: players
+- source: player
   target: team
+  label: play in
+  type: many_to_one
+  source_field: current_team_id
+  target_field: team_id
+  label_dx: 0
+  label_dy: 0
+- source: team
+  target: game
   label: ''
   type: one_to_many
-  source_field: current_team
-  target_field: team_name
+  source_field: team_id
+  target_field: home_team_id
+  label_dx: 1.939453125
+  label_dy: -24.242401123046875
+- source: team
+  target: game
+  label: ''
+  type: one_to_many
+  source_field: team_id
+  target_field: away_team_id
+  label_dx: -5.81817626953125
+  label_dy: -3.8787841796875

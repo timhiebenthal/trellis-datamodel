@@ -7,7 +7,7 @@
     } from "@xyflow/svelte";
     import { viewMode, dbtModels, nodes, edges, draggingField } from "$lib/stores";
     import type { DbtModel, DraftedField, ColumnLink } from "$lib/types";
-    import { saveDbtSchema, inferRelationships } from "$lib/api";
+    import { inferRelationships } from "$lib/api";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
 
     type $$Props = NodeProps;
@@ -150,6 +150,13 @@
                 modelToEntity[node.id] = node.id;
             }
             
+            function getParallelOffset(index: number): number {
+                if (index === 0) return 0;
+                const level = Math.ceil(index / 2);
+                const offset = level * 20;
+                return index % 2 === 1 ? offset : -offset;
+            }
+
             for (const rel of inferred) {
                 // Remap source/target using current canvas bindings
                 const sourceEntityId = modelToEntity[rel.source] || rel.source;
@@ -163,17 +170,34 @@
                 const targetExists = $nodes.some((n) => n.id === targetEntityId);
                 if (!sourceExists || !targetExists) continue;
                 
-                // Check if edge already exists
+                // Check if edge with same field mapping already exists
                 const edgeExists = $edges.some(
                     (e) =>
-                        (e.source === sourceEntityId && e.target === targetEntityId) ||
-                        (e.source === targetEntityId && e.target === sourceEntityId)
+                        ((e.source === sourceEntityId && e.target === targetEntityId) ||
+                        (e.source === targetEntityId && e.target === sourceEntityId)) &&
+                        e.data?.source_field === rel.source_field &&
+                        e.data?.target_field === rel.target_field
                 );
                 if (edgeExists) continue;
                 
+                const existingBetweenPair = $edges.filter(
+                    (e) =>
+                        (e.source === sourceEntityId && e.target === targetEntityId) ||
+                        (e.source === targetEntityId && e.target === sourceEntityId),
+                ).length;
+                
+                // Generate unique edge ID (allow multiple edges between same entities)
+                const baseId = `e${sourceEntityId}-${targetEntityId}`;
+                let edgeId = baseId;
+                let counter = 1;
+                while ($edges.some((e) => e.id === edgeId)) {
+                    edgeId = `${baseId}-${counter}`;
+                    counter++;
+                }
+                
                 // Create new edge
                 const newEdge = {
-                    id: `e${sourceEntityId}-${targetEntityId}`,
+                    id: edgeId,
                     source: sourceEntityId,
                     target: targetEntityId,
                     type: "custom",
@@ -182,6 +206,9 @@
                         type: rel.type || "one_to_many",
                         source_field: rel.source_field,
                         target_field: rel.target_field,
+                        parallelOffset: getParallelOffset(existingBetweenPair),
+                        label_dx: 0,
+                        label_dy: 0,
                     },
                 };
                 $edges = [...$edges, newEdge];
@@ -248,6 +275,21 @@
 
     function unbind() {
         updateNodeData(id, { dbt_model: null });
+        
+        // Clear field mappings on edges connected to this entity
+        edges.update((list) =>
+            list.map((edge) => {
+                if (edge.source === id || edge.target === id) {
+                    // Create new data object without source_field and target_field
+                    const { source_field, target_field, ...restData } = (edge.data || {}) as Record<string, unknown>;
+                    return {
+                        ...edge,
+                        data: restData,
+                    };
+                }
+                return edge;
+            })
+        );
     }
 
     function toggleCollapse(event: MouseEvent) {
@@ -309,8 +351,6 @@
 
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
-    let savingSchema = $state(false);
-    let saveSchemaError = $state<string | null>(null);
     
     function addDraftedField() {
         const newField: DraftedField = {
@@ -464,51 +504,6 @@
         
         $draggingField = null;
     }
-
-    async function saveToDbtSchema() {
-        if (draftedFields.length === 0) {
-            saveSchemaError = "No fields to save";
-            return;
-        }
-
-        // Validate that all fields have names
-        const invalidFields = draftedFields.filter((f) => !f.name.trim());
-        if (invalidFields.length > 0) {
-            saveSchemaError = "All fields must have a name";
-            return;
-        }
-        savingSchema = true;
-        saveSchemaError = null;
-
-        try {
-            console.log("Saving dbt schema...", {
-                id,
-                modelName: data.label || id,
-                fields: draftedFields,
-            });
-            const response = await saveDbtSchema(
-                id,
-                data.label || id,
-                draftedFields,
-            );
-            saveSchemaError = null;
-            console.log("Successfully saved dbt schema");
-            console.log("File saved to:", response);
-            // Show brief success indication
-            setTimeout(() => {
-                savingSchema = false;
-            }, 1000);
-        } catch (error) {
-            savingSchema = false;
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : "Failed to save schema";
-            saveSchemaError = errorMessage;
-            console.error("Failed to save dbt schema:", error);
-            console.error("Error details:", errorMessage);
-        }
-    }
 </script>
 
 <div
@@ -617,7 +612,7 @@
                                         ondragend={onFieldDragEnd}
                                         class:cursor-grabbing={$draggingField?.nodeId === id && $draggingField?.fieldName === col.name}
                                         title="Drag to link to another field"
-                                    >⋮⋮</span>
+                                    >🔗</span>
                                     {col.name}
                                 </span>
                                 <span
@@ -672,7 +667,7 @@
                                                 ondragend={onFieldDragEnd}
                                                 class:cursor-grabbing={$draggingField?.nodeId === id && $draggingField?.fieldName === field.name}
                                                 title="Drag to link to another field"
-                                            >⋮⋮</span>
+                                            >🔗</span>
                                             <input
                                                 type="text"
                                                 value={field.name}
@@ -763,24 +758,6 @@
                             + Add Field
                         </button>
 
-                        {#if draftedFields.length > 0}
-                            <button
-                                onclick={saveToDbtSchema}
-                                disabled={savingSchema}
-                                class="mt-2 w-full text-xs text-green-600 hover:bg-green-50 p-1 rounded border border-green-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {savingSchema
-                                    ? "✓ Saved!"
-                                    : "💾 Save as dbt schema (.yml)"}
-                            </button>
-                            {#if saveSchemaError}
-                                <div
-                                    class="mt-1 text-[10px] text-red-600 bg-red-50 p-1 rounded"
-                                >
-                                    {saveSchemaError}
-                                </div>
-                            {/if}
-                        {/if}
                     </div>
                 {:else}
                     <!-- Concept View -->

@@ -51,11 +51,16 @@ export async function getConfigStatus(): Promise<any> {
     }
 }
 
-export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[]): Promise<any> {
+export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[], description?: string): Promise<any> {
     const res = await fetch(`${API_BASE}/dbt-schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entity_id: entityId, model_name: modelName, fields })
+        body: JSON.stringify({ 
+            entity_id: entityId, 
+            model_name: modelName, 
+            fields,
+            description
+        })
     });
     if (!res.ok) {
         const error = await res.text();

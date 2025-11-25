@@ -5,7 +5,7 @@
     getSmoothStepPath,
     type EdgeProps
   } from '@xyflow/svelte';
-  import { edges, nodes, dbtModels, viewMode } from '$lib/stores';
+  import { edges, nodes, viewMode } from '$lib/stores';
 
   type $$Props = EdgeProps;
 
@@ -32,6 +32,28 @@
     targetY,
     targetPosition
   }));
+
+  let storedOffsetX = $derived((data?.label_dx as number) || 0);
+  let storedOffsetY = $derived((data?.label_dy as number) || 0);
+  let dragOffsetX = $state(0);
+  let dragOffsetY = $state(0);
+  let isDraggingLabel = $state(false);
+  let dragStartX = 0;
+  let dragStartY = 0;
+
+  // Compute index among parallel edges (edges between same source-target pair)
+  const parallelIndex = $derived.by(() => {
+    const parallelEdges = $edges.filter(
+      (e) => (e.source === source && e.target === target) || (e.source === target && e.target === source)
+    );
+    return parallelEdges.findIndex((e) => e.id === id);
+  });
+
+  // Auto-offset for cascading labels (60px vertical spacing)
+  const autoCascadeY = $derived(parallelIndex * 70);
+
+  const displayLabelX = $derived(labelX + storedOffsetX + dragOffsetX);
+  const displayLabelY = $derived(labelY + storedOffsetY + dragOffsetY + autoCascadeY);
 
   // Use raw data.label for input value, default to empty
   let label = $derived((data?.label as string) || '');
@@ -60,29 +82,6 @@
   const targetName = $derived(targetNode?.data?.label || 'Target');
   const actionText = $derived(label?.trim() || 'relates to');
   
-  // Get available columns for source and target entities
-  const sourceColumns = $derived.by(() => {
-    if (!sourceNode) return [];
-    // Check if bound to dbt model
-    if (sourceNode.data?.dbt_model) {
-      const model = $dbtModels.find(m => m.unique_id === sourceNode.data.dbt_model);
-      return model?.columns.map(c => c.name) || [];
-    }
-    // Check drafted fields
-    return (sourceNode.data?.drafted_fields || []).map((f: any) => f.name);
-  });
-  
-  const targetColumns = $derived.by(() => {
-    if (!targetNode) return [];
-    // Check if bound to dbt model
-    if (targetNode.data?.dbt_model) {
-      const model = $dbtModels.find(m => m.unique_id === targetNode.data.dbt_model);
-      return model?.columns.map(c => c.name) || [];
-    }
-    // Check drafted fields
-    return (targetNode.data?.drafted_fields || []).map((f: any) => f.name);
-  });
-
   const relationText = $derived(
     `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
   );
@@ -120,17 +119,49 @@
     
     updateEdge({ type: nextType });
   }
+
+  function startLabelDrag(e: PointerEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    isDraggingLabel = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragOffsetX = 0;
+    dragOffsetY = 0;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      dragOffsetX = moveEvent.clientX - dragStartX;
+      dragOffsetY = moveEvent.clientY - dragStartY;
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      if (isDraggingLabel) {
+        updateEdge({
+          label_dx: storedOffsetX + dragOffsetX,
+          label_dy: storedOffsetY + dragOffsetY,
+        });
+      }
+      isDraggingLabel = false;
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} {style} />
 
-<EdgeLabel
-  x={labelX}
-  y={labelY}
+  <EdgeLabel
+  x={displayLabelX}
+  y={displayLabelY}
 >
   <div
-    class="pointer-events-auto nodrag nopan bg-white px-2 py-1 rounded shadow border border-gray-200 flex flex-col gap-1 min-w-[180px]"
-    onmousedown={(e) => e.stopPropagation()}
+    class="pointer-events-auto nodrag nopan bg-white px-2 py-1 rounded shadow border border-gray-200 flex flex-col gap-1 min-w-[180px] cursor-move select-none"
+    onpointerdown={startLabelDrag}
     click={(e) => e.stopPropagation()}
     role="presentation"
   >
@@ -154,37 +185,12 @@
     <div class="text-[10px] text-gray-500 text-center whitespace-nowrap">
       {relationText}
     </div>
-    <!-- Field mappings - only show in Physical view -->
-    {#if $viewMode === "physical"}
-    <div class="text-[9px] text-gray-400 mt-1 space-y-1">
-      <div class="flex items-center gap-1">
-        <span class="text-gray-500">From:</span>
-        <select
-          value={sourceField}
-          onchange={(e) => updateEdge({ source_field: (e.target as HTMLSelectElement).value || undefined })}
-          class="flex-1 text-[9px] border border-gray-200 rounded px-1 py-0.5 bg-white"
-          onclick={(e) => e.stopPropagation()}
-        >
-          <option value="">Select field...</option>
-          {#each sourceColumns as col}
-            <option value={col}>{col}</option>
-          {/each}
-        </select>
-      </div>
-      <div class="flex items-center gap-1">
-        <span class="text-gray-500">To:</span>
-        <select
-          value={targetField}
-          onchange={(e) => updateEdge({ target_field: (e.target as HTMLSelectElement).value || undefined })}
-          class="flex-1 text-[9px] border border-gray-200 rounded px-1 py-0.5 bg-white"
-          onclick={(e) => e.stopPropagation()}
-        >
-          <option value="">Select field...</option>
-          {#each targetColumns as col}
-            <option value={col}>{col}</option>
-          {/each}
-        </select>
-      </div>
+    <!-- Field mappings - only show in Physical view when fields are set -->
+    {#if $viewMode === "physical" && (sourceField || targetField)}
+    <div class="text-[9px] text-gray-500 text-center border-t border-gray-100 pt-1 mt-1">
+      <span class="font-mono"><span class="text-gray-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
+      <span class="text-gray-400 mx-1">→</span>
+      <span class="font-mono"><span class="text-gray-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
     </div>
     {/if}
   </div>

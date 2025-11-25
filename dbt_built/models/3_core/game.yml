@@ -8,24 +8,24 @@ models:
   - name: game_day
     data_type: text
     data_tests:
-      - relationships:
-          to: ref('calendar')
-          field: calendar_date
+    - relationships:
+        to: ref('calendar')
+        field: calendar_date
   - name: game_time
     data_type: text
     description: 'tbd: need to check timezone'
   - name: home_team_id
     data_type: text
     data_tests:
-      - relationships:
-          to: ref('team')
-          field: team_id
+    - relationships:
+        to: ref('team')
+        field: team_id
   - name: away_team_id
     data_type: text
     data_tests:
-      - relationships:
-          to: ref('team')
-          field: team_id
+    - relationships:
+        to: ref('team')
+        field: team_id
   - name: matchup
     data_type: text
     description: '"{home_team_abbrevation} - {away_team_abbrevation}" syntax (like

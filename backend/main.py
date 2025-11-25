@@ -257,6 +257,7 @@ class DbtSchemaRequest(BaseModel):
     entity_id: str
     model_name: str
     fields: List[Dict[str, str]]
+    description: Optional[str] = None
 
 
 @app.post("/api/dbt-schema")
@@ -284,9 +285,10 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         # Create models directory if it doesn't exist
         os.makedirs(models_dir, exist_ok=True)
 
-        # Load ontology to get entity description
-        entity_description = None
-        if ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
+        # Use description from request if available, otherwise fallback to ontology
+        entity_description = request.description
+
+        if not entity_description and ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
             try:
                 with open(ONTOLOGY_PATH, "r") as f:
                     ontology_data = yaml.safe_load(f) or {}
@@ -461,6 +463,10 @@ async def sync_dbt_tests():
                 models_list.append(model_entry)
                 schema["models"] = models_list
 
+            # Sync description if available in ontology
+            if entity.get("description"):
+                model_entry["description"] = entity.get("description")
+
             # Ensure columns list exists
             if "columns" not in model_entry:
                 model_entry["columns"] = []
@@ -632,11 +638,16 @@ async def infer_relationships():
                 print(f"Warning: Could not parse {filename}: {e}")
                 continue
 
-        # Remove duplicates (same source-target pair)
+        # Remove duplicates (same source-target-fields combination)
         seen = set()
         unique_relationships = []
         for rel in relationships:
-            key = (rel["source"], rel["target"])
+            key = (
+                rel["source"],
+                rel["target"],
+                rel.get("source_field"),
+                rel.get("target_field"),
+            )
             if key not in seen:
                 seen.add(key)
                 unique_relationships.append(rel)

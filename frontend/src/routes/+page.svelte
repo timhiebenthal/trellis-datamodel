@@ -111,18 +111,40 @@
                 },
             })) as Node[];
 
-            $edges = relationships.map((r: any) => ({
-                id: `e${r.source}-${r.target}`,
-                source: r.source,
-                target: r.target,
-                type: "custom",
-                data: {
-                    label: r.label || "",
-                    type: r.type || "one_to_many",
-                    source_field: r.source_field,
-                    target_field: r.target_field,
-                },
-            })) as Edge[];
+            function getParallelOffset(index: number): number {
+                if (index === 0) return 0;
+                const level = Math.ceil(index / 2);
+                const offset = level * 20;
+                return index % 2 === 1 ? offset : -offset;
+            }
+
+            const edgeCounts = new Map<string, number>();
+            $edges = relationships.map((r: any) => {
+                const pairKey =
+                    r.source < r.target ? `${r.source}-${r.target}` : `${r.target}-${r.source}`;
+                const currentCount = edgeCounts.get(pairKey) ?? 0;
+                edgeCounts.set(pairKey, currentCount + 1);
+
+                const baseId = `e${r.source}-${r.target}`;
+                let edgeId = `${baseId}-${currentCount}`;
+                if (currentCount === 0) edgeId = baseId;
+
+                return {
+                    id: edgeId,
+                    source: r.source,
+                    target: r.target,
+                    type: "custom",
+                    data: {
+                        label: r.label || "",
+                        type: r.type || "one_to_many",
+                        source_field: r.source_field,
+                        target_field: r.target_field,
+                        label_dx: r.label_dx || 0,
+                        label_dy: r.label_dy || 0,
+                        parallelOffset: getParallelOffset(currentCount),
+                    },
+                };
+            }) as Edge[];
 
             lastSavedState = JSON.stringify({ nodes: $nodes, edges: $edges });
         } catch (e) {
@@ -174,6 +196,8 @@
                         type: (e.data?.type as string) || "one_to_many",
                         source_field: e.data?.source_field,
                         target_field: e.data?.target_field,
+                        label_dx: e.data?.label_dx,
+                        label_dy: e.data?.label_dy,
                     })),
                 };
 
