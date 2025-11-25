@@ -7,7 +7,7 @@
     } from "@xyflow/svelte";
     import { viewMode, dbtModels, nodes, edges, draggingField } from "$lib/stores";
     import type { DbtModel, DraftedField, ColumnLink } from "$lib/types";
-    import { saveDbtSchema } from "$lib/api";
+    import { saveDbtSchema, inferRelationships } from "$lib/api";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
 
     type $$Props = NodeProps;
@@ -113,7 +113,7 @@
 
     let isDragOver = $state(false);
 
-    function onDrop(event: DragEvent) {
+    async function onDrop(event: DragEvent) {
         event.preventDefault();
         event.stopPropagation(); // Stop bubbling to canvas
         event.stopImmediatePropagation();
@@ -131,6 +131,64 @@
         }
 
         updateNodeData(id, updates);
+        
+        // Auto-create relationships from yml relationship tests
+        try {
+            const inferred = await inferRelationships();
+            
+            // Build model name -> entity ID map from current canvas state
+            // Include the model we just bound (since ontology hasn't saved yet)
+            const modelToEntity: Record<string, string> = {};
+            for (const node of $nodes) {
+                const boundModel = node.id === id ? model.unique_id : node.data?.dbt_model;
+                if (boundModel && typeof boundModel === 'string') {
+                    // Extract model name from "model.project.name" -> "name"
+                    const modelName = boundModel.includes('.') ? boundModel.split('.').pop()! : boundModel;
+                    modelToEntity[modelName] = node.id;
+                }
+                // Also map entity ID to itself
+                modelToEntity[node.id] = node.id;
+            }
+            
+            for (const rel of inferred) {
+                // Remap source/target using current canvas bindings
+                const sourceEntityId = modelToEntity[rel.source] || rel.source;
+                const targetEntityId = modelToEntity[rel.target] || rel.target;
+                
+                // Check if this relationship involves the current entity
+                if (sourceEntityId !== id && targetEntityId !== id) continue;
+                
+                // Check if both entities exist on the canvas
+                const sourceExists = $nodes.some((n) => n.id === sourceEntityId);
+                const targetExists = $nodes.some((n) => n.id === targetEntityId);
+                if (!sourceExists || !targetExists) continue;
+                
+                // Check if edge already exists
+                const edgeExists = $edges.some(
+                    (e) =>
+                        (e.source === sourceEntityId && e.target === targetEntityId) ||
+                        (e.source === targetEntityId && e.target === sourceEntityId)
+                );
+                if (edgeExists) continue;
+                
+                // Create new edge
+                const newEdge = {
+                    id: `e${sourceEntityId}-${targetEntityId}`,
+                    source: sourceEntityId,
+                    target: targetEntityId,
+                    type: "custom",
+                    data: {
+                        label: rel.label || "",
+                        type: rel.type || "one_to_many",
+                        source_field: rel.source_field,
+                        target_field: rel.target_field,
+                    },
+                };
+                $edges = [...$edges, newEdge];
+            }
+        } catch (e) {
+            console.warn("Could not infer relationships:", e);
+        }
     }
 
     function onDragOver(event: DragEvent) {

@@ -7,8 +7,16 @@ models:
     description: surrogate-key from game_id and player_id
   - name: player_id
     data_type: text
+    data_tests:
+      - relationships:
+          to: ref('player')
+          field: player_id
   - name: game_id
     data_type: text
+    data_tests:
+      - relationships:
+          to: ref('game')
+          field: game_id
   - name: minutes_played
     data_type: text
   - name: field_goals_attempted

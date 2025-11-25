@@ -546,15 +546,26 @@ async def infer_relationships():
             return {"relationships": []}
 
         # Load ontology to map model names to entity IDs
-        entity_id_map = {}  # Maps model name -> entity id
+        # Maps: model name (from dbt_model unique_id) -> entity id on canvas
+        model_to_entity = {}
         if ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
             try:
                 with open(ONTOLOGY_PATH, "r") as f:
                     ontology_data = yaml.safe_load(f) or {}
                     entities = ontology_data.get("entities", [])
                     for entity in entities:
-                        # Try to match by entity id (which should match yml filename)
-                        entity_id_map[entity.get("id")] = entity.get("id")
+                        entity_id = entity.get("id")
+                        dbt_model = entity.get("dbt_model")
+                        if dbt_model:
+                            # Extract model name from unique_id like "model.nba_analytics.team" -> "team"
+                            model_name = (
+                                dbt_model.split(".")[-1]
+                                if "." in dbt_model
+                                else dbt_model
+                            )
+                            model_to_entity[model_name] = entity_id
+                        # Also map entity_id to itself for non-bound entities
+                        model_to_entity[entity_id] = entity_id
             except Exception as e:
                 print(f"Warning: Could not load ontology for entity mapping: {e}")
 
@@ -576,11 +587,8 @@ async def infer_relationships():
                     if not model_name:
                         continue
 
-                    # Try to find entity ID - first try filename (without extension)
-                    entity_id = os.path.splitext(filename)[0]
-                    if entity_id not in entity_id_map:
-                        # Fallback: use model name as entity id
-                        entity_id = model_name
+                    # Map model name to entity ID using bound dbt models
+                    entity_id = model_to_entity.get(model_name, model_name)
 
                     columns = model.get("columns", [])
                     for column in columns:
@@ -601,20 +609,10 @@ async def infer_relationships():
                                 ):
                                     target_model = to_ref[5:-2]
 
-                                # Find target entity ID
-                                target_entity_id = target_model
-                                # Check if we have a yml file for this model
-                                target_yml_path = os.path.join(
-                                    models_dir, f"{target_model}.yml"
+                                # Map target model name to entity ID using bound dbt models
+                                target_entity_id = model_to_entity.get(
+                                    target_model, target_model
                                 )
-                                if not os.path.exists(target_yml_path):
-                                    target_yml_path = os.path.join(
-                                        models_dir, f"{target_model}.yaml"
-                                    )
-                                if os.path.exists(target_yml_path):
-                                    target_entity_id = os.path.splitext(
-                                        os.path.basename(target_yml_path)
-                                    )[0]
 
                                 # Create relationship (one_to_many by default, as FK implies many side)
                                 # Include field mappings
