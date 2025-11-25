@@ -1,13 +1,3 @@
 version: 0.1
-entities:
-- id: new_entity
-  label: New Entity
-  description: ''
-  dbt_model: null
-  position:
-    x: 272.82774998964476
-    y: 242.13091105157372
-  width: 280
-  panel_height: 200
-  collapsed: false
+entities: []
 relationships: []

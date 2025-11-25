@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: Team
+- name: team
   description: A Basketball Team in the NBA
   columns:
   - name: team_id

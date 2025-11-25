@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: Game
+- name: game
   description: A game where two teams compete
   columns:
   - name: game_id

@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: Game Stats per Player
+- name: game_stats_per_player
   columns:
   - name: game_player_id
     data_type: text

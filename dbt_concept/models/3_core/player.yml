@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: Player
+- name: player
   description: The players competing in the NBA
   columns:
   - name: player_id

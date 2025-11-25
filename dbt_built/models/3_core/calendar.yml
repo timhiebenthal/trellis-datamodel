@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: Calendar
+- name: calendar
   columns:
   - name: calendar_date
     data_type: text
