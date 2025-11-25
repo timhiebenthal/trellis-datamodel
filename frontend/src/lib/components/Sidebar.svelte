@@ -119,10 +119,10 @@
                             >
                                 <strong>📍 Configuration Info</strong><br />
                                 {#if !$configStatus.config_present}
-                                    No <code>config.yaml</code> found.
+                                    No <code>config.yml</code> found.
                                 {:else if !$configStatus.dbt_project_path}
                                     Set <code>dbt_project_path</code> in
-                                    <code>config.yaml</code> to load your dbt models.
+                                    <code>config.yml</code> to load your dbt models.
                                 {:else if !$configStatus.manifest_exists}
                                     Manifest not found at:<br />
                                     <span

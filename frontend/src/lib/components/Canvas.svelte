@@ -141,3 +141,12 @@
         {/if}
     </SvelteFlow>
 </div>
+
+<style>
+    :global(.svelte-flow__pane) {
+        cursor:
+            url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M3 3 L3 18 L8 13 L11 20 L13 19 L10 12 L17 12 Z" fill="black" stroke="white" stroke-width="0.5"/></svg>')
+                0 0,
+            default !important;
+    }
+</style>

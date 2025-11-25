@@ -1,0 +1,21 @@
+version: 0.1
+entities:
+- id: team
+  label: team
+  description: ''
+  drafted_fields:
+  - name: team_id
+    datatype: text
+    description: unique ID
+  - name: team_name
+    datatype: text
+  - name: city
+    datatype: text
+    description: yada
+  position:
+    x: 177.0275037700643
+    y: 189.99564502855304
+  width: 504.4444580078125
+  panel_height: 480
+  collapsed: false
+relationships: []

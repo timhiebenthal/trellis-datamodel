@@ -20,13 +20,13 @@ app.add_middleware(
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# dbt-ontology/config.yaml
-CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yaml"))
+# dbt-ontology/config.yml
+CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
 
 # Default values
 MANIFEST_PATH = ""
 CATALOG_PATH = ""
-ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yaml"))
+ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
 DBT_PROJECT_PATH = ""
 DBT_MODEL_PATHS = ["3-entity"]
 
@@ -249,6 +249,75 @@ async def save_ontology(data: OntologyUpdate):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving ontology: {str(e)}")
+
+
+class DbtSchemaRequest(BaseModel):
+    entity_id: str
+    model_name: str
+    fields: List[Dict[str, str]]
+
+
+@app.post("/api/dbt-schema")
+async def save_dbt_schema(request: DbtSchemaRequest):
+    """Generate and save a dbt schema YAML file for the drafted fields"""
+    try:
+        # Validate that DBT_PROJECT_PATH is set
+        if not DBT_PROJECT_PATH:
+            raise HTTPException(
+                status_code=400,
+                detail="dbt_project_path is not configured. Please set it in config.yml"
+            )
+        
+        # Determine the models directory
+        # Use the first path from dbt_model_paths if available, otherwise just "models"
+        if DBT_MODEL_PATHS and len(DBT_MODEL_PATHS) > 0:
+            models_subdir = DBT_MODEL_PATHS[0]
+        else:
+            models_subdir = "models"
+        
+        models_dir = os.path.abspath(os.path.join(DBT_PROJECT_PATH, "models", models_subdir))
+        
+        # Create models directory if it doesn't exist
+        os.makedirs(models_dir, exist_ok=True)
+        
+        # Generate YAML content
+        schema_content = {
+            'version': 2,
+            'models': [{
+                'name': request.model_name,
+                'columns': [
+                    {
+                        'name': field['name'],
+                        'data_type': field['datatype'],
+                        **({'description': field['description']} if field.get('description') else {})
+                    }
+                    for field in request.fields
+                ]
+            }]
+        }
+        
+        # Write to file (using .yml extension to match dbt convention)
+        output_path = os.path.join(models_dir, f"{request.entity_id}.yml")
+        
+        # Log the path we're writing to
+        print(f"Writing dbt schema to: {output_path}")
+        print(f"Schema content: {schema_content}")
+        
+        with open(output_path, 'w') as f:
+            yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
+        
+        print(f"Successfully wrote file to: {output_path}")
+        
+        return {
+            "status": "success",
+            "file_path": output_path,
+            "message": f"Schema saved to {output_path}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving dbt schema: {str(e)}")
 
 
 # Mount static files (Frontend)

@@ -3,12 +3,12 @@ import yaml
 import json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yaml"))
+CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
 
 # Default values
 MANIFEST_PATH = ""
 CATALOG_PATH = ""
-ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yaml"))
+ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
 DBT_PROJECT_PATH = ""
 DBT_MODEL_PATHS = ["3-entity"]
 

@@ -1,4 +1,4 @@
-import type { DbtModel, Ontology } from './types';
+import type { DbtModel, Ontology, DraftedField } from './types';
 
 const API_BASE = 'http://localhost:8000/api';
 
@@ -47,8 +47,19 @@ export async function getConfigStatus(): Promise<any> {
         console.error("Error fetching config status:", e);
         return {
             config_present: false,
-            error: "Failed to connect to backend"
         };
     }
 }
 
+export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[]): Promise<any> {
+    const res = await fetch(`${API_BASE}/dbt-schema`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity_id: entityId, model_name: modelName, fields })
+    });
+    if (!res.ok) {
+        const error = await res.text();
+        throw new Error(`Failed to save dbt schema: ${error}`);
+    }
+    return await res.json();
+}

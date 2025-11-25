@@ -13,10 +13,17 @@ export interface DbtModel {
     materialization?: string;
 }
 
+export interface DraftedField {
+    name: string;
+    datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp';
+    description?: string;
+}
+
 export interface EntityData {
     label: string;
     description?: string;
     dbt_model?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
+    drafted_fields?: DraftedField[]; // User-defined fields when no dbt model is bound
     width?: number;
     panelHeight?: number;
     collapsed?: boolean;

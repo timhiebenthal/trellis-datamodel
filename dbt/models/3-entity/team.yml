@@ -1,0 +1,12 @@
+version: 2
+models:
+- name: team
+  columns:
+  - name: team_id
+    data_type: text
+    description: unique ID
+  - name: team_name
+    data_type: text
+  - name: city
+    data_type: text
+    description: yada

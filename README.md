@@ -71,11 +71,11 @@ uv run python main.py
 The backend hosts the compiled frontend at http://localhost:8000.
 
 ## dbt Metadata
-- The repo ships with an empty `dbt/target/` scaffold. Drop `manifest.json` and `catalog.json` there (or point `config.yaml` to a full dbt project) to power the ERD modeller.
+- The repo ships with an empty `dbt/target/` scaffold. Drop `manifest.json` and `catalog.json` there (or point `config.yml` to a full dbt project) to power the ERD modeller.
 - Without these artifacts, the UI loads but shows no dbt models.
 
 ## Configuration
 - `dbt_manifest_path`: defaults to `../dbt/target/manifest.json` (relative to `backend/`).
 - `dbt_catalog_path`: defaults to `../dbt/target/catalog.json` (relative to `backend/`).
-- `ontology_file`: saved as `ontology.yaml` in the repo root.
+- `ontology_file`: saved as `ontology.yml` in the repo root.
 

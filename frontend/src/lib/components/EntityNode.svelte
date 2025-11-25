@@ -1,16 +1,22 @@
 <script lang="ts">
-    import { Handle, Position, useSvelteFlow, type NodeProps } from '@xyflow/svelte';
-    import { viewMode, dbtModels, nodes, edges } from '$lib/stores';
-    import type { DbtModel } from '$lib/types';
-    import DeleteConfirmModal from './DeleteConfirmModal.svelte';
+    import {
+        Handle,
+        Position,
+        useSvelteFlow,
+        type NodeProps,
+    } from "@xyflow/svelte";
+    import { viewMode, dbtModels, nodes, edges } from "$lib/stores";
+    import type { DbtModel, DraftedField } from "$lib/types";
+    import { saveDbtSchema } from "$lib/api";
+    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
 
     type $$Props = NodeProps;
 
     let { data, id } = $props<$$Props>();
-    
+
     const { updateNodeData } = useSvelteFlow();
     let showDeleteModal = $state(false);
-    
+
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
     let isBound = $derived(!!boundModelName);
@@ -24,47 +30,51 @@
     let nodeWidth = $derived(data.width ?? DEFAULT_WIDTH);
     let columnPanelHeight = $derived(data.panelHeight ?? DEFAULT_PANEL_HEIGHT);
 
-    
     // Find model details by unique_id (e.g. "model.elmo.entity_booking")
     let modelDetails = $derived(
-        isBound ? $dbtModels.find(m => m.unique_id === boundModelName) : null
+        isBound ? $dbtModels.find((m) => m.unique_id === boundModelName) : null,
     );
 
     function generateSlug(label: string, currentId: string): string {
         // Convert to lowercase and replace spaces/special chars with underscores
-        let slug = label.toLowerCase()
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, ''); // trim leading/trailing underscores
-        
+        let slug = label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, ""); // trim leading/trailing underscores
+
         // If empty after cleaning, use a default
-        if (!slug) slug = 'entity';
-        
+        if (!slug) slug = "entity";
+
         // Ensure uniqueness by checking existing node IDs (excluding current node)
         let finalSlug = slug;
         let counter = 1;
-        while ($nodes.some(node => node.id === finalSlug && node.id !== currentId)) {
+        while (
+            $nodes.some(
+                (node) => node.id === finalSlug && node.id !== currentId,
+            )
+        ) {
             finalSlug = `${slug}_${counter}`;
             counter++;
         }
-        
+
         return finalSlug;
     }
-    
+
     function updateLabel(e: Event) {
         const label = (e.target as HTMLInputElement).value;
         // Just update the label without changing ID (for real-time typing)
         updateNodeData(id, { label });
     }
-    
+
     function updateIdFromLabel(e: Event) {
         // Called on blur - update the ID based on final label
         const label = (e.target as HTMLInputElement).value;
         const newId = generateSlug(label, id);
-        
+
         // If ID changes, update the node and all relationships
         if (newId !== id) {
             // Update all edges that reference this node
-            $edges = $edges.map(edge => {
+            $edges = $edges.map((edge) => {
                 let updatedEdge = { ...edge };
                 if (edge.source === id) {
                     updatedEdge.source = newId;
@@ -73,22 +83,29 @@
                     updatedEdge.target = newId;
                 }
                 // Update edge ID if it was based on source-target pattern
-                if (updatedEdge.source !== edge.source || updatedEdge.target !== edge.target) {
+                if (
+                    updatedEdge.source !== edge.source ||
+                    updatedEdge.target !== edge.target
+                ) {
                     updatedEdge.id = `e${updatedEdge.source}-${updatedEdge.target}`;
                 }
                 return updatedEdge;
             });
-            
+
             // Update the node itself with new ID
-            $nodes = $nodes.map(node => {
+            $nodes = $nodes.map((node) => {
                 if (node.id === id) {
-                    return { ...node, id: newId, data: { ...node.data, label } };
+                    return {
+                        ...node,
+                        id: newId,
+                        data: { ...node.data, label },
+                    };
                 }
                 return node;
             });
         }
     }
-    
+
     function updateDescription(e: Event) {
         const description = (e.target as HTMLTextAreaElement).value;
         updateNodeData(id, { description });
@@ -101,28 +118,28 @@
         event.stopPropagation(); // Stop bubbling to canvas
         event.stopImmediatePropagation();
         isDragOver = false;
-        
-        const json = event.dataTransfer?.getData('application/dbt-model');
+
+        const json = event.dataTransfer?.getData("application/dbt-model");
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
-        
+
         // Store the full unique_id (e.g. "model.elmo.entity_booking")
         const updates: Record<string, unknown> = { dbt_model: model.unique_id };
-        const hasDescription = (data.description || '').trim().length > 0;
-        if (!hasDescription && (model.description || '').trim().length > 0) {
+        const hasDescription = (data.description || "").trim().length > 0;
+        if (!hasDescription && (model.description || "").trim().length > 0) {
             updates.description = model.description;
         }
-        
+
         updateNodeData(id, updates);
     }
-    
+
     function onDragOver(event: DragEvent) {
         event.preventDefault(); // Essential to allow drop
         if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = 'copy';
+            event.dataTransfer.dropEffect = "copy";
         }
     }
-    
+
     function onDragEnter(event: DragEvent) {
         event.preventDefault();
         isDragOver = true;
@@ -132,7 +149,10 @@
         isDragOver = false;
     }
 
-    function startDimensionResize(event: PointerEvent, type: 'width' | 'height') {
+    function startDimensionResize(
+        event: PointerEvent,
+        type: "width" | "height",
+    ) {
         event.stopPropagation();
         event.preventDefault();
 
@@ -142,33 +162,39 @@
         const initialHeight = columnPanelHeight;
 
         function onMove(moveEvent: PointerEvent) {
-            if (type === 'width') {
+            if (type === "width") {
                 const delta = moveEvent.clientX - startX;
-                const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, initialWidth + delta));
+                const next = Math.min(
+                    MAX_WIDTH,
+                    Math.max(MIN_WIDTH, initialWidth + delta),
+                );
                 updateNodeData(id, { width: next });
             } else {
                 const delta = moveEvent.clientY - startY;
-                const next = Math.min(MAX_PANEL_HEIGHT, Math.max(MIN_PANEL_HEIGHT, initialHeight + delta));
+                const next = Math.min(
+                    MAX_PANEL_HEIGHT,
+                    Math.max(MIN_PANEL_HEIGHT, initialHeight + delta),
+                );
                 updateNodeData(id, { panelHeight: next });
             }
         }
 
         function onUp() {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
         }
 
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
     }
-    
+
     function unbind() {
         updateNodeData(id, { dbt_model: null });
     }
-    
+
     function toggleCollapse(event: MouseEvent) {
         // Only toggle if clicking on the header background, not on the input
-        if ((event.target as HTMLElement).tagName === 'INPUT') {
+        if ((event.target as HTMLElement).tagName === "INPUT") {
             return;
         }
         updateNodeData(id, { collapsed: !isCollapsed });
@@ -182,17 +208,17 @@
     function deleteEntity() {
         try {
             // Remove all edges that reference this node
-            edges.update(list => list.filter(edge => 
-                edge.source !== id && edge.target !== id
-            ));
-            
+            edges.update((list) =>
+                list.filter((edge) => edge.source !== id && edge.target !== id),
+            );
+
             // Remove the node itself
-            nodes.update(list => list.filter(node => node.id !== id));
-            
+            nodes.update((list) => list.filter((node) => node.id !== id));
+
             showDeleteModal = false;
         } catch (error) {
-            console.error('Failed to delete entity:', error);
-            alert('Failed to delete entity. Please try again.');
+            console.error("Failed to delete entity:", error);
+            alert("Failed to delete entity. Please try again.");
             showDeleteModal = false;
         }
     }
@@ -200,9 +226,80 @@
     function cancelDelete() {
         showDeleteModal = false;
     }
+
+    // Field drafting functionality
+    let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
+    let savingSchema = $state(false);
+    let saveSchemaError = $state<string | null>(null);
+
+    function addDraftedField() {
+        const newField: DraftedField = {
+            name: "",
+            datatype: "text",
+        };
+        const updatedFields = [...draftedFields, newField];
+        updateNodeData(id, { drafted_fields: updatedFields });
+    }
+
+    function updateDraftedField(index: number, updates: Partial<DraftedField>) {
+        const updatedFields = draftedFields.map((field, i) =>
+            i === index ? { ...field, ...updates } : field,
+        );
+        updateNodeData(id, { drafted_fields: updatedFields });
+    }
+
+    function deleteDraftedField(index: number) {
+        const updatedFields = draftedFields.filter((_, i) => i !== index);
+        updateNodeData(id, { drafted_fields: updatedFields });
+    }
+
+    async function saveToDbtSchema() {
+        if (draftedFields.length === 0) {
+            saveSchemaError = "No fields to save";
+            return;
+        }
+
+        // Validate that all fields have names
+        const invalidFields = draftedFields.filter((f) => !f.name.trim());
+        if (invalidFields.length > 0) {
+            saveSchemaError = "All fields must have a name";
+            return;
+        }
+        savingSchema = true;
+        saveSchemaError = null;
+
+        try {
+            console.log("Saving dbt schema...", {
+                id,
+                modelName: data.label || id,
+                fields: draftedFields,
+            });
+            const response = await saveDbtSchema(
+                id,
+                data.label || id,
+                draftedFields,
+            );
+            saveSchemaError = null;
+            console.log("Successfully saved dbt schema");
+            console.log("File saved to:", response);
+            // Show brief success indication
+            setTimeout(() => {
+                savingSchema = false;
+            }, 1000);
+        } catch (error) {
+            savingSchema = false;
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to save schema";
+            saveSchemaError = errorMessage;
+            console.error("Failed to save dbt schema:", error);
+            console.error("Error details:", errorMessage);
+        }
+    }
 </script>
 
-<div 
+<div
     class="rounded-md border-2 bg-white shadow-sm transition-all hover:shadow-md relative"
     class:border-green-500={isBound}
     class:border-blue-500={isDragOver}
@@ -216,20 +313,27 @@
     ondragleave={onDragLeave}
     role="presentation"
 >
-    <Handle type="target" position={Position.Top} class="!bg-gray-400 !w-3 !h-3" />
-    
+    <Handle
+        type="target"
+        position={Position.Top}
+        class="!bg-gray-400 !w-3 !h-3"
+    />
+
     <!-- Header -->
-    <div 
+    <div
         class="p-2 border-b border-gray-100 bg-gray-50 rounded-t-md flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
         onclick={toggleCollapse}
         title={isCollapsed ? "Click to expand" : "Click to collapse"}
     >
         <div class="flex items-center gap-1 flex-1 min-w-0">
-            <span class="text-gray-500 text-xs flex-shrink-0 select-none transition-transform" style={`transform: rotate(${isCollapsed ? 0 : 90}deg)`}>
+            <span
+                class="text-gray-500 text-xs flex-shrink-0 select-none transition-transform"
+                style={`transform: rotate(${isCollapsed ? 0 : 90}deg)`}
+            >
                 ▶
             </span>
-            <input 
-                value={data.label} 
+            <input
+                value={data.label}
                 oninput={updateLabel}
                 onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}
@@ -239,7 +343,10 @@
         </div>
         <div class="flex items-center gap-1 flex-shrink-0">
             {#if isBound}
-                <div class="w-2 h-2 rounded-full bg-green-500" title="Bound to {boundModelName}"></div>
+                <div
+                    class="w-2 h-2 rounded-full bg-green-500"
+                    title="Bound to {boundModelName}"
+                ></div>
             {/if}
             <button
                 onclick={handleDeleteClick}
@@ -254,69 +361,219 @@
 
     <!-- Body -->
     {#if !isCollapsed}
-    <div class="p-2">
-        {#if $viewMode === 'physical' && isBound && modelDetails}
-            <div class="text-xs">
-                <div class="font-mono text-gray-600 mb-2 bg-gray-100 p-1 rounded break-all">
-                    {modelDetails.schema}.{modelDetails.table}
-                </div>
-                {#if modelDetails.materialization}
-                    <div class="mb-2 text-gray-500">
-                        <span class="font-medium">Materialization:</span> 
-                        <span class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-semibold uppercase">
-                            {modelDetails.materialization}
-                        </span>
+        <div class="p-2">
+            {#if $viewMode === "physical" && isBound && modelDetails}
+                <div class="text-xs">
+                    <div
+                        class="font-mono text-gray-600 mb-2 bg-gray-100 p-1 rounded break-all"
+                    >
+                        {modelDetails.schema}.{modelDetails.table}
                     </div>
-                {/if}
-                <div class="overflow-y-auto border rounded bg-gray-50 p-1 scrollbar-thin" style={`max-height:${columnPanelHeight}px`}>
-                    {#each modelDetails.columns as col}
-                        <div class="flex justify-between py-1 border-b border-gray-200 last:border-0">
-                            <span class="font-medium text-gray-700 truncate pr-2" title={col.name}>{col.name}</span>
-                            <span class="text-gray-400 text-[10px] uppercase">{col.type}</span>
+                    {#if modelDetails.materialization}
+                        <div class="mb-2 text-gray-500">
+                            <span class="font-medium">Materialization:</span>
+                            <span
+                                class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-semibold uppercase"
+                            >
+                                {modelDetails.materialization}
+                            </span>
                         </div>
-                    {/each}
+                    {/if}
+                    <div
+                        class="overflow-y-auto border rounded bg-gray-50 p-1 scrollbar-thin"
+                        style={`max-height:${columnPanelHeight}px`}
+                    >
+                        {#each modelDetails.columns as col}
+                            <div
+                                class="flex justify-between py-1 border-b border-gray-200 last:border-0"
+                            >
+                                <span
+                                    class="font-medium text-gray-700 truncate pr-2"
+                                    title={col.name}>{col.name}</span
+                                >
+                                <span
+                                    class="text-gray-400 text-[10px] uppercase"
+                                    >{col.type}</span
+                                >
+                            </div>
+                        {/each}
+                    </div>
+                    <button
+                        class="mt-2 w-full text-xs text-red-500 hover:bg-red-50 p-1 rounded border border-red-100 transition-colors"
+                        onclick={unbind}
+                    >
+                        Unbind Model
+                    </button>
                 </div>
-                <button 
-                    class="mt-2 w-full text-xs text-red-500 hover:bg-red-50 p-1 rounded border border-red-100 transition-colors"
-                    onclick={unbind}
-                >
-                    Unbind Model
-                </button>
-            </div>
-        {:else}
-            <!-- Concept View -->
-             <textarea 
-                value={data.description || ''} 
-                oninput={updateDescription}
-                class="w-full text-xs text-gray-600 resize-y min-h-[60px] bg-gray-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded p-1"
-                placeholder="Description..."
-            ></textarea>
-            {#if isBound}
-                 <div class="mt-2 text-xs text-green-600 flex items-center justify-between bg-green-50 p-1 rounded border border-green-100">
-                    <span class="truncate font-medium" title={boundModelName}>🔗 {boundModelName}</span>
-                    <button onclick={unbind} class="text-red-400 hover:text-red-600 ml-1 px-1">×</button>
-                 </div>
             {:else}
-                <div class="mt-2 text-[10px] text-gray-400 text-center border border-dashed border-gray-300 rounded p-2 bg-gray-50 pointer-events-none">
-                    Drag dbt model here
-                </div>
+                <!-- When not bound to dbt model: show concept view OR field editor based on view mode -->
+                {#if $viewMode === "physical"}
+                    <!-- Physical View - Field Editor -->
+                    <div class="text-xs">
+                        <div
+                            class="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-[10px]"
+                        >
+                            ⚠️ Generic datatypes - may need adjustment for your
+                            database
+                        </div>
+
+                        <div
+                            class="overflow-y-auto border rounded bg-gray-50 p-1 scrollbar-thin"
+                            style={`max-height:${columnPanelHeight}px`}
+                        >
+                            {#if draftedFields.length > 0}
+                                {#each draftedFields as field, index}
+                                    <div
+                                        class="p-2 border-b border-gray-200 last:border-0 bg-white rounded mb-1"
+                                    >
+                                        <div
+                                            class="flex gap-1 mb-1 items-center"
+                                        >
+                                            <input
+                                                type="text"
+                                                value={field.name}
+                                                oninput={(e) =>
+                                                    updateDraftedField(index, {
+                                                        name: (
+                                                            e.target as HTMLInputElement
+                                                        ).value,
+                                                    })}
+                                                class="flex-1 px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                                placeholder="field_name"
+                                            />
+                                            <select
+                                                value={field.datatype}
+                                                onchange={(e) =>
+                                                    updateDraftedField(index, {
+                                                        datatype: (
+                                                            e.target as HTMLSelectElement
+                                                        ).value as any,
+                                                    })}
+                                                class="px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 uppercase text-gray-600"
+                                            >
+                                                <option value="text"
+                                                    >text</option
+                                                >
+                                                <option value="int">int</option>
+                                                <option value="float"
+                                                    >float</option
+                                                >
+                                                <option value="bool"
+                                                    >bool</option
+                                                >
+                                                <option value="date"
+                                                    >date</option
+                                                >
+                                                <option value="timestamp"
+                                                    >timestamp</option
+                                                >
+                                            </select>
+                                            <button
+                                                onclick={() =>
+                                                    deleteDraftedField(index)}
+                                                class="text-red-400 hover:text-red-600 px-1"
+                                                title="Delete field">×</button
+                                            >
+                                        </div>
+                                        <textarea
+                                            value={field.description || ""}
+                                            oninput={(e) =>
+                                                updateDraftedField(index, {
+                                                    description: (
+                                                        e.target as HTMLTextAreaElement
+                                                    ).value,
+                                                })}
+                                            class="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
+                                            placeholder="Description (optional)"
+                                            rows="2"
+                                        ></textarea>
+                                    </div>
+                                {/each}
+                            {:else}
+                                <div
+                                    class="text-center text-gray-400 py-4 text-[10px]"
+                                >
+                                    No fields defined
+                                </div>
+                            {/if}
+                        </div>
+
+                        <button
+                            onclick={addDraftedField}
+                            class="mt-2 w-full text-xs text-blue-600 hover:bg-blue-50 p-1 rounded border border-blue-200 transition-colors font-medium"
+                        >
+                            + Add Field
+                        </button>
+
+                        {#if draftedFields.length > 0}
+                            <button
+                                onclick={saveToDbtSchema}
+                                disabled={savingSchema}
+                                class="mt-2 w-full text-xs text-green-600 hover:bg-green-50 p-1 rounded border border-green-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {savingSchema
+                                    ? "✓ Saved!"
+                                    : "💾 Save as dbt schema (.yml)"}
+                            </button>
+                            {#if saveSchemaError}
+                                <div
+                                    class="mt-1 text-[10px] text-red-600 bg-red-50 p-1 rounded"
+                                >
+                                    {saveSchemaError}
+                                </div>
+                            {/if}
+                        {/if}
+                    </div>
+                {:else}
+                    <!-- Concept View -->
+                    <textarea
+                        value={data.description || ""}
+                        oninput={updateDescription}
+                        class="w-full text-xs text-gray-600 resize-y min-h-[60px] bg-gray-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded p-1"
+                        placeholder="Description..."
+                    ></textarea>
+                    {#if isBound}
+                        <div
+                            class="mt-2 text-xs text-green-600 flex items-center justify-between bg-green-50 p-1 rounded border border-green-100"
+                        >
+                            <span
+                                class="truncate font-medium"
+                                title={boundModelName}>🔗 {boundModelName}</span
+                            >
+                            <button
+                                onclick={unbind}
+                                class="text-red-400 hover:text-red-600 ml-1 px-1"
+                                >×</button
+                            >
+                        </div>
+                    {:else}
+                        <div
+                            class="mt-2 text-[10px] text-gray-400 text-center border border-dashed border-gray-300 rounded p-2 bg-gray-50 pointer-events-none"
+                        >
+                            Drag dbt model here
+                        </div>
+                    {/if}
+                {/if}
             {/if}
-        {/if}
-    </div>
+        </div>
     {/if}
 
-    <Handle type="source" position={Position.Bottom} class="!bg-gray-400 !w-3 !h-3" />
+    <Handle
+        type="source"
+        position={Position.Bottom}
+        class="!bg-gray-400 !w-3 !h-3"
+    />
 
-    <div 
+    <div
         class="width-resize-handle"
-        onpointerdown={(event) => startDimensionResize(event, 'width')}
+        onpointerdown={(event) => startDimensionResize(event, "width")}
         title="Drag to resize width"
     ></div>
 
-    {#if $viewMode === 'physical'}
-        <div 
+    {#if $viewMode === "physical"}
+        <div
             class="height-resize-handle"
-            onpointerdown={(event) => startDimensionResize(event, 'height')}
+            onpointerdown={(event) => startDimensionResize(event, "height")}
             title="Drag to show more columns"
         ></div>
     {/if}
@@ -324,7 +581,7 @@
 
 <DeleteConfirmModal
     open={showDeleteModal}
-    entityLabel={data.label || 'Entity'}
+    entityLabel={data.label || "Entity"}
     onConfirm={deleteEntity}
     onCancel={cancelDelete}
 />
@@ -336,7 +593,10 @@
         right: -3px;
         width: 6px;
         height: 100%;
-        cursor: col-resize;
+        cursor:
+            url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M8 12 L2 8 L2 16 Z M16 12 L22 8 L22 16 Z" fill="black" stroke="white" stroke-width="0.5"/></svg>')
+                12 12,
+            ew-resize;
         border-radius: 999px;
     }
 
@@ -351,8 +611,10 @@
         left: 0;
         width: 100%;
         height: 6px;
-        cursor: row-resize;
+        cursor:
+            url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M12 8 L8 2 L16 2 Z M12 16 L8 22 L16 22 Z" fill="black" stroke="white" stroke-width="0.5"/></svg>')
+                12 12,
+            ns-resize;
         border-radius: 999px;
     }
 </style>
-
