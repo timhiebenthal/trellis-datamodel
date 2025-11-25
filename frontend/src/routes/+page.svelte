@@ -24,6 +24,13 @@
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
     let lastSavedState = "";
+
+    function getParallelOffset(index: number): number {
+        if (index === 0) return 0;
+        const level = Math.ceil(index / 2);
+        const offset = level * 20;
+        return index % 2 === 1 ? offset : -offset;
+    }
     
     async function handleSyncDbt() {
         syncing = true;
@@ -34,6 +41,73 @@
             setTimeout(() => { syncMessage = null; }, 3000);
         } catch (e) {
             syncMessage = `✗ ${e instanceof Error ? e.message : 'Sync failed'}`;
+            setTimeout(() => { syncMessage = null; }, 5000);
+        } finally {
+            syncing = false;
+        }
+    }
+
+    async function handleInferFromDbt() {
+        syncing = true;
+        syncMessage = "Inferring...";
+        try {
+            const inferred = await inferRelationships();
+            if (inferred.length > 0) {
+                let addedCount = 0;
+                const newEdges = [...$edges];
+                
+                inferred.forEach((r: any) => {
+                    const exists = newEdges.some(e => 
+                        e.source === r.source && 
+                        e.target === r.target && 
+                        e.data?.source_field === r.source_field &&
+                        e.data?.target_field === r.target_field
+                    );
+                    
+                    if (!exists) {
+                        const parallelEdges = newEdges.filter(e => 
+                             (e.source === r.source && e.target === r.target) ||
+                             (e.source === r.target && e.target === r.source)
+                        );
+                        const currentCount = parallelEdges.length;
+                        
+                        const baseId = `e${r.source}-${r.target}`;
+                        const edgeId = `${baseId}-${Date.now()}-${currentCount}`; 
+                        
+                        newEdges.push({
+                            id: edgeId,
+                            source: r.source,
+                            target: r.target,
+                            type: "custom",
+                            data: {
+                                label: r.label || "",
+                                type: r.type || "one_to_many",
+                                source_field: r.source_field,
+                                target_field: r.target_field,
+                                label_dx: r.label_dx || 0,
+                                label_dy: r.label_dy || 0,
+                                parallelOffset: getParallelOffset(currentCount),
+                            },
+                        });
+                        addedCount++;
+                    }
+                });
+                
+                if (addedCount > 0) {
+                    $edges = newEdges;
+                    syncMessage = `✓ Added ${addedCount} new`;
+                    setTimeout(() => { syncMessage = null; }, 3000);
+                } else {
+                    syncMessage = "No new found";
+                    setTimeout(() => { syncMessage = null; }, 3000);
+                }
+            } else {
+                syncMessage = "No relationships in dbt";
+                setTimeout(() => { syncMessage = null; }, 3000);
+            }
+        } catch (e) {
+            console.error(e);
+            syncMessage = "✗ Failed to infer";
             setTimeout(() => { syncMessage = null; }, 5000);
         } finally {
             syncing = false;
@@ -110,13 +184,6 @@
                     collapsed: e.collapsed ?? false,
                 },
             })) as Node[];
-
-            function getParallelOffset(index: number): number {
-                if (index === 0) return 0;
-                const level = Math.ceil(index / 2);
-                const offset = level * 20;
-                return index % 2 === 1 ? offset : -offset;
-            }
 
             const edgeCounts = new Map<string, number>();
             $edges = relationships.map((r: any) => {
@@ -281,6 +348,14 @@
                     {syncMessage}
                 </span>
             {/if}
+            <button
+                onclick={handleInferFromDbt}
+                disabled={syncing || loading}
+                class="px-4 py-1.5 text-sm rounded font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title="Import relationship tests from dbt yml files"
+            >
+                ⬇️ Import from dbt
+            </button>
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}

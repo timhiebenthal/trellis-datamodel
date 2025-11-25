@@ -2,8 +2,8 @@
   import { 
     BaseEdge, 
     EdgeLabel,
-    getSmoothStepPath,
-    type EdgeProps
+    type EdgeProps,
+    useSvelteFlow
   } from '@xyflow/svelte';
   import { edges, nodes, viewMode } from '$lib/stores';
 
@@ -21,25 +21,11 @@
     targetPosition,
     style,
     markerEnd,
-    data 
+    data,
+    selected
   } = $props<$$Props>();
 
-  let [edgePath, labelX, labelY] = $derived(getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition
-  }));
-
-  let storedOffsetX = $derived((data?.label_dx as number) || 0);
-  let storedOffsetY = $derived((data?.label_dy as number) || 0);
-  let dragOffsetX = $state(0);
-  let dragOffsetY = $state(0);
-  let isDraggingLabel = $state(false);
-  let dragStartX = 0;
-  let dragStartY = 0;
+  const { updateEdge: flowUpdateEdge } = useSvelteFlow();
 
   // Compute index among parallel edges (edges between same source-target pair)
   const parallelIndex = $derived.by(() => {
@@ -49,11 +35,78 @@
     return parallelEdges.findIndex((e) => e.id === id);
   });
 
-  // Auto-offset for cascading labels (60px vertical spacing)
-  const autoCascadeY = $derived(parallelIndex * 70);
+  const totalParallel = $derived.by(() => {
+    return $edges.filter(
+      (e) => (e.source === source && e.target === target) || (e.source === target && e.target === source)
+    ).length;
+  });
 
-  const displayLabelX = $derived(labelX + storedOffsetX + dragOffsetX);
-  const displayLabelY = $derived(labelY + storedOffsetY + dragOffsetY + autoCascadeY);
+  // Calculate base offset for parallel edges - spread them out horizontally
+  const baseOffset = $derived.by(() => {
+    if (totalParallel <= 1) return 0;
+    const spacing = 50; // pixels between parallel edges
+    const totalWidth = (totalParallel - 1) * spacing;
+    return (parallelIndex * spacing) - (totalWidth / 2);
+  });
+
+  // Get stored label offset (user-dragged position)
+  let storedOffsetX = $derived((data?.label_dx as number) || 0);
+  let storedOffsetY = $derived((data?.label_dy as number) || 0);
+  let dragOffsetX = $state(0);
+  let dragOffsetY = $state(0);
+  let isDraggingLabel = $state(false);
+  let dragStartX = 0;
+  let dragStartY = 0;
+
+  // Calculate total offset (base parallel + user drag)
+  const totalOffsetX = $derived(baseOffset + storedOffsetX + dragOffsetX);
+  const totalOffsetY = $derived(storedOffsetY + dragOffsetY);
+
+  // Label position at midpoint plus offsets
+  const baseLabelX = $derived((sourceX + targetX) / 2);
+  const baseLabelY = $derived((sourceY + targetY) / 2);
+  const displayLabelX = $derived(baseLabelX + totalOffsetX);
+  const displayLabelY = $derived(baseLabelY + totalOffsetY);
+
+  // Create a custom path: source -> label -> target with straight segments
+  const edgePath = $derived.by(() => {
+    const labelPosX = displayLabelX;
+    const labelPosY = displayLabelY;
+    
+    // Path goes: source down -> horizontal to label -> down to target level -> to target
+    // Using smooth step style with the label as a waypoint
+    
+    // Determine if we're going left-to-right or right-to-left
+    const goingRight = targetX > sourceX;
+    const goingDown = targetY > sourceY;
+    
+    // Calculate intermediate points for step path through label
+    const sourceExitY = sourceY + 20; // Exit below source
+    const targetEntryY = targetY - 20; // Enter above target
+    
+    // Build path segments
+    let path = `M ${sourceX} ${sourceY}`;
+    
+    // Go down from source
+    path += ` L ${sourceX} ${sourceExitY}`;
+    
+    // Go horizontal to label X position
+    path += ` L ${labelPosX} ${sourceExitY}`;
+    
+    // Go to label Y position
+    path += ` L ${labelPosX} ${labelPosY}`;
+    
+    // Continue to target entry level
+    path += ` L ${labelPosX} ${targetEntryY}`;
+    
+    // Go horizontal to target X
+    path += ` L ${targetX} ${targetEntryY}`;
+    
+    // Go down to target
+    path += ` L ${targetX} ${targetY}`;
+    
+    return path;
+  });
 
   // Use raw data.label for input value, default to empty
   let label = $derived((data?.label as string) || '');
@@ -120,7 +173,18 @@
     updateEdge({ type: nextType });
   }
 
+  function selectThisEdge() {
+    // Deselect all edges and select this one
+    $edges = $edges.map(e => ({
+      ...e,
+      selected: e.id === id
+    }));
+  }
+
   function startLabelDrag(e: PointerEvent) {
+    // Select this edge when starting to interact with label
+    selectThisEdge();
+    
     e.stopPropagation();
     e.preventDefault();
     isDraggingLabel = true;
@@ -151,18 +215,29 @@
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }
+
+  // Style overrides for selection
+  const edgeStyle = $derived(
+    selected 
+      ? `stroke: #3b82f6; stroke-width: 2; ${style || ''}` 
+      : style
+  );
 </script>
 
-<BaseEdge path={edgePath} {markerEnd} {style} />
+<BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
 
   <EdgeLabel
   x={displayLabelX}
   y={displayLabelY}
 >
   <div
-    class="pointer-events-auto nodrag nopan bg-white px-2 py-1 rounded shadow border border-gray-200 flex flex-col gap-1 min-w-[180px] cursor-move select-none"
+    class="pointer-events-auto nodrag nopan bg-white px-2 py-1 rounded shadow border flex flex-col gap-1 min-w-[180px] cursor-move select-none transition-colors"
+    class:border-blue-500={selected}
+    class:ring-2={selected}
+    class:ring-blue-200={selected}
+    class:border-gray-200={!selected}
     onpointerdown={startLabelDrag}
-    click={(e) => e.stopPropagation()}
+    onclick={selectThisEdge}
     role="presentation"
   >
     <div class="flex items-center gap-2">

@@ -31,8 +31,8 @@ entities:
       targetEntity: players
       targetColumn: current_team_id
   position:
-    x: -331.1518025967639
-    y: 550.4859287453091
+    x: -376.28295046151936
+    y: 434.76503678439775
   width: 280
   panel_height: 200
   collapsed: false
@@ -53,21 +53,21 @@ relationships:
   type: many_to_one
   source_field: current_team_id
   target_field: team_id
-  label_dx: 0
-  label_dy: 0
-- source: team
-  target: game
+  label_dx: -168.727294921875
+  label_dy: -42.66668701171875
+- source: game
+  target: team
   label: ''
   type: one_to_many
-  source_field: team_id
-  target_field: home_team_id
-  label_dx: 1.939453125
-  label_dy: -24.242401123046875
-- source: team
-  target: game
+  source_field: home_team_id
+  target_field: team_id
+  label_dx: -90.18170166015625
+  label_dy: 68.84848022460938
+- source: game
+  target: team
   label: ''
   type: one_to_many
-  source_field: team_id
-  target_field: away_team_id
-  label_dx: -5.81817626953125
-  label_dy: -3.8787841796875
+  source_field: away_team_id
+  target_field: team_id
+  label_dx: -0.9697265625
+  label_dy: 9.69677734375

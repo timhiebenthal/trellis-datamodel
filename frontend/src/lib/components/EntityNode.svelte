@@ -12,7 +12,7 @@
 
     type $$Props = NodeProps;
 
-    let { data, id } = $props<$$Props>();
+    let { data, id, selected } = $props<$$Props>();
 
     const { updateNodeData } = useSvelteFlow();
     let showDeleteModal = $state(false);
@@ -457,43 +457,20 @@
         const sourceNodeId = $draggingField.nodeId;
         const targetNodeId = id;
         
-        // Check if edge already exists
-        let existingEdge = $edges.find(
-            (edge) =>
-                (edge.source === sourceNodeId && edge.target === targetNodeId) ||
-                (edge.source === targetNodeId && edge.target === sourceNodeId)
-        );
-        
-        if (existingEdge) {
-            // Update existing edge with field mapping
-            $edges = $edges.map((edge) =>
-                edge.id === existingEdge!.id
-                    ? {
-                          ...edge,
-                          data: {
-                              ...edge.data,
-                              source_field: edge.source === sourceNodeId ? $draggingField!.fieldName : targetFieldName,
-                              target_field: edge.target === targetNodeId ? targetFieldName : $draggingField!.fieldName,
-                          },
-                      }
-                    : edge
-            );
-        } else {
-            // Create new edge with field mapping
-            const newEdge = {
-                id: `e${sourceNodeId}-${targetNodeId}`,
-                source: sourceNodeId,
-                target: targetNodeId,
-                type: "custom",
-                data: {
-                    label: "",
-                    type: "one_to_many",
-                    source_field: $draggingField.fieldName,
-                    target_field: targetFieldName,
-                },
-            };
-            $edges = [...$edges, newEdge];
-        }
+        // Create new edge with field mapping (always create new edge to support multiple relationships)
+        const newEdge = {
+            id: `e${sourceNodeId}-${targetNodeId}-${Date.now()}`,
+            source: sourceNodeId,
+            target: targetNodeId,
+            type: "custom",
+            data: {
+                label: "",
+                type: "one_to_many",
+                source_field: $draggingField.fieldName,
+                target_field: targetFieldName,
+            },
+        };
+        $edges = [...$edges, newEdge];
 
         applyFieldLinkToSource(
             sourceNodeId,
@@ -508,11 +485,13 @@
 
 <div
     class="rounded-md border-2 bg-white shadow-sm hover:shadow-md relative"
-    class:border-green-500={isBound}
-    class:border-blue-500={isDragOver}
-    class:border-gray-300={!isBound && !isDragOver}
-    class:ring-2={isDragOver}
-    class:ring-blue-200={isDragOver}
+    class:border-green-500={isBound && !selected}
+    class:border-blue-600={selected}
+    class:ring-2={selected || isDragOver}
+    class:ring-blue-400={selected}
+    class:ring-blue-200={isDragOver && !selected}
+    class:border-blue-500={isDragOver && !selected}
+    class:border-gray-300={!isBound && !isDragOver && !selected}
     style={`width:${nodeWidth}px`}
     ondrop={onDrop}
     ondragover={onDragOver}
