@@ -284,26 +284,45 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         # Create models directory if it doesn't exist
         os.makedirs(models_dir, exist_ok=True)
 
+        # Load ontology to get entity description
+        entity_description = None
+        if ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
+            try:
+                with open(ONTOLOGY_PATH, "r") as f:
+                    ontology_data = yaml.safe_load(f) or {}
+                    entities = ontology_data.get("entities", [])
+                    # Find the entity by id
+                    for entity in entities:
+                        if entity.get("id") == request.entity_id:
+                            entity_description = entity.get("description")
+                            break
+            except Exception as e:
+                print(f"Warning: Could not load ontology for description: {e}")
+
         # Generate YAML content
+        model_dict = {
+            "name": request.model_name,
+            "columns": [
+                {
+                    "name": field["name"],
+                    "data_type": field["datatype"],
+                    **(
+                        {"description": field["description"]}
+                        if field.get("description")
+                        else {}
+                    ),
+                }
+                for field in request.fields
+            ],
+        }
+        
+        # Add description if available
+        if entity_description:
+            model_dict["description"] = entity_description
+
         schema_content = {
             "version": 2,
-            "models": [
-                {
-                    "name": request.model_name,
-                    "columns": [
-                        {
-                            "name": field["name"],
-                            "data_type": field["datatype"],
-                            **(
-                                {"description": field["description"]}
-                                if field.get("description")
-                                else {}
-                            ),
-                        }
-                        for field in request.fields
-                    ],
-                }
-            ],
+            "models": [model_dict],
         }
 
         # Write to file (using .yml extension to match dbt convention)

@@ -1,8 +1,8 @@
 # Configuration for dbt-ontology
 
 # Path to the dbt project directory (relative to this config file or absolute)
-dbt_project_path: "./dbt_concept"
-# dbt_project_path: "./dbt_built"
+# dbt_project_path: "./dbt_concept"
+dbt_project_path: "./dbt_built"
 
 # Path to the dbt manifest.json (relative to dbt_project_path or absolute)
 dbt_manifest_path: "target/manifest.json"

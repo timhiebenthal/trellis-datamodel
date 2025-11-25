@@ -6,3 +6,4 @@ nba-data/__marimo__/session/pull_data.py.json
 dbt_built/logs/dbt.log
 dbt_built/.user.yml
 dbt_built/nba.duckdb
+logs/dbt.log

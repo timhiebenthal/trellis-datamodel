@@ -1,0 +1,12 @@
+version: 2
+models:
+- name: Calendar
+  columns:
+  - name: calendar_date
+    data_type: text
+  - name: calender_week
+    data_type: text
+    description: ISO week number
+  - name: year_month
+    data_type: text
+    description: yyyy-MM syntax
