@@ -4,3 +4,5 @@ backend/__pycache__/main.cpython-312.pyc
 backend/backend.log
 nba-data/__marimo__/session/pull_data.py.json
 dbt_built/logs/dbt.log
+dbt_built/.user.yml
+dbt_built/nba.duckdb

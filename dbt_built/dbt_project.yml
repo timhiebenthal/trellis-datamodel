@@ -19,9 +19,9 @@ clean-targets:         # directories to be removed by 'dbt clean'
 models:
   nba_analytics:
     # Configured by layer
-    clean:
+    1_clean:
       +materialized: view
-    prep:
+    2_prep:
       +materialized: view
-    core:
+    3_core:
       +materialized: table
