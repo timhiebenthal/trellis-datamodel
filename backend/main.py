@@ -61,8 +61,8 @@ def load_config():
                 elif os.path.isabs(p):
                     MANIFEST_PATH = p
                 else:
-                     # Fallback for legacy or missing project path (though we said no backwards compat, safe to keep simple)
-                     MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+                    # Fallback for legacy or missing project path (though we said no backwards compat, safe to keep simple)
+                    MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
 
             # 3. Resolve Catalog
             if "dbt_catalog_path" in config:
@@ -77,11 +77,9 @@ def load_config():
             # 4. Resolve Ontology
             if "ontology_file" in config:
                 p = config["ontology_file"]
-                # Resolve relative path from dbt-ontology/ (config location)
                 if not os.path.isabs(p):
-                    ONTOLOGY_PATH = os.path.abspath(
-                        os.path.join(os.path.dirname(CONFIG_PATH), p)
-                    )
+                    base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
+                    ONTOLOGY_PATH = os.path.abspath(os.path.join(base_path, p))
                 else:
                     ONTOLOGY_PATH = p
 
@@ -108,7 +106,7 @@ async def get_config_status():
     manifest_exists = os.path.exists(MANIFEST_PATH) if MANIFEST_PATH else False
     catalog_exists = os.path.exists(CATALOG_PATH) if CATALOG_PATH else False
     ontology_exists = os.path.exists(ONTOLOGY_PATH) if ONTOLOGY_PATH else False
-    
+
     error = None
     if not config_present:
         error = "Config file not found."
@@ -125,7 +123,7 @@ async def get_config_status():
         "manifest_exists": manifest_exists,
         "catalog_exists": catalog_exists,
         "ontology_exists": ontology_exists,
-        "error": error
+        "error": error,
     }
 
 
@@ -265,59 +263,69 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         if not DBT_PROJECT_PATH:
             raise HTTPException(
                 status_code=400,
-                detail="dbt_project_path is not configured. Please set it in config.yml"
+                detail="dbt_project_path is not configured. Please set it in config.yml",
             )
-        
+
         # Determine the models directory
         # Use the first path from dbt_model_paths if available, otherwise just "models"
         if DBT_MODEL_PATHS and len(DBT_MODEL_PATHS) > 0:
             models_subdir = DBT_MODEL_PATHS[0]
         else:
             models_subdir = "models"
-        
-        models_dir = os.path.abspath(os.path.join(DBT_PROJECT_PATH, "models", models_subdir))
-        
+
+        models_dir = os.path.abspath(
+            os.path.join(DBT_PROJECT_PATH, "models", models_subdir)
+        )
+
         # Create models directory if it doesn't exist
         os.makedirs(models_dir, exist_ok=True)
-        
+
         # Generate YAML content
         schema_content = {
-            'version': 2,
-            'models': [{
-                'name': request.model_name,
-                'columns': [
-                    {
-                        'name': field['name'],
-                        'data_type': field['datatype'],
-                        **({'description': field['description']} if field.get('description') else {})
-                    }
-                    for field in request.fields
-                ]
-            }]
+            "version": 2,
+            "models": [
+                {
+                    "name": request.model_name,
+                    "columns": [
+                        {
+                            "name": field["name"],
+                            "data_type": field["datatype"],
+                            **(
+                                {"description": field["description"]}
+                                if field.get("description")
+                                else {}
+                            ),
+                        }
+                        for field in request.fields
+                    ],
+                }
+            ],
         }
-        
+
         # Write to file (using .yml extension to match dbt convention)
         output_path = os.path.join(models_dir, f"{request.entity_id}.yml")
-        
+
         # Log the path we're writing to
         print(f"Writing dbt schema to: {output_path}")
         print(f"Schema content: {schema_content}")
-        
-        with open(output_path, 'w') as f:
+
+        with open(output_path, "w") as f:
             yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
-        
+
         print(f"Successfully wrote file to: {output_path}")
-        
+
         return {
             "status": "success",
             "file_path": output_path,
-            "message": f"Schema saved to {output_path}"
+            "message": f"Schema saved to {output_path}",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving dbt schema: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error saving dbt schema: {str(e)}"
+        )
 
 
 # Mount static files (Frontend)

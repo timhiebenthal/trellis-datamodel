@@ -58,9 +58,8 @@ def load_config():
             if "ontology_file" in config:
                 p = config["ontology_file"]
                 if not os.path.isabs(p):
-                    ONTOLOGY_PATH = os.path.abspath(
-                        os.path.join(os.path.dirname(CONFIG_PATH), p)
-                    )
+                    base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
+                    ONTOLOGY_PATH = os.path.abspath(os.path.join(base_path, p))
                 else:
                     ONTOLOGY_PATH = p
 
