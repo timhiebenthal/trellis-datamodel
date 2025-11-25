@@ -59,12 +59,12 @@ def _():
 @app.cell
 def _(leaguegamefinder, pd):
     seasons_to_fetch = [
-        #'2025-26', 
-        '2024-25'
+        '2025-26', 
+        #'2024-25'
     ]
 
-    START_DATE = '2025-01-01'
-    END_DATE = '2025-03-31'
+    START_DATE = '2025-10-01'
+    END_DATE = '2025-11-30'
 
     def get_season_games():
         all_games = []
@@ -200,12 +200,12 @@ def _(all_games_df, get_gamestats, pd, save_endpoint_data):
             all_month_stats.append(game_data)
 
             # add small pause between iteration to avoid timeouts/rate-limits
-            time.sleep(2)
+            time.sleep(2.5)
 
         # expand data to player-grain and save as monthly .csv
         month_df = pd.json_normalize(all_month_stats, record_path="player_stats", meta="game_id")
         save_endpoint_data(month_df, f"game_stats_{selected_month}")
-        time.sleep(1)
+        time.sleep(10)
     return
 
 
