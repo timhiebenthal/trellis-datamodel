@@ -23,7 +23,6 @@ export interface DraftedField {
     name: string;
     datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp';
     description?: string;
-    fk_link?: ColumnLink;      // NEW: optional FK link
 }
 
 export interface EntityData {

@@ -285,21 +285,54 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         # Create models directory if it doesn't exist
         os.makedirs(models_dir, exist_ok=True)
 
-        # Use description from request if available, otherwise fallback to ontology
-        entity_description = request.description
-
-        if not entity_description and ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
+        # Load ontology to get relationships and description
+        ontology_data = {}
+        if ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
             try:
                 with open(ONTOLOGY_PATH, "r") as f:
                     ontology_data = yaml.safe_load(f) or {}
-                    entities = ontology_data.get("entities", [])
-                    # Find the entity by id
-                    for entity in entities:
-                        if entity.get("id") == request.entity_id:
-                            entity_description = entity.get("description")
-                            break
             except Exception as e:
-                print(f"Warning: Could not load ontology for description: {e}")
+                print(f"Warning: Could not load ontology: {e}")
+
+        # Use description from request if available, otherwise fallback to ontology
+        entity_description = request.description
+        if not entity_description:
+            entities = ontology_data.get("entities", [])
+            for entity in entities:
+                if entity.get("id") == request.entity_id:
+                    entity_description = entity.get("description")
+                    break
+
+        # Build a map of field names to relationships for this entity
+        # FK is on the "many" side: target for one_to_many, source for many_to_one
+        # This matches the logic in sync_dbt_tests
+        relationships = ontology_data.get("relationships", [])
+        field_to_relationship = {}
+
+        for rel in relationships:
+            source_id = rel.get("source")
+            target_id = rel.get("target")
+            rel_type = rel.get("type", "one_to_many")
+            source_field = rel.get("source_field")
+            target_field = rel.get("target_field")
+
+            if not source_field or not target_field:
+                continue
+
+            # FK is on the "many" side: target for one_to_many, source for many_to_one
+            fk_on_target = rel_type == "one_to_many"
+
+            fk_entity = target_id if fk_on_target else source_id
+            fk_field = target_field if fk_on_target else source_field
+            ref_entity = source_id if fk_on_target else target_id
+            ref_field = source_field if fk_on_target else target_field
+
+            # If this entity has the FK field, add it to the map
+            if fk_entity == request.entity_id:
+                field_to_relationship[fk_field] = {
+                    "target_entity": ref_entity,
+                    "target_field": ref_field,
+                }
 
         # Generate YAML content with relationship tests
         columns = []
@@ -313,14 +346,15 @@ async def save_dbt_schema(request: DbtSchemaRequest):
             if field.get("description"):
                 column_dict["description"] = field["description"]
 
-            # Add relationship test if fk_link is present
-            if field.get("fk_link"):
-                fk_link = field["fk_link"]
+            # Add relationship test if field has a relationship defined
+            field_name = field["name"]
+            if field_name in field_to_relationship:
+                rel_info = field_to_relationship[field_name]
                 column_dict["data_tests"] = [
                     {
                         "relationships": {
-                            "to": f"ref('{fk_link['targetEntity']}')",
-                            "field": fk_link["targetColumn"],
+                            "to": f"ref('{rel_info['target_entity']}')",
+                            "field": rel_info["target_field"],
                         }
                     }
                 ]

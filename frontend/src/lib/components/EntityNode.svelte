@@ -6,7 +6,7 @@
         type NodeProps,
     } from "@xyflow/svelte";
     import { viewMode, dbtModels, nodes, edges, draggingField } from "$lib/stores";
-    import type { DbtModel, DraftedField, ColumnLink } from "$lib/types";
+    import type { DbtModel, DraftedField } from "$lib/types";
     import { inferRelationships } from "$lib/api";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
 
@@ -312,28 +312,6 @@
                 list.filter((edge) => edge.source !== id && edge.target !== id),
             );
 
-            // Clean up fk_link references in other entities that point to this entity
-            nodes.update((list) =>
-                list.map((node) => {
-                    if (node.id === id) return node; // Skip the node being deleted
-                    const fields = node.data?.drafted_fields as DraftedField[] | undefined;
-                    if (!fields) return node;
-                    
-                    // Check if any field links to the deleted entity
-                    const hasLinkToDeleted = fields.some((f) => f.fk_link?.targetEntity === id);
-                    if (!hasLinkToDeleted) return node;
-                    
-                    // Remove fk_link from fields that reference the deleted entity
-                    const updatedFields = fields.map((f) =>
-                        f.fk_link?.targetEntity === id ? { ...f, fk_link: undefined } : f
-                    );
-                    return {
-                        ...node,
-                        data: { ...node.data, drafted_fields: updatedFields },
-                    };
-                })
-            );
-
             // Remove the node itself
             nodes.update((list) => list.filter((node) => node.id !== id));
 
@@ -373,10 +351,6 @@
         updateNodeData(id, { drafted_fields: updatedFields });
     }
     
-    function removeLink(index: number) {
-        updateDraftedField(index, { fk_link: undefined });
-    }
-    
     // Drag-and-drop for field linking
     function onFieldDragStart(fieldName: string, e: DragEvent) {
         e.stopPropagation(); // Prevent node drag
@@ -406,48 +380,6 @@
         }
     }
     
-    function applyFieldLinkToSource(
-        sourceNodeId: string,
-        fieldName: string,
-        targetEntityId: string,
-        targetFieldName: string,
-    ) {
-        const fkLink: ColumnLink = {
-            sourceColumn: fieldName,
-            targetEntity: targetEntityId,
-            targetColumn: targetFieldName,
-        };
-
-        if (sourceNodeId === id) {
-            const localIndex = draftedFields.findIndex((f) => f.name === fieldName);
-            if (localIndex !== -1) {
-                updateDraftedField(localIndex, { fk_link: fkLink });
-            }
-            return;
-        }
-
-        nodes.update((list) =>
-            list.map((node) => {
-                if (node.id !== sourceNodeId) return node;
-                const nodeFields = (node.data?.drafted_fields || []) as DraftedField[];
-                const hasField = nodeFields.some((f) => f.name === fieldName);
-                if (!hasField) return node;
-
-                const updatedFields = nodeFields.map((f) =>
-                    f.name === fieldName ? { ...f, fk_link: fkLink } : f,
-                );
-
-                return {
-                    ...node,
-                    data: {
-                        ...node.data,
-                        drafted_fields: updatedFields,
-                    },
-                };
-            }),
-        );
-    }
-    
     function onFieldDrop(targetFieldName: string, e: DragEvent) {
         e.preventDefault();
         e.stopPropagation(); // Prevent bubble to canvas
@@ -471,13 +403,6 @@
             },
         };
         $edges = [...$edges, newEdge];
-
-        applyFieldLinkToSource(
-            sourceNodeId,
-            $draggingField.fieldName,
-            targetNodeId,
-            targetFieldName,
-        );
         
         $draggingField = null;
     }
@@ -686,15 +611,6 @@
                                                     >timestamp</option
                                                 >
                                             </select>
-                                            {#if field.fk_link}
-                                                <button
-                                                    onclick={() => removeLink(index)}
-                                                    class="text-blue-600 hover:text-red-600 px-1"
-                                                    title={`Remove link to ${field.fk_link.targetEntity}.${field.fk_link.targetColumn}`}
-                                                >
-                                                    ✕
-                                                </button>
-                                            {/if}
                                             <button
                                                 onclick={() =>
                                                     deleteDraftedField(index)}
@@ -702,11 +618,6 @@
                                                 title="Delete field">×</button
                                             >
                                         </div>
-                                        {#if field.fk_link}
-                                            <div class="text-[9px] text-blue-600 mb-1">
-                                                → {field.fk_link.targetEntity}.{field.fk_link.targetColumn}
-                                            </div>
-                                        {/if}
                                         <textarea
                                             value={field.description || ""}
                                             oninput={(e) =>

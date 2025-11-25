@@ -9,10 +9,6 @@ entities:
     datatype: text
   - name: current_team_id
     datatype: text
-    fk_link:
-      sourceColumn: current_team_id
-      targetEntity: team
-      targetColumn: team_id
   position:
     x: 215.340788965465
     y: -0.24249502070844642
@@ -26,13 +22,9 @@ entities:
   drafted_fields:
   - name: team_id
     datatype: text
-    fk_link:
-      sourceColumn: team_id
-      targetEntity: players
-      targetColumn: current_team_id
   position:
-    x: -376.28295046151936
-    y: 434.76503678439775
+    x: -380.91178613995584
+    y: 352.60320349215067
   width: 280
   panel_height: 200
   collapsed: false
