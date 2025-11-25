@@ -300,7 +300,7 @@
 </script>
 
 <div
-    class="rounded-md border-2 bg-white shadow-sm transition-all hover:shadow-md relative"
+    class="rounded-md border-2 bg-white shadow-sm hover:shadow-md relative cursor-default"
     class:border-green-500={isBound}
     class:border-blue-500={isDragOver}
     class:border-gray-300={!isBound && !isDragOver}
@@ -593,10 +593,7 @@
         right: -3px;
         width: 6px;
         height: 100%;
-        cursor:
-            url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M8 12 L2 8 L2 16 Z M16 12 L22 8 L22 16 Z" fill="black" stroke="white" stroke-width="0.5"/></svg>')
-                12 12,
-            ew-resize;
+        cursor: ew-resize;
         border-radius: 999px;
     }
 
@@ -611,10 +608,7 @@
         left: 0;
         width: 100%;
         height: 6px;
-        cursor:
-            url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M12 8 L8 2 L16 2 Z M12 16 L8 22 L16 22 Z" fill="black" stroke="white" stroke-width="0.5"/></svg>')
-                12 12,
-            ns-resize;
+        cursor: ns-resize;
         border-radius: 999px;
     }
 </style>

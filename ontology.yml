@@ -2,20 +2,24 @@ version: 0.1
 entities:
 - id: team
   label: team
-  description: ''
+  description: A Team in the NBA
   drafted_fields:
   - name: team_id
     datatype: text
-    description: unique ID
+    description: 'unique ID of the team '
   - name: team_name
     datatype: text
+    description: Full Name of the Team (e.g. Los Angeles Lakers)
   - name: city
     datatype: text
-    description: yada
+    description: City where the team is based (e.g. Los Angeles)
+  - name: abbrevation
+    datatype: text
+    description: 3-letter abbrevation (e.g. LAC)
   position:
-    x: 177.0275037700643
-    y: 189.99564502855304
-  width: 504.4444580078125
+    x: 255.49018287768496
+    y: 149.70052476482618
+  width: 553.3333129882812
   panel_height: 480
   collapsed: false
 relationships: []
