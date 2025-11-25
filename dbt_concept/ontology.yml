@@ -1,8 +1,8 @@
 version: 0.1
 entities:
 - id: team
-  label: team
-  description: A Team in the NBA
+  label: Team
+  description: A Basketball Team in the NBA
   drafted_fields:
   - name: team_id
     datatype: text
@@ -17,9 +17,65 @@ entities:
     datatype: text
     description: 3-letter abbrevation (e.g. LAC)
   position:
-    x: 255.49018287768496
-    y: 149.70052476482618
-  width: 553.3333129882812
+    x: 347.94889343481924
+    y: -98.87699214287917
+  width: 338.060546875
   panel_height: 480
   collapsed: true
-relationships: []
+- id: player
+  label: Player
+  description: The players competing in the NBA
+  position:
+    x: 251.2858870451367
+    y: 351.64084900444914
+  width: 280
+  panel_height: 200
+  collapsed: false
+- id: game
+  label: Game
+  description: A game where two teams compete
+  position:
+    x: 757.1496200441215
+    y: 145.58567529713415
+  width: 280
+  panel_height: 200
+  collapsed: false
+- id: calendar
+  label: Calendar
+  description: ''
+  position:
+    x: 1425.1367534312217
+    y: 308.3132621556553
+  width: 280
+  panel_height: 200
+  collapsed: true
+- id: game_stats_per_player
+  label: Game Stats per Player
+  description: ''
+  position:
+    x: 922.2917436153347
+    y: 623.5843512151973
+  width: 280
+  panel_height: 200
+  collapsed: false
+relationships:
+- source: team
+  target: player
+  label: employs
+  type: one_to_many
+- source: team
+  target: game
+  label: face another one in
+  type: one_to_many
+- source: game
+  target: calendar
+  label: are scheduled in
+  type: many_to_one
+- source: player
+  target: game_stats_per_player
+  label: has
+  type: one_to_many
+- source: game
+  target: game_stats_per_player
+  label: generates
+  type: one_to_many
