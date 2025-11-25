@@ -8,3 +8,11 @@ export const dbtModels = writable<DbtModel[]>([]);
 export const viewMode = writable<'concept' | 'physical'>('concept');
 export const configStatus = writable<any>(null);
 
+// Drag-and-drop state for field linking
+export interface FieldDragState {
+    nodeId: string;
+    fieldName: string;
+    nodeLabel: string;
+}
+export const draggingField = writable<FieldDragState | null>(null);
+

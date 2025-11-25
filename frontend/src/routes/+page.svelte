@@ -12,6 +12,7 @@
         getOntology,
         saveOntology,
         getConfigStatus,
+        inferRelationships,
     } from "$lib/api";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
@@ -65,6 +66,17 @@
             // Load Ontology
             const ontology = await getOntology();
 
+            // If no relationships in ontology, try to infer from dbt yml files
+            let relationships = ontology.relationships || [];
+            if (relationships.length === 0) {
+                console.log("No relationships found in ontology, attempting to infer from dbt yml files...");
+                const inferred = await inferRelationships();
+                if (inferred.length > 0) {
+                    relationships = inferred;
+                    console.log(`Inferred ${inferred.length} relationships from dbt yml files`);
+                }
+            }
+
             // Map ontology to Svelte Flow format
             $nodes = (ontology.entities || []).map((e: any) => ({
                 id: e.id,
@@ -81,7 +93,7 @@
                 },
             })) as Node[];
 
-            $edges = (ontology.relationships || []).map((r: any) => ({
+            $edges = relationships.map((r: any) => ({
                 id: `e${r.source}-${r.target}`,
                 source: r.source,
                 target: r.target,
@@ -89,6 +101,8 @@
                 data: {
                     label: r.label || "",
                     type: r.type || "one_to_many",
+                    source_field: r.source_field,
+                    target_field: r.target_field,
                 },
             })) as Edge[];
 
@@ -140,6 +154,8 @@
                         target: e.target,
                         label: (e.data?.label as string) || "",
                         type: (e.data?.type as string) || "one_to_many",
+                        source_field: e.data?.source_field,
+                        target_field: e.data?.target_field,
                     })),
                 };
 

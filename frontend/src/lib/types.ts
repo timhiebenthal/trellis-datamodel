@@ -13,10 +13,17 @@ export interface DbtModel {
     materialization?: string;
 }
 
+export interface ColumnLink {
+    sourceColumn: string;      // e.g., "home_team_id"
+    targetEntity: string;      // e.g., "team"
+    targetColumn: string;      // e.g., "team_id"
+}
+
 export interface DraftedField {
     name: string;
     datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp';
     description?: string;
+    fk_link?: ColumnLink;      // NEW: optional FK link
 }
 
 export interface EntityData {
@@ -46,5 +53,11 @@ export interface ConfigStatus {
     catalog_exists: boolean;
     ontology_exists: boolean;
     error?: string;
+}
+
+export interface FieldDragState {
+    nodeId: string;
+    fieldName: string;
+    nodeLabel: string;
 }
 

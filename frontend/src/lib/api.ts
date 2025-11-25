@@ -63,3 +63,18 @@ export async function saveDbtSchema(entityId: string, modelName: string, fields:
     }
     return await res.json();
 }
+
+export async function inferRelationships(): Promise<any[]> {
+    try {
+        const res = await fetch(`${API_BASE}/infer-relationships`);
+        if (!res.ok) {
+            if (res.status === 404) return []; // Handle gracefully
+            throw new Error(`Status: ${res.status}`);
+        }
+        const data = await res.json();
+        return data.relationships || [];
+    } catch (e) {
+        console.error("Error inferring relationships:", e);
+        return [];
+    }
+}

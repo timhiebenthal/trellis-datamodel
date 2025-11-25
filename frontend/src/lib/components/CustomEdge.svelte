@@ -5,7 +5,7 @@
     getSmoothStepPath,
     type EdgeProps
   } from '@xyflow/svelte';
-  import { edges, nodes } from '$lib/stores';
+  import { edges, nodes, dbtModels, viewMode } from '$lib/stores';
 
   type $$Props = EdgeProps;
 
@@ -36,6 +36,8 @@
   // Use raw data.label for input value, default to empty
   let label = $derived((data?.label as string) || '');
   let type = $derived((data?.type as string) || 'one_to_many');
+  let sourceField = $derived((data?.source_field as string) || '');
+  let targetField = $derived((data?.target_field as string) || '');
   // Cardinality text map
   const cardinalityText = $derived({
     'one_to_many': 'one → many',
@@ -57,6 +59,29 @@
   const sourceName = $derived(sourceNode?.data?.label || 'Source');
   const targetName = $derived(targetNode?.data?.label || 'Target');
   const actionText = $derived(label?.trim() || 'relates to');
+  
+  // Get available columns for source and target entities
+  const sourceColumns = $derived.by(() => {
+    if (!sourceNode) return [];
+    // Check if bound to dbt model
+    if (sourceNode.data?.dbt_model) {
+      const model = $dbtModels.find(m => m.unique_id === sourceNode.data.dbt_model);
+      return model?.columns.map(c => c.name) || [];
+    }
+    // Check drafted fields
+    return (sourceNode.data?.drafted_fields || []).map((f: any) => f.name);
+  });
+  
+  const targetColumns = $derived.by(() => {
+    if (!targetNode) return [];
+    // Check if bound to dbt model
+    if (targetNode.data?.dbt_model) {
+      const model = $dbtModels.find(m => m.unique_id === targetNode.data.dbt_model);
+      return model?.columns.map(c => c.name) || [];
+    }
+    // Check drafted fields
+    return (targetNode.data?.drafted_fields || []).map((f: any) => f.name);
+  });
 
   const relationText = $derived(
     `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
@@ -129,5 +154,38 @@
     <div class="text-[10px] text-gray-500 text-center whitespace-nowrap">
       {relationText}
     </div>
+    <!-- Field mappings - only show in Physical view -->
+    {#if $viewMode === "physical"}
+    <div class="text-[9px] text-gray-400 mt-1 space-y-1">
+      <div class="flex items-center gap-1">
+        <span class="text-gray-500">From:</span>
+        <select
+          value={sourceField}
+          onchange={(e) => updateEdge({ source_field: (e.target as HTMLSelectElement).value || undefined })}
+          class="flex-1 text-[9px] border border-gray-200 rounded px-1 py-0.5 bg-white"
+          onclick={(e) => e.stopPropagation()}
+        >
+          <option value="">Select field...</option>
+          {#each sourceColumns as col}
+            <option value={col}>{col}</option>
+          {/each}
+        </select>
+      </div>
+      <div class="flex items-center gap-1">
+        <span class="text-gray-500">To:</span>
+        <select
+          value={targetField}
+          onchange={(e) => updateEdge({ target_field: (e.target as HTMLSelectElement).value || undefined })}
+          class="flex-1 text-[9px] border border-gray-200 rounded px-1 py-0.5 bg-white"
+          onclick={(e) => e.stopPropagation()}
+        >
+          <option value="">Select field...</option>
+          {#each targetColumns as col}
+            <option value={col}>{col}</option>
+          {/each}
+        </select>
+      </div>
+    </div>
+    {/if}
   </div>
 </EdgeLabel>

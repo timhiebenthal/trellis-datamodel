@@ -1,3 +1,41 @@
 version: 0.1
-entities: []
-relationships: []
+entities:
+- id: players
+  label: Players
+  description: Players competing in the NBA
+  dbt_model: model.nba_analytics.player
+  drafted_fields:
+  - name: player_id
+    datatype: text
+  - name: current_team_id
+    datatype: text
+  position:
+    x: 173.89731592713088
+    y: 237.88171978777652
+  width: 460.363525390625
+  panel_height: 480
+  collapsed: false
+- id: team
+  label: Team
+  description: A Basketball Team competing in the NBA League
+  dbt_model: model.nba_analytics.team
+  drafted_fields:
+  - name: team_id
+    datatype: text
+    fk_link:
+      sourceColumn: team_id
+      targetEntity: players
+      targetColumn: current_team_id
+  position:
+    x: -76.42301185291514
+    y: 756.267529388211
+  width: 280
+  panel_height: 200
+  collapsed: false
+relationships:
+- source: players
+  target: team
+  label: ''
+  type: one_to_many
+  source_field: current_team
+  target_field: team_name
