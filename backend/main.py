@@ -241,11 +241,15 @@ class OntologyUpdate(BaseModel):
 @app.post("/api/ontology")
 async def save_ontology(data: OntologyUpdate):
     try:
-        content = data.model_dump()
+        content = data.dict()  # Pydantic v1 (required by dbt-core==1.10)
+        print(f"Saving ontology to: {ONTOLOGY_PATH}")
         with open(ONTOLOGY_PATH, "w") as f:
             yaml.dump(content, f, default_flow_style=False, sort_keys=False)
         return {"status": "success"}
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error saving ontology: {str(e)}")
 
 
