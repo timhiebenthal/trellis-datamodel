@@ -247,6 +247,8 @@ async def save_data_model(data: DataModelUpdate):
         print(f"Saving data model to: {DATA_MODEL_PATH}")
         with open(DATA_MODEL_PATH, "w") as f:
             yaml.dump(content, f, default_flow_style=False, sort_keys=False)
+            f.flush()
+            os.fsync(f.fileno())
         return {"status": "success"}
     except Exception as e:
         import traceback

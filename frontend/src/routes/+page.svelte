@@ -6,6 +6,12 @@
         dbtModels,
         viewMode,
         configStatus,
+        initHistory,
+        pushHistory,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
     } from "$lib/stores";
     import {
         getManifest,
@@ -147,6 +153,7 @@
     }
 
     onMount(async () => {
+        console.log(`[${Date.now()}] Page mounted, loading data...`);
         try {
             // Check Config Status
             const status = await getConfigStatus();
@@ -215,12 +222,32 @@
             }) as Edge[];
 
             lastSavedState = JSON.stringify({ nodes: $nodes, edges: $edges });
+            initHistory();
         } catch (e) {
             console.error("Initialization error:", e);
             alert("Failed to initialize. Check backend connection.");
         } finally {
             loading = false;
         }
+
+        // Keyboard shortcut for undo/redo
+        function handleKeydown(e: KeyboardEvent) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    redo();
+                } else {
+                    undo();
+                }
+            }
+            // Ctrl+Y as alternative redo
+            if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+                e.preventDefault();
+                redo();
+            }
+        }
+        window.addEventListener('keydown', handleKeydown);
+        return () => window.removeEventListener('keydown', handleKeydown);
     });
 
     // Auto-save logic
@@ -233,11 +260,16 @@
         const currentNodes = $nodes;
         const currentEdges = $edges;
 
+        console.log("State changed:", { nodes: currentNodes.length, edges: currentEdges.length });
+
         const state = JSON.stringify({
             nodes: currentNodes,
             edges: currentEdges,
         });
         if (state === lastSavedState) return;
+
+        // Push to undo history
+        pushHistory();
 
         clearTimeout(timeout);
         saving = true;

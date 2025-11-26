@@ -1,3 +1,8 @@
+<script context="module" lang="ts">
+    // Track recently created edges to prevent duplicates (persists across component remounts)
+    const recentConnections = new Set<string>();
+</script>
+
 <script lang="ts">
     import {
         SvelteFlow,
@@ -31,7 +36,34 @@
     }
 
     function onConnect(connection: Connection) {
-        // Generate unique edge ID (allow multiple edges between same entities)
+        const connectionKey = `${connection.source}-${connection.target}`;
+        console.log(`[${Date.now()}] onConnect triggered for ${connectionKey}`, connection);
+        
+        // Check if this exact connection was just made
+        if (recentConnections.has(connectionKey)) {
+            console.warn("Blocked duplicate connection:", connectionKey);
+            return;
+        }
+        
+        // Mark as recently created, clear after 1 second
+        recentConnections.add(connectionKey);
+        setTimeout(() => recentConnections.delete(connectionKey), 1000);
+
+        // Check if a generic edge (no field mapping) already exists between these nodes
+        // This prevents double creation if the store hasn't updated yet but we have a logical duplicate
+        const genericEdgeExists = $edges.some(e => 
+            ((e.source === connection.source && e.target === connection.target) ||
+             (e.source === connection.target && e.target === connection.source)) &&
+            !e.data?.source_field && 
+            !e.data?.target_field
+        );
+
+        if (genericEdgeExists) {
+             console.warn("Blocked duplicate generic edge:", connectionKey);
+             return;
+        }
+
+        // Generate unique edge ID
         const baseId = `e${connection.source}-${connection.target}`;
         let edgeId = baseId;
         let counter = 1;
@@ -131,7 +163,7 @@
 <div class="flex-1 h-full relative w-full">
     <SvelteFlow
         bind:nodes={$nodes}
-        bind:edges={$edges}
+        edges={$edges}
         {nodeTypes}
         {edgeTypes}
         onconnect={onConnect}

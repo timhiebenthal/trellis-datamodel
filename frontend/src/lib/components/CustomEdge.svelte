@@ -184,6 +184,14 @@
   function startLabelDrag(e: PointerEvent) {
     // Select this edge when starting to interact with label
     selectThisEdge();
+
+    const target = e.target as HTMLElement | null;
+    const isInteractive = target?.closest('input,button,textarea,select,[contenteditable="true"]');
+    if (isInteractive) {
+      // Allow form controls to receive focus/typing but keep the event local
+      e.stopPropagation();
+      return;
+    }
     
     e.stopPropagation();
     e.preventDefault();
