@@ -1,4 +1,4 @@
-# dbt-ontology (ERD Modeller)
+# dbt Data Model UI
 
 A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implementation.
 
@@ -77,5 +77,5 @@ The backend hosts the compiled frontend at http://localhost:8000.
 ## Configuration
 - `dbt_manifest_path`: defaults to `../dbt/target/manifest.json` (relative to `backend/`).
 - `dbt_catalog_path`: defaults to `../dbt/target/catalog.json` (relative to `backend/`).
-- `ontology_file`: saved under `dbt_project_path` (defaults to `ontology.yml`).
+- `data_model_file`: saved under `dbt_project_path` (defaults to `data_model.yml`).
 

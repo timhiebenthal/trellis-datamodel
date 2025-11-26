@@ -137,7 +137,7 @@
             const inferred = await inferRelationships();
             
             // Build model name -> entity ID map from current canvas state
-            // Include the model we just bound (since ontology hasn't saved yet)
+            // Include the model we just bound (since data model hasn't saved yet)
             const modelToEntity: Record<string, string> = {};
             for (const node of $nodes) {
                 const boundModel = node.id === id ? model.unique_id : node.data?.dbt_model;

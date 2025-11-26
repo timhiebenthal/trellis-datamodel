@@ -9,8 +9,8 @@
     } from "$lib/stores";
     import {
         getManifest,
-        getOntology,
-        saveOntology,
+        getDataModel,
+        saveDataModel,
         getConfigStatus,
         inferRelationships,
         syncDbtTests,
@@ -155,13 +155,13 @@
             const models = await getManifest();
             $dbtModels = models;
 
-            // Load Ontology
-            const ontology = await getOntology();
+            // Load Data Model
+            const dataModel = await getDataModel();
 
-            // If no relationships in ontology, try to infer from dbt yml files
-            let relationships = ontology.relationships || [];
+            // If no relationships in data model, try to infer from dbt yml files
+            let relationships = dataModel.relationships || [];
             if (relationships.length === 0) {
-                console.log("No relationships found in ontology, attempting to infer from dbt yml files...");
+                console.log("No relationships found in data model, attempting to infer from dbt yml files...");
                 const inferred = await inferRelationships();
                 if (inferred.length > 0) {
                     relationships = inferred;
@@ -169,8 +169,8 @@
                 }
             }
 
-            // Map ontology to Svelte Flow format
-            $nodes = (ontology.entities || []).map((e: any) => ({
+            // Map data model to Svelte Flow format
+            $nodes = (dataModel.entities || []).map((e: any) => ({
                 id: e.id,
                 type: "entity",
                 position: e.position || { x: 0, y: 0 },
@@ -242,8 +242,8 @@
         saving = true;
         timeout = setTimeout(async () => {
             try {
-                // Convert back to ontology format
-                const ontology = {
+                // Convert back to data model format
+                const dataModel = {
                     version: 0.1,
                     entities: currentNodes.map((n) => ({
                         id: n.id,
@@ -268,7 +268,7 @@
                     })),
                 };
 
-                await saveOntology(ontology);
+                await saveDataModel(dataModel);
                 lastSavedState = state;
             } catch (e) {
                 console.error("Save failed", e);
@@ -307,7 +307,7 @@
             <div
                 class="font-bold text-xl text-gray-800 flex items-center gap-2"
             >
-                📦 dbt Ontology
+                📦 dbt Data Model
             </div>
             {#if saving}
                 <span class="text-xs text-gray-400 animate-pulse"

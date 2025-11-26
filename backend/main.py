@@ -20,19 +20,18 @@ app.add_middleware(
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# dbt-ontology/config.yml
 CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
 
 # Default values
 MANIFEST_PATH = ""
 CATALOG_PATH = ""
-ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
+DATA_MODEL_PATH = os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
 DBT_PROJECT_PATH = ""
 DBT_MODEL_PATHS = ["3-entity"]
 
 
 def load_config():
-    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
+    global MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r") as f:
@@ -74,14 +73,14 @@ def load_config():
                 else:
                     CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
 
-            # 4. Resolve Ontology
-            if "ontology_file" in config:
-                p = config["ontology_file"]
+            # 4. Resolve Data Model
+            if "data_model_file" in config:
+                p = config["data_model_file"]
                 if not os.path.isabs(p):
                     base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
-                    ONTOLOGY_PATH = os.path.abspath(os.path.join(base_path, p))
+                    DATA_MODEL_PATH = os.path.abspath(os.path.join(base_path, p))
                 else:
-                    ONTOLOGY_PATH = p
+                    DATA_MODEL_PATH = p
 
             if "dbt_model_paths" in config:
                 DBT_MODEL_PATHS = config["dbt_model_paths"]
@@ -96,7 +95,7 @@ print(f"Using Config: {CONFIG_PATH}")
 print(f"dbt Project Path: {DBT_PROJECT_PATH}")
 print(f"Looking for manifest at: {MANIFEST_PATH}")
 print(f"Looking for catalog at: {CATALOG_PATH}")
-print(f"Looking for ontology at: {ONTOLOGY_PATH}")
+print(f"Looking for data model at: {DATA_MODEL_PATH}")
 print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
 
 
@@ -105,7 +104,7 @@ async def get_config_status():
     config_present = os.path.exists(CONFIG_PATH)
     manifest_exists = os.path.exists(MANIFEST_PATH) if MANIFEST_PATH else False
     catalog_exists = os.path.exists(CATALOG_PATH) if CATALOG_PATH else False
-    ontology_exists = os.path.exists(ONTOLOGY_PATH) if ONTOLOGY_PATH else False
+    data_model_exists = os.path.exists(DATA_MODEL_PATH) if DATA_MODEL_PATH else False
 
     error = None
     if not config_present:
@@ -122,7 +121,7 @@ async def get_config_status():
         "catalog_path": CATALOG_PATH,
         "manifest_exists": manifest_exists,
         "catalog_exists": catalog_exists,
-        "ontology_exists": ontology_exists,
+        "data_model_exists": data_model_exists,
         "error": error,
     }
 
@@ -214,13 +213,13 @@ async def get_manifest():
     return {"models": models}
 
 
-@app.get("/api/ontology")
-async def get_ontology():
-    if not os.path.exists(ONTOLOGY_PATH):
+@app.get("/api/data-model")
+async def get_data_model():
+    if not os.path.exists(DATA_MODEL_PATH):
         return {"version": 0.1, "entities": [], "relationships": []}
 
     try:
-        with open(ONTOLOGY_PATH, "r") as f:
+        with open(DATA_MODEL_PATH, "r") as f:
             data = yaml.safe_load(f) or {}
 
         if not data.get("entities"):
@@ -230,28 +229,32 @@ async def get_ontology():
 
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading ontology: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error reading data model: {str(e)}"
+        )
 
 
-class OntologyUpdate(BaseModel):
+class DataModelUpdate(BaseModel):
     version: float = 0.1
     entities: List[Dict[str, Any]]
     relationships: List[Dict[str, Any]]
 
 
-@app.post("/api/ontology")
-async def save_ontology(data: OntologyUpdate):
+@app.post("/api/data-model")
+async def save_data_model(data: DataModelUpdate):
     try:
         content = data.dict()  # Pydantic v1 (required by dbt-core==1.10)
-        print(f"Saving ontology to: {ONTOLOGY_PATH}")
-        with open(ONTOLOGY_PATH, "w") as f:
+        print(f"Saving data model to: {DATA_MODEL_PATH}")
+        with open(DATA_MODEL_PATH, "w") as f:
             yaml.dump(content, f, default_flow_style=False, sort_keys=False)
         return {"status": "success"}
     except Exception as e:
         import traceback
 
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error saving ontology: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error saving data model: {str(e)}"
+        )
 
 
 class DbtSchemaRequest(BaseModel):
@@ -286,19 +289,19 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         # Create models directory if it doesn't exist
         os.makedirs(models_dir, exist_ok=True)
 
-        # Load ontology to get relationships and description
-        ontology_data = {}
-        if ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
+        # Load data model to get relationships and description
+        data_model = {}
+        if DATA_MODEL_PATH and os.path.exists(DATA_MODEL_PATH):
             try:
-                with open(ONTOLOGY_PATH, "r") as f:
-                    ontology_data = yaml.safe_load(f) or {}
+                with open(DATA_MODEL_PATH, "r") as f:
+                    data_model = yaml.safe_load(f) or {}
             except Exception as e:
-                print(f"Warning: Could not load ontology: {e}")
+                print(f"Warning: Could not load data model: {e}")
 
-        # Use description from request if available, otherwise fallback to ontology
+        # Use description from request if available, otherwise fallback to data model
         entity_description = request.description
         if not entity_description:
-            entities = ontology_data.get("entities", [])
+            entities = data_model.get("entities", [])
             for entity in entities:
                 if entity.get("id") == request.entity_id:
                     entity_description = entity.get("description")
@@ -307,7 +310,7 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         # Build a map of field names to relationships for this entity
         # FK is on the "many" side: target for one_to_many, source for many_to_one
         # This matches the logic in sync_dbt_tests
-        relationships = ontology_data.get("relationships", [])
+        relationships = data_model.get("relationships", [])
         field_to_relationship = {}
 
         for rel in relationships:
@@ -404,7 +407,7 @@ async def save_dbt_schema(request: DbtSchemaRequest):
 
 @app.post("/api/sync-dbt-tests")
 async def sync_dbt_tests():
-    """Sync relationship tests from ontology to dbt yml files"""
+    """Sync relationship tests from data model to dbt yml files"""
     try:
         if not DBT_PROJECT_PATH:
             raise HTTPException(
@@ -412,15 +415,15 @@ async def sync_dbt_tests():
                 detail="dbt_project_path is not configured. Please set it in config.yml",
             )
 
-        # Load ontology
-        if not ONTOLOGY_PATH or not os.path.exists(ONTOLOGY_PATH):
-            raise HTTPException(status_code=404, detail="Ontology file not found")
+        # Load data model
+        if not DATA_MODEL_PATH or not os.path.exists(DATA_MODEL_PATH):
+            raise HTTPException(status_code=404, detail="Data model file not found")
 
-        with open(ONTOLOGY_PATH, "r") as f:
-            ontology = yaml.safe_load(f) or {}
+        with open(DATA_MODEL_PATH, "r") as f:
+            data_model = yaml.safe_load(f) or {}
 
-        entities = ontology.get("entities", [])
-        relationships = ontology.get("relationships", [])
+        entities = data_model.get("entities", [])
+        relationships = data_model.get("relationships", [])
 
         # Build entity lookup
         entity_map = {e["id"]: e for e in entities}
@@ -468,7 +471,7 @@ async def sync_dbt_tests():
 
         updated_files = []
 
-        # Iterate over all entities in the ontology
+        # Iterate over all entities in the data model
         for entity in entities:
             entity_id = entity.get("id")
             if not entity_id:
@@ -637,14 +640,14 @@ async def infer_relationships():
         if not os.path.exists(models_dir):
             return {"relationships": []}
 
-        # Load ontology to map model names to entity IDs
+        # Load data model to map model names to entity IDs
         # Maps: model name (from dbt_model unique_id) -> entity id on canvas
         model_to_entity = {}
-        if ONTOLOGY_PATH and os.path.exists(ONTOLOGY_PATH):
+        if DATA_MODEL_PATH and os.path.exists(DATA_MODEL_PATH):
             try:
-                with open(ONTOLOGY_PATH, "r") as f:
-                    ontology_data = yaml.safe_load(f) or {}
-                    entities = ontology_data.get("entities", [])
+                with open(DATA_MODEL_PATH, "r") as f:
+                    data_model = yaml.safe_load(f) or {}
+                    entities = data_model.get("entities", [])
                     for entity in entities:
                         entity_id = entity.get("id")
                         dbt_model = entity.get("dbt_model")
@@ -659,7 +662,7 @@ async def infer_relationships():
                         # Also map entity_id to itself for non-bound entities
                         model_to_entity[entity_id] = entity_id
             except Exception as e:
-                print(f"Warning: Could not load ontology for entity mapping: {e}")
+                print(f"Warning: Could not load data model for entity mapping: {e}")
 
         relationships = []
 

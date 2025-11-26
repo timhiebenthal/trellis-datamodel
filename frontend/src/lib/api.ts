@@ -1,4 +1,4 @@
-import type { DbtModel, Ontology, DraftedField } from './types';
+import type { DbtModel, DataModel, DraftedField } from './types';
 
 const API_BASE = 'http://localhost:8000/api';
 
@@ -17,25 +17,25 @@ export async function getManifest(): Promise<DbtModel[]> {
     }
 }
 
-export async function getOntology(): Promise<Ontology> {
+export async function getDataModel(): Promise<DataModel> {
     try {
-        const res = await fetch(`${API_BASE}/ontology`);
+        const res = await fetch(`${API_BASE}/data-model`);
         if (!res.ok) throw new Error(`Status: ${res.status}`);
         return await res.json();
     } catch (e) {
-        console.error("Error fetching ontology:", e);
+        console.error("Error fetching data model:", e);
         // Return empty default
         return { version: 0.1, entities: [], relationships: [] };
     }
 }
 
-export async function saveOntology(ontology: Ontology): Promise<void> {
-    const res = await fetch(`${API_BASE}/ontology`, {
+export async function saveDataModel(dataModel: DataModel): Promise<void> {
+    const res = await fetch(`${API_BASE}/data-model`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ontology)
+        body: JSON.stringify(dataModel)
     });
-    if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to save data model: ${res.status}`);
 }
 
 export async function getConfigStatus(): Promise<any> {

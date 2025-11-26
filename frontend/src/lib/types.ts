@@ -46,7 +46,7 @@ export interface EntityData {
 
 // We'll use Svelte Flow types for nodes/edges in the actual components, 
 // but for API/Persistence we treat them as generic objects or define a schema.
-export interface Ontology {
+export interface DataModel {
     version: number;
     entities: any[];
     relationships: any[];
@@ -59,7 +59,7 @@ export interface ConfigStatus {
     catalog_path: string;
     manifest_exists: boolean;
     catalog_exists: boolean;
-    ontology_exists: boolean;
+    data_model_exists: boolean;
     error?: string;
 }
 

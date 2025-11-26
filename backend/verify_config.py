@@ -8,12 +8,12 @@ CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
 # Default values
 MANIFEST_PATH = ""
 CATALOG_PATH = ""
-ONTOLOGY_PATH = os.path.abspath(os.path.join(BASE_DIR, "../ontology.yml"))
+DATA_MODEL_PATH = os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
 DBT_PROJECT_PATH = ""
 DBT_MODEL_PATHS = ["3-entity"]
 
 def load_config():
-    global MANIFEST_PATH, ONTOLOGY_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
+    global MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r") as f:
@@ -54,14 +54,14 @@ def load_config():
                 else:
                     CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
 
-            # 4. Resolve Ontology
-            if "ontology_file" in config:
-                p = config["ontology_file"]
+            # 4. Resolve Data Model
+            if "data_model_file" in config:
+                p = config["data_model_file"]
                 if not os.path.isabs(p):
                     base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
-                    ONTOLOGY_PATH = os.path.abspath(os.path.join(base_path, p))
+                    DATA_MODEL_PATH = os.path.abspath(os.path.join(base_path, p))
                 else:
-                    ONTOLOGY_PATH = p
+                    DATA_MODEL_PATH = p
 
             if "dbt_model_paths" in config:
                 DBT_MODEL_PATHS = config["dbt_model_paths"]

@@ -1,4 +1,4 @@
-# Configuration for dbt-ontology
+# Configuration for dbt data model UI
 
 # Path to the dbt project directory (relative to this config file or absolute)
 # dbt_project_path: "./dbt_concept"
@@ -10,8 +10,8 @@ dbt_manifest_path: "target/manifest.json"
 # Path to the dbt catalog.json (relative to dbt_project_path or absolute)
 dbt_catalog_path: "target/catalog.json"
 
-# Path where the ontology YAML will be saved (relative to dbt_project_path or absolute)
-ontology_file: "ontology.yml"
+# Path where the data model YAML will be saved (relative to dbt_project_path or absolute)
+data_model_file: "data_model.yml"
 
 # List of path patterns to include (filters dbt models by original_file_path)
 # If empty, all models are included.

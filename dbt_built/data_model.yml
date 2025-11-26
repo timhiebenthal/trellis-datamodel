@@ -23,8 +23,8 @@ entities:
   - name: team_id
     datatype: text
   position:
-    x: -418.91178613995584
-    y: 494.60320349215067
+    x: -470.986187522366
+    y: 662.3984968354723
   width: 280
   panel_height: 200
   collapsed: false

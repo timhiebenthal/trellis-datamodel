@@ -1,7 +1,7 @@
 .PHONY: setup backend frontend dev prod help
 
 help:
-	@echo "dbt-ontology Makefile"
+	@echo "dbt Data Model UI Makefile"
 	@echo ""
 	@echo "Available commands:"
 	@echo "  make install-uv  - Install uv package manager"
