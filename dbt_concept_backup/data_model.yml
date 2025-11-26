@@ -1,0 +1,158 @@
+version: 0.1
+entities:
+- id: team
+  label: Team
+  description: A Basketball Team in the NBA
+  drafted_fields:
+  - name: team_id
+    datatype: text
+    description: 'unique ID of the team '
+  - name: team_name
+    datatype: text
+    description: Full Name of the Team (e.g. Los Angeles Lakers)
+  - name: city
+    datatype: text
+    description: City where the team is based (e.g. Los Angeles)
+  - name: abbrevation
+    datatype: text
+    description: 3-letter abbrevation (e.g. LAC)
+  position:
+    x: 31.49084392219845
+    y: 75.24403073306065
+  width: 338.060546875
+  panel_height: 480
+  collapsed: false
+- id: player
+  label: Player
+  description: The players competing in the NBA
+  drafted_fields:
+  - name: player_id
+    datatype: text
+    description: unique ID
+  - name: full_name
+    datatype: text
+  - name: current_team
+    datatype: text
+  - name: draft_year
+    datatype: text
+  position:
+    x: 1.7826225462227399
+    y: 622.8663623807272
+  width: 280
+  panel_height: 293.09088134765625
+  collapsed: false
+- id: game
+  label: Game
+  description: A game where two teams compete
+  drafted_fields:
+  - name: game_id
+    datatype: text
+  - name: game_day
+    datatype: text
+  - name: game_time
+    datatype: text
+    description: 'tbd: need to check timezone'
+  - name: home_team_id
+    datatype: text
+  - name: away_team_id
+    datatype: text
+  - name: matchup
+    datatype: text
+    description: '"{home_team_abbrevation} - {away_team_abbrevation}" syntax (like
+      "LAC - PHX"'
+  position:
+    x: 747.0491586082898
+    y: -76.65370801301539
+  width: 280
+  panel_height: 324.1211853027344
+  collapsed: false
+- id: calendar
+  label: Calendar
+  description: ''
+  drafted_fields:
+  - name: calendar_date
+    datatype: text
+  - name: calender_week
+    datatype: text
+    description: ISO week number
+  - name: year_month
+    datatype: text
+    description: yyyy-MM syntax
+  position:
+    x: 1332.6780428740874
+    y: 453.82205254065354
+  width: 314.06060791015625
+  panel_height: 344.48480224609375
+  collapsed: false
+- id: game_stats_per_player
+  label: Game Stats per Player
+  description: ''
+  drafted_fields:
+  - name: game_player_id
+    datatype: text
+    description: surrogate-key from game_id and player_id
+  - name: player_id
+    datatype: text
+  - name: game_id
+    datatype: text
+  - name: minutes_played
+    datatype: text
+  - name: field_goals_attempted
+    datatype: text
+  - name: field_goals_made
+    datatype: text
+  - name: points
+    datatype: text
+  - name: assists
+    datatype: text
+  - name: total_rebounds
+    datatype: text
+  - name: offensive_rebounds
+    datatype: text
+  - name: defensive_rebounds
+    datatype: text
+  - name: 3pt_attempted
+    datatype: text
+  - name: 3pt_made
+    datatype: text
+  - name: free_throws_attempted
+    datatype: text
+  - name: free_throws_made
+    datatype: text
+  position:
+    x: 951.7389853707155
+    y: 630.4939156150361
+  width: 280
+  panel_height: 480
+  collapsed: false
+relationships:
+- source: team
+  target: player
+  label: employs
+  type: one_to_many
+  label_dx: 0
+  label_dy: 0
+- source: team
+  target: game
+  label: face another one in
+  type: one_to_many
+  label_dx: 0
+  label_dy: 0
+- source: game
+  target: calendar
+  label: are scheduled in
+  type: many_to_one
+  label_dx: 0
+  label_dy: 0
+- source: player
+  target: game_stats_per_player
+  label: has
+  type: one_to_many
+  label_dx: 0
+  label_dy: 0
+- source: game
+  target: game_stats_per_player
+  label: generates
+  type: one_to_many
+  label_dx: 0
+  label_dy: 0
