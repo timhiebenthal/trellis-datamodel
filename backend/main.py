@@ -468,37 +468,62 @@ async def sync_dbt_tests():
 
         updated_files = []
 
-        # Update yml files for entities with FK relationships
-        for entity_id, fk_list in fk_by_entity.items():
-            entity = entity_map.get(entity_id)
-            if not entity:
+        # Iterate over all entities in the ontology
+        for entity in entities:
+            entity_id = entity.get("id")
+            if not entity_id:
                 continue
 
-            # Find or create yml file
+            # Determine the correct model name
+            # If bound to a dbt model, use that name. Otherwise use label or ID.
+            model_name = entity_id
+            dbt_model = entity.get("dbt_model")
+            if dbt_model:
+                # Extract model name from unique_id like "model.project.my_model" -> "my_model"
+                model_name = dbt_model.split(".")[-1] if "." in dbt_model else dbt_model
+            elif entity.get("label"):
+                # If purely drafted, maybe use label? adhering to existing logic:
+                # Logic below checks m.get("name") == entity_id or m.get("name") == entity.get("label")
+                # We'll prioritize model_name matching what dbt expects.
+                # For now, let's stick to entity_id for the filename if not bound, but model name in yml.
+                pass
+
+            # Determine file path
+            # If it's a known dbt model, ideally we'd know its file path.
+            # Since we don't have that easily here (unless we scan manifest), we stick to {entity_id}.yml
+            # or {model_name}.yml.
+            # The previous logic used {entity_id}.yml. Let's keep that for consistency with created files.
+            # However, if the user wants to sync to *existing* structure, we should try to find it.
+
+            # For simplicity and safety in this "fix", we'll stick to the previous file naming strategy:
+            # {entity_id}.yml in the first models_subdir.
             yml_path = os.path.join(models_dir, f"{entity_id}.yml")
 
             if os.path.exists(yml_path):
-                # Load existing yml
                 with open(yml_path, "r") as f:
                     schema = yaml.safe_load(f) or {"version": 2, "models": []}
             else:
-                # Create new yml structure
                 schema = {"version": 2, "models": []}
 
-            # Find or create model entry
             models_list = schema.get("models", [])
             model_entry = None
+
+            # Find existing model entry by name
             for m in models_list:
-                if m.get("name") == entity_id or m.get("name") == entity.get("label"):
+                if (
+                    m.get("name") == model_name
+                    or m.get("name") == entity.get("label")
+                    or m.get("name") == entity_id
+                ):
                     model_entry = m
                     break
 
             if not model_entry:
-                model_entry = {"name": entity_id, "columns": []}
+                model_entry = {"name": model_name, "columns": []}
                 models_list.append(model_entry)
                 schema["models"] = models_list
 
-            # Sync description if available in ontology
+            # Sync description
             if entity.get("description"):
                 model_entry["description"] = entity.get("description")
 
@@ -506,7 +531,34 @@ async def sync_dbt_tests():
             if "columns" not in model_entry:
                 model_entry["columns"] = []
 
-            # Add/update relationship tests for each FK
+            # 1. Sync Drafted Fields
+            drafted_fields = entity.get("drafted_fields", [])
+            for field in drafted_fields:
+                f_name = field.get("name")
+                f_type = field.get("datatype")
+                f_desc = field.get("description")
+
+                if not f_name:
+                    continue
+
+                col_entry = None
+                for col in model_entry["columns"]:
+                    if col.get("name") == f_name:
+                        col_entry = col
+                        break
+
+                if not col_entry:
+                    col_entry = {"name": f_name}
+                    model_entry["columns"].append(col_entry)
+
+                # Update type/desc
+                if f_type:
+                    col_entry["data_type"] = f_type
+                if f_desc:
+                    col_entry["description"] = f_desc
+
+            # 2. Sync Relationships (FKs)
+            fk_list = fk_by_entity.get(entity_id, [])
             for fk_info in fk_list:
                 fk_field = fk_info["fk_field"]
                 ref_entity = fk_info["ref_entity"]
@@ -533,7 +585,6 @@ async def sync_dbt_tests():
 
                 # Check if data_tests exists and update
                 data_tests = col_entry.get("data_tests", [])
-
                 # Remove any existing relationship test for this column
                 data_tests = [t for t in data_tests if "relationships" not in t]
                 data_tests.append(rel_test)

@@ -354,20 +354,21 @@
                 class="px-4 py-1.5 text-sm rounded font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 title="Import relationship tests from dbt yml files"
             >
-                ⬇️ Import from dbt
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 8V7a3 3 0 00-3-3H7a3 3 0 00-3 3v1m4 4l4-4m0 0l4 4m-4-4v12" />
+                </svg>
+                Pull from dbt
             </button>
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
-                class="px-4 py-1.5 text-sm rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                class="px-4 py-1.5 text-sm rounded font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 title="Sync relationship tests to dbt yml files"
             >
-                {#if syncing}
-                    <span class="animate-spin">⟳</span>
-                {:else}
-                    🔄
-                {/if}
-                Sync to dbt
+                <svg class={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Push to dbt
             </button>
         </div>
     </header>
