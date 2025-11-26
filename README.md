@@ -2,12 +2,30 @@
 
 A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implementation.
 
+## Motivation
+
+**Current dbt workflow pains:**
+- ERD diagrams live in separate tools (Lucidchart, draw.io) and quickly become stale
+- Data transformations are done isolated from the conceptual data model.
+- No single view connecting business concepts to physical schema
+- Stakeholders can't easily understand model structure without technical context
+
+**How Trellis helps:**
+- Visual data model that stays in sync — reads directly from `manifest.json` / `catalog.json`
+- Sketch entities and with their fields and auto-generate schema.yml's for dbt
+- Draw relationships on canvas → auto-generates dbt `relationships` tests
+- Two views: **Conceptual** (entity names, descriptions) and **Physical** (columns, types, materializations) to jump between high-level architect and execution-view.
+
+**Two Ways of getting started** 
+- Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  
+- Brownfield: document your existing data model by loading existing dbt models and utilize relationship tests to infer links
+
 ## Prerequisites
 - **Node.js 22+ (or 20.19+) & npm**  
   - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
   - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
   - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
-- **Python 3.10+ & [uv](https://github.com/astral-sh/uv)**  
+- **Python 3.12+ & [uv](https://github.com/astral-sh/uv)**  
   - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
 
