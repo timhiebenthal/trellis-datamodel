@@ -469,6 +469,9 @@ async def sync_dbt_tests():
             os.path.join(DBT_PROJECT_PATH, "models", models_subdir)
         )
 
+        # Ensure destination directory exists so file writes don't fail
+        os.makedirs(models_dir, exist_ok=True)
+
         updated_files = []
 
         # Iterate over all entities in the data model
