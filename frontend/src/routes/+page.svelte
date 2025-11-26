@@ -293,7 +293,7 @@
             </div>
             <div class="flex flex-col">
                 <h1 class="font-bold text-lg text-[#0f172a] leading-tight tracking-tight">Trellis</h1>
-                <span class="text-[10px] text-slate-500 font-medium tracking-wider uppercase">dbt Data Modeler</span>
+                <span class="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Data Model UI</span>
             </div>
             
             {#if saving}
