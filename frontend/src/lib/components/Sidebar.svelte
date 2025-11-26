@@ -1,6 +1,7 @@
 <script lang="ts">
     import { dbtModels, configStatus } from "$lib/stores";
-    import type { DbtModel } from "$lib/types";
+    import type { DbtModel, TreeNode } from "$lib/types";
+    import SidebarGroup from "./SidebarGroup.svelte";
 
     const { width = 260, loading = false } = $props<{
         width?: number;
@@ -15,6 +16,55 @@
             m.name.toLowerCase().includes(searchTerm.toLowerCase()),
         ),
     );
+
+    let treeNodes = $derived(buildTree(filteredModels));
+
+    function buildTree(models: DbtModel[]): TreeNode[] {
+        const rootObj: any = { _files: [], _folders: {} };
+
+        for (const model of models) {
+            let p = model.file_path?.replace(/\\/g, '/') || "";
+            const lastSlash = p.lastIndexOf('/');
+            const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
+            
+            let parts = dir.split('/').filter(x => x !== "." && x !== "");
+            if (parts[0] === "models") parts.shift();
+            
+            let current = rootObj;
+            for (const part of parts) {
+                if (!current._folders[part]) {
+                    current._folders[part] = { _files: [], _folders: {} };
+                }
+                current = current._folders[part];
+            }
+            current._files.push(model);
+        }
+
+        function convert(obj: any, name: string, path: string): TreeNode {
+             const folderNodes = Object.keys(obj._folders).map(key => 
+                convert(obj._folders[key], key, path ? `${path}/${key}` : key)
+             );
+             const fileNodes = obj._files.map((m: DbtModel) => ({
+                 name: m.name,
+                 path: path ? `${path}/${m.name}` : m.name,
+                 type: 'file',
+                 children: [],
+                 model: m
+             }));
+             
+             folderNodes.sort((a: TreeNode, b: TreeNode) => a.name.localeCompare(b.name));
+             fileNodes.sort((a: TreeNode, b: TreeNode) => a.name.localeCompare(b.name));
+
+             return {
+                 name,
+                 path,
+                 type: 'folder',
+                 children: [...folderNodes, ...fileNodes]
+             };
+        }
+        
+        return convert(rootObj, "root", "").children;
+    }
 
     function onDragStart(event: DragEvent, model: DbtModel) {
         if (!event.dataTransfer) return;
@@ -86,17 +136,9 @@
             class="w-full px-2 py-1.5 border rounded mb-3 bg-white text-sm"
         />
 
-        <div class="flex-1 overflow-y-auto pr-1 space-y-1.5">
-            {#each filteredModels as model (model.name)}
-                <div
-                    class="px-2 py-1 bg-white rounded cursor-move hover:shadow border border-gray-200 hover:border-blue-400 transition-all select-none text-xs font-medium text-gray-900 truncate"
-                    draggable="true"
-                    ondragstart={(e) => onDragStart(e, model)}
-                    role="listitem"
-                    title={`${model.name} (${model.schema}.${model.table})`}
-                >
-                    {model.name}
-                </div>
+        <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
+            {#each treeNodes as node (node.path)}
+                <SidebarGroup {node} {onDragStart} />
             {/each}
             {#if filteredModels.length === 0}
                 {#if loading}

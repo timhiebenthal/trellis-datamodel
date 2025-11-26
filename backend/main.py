@@ -206,6 +206,7 @@ async def get_manifest():
                     "columns": columns,
                     "description": node.get("description"),
                     "materialization": materialized,
+                    "file_path": original_path,
                 }
             )
 

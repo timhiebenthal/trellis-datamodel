@@ -11,6 +11,15 @@ export interface DbtModel {
     columns: DbtColumn[];
     description?: string;
     materialization?: string;
+    file_path?: string;
+}
+
+export interface TreeNode {
+    name: string;
+    path: string;
+    type: 'folder' | 'file';
+    children: TreeNode[]; 
+    model?: DbtModel; 
 }
 
 export interface ColumnLink {
