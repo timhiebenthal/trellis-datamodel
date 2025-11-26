@@ -366,7 +366,7 @@
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
                 class="px-4 py-2 text-sm rounded-lg font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
-                title="Sync relationship tests to dbt yml files"
+                title="Sync entity & field-definitions and relationship-tests to dbt schema.yml files"
             >
                 {#if syncing}
                     <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />

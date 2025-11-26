@@ -23,8 +23,8 @@ entities:
   - name: team_id
     datatype: text
   position:
-    x: -476.09045322922213
-    y: 563.375742122462
+    x: -316.7864939991946
+    y: 510.9564162497551
   width: 280
   panel_height: 200
   collapsed: false
@@ -53,8 +53,8 @@ relationships:
   type: one_to_many
   source_field: home_team_id
   target_field: team_id
-  label_dx: -146.42413330078125
-  label_dy: -63.030303955078125
+  label_dx: -109.5758056640625
+  label_dy: 179.39389038085938
 - source: game
   target: team
   label: ''
