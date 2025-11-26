@@ -13,6 +13,7 @@
     import { nodes, edges } from "$lib/stores";
     import EntityNode from "./EntityNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
+    import Icon from "@iconify/svelte";
 
     const nodeTypes = {
         entity: EntityNode,
@@ -137,7 +138,7 @@
         onedgesdelete={onEdgesDelete}
         defaultEdgeOptions={{ type: "custom" }}
         fitView
-        class="bg-gray-50"
+        class="bg-slate-50"
     >
         <Controls />
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
@@ -145,10 +146,11 @@
 
         <div class="absolute top-4 right-4 z-10 shadow-lg">
             <button
-                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-medium transition-colors flex items-center gap-2"
+                class="bg-[#0f172a] text-white px-4 py-2 rounded-lg hover:bg-slate-800 font-medium transition-colors flex items-center gap-2 shadow-sm"
                 onclick={addEntity}
             >
-                <span>+</span> Add Entity
+                <Icon icon="lucide:plus" class="w-4 h-4" />
+                Add Entity
             </button>
         </div>
 
@@ -157,20 +159,23 @@
                 class="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
             >
                 <div
-                    class="bg-white/80 backdrop-blur-sm p-8 rounded-xl border border-gray-200 shadow-lg text-center max-w-md mx-4"
+                    class="bg-white/90 backdrop-blur-sm p-8 rounded-xl border border-slate-200 shadow-xl text-center max-w-md mx-4"
                 >
-                    <div class="text-4xl mb-4">🎨</div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
+                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                         <Icon icon="lucide:palette" class="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">
                         Start Designing
                     </h3>
-                    <p class="text-gray-600 mb-6">
+                    <p class="text-slate-600 mb-6">
                         Drag dbt models from the sidebar or create new entities
                         to begin building your data model.
                     </p>
                     <button
-                        class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm pointer-events-auto"
+                        class="bg-[#0f172a] text-white px-6 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition-colors shadow-md pointer-events-auto flex items-center justify-center gap-2 mx-auto"
                         onclick={addEntity}
                     >
+                        <Icon icon="lucide:plus" class="w-4 h-4" />
                         Create First Entity
                     </button>
                 </div>
@@ -178,4 +183,3 @@
         {/if}
     </SvelteFlow>
 </div>
-

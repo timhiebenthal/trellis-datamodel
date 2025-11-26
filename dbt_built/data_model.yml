@@ -10,9 +10,9 @@ entities:
   - name: current_team_id
     datatype: text
   position:
-    x: 215.340788965465
-    y: -0.24249502070844642
-  width: 460.363525390625
+    x: 56.018209174761154
+    y: 80.00887850349793
+  width: 317.818115234375
   panel_height: 480
   collapsed: false
 - id: team
@@ -23,8 +23,8 @@ entities:
   - name: team_id
     datatype: text
   position:
-    x: -470.986187522366
-    y: 662.3984968354723
+    x: -476.09045322922213
+    y: 563.375742122462
   width: 280
   panel_height: 200
   collapsed: false
@@ -33,8 +33,8 @@ entities:
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
   position:
-    x: 408.481078345333
-    y: 696.7209411684725
+    x: 479.4163962301453
+    y: 421.9223104512039
   width: 280
   panel_height: 200
   collapsed: false
@@ -45,21 +45,21 @@ relationships:
   type: many_to_one
   source_field: current_team_id
   target_field: team_id
-  label_dx: -168.727294921875
-  label_dy: -42.66668701171875
+  label_dx: -128.9697265625
+  label_dy: 10.666656494140625
 - source: game
   target: team
   label: ''
   type: one_to_many
   source_field: home_team_id
   target_field: team_id
-  label_dx: -90.18170166015625
-  label_dy: 68.84848022460938
+  label_dx: -146.42413330078125
+  label_dy: -63.030303955078125
 - source: game
   target: team
   label: ''
   type: one_to_many
   source_field: away_team_id
   target_field: team_id
-  label_dx: -0.9697265625
-  label_dy: 9.69677734375
+  label_dx: 14.54541015625
+  label_dy: 25.21197509765625

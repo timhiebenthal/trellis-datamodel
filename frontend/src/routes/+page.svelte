@@ -18,6 +18,7 @@
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
+    import Icon from "@iconify/svelte";
 
     let loading = $state(true);
     let saving = $state(false);
@@ -278,96 +279,100 @@
         }, 1000); // 1s debounce
     });
 
-    // Auto-expand entities when switching to physical view
-    $effect(() => {
-        if ($viewMode === "physical") {
-            // Only update nodes if there are actually collapsed ones
-            const hasCollapsed = $nodes.some(
-                (node) => node.data?.collapsed === true,
-            );
-            if (hasCollapsed) {
-                $nodes = $nodes.map((node) => ({
-                    ...node,
-                    data: {
-                        ...node.data,
-                        collapsed: false,
-                    },
-                }));
-            }
-        }
-    });
 </script>
 
-<div class="flex flex-col h-screen overflow-hidden font-sans text-gray-900">
+<div class="flex flex-col h-screen overflow-hidden font-sans text-slate-900 bg-slate-50">
     <!-- Header -->
     <header
-        class="h-14 bg-white border-b flex items-center px-6 justify-between z-20 shadow-sm shrink-0"
+        class="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between z-20 shadow-sm shrink-0"
     >
-        <div class="flex items-center gap-4">
-            <div
-                class="font-bold text-xl text-gray-800 flex items-center gap-2"
-            >
-                📦 dbt Data Model
+        <!-- Brand -->
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-[#0f172a] rounded-lg flex items-center justify-center text-white shadow-sm">
+                <Icon icon="lucide:box" class="w-5 h-5" />
             </div>
+            <div class="flex flex-col">
+                <h1 class="font-bold text-lg text-[#0f172a] leading-tight tracking-tight">Trellis</h1>
+                <span class="text-[10px] text-slate-500 font-medium tracking-wider uppercase">dbt Data Modeler</span>
+            </div>
+            
             {#if saving}
-                <span class="text-xs text-gray-400 animate-pulse"
-                    >Saving changes...</span
+                <span class="text-xs text-slate-400 animate-pulse ml-2"
+                    >Saving...</span
                 >
             {/if}
             {#if loading}
-                <span class="text-xs text-blue-400">Loading...</span>
+                <span class="text-xs text-blue-400 ml-2">Loading...</span>
             {/if}
         </div>
 
-        <div class="flex bg-gray-100 rounded p-1 border border-gray-200">
+        <!-- View Switcher -->
+        <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200/60">
             <button
-                class="px-4 py-1.5 text-sm rounded transition-all duration-200 font-medium"
-                class:bg-white={$viewMode === "concept"}
+                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                class:bg-[#0f172a]={$viewMode === "concept"}
+                class:text-white={$viewMode === "concept"}
                 class:shadow-sm={$viewMode === "concept"}
-                class:text-blue-600={$viewMode === "concept"}
-                class:text-gray-600={$viewMode !== "concept"}
+                class:text-slate-500={$viewMode !== "concept"}
+                class:hover:text-slate-900={$viewMode !== "concept"}
                 onclick={() => ($viewMode = "concept")}
             >
+                <Icon icon="octicon:workflow-16" class="w-4 h-4" />
                 Conceptual
             </button>
             <button
-                class="px-4 py-1.5 text-sm rounded transition-all duration-200 font-medium"
-                class:bg-white={$viewMode === "physical"}
+                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                class:bg-[#0f172a]={$viewMode === "physical"}
+                class:text-white={$viewMode === "physical"}
                 class:shadow-sm={$viewMode === "physical"}
-                class:text-blue-600={$viewMode === "physical"}
-                class:text-gray-600={$viewMode !== "physical"}
+                class:text-slate-500={$viewMode !== "physical"}
+                class:hover:text-slate-900={$viewMode !== "physical"}
                 onclick={() => ($viewMode = "physical")}
             >
+                <Icon icon="lucide:database" class="w-4 h-4" />
                 Physical
             </button>
         </div>
         
+        <!-- Actions -->
         <div class="flex items-center gap-3">
             {#if syncMessage}
-                <span class="text-xs" class:text-green-600={syncMessage.startsWith('✓')} class:text-red-600={syncMessage.startsWith('✗')}>
-                    {syncMessage}
-                </span>
+                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200">
+                    {#if syncMessage.startsWith('✓')}
+                        <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span class="text-xs font-medium text-green-700">{syncMessage.substring(2)}</span>
+                    {:else if syncMessage.startsWith('✗')}
+                        <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                        <span class="text-xs font-medium text-red-700">{syncMessage.substring(2)}</span>
+                    {:else}
+                        <span class="text-xs text-slate-600">{syncMessage}</span>
+                    {/if}
+                </div>
             {/if}
+            
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
             <button
                 onclick={handleInferFromDbt}
                 disabled={syncing || loading}
-                class="px-4 py-1.5 text-sm rounded font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Import relationship tests from dbt yml files"
             >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
+                <Icon icon="lucide:download" class="w-4 h-4" />
                 Pull from dbt
             </button>
+            
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
-                class="px-4 py-1.5 text-sm rounded font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Sync relationship tests to dbt yml files"
             >
-                <svg class={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 8V7a3 3 0 00-3-3H7a3 3 0 00-3 3v1m4 4l4-4m0 0l4 4m-4-4v12" />
-                </svg>
+                {#if syncing}
+                    <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+                {:else}
+                    <Icon icon="lucide:upload" class="w-4 h-4" />
+                {/if}
                 Push to dbt
             </button>
         </div>

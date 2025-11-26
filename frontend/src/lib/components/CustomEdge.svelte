@@ -216,10 +216,10 @@
     window.addEventListener("pointerup", onUp);
   }
 
-  // Style overrides for selection
+  // Style overrides for selection - Use #26A69A (Teal)
   const edgeStyle = $derived(
     selected 
-      ? `stroke: #3b82f6; stroke-width: 2; ${style || ''}` 
+      ? `stroke: #26A69A; stroke-width: 2; ${style || ''}` 
       : style
   );
 </script>
@@ -232,10 +232,11 @@
 >
   <div
     class="pointer-events-auto nodrag nopan bg-white px-2 py-1 rounded shadow border flex flex-col gap-1 min-w-[180px] cursor-move select-none transition-colors"
-    class:border-blue-500={selected}
+    class:border-[#26A69A]={selected}
     class:ring-2={selected}
-    class:ring-blue-200={selected}
-    class:border-gray-200={!selected}
+    class:ring-[#26A69A]={selected}
+    class:ring-opacity-30={selected}
+    class:border-slate-200={!selected}
     onpointerdown={startLabelDrag}
     onclick={selectThisEdge}
     role="presentation"
@@ -245,11 +246,11 @@
         value={label}
         oninput={onLabelChange}
         onchange={onLabelChange}
-        class="text-xs font-medium focus:outline-none focus:bg-gray-50 flex-1 bg-transparent border border-gray-200 rounded px-1 py-0.5"
+        class="text-xs font-medium focus:outline-none focus:bg-slate-50 flex-1 bg-transparent border border-slate-200 rounded px-1 py-0.5 focus:border-[#26A69A]"
         placeholder="relationship..."
       />
       <button 
-          class="text-[10px] font-semibold text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded px-2 py-0.5 cursor-pointer bg-transparent border border-gray-300"
+          class="text-[10px] font-semibold text-slate-600 hover:text-[#26A69A] hover:bg-slate-50 rounded px-2 py-0.5 cursor-pointer bg-transparent border border-slate-300"
           onclick={toggleType}
           title="Click to toggle type"
           type="button"
@@ -257,15 +258,15 @@
           {cardinalityText}
       </button>
     </div>
-    <div class="text-[10px] text-gray-500 text-center whitespace-nowrap">
+    <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">
       {relationText}
     </div>
     <!-- Field mappings - only show in Physical view when fields are set -->
     {#if $viewMode === "physical" && (sourceField || targetField)}
-    <div class="text-[9px] text-gray-500 text-center border-t border-gray-100 pt-1 mt-1">
-      <span class="font-mono"><span class="text-gray-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
-      <span class="text-gray-400 mx-1">→</span>
-      <span class="font-mono"><span class="text-gray-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
+    <div class="text-[9px] text-slate-500 text-center border-t border-slate-100 pt-1 mt-1">
+      <span class="font-mono"><span class="text-slate-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
+      <span class="text-slate-400 mx-1">→</span>
+      <span class="font-mono"><span class="text-slate-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
     </div>
     {/if}
   </div>

@@ -7,3 +7,10 @@ dbt_built/logs/dbt.log
 dbt_built/.user.yml
 dbt_built/nba.duckdb
 logs/dbt.log
+
+# Frontend / Node
+**/node_modules
+frontend/.svelte-kit
+frontend/build
+frontend/.env
+.DS_Store

@@ -2,6 +2,7 @@
     import { dbtModels, configStatus } from "$lib/stores";
     import type { DbtModel, TreeNode } from "$lib/types";
     import SidebarGroup from "./SidebarGroup.svelte";
+    import Icon from "@iconify/svelte";
 
     const { width = 260, loading = false } = $props<{
         width?: number;
@@ -82,59 +83,40 @@
 </script>
 
 <aside
-    class="bg-gray-100 h-full p-3 flex flex-col border-r overflow-hidden flex-shrink-0 sidebar transition-all duration-300"
+    class="bg-slate-50 h-full p-3 flex flex-col border-r border-slate-200 overflow-hidden flex-shrink-0 sidebar transition-all duration-300"
     style={`width:${collapsed ? 48 : width}px`}
 >
     {#if collapsed}
         <button
             onclick={toggleCollapse}
-            class="w-full h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
+            class="w-full h-10 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded transition-colors"
             title="Expand sidebar"
         >
-            <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5l7 7-7 7"
-                />
-            </svg>
+            <Icon icon="lucide:chevron-right" class="w-5 h-5" />
         </button>
     {:else}
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-base font-semibold text-gray-800">dbt Models</h2>
+            <h2 class="text-sm font-bold text-[#0f172a] uppercase tracking-wide">Explorer</h2>
             <button
                 onclick={toggleCollapse}
-                class="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-200 rounded transition-colors"
+                class="text-slate-400 hover:text-slate-700 p-1 hover:bg-slate-200 rounded transition-colors"
                 title="Collapse sidebar"
             >
-                <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15 19l-7-7 7-7"
-                    />
-                </svg>
+                <Icon icon="lucide:chevron-left" class="w-4 h-4" />
             </button>
         </div>
 
-        <input
-            type="text"
-            placeholder="Search models..."
-            bind:value={searchTerm}
-            class="w-full px-2 py-1.5 border rounded mb-3 bg-white text-sm"
-        />
+        <div class="relative mb-3">
+            <div class="absolute left-2.5 top-2 text-slate-400">
+                 <Icon icon="lucide:search" class="w-4 h-4" />
+            </div>
+            <input
+                type="text"
+                placeholder="Search models..."
+                bind:value={searchTerm}
+                class="w-full pl-8 pr-2 py-1.5 border border-slate-200 rounded bg-white text-sm focus:outline-none focus:ring-1 focus:ring-[#26A69A]"
+            />
+        </div>
 
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
             {#each treeNodes as node (node.path)}
@@ -144,44 +126,37 @@
                 {#if loading}
                     <div class="text-center mt-10">
                         <div
-                            class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mb-2"
+                            class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#0f172a] mb-2"
                         ></div>
-                        <div class="text-gray-500 text-sm italic">
-                            Loading models...
+                        <div class="text-slate-500 text-sm italic">
+                            Loading...
                         </div>
                     </div>
                 {:else if $dbtModels.length === 0}
                     <div class="text-center mt-10 px-2">
-                        <div class="text-gray-500 text-sm mb-4">
+                        <div class="text-slate-500 text-sm mb-4">
                             No models found
                         </div>
                         {#if $configStatus && (!$configStatus.config_present || !$configStatus.dbt_project_path || !$configStatus.manifest_exists)}
                             <div
-                                class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-700 text-left"
+                                class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800 text-left"
                             >
-                                <strong>📍 Configuration Info</strong><br />
+                                <strong>📍 Setup Required</strong><br />
                                 {#if !$configStatus.config_present}
-                                    No <code>config.yml</code> found.
+                                    Missing <code>config.yml</code>.
                                 {:else if !$configStatus.dbt_project_path}
-                                    Set <code>dbt_project_path</code> in
-                                    <code>config.yml</code> to load your dbt models.
+                                    Set <code>dbt_project_path</code> in config.
                                 {:else if !$configStatus.manifest_exists}
-                                    Manifest not found at:<br />
-                                    <span
-                                        class="font-mono text-[10px] break-all"
-                                        >{$configStatus.manifest_path}</span
-                                    ><br />
-                                    <span class="text-[10px] mt-1 block"
-                                        >Please verify your <code
-                                            >dbt_project_path</code
-                                        > points to the correct location.</span
+                                    Manifest not found.<br />
+                                    <span class="text-[10px] mt-1 block opacity-75"
+                                        >Check <code>dbt_project_path</code>.</span
                                     >
                                 {/if}
                             </div>
                         {/if}
                     </div>
                 {:else}
-                    <div class="text-gray-500 text-sm text-center mt-10 italic">
+                    <div class="text-slate-400 text-sm text-center mt-10 italic">
                         No matches found
                     </div>
                 {/if}
