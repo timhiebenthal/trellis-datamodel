@@ -118,6 +118,11 @@
     function addEntity() {
         const label = "New Entity";
         const id = generateSlug(label);
+        
+        // Find max zIndex to place new entity on top
+        // Groups have zIndex 1, entities should start at 10+ to be above groups
+        const maxZIndex = Math.max(...$nodes.map(n => n.zIndex || (n.type === "group" ? 1 : 10)), 10);
+        
         const newNode: Node = {
             id,
             type: "entity",
@@ -132,6 +137,7 @@
                 panelHeight: 200,
                 collapsed: false,
             },
+            zIndex: maxZIndex + 1, // Place on top of all other nodes
         };
         $nodes = [...$nodes, newNode];
     }

@@ -212,6 +212,7 @@
                     id: e.id,
                     type: "entity",
                     position: e.position || { x: 0, y: 0 },
+                    zIndex: 10, // Entities should be above groups (zIndex 1)
                     data: {
                         label: e.label,
                         description: e.description,
@@ -244,6 +245,9 @@
                 // Create group nodes for each folder
                 const PADDING = 40;
                 const HEADER_HEIGHT = 60;
+                const GROUP_SPACING = 50; // Minimum spacing between groups
+                
+                const tempGroups: Array<{x: number, y: number, width: number, height: number, node: any}> = [];
                 
                 folderMap.forEach((children, folderPath) => {
                     if (children.length === 0) return;
@@ -256,16 +260,34 @@
                     const maxX = Math.max(...children.map(n => n.position.x + (n.data.width || 280)));
                     const maxY = Math.max(...children.map(n => n.position.y + (n.data.panelHeight || 200)));
                     
-                    const groupX = minX - PADDING;
-                    const groupY = minY - PADDING - HEADER_HEIGHT;
+                    let groupX = minX - PADDING;
+                    let groupY = minY - PADDING - HEADER_HEIGHT;
                     const groupWidth = maxX - minX + PADDING * 2;
                     const groupHeight = maxY - minY + PADDING * 2 + HEADER_HEIGHT;
                     
-                    groupNodes.push({
+                    // Check for overlaps with existing groups and adjust position
+                    for (const existing of tempGroups) {
+                        const overlapX = groupX < existing.x + existing.width + GROUP_SPACING && 
+                                        groupX + groupWidth + GROUP_SPACING > existing.x;
+                        const overlapY = groupY < existing.y + existing.height + GROUP_SPACING && 
+                                        groupY + groupHeight + GROUP_SPACING > existing.y;
+                        
+                        if (overlapX && overlapY) {
+                            // Move this group to the right of the overlapping group
+                            groupX = existing.x + existing.width + GROUP_SPACING;
+                            // If still overlapping vertically, move down
+                            if (groupY < existing.y + existing.height + GROUP_SPACING) {
+                                groupY = existing.y + existing.height + GROUP_SPACING;
+                            }
+                        }
+                    }
+                    
+                    const groupNode = {
                         id: groupId,
                         type: "group",
                         position: { x: groupX, y: groupY },
                         style: `width: ${groupWidth}px; height: ${groupHeight}px;`,
+                        zIndex: 1, // Groups should be behind entities
                         data: {
                             label: folderPath.split('/').pop() || folderPath,
                             description: `Folder: ${folderPath}`,
@@ -273,7 +295,10 @@
                             height: groupHeight,
                             collapsed: false,
                         },
-                    });
+                    };
+                    
+                    tempGroups.push({ x: groupX, y: groupY, width: groupWidth, height: groupHeight, node: groupNode });
+                    groupNodes.push(groupNode);
 
                     // Convert children to relative positions and set parent
                     children.forEach((child: any) => {

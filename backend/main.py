@@ -606,10 +606,7 @@ async def get_model_schema(model_name: str):
         # Find the model in the manifest
         model_node = None
         for key, node in manifest.get("nodes", {}).items():
-            if (
-                node.get("resource_type") == "model"
-                and node.get("name") == model_name
-            ):
+            if node.get("resource_type") == "model" and node.get("name") == model_name:
                 model_node = node
                 break
 
@@ -701,10 +698,7 @@ async def update_model_schema(model_name: str, request: ModelSchemaRequest):
         # Find the model in the manifest
         model_node = None
         for key, node in manifest.get("nodes", {}).items():
-            if (
-                node.get("resource_type") == "model"
-                and node.get("name") == model_name
-            ):
+            if node.get("resource_type") == "model" and node.get("name") == model_name:
                 model_node = node
                 break
 
