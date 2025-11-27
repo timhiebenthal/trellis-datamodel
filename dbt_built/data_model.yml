@@ -37,6 +37,16 @@ entities:
     y: 100
   width: 280
   panel_height: 200
+  collapsed: true
+- id: calendar
+  label: calendar
+  description: ''
+  dbt_model: model.nba_analytics.calendar
+  position:
+    x: 33.13438636456567
+    y: 54.6717375015333
+  width: 280
+  panel_height: 200
   collapsed: false
 relationships:
 - source: player
@@ -53,8 +63,8 @@ relationships:
   type: one_to_many
   source_field: home_team_id
   target_field: team_id
-  label_dx: -109.5758056640625
-  label_dy: 179.39389038085938
+  label_dx: -87.272705078125
+  label_dy: 121.21206665039062
 - source: game
   target: team
   label: ''
