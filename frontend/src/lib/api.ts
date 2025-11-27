@@ -95,3 +95,30 @@ export async function syncDbtTests(): Promise<{ status: string; message: string;
     }
     return await res.json();
 }
+
+export async function getModelSchema(modelName: string): Promise<any> {
+    try {
+        const res = await fetch(`${API_BASE}/models/${modelName}/schema`);
+        if (!res.ok) {
+            if (res.status === 404) return null; // Model not found
+            throw new Error(`Status: ${res.status}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching model schema:", e);
+        return null;
+    }
+}
+
+export async function updateModelSchema(modelName: string, columns: any[], description?: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/models/${modelName}/schema`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columns, description })
+    });
+    if (!res.ok) {
+        const error = await res.text();
+        throw new Error(`Failed to update model schema: ${error}`);
+    }
+    return await res.json();
+}

@@ -6,8 +6,8 @@
         type NodeProps,
     } from "@xyflow/svelte";
     import { viewMode, dbtModels, nodes, edges, draggingField } from "$lib/stores";
-    import type { DbtModel, DraftedField } from "$lib/types";
-    import { inferRelationships } from "$lib/api";
+    import type { DbtModel, DraftedField, ModelSchemaColumn } from "$lib/types";
+    import { inferRelationships, getModelSchema, updateModelSchema } from "$lib/api";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
 
@@ -35,6 +35,108 @@
     let modelDetails = $derived(
         isBound ? $dbtModels.find((m) => m.unique_id === boundModelName) : null,
     );
+
+    // Schema editing state for bound models
+    let editableColumns = $state<ModelSchemaColumn[]>([]);
+    let schemaLoading = $state(false);
+    let schemaSaving = $state(false);
+    let schemaError = $state<string | null>(null);
+    let hasUnsavedChanges = $state(false);
+
+    // Fetch schema when model is bound
+    $effect(() => {
+        if (isBound && modelDetails) {
+            loadSchema();
+        } else {
+            editableColumns = [];
+            hasUnsavedChanges = false;
+        }
+    });
+
+    async function loadSchema() {
+        if (!modelDetails) return;
+        
+        schemaLoading = true;
+        schemaError = null;
+        
+        try {
+            const schema = await getModelSchema(modelDetails.name);
+            
+            if (schema && schema.columns) {
+                // Use columns from schema (includes descriptions)
+                editableColumns = schema.columns.map((col: ModelSchemaColumn) => ({
+                    name: col.name,
+                    data_type: col.data_type || 'text',
+                    description: col.description || '',
+                }));
+            } else {
+                // Fallback to manifest columns if schema not found
+                editableColumns = modelDetails.columns.map((col) => ({
+                    name: col.name,
+                    data_type: col.type || 'text',
+                    description: '',
+                }));
+            }
+            hasUnsavedChanges = false;
+        } catch (e) {
+            console.error("Error loading schema:", e);
+            schemaError = "Failed to load schema";
+            // Fallback to manifest columns
+            editableColumns = modelDetails.columns.map((col) => ({
+                name: col.name,
+                data_type: col.type || 'text',
+                description: '',
+            }));
+        } finally {
+            schemaLoading = false;
+        }
+    }
+
+    async function saveSchema() {
+        if (!modelDetails) return;
+        
+        schemaSaving = true;
+        schemaError = null;
+        
+        try {
+            await updateModelSchema(
+                modelDetails.name,
+                editableColumns.map(col => ({
+                    name: col.name,
+                    data_type: col.data_type,
+                    description: col.description,
+                })),
+                data.description
+            );
+            hasUnsavedChanges = false;
+        } catch (e: any) {
+            console.error("Error saving schema:", e);
+            schemaError = e.message || "Failed to save schema";
+        } finally {
+            schemaSaving = false;
+        }
+    }
+
+    function updateEditableColumn(index: number, updates: Partial<ModelSchemaColumn>) {
+        editableColumns = editableColumns.map((col, i) =>
+            i === index ? { ...col, ...updates } : col
+        );
+        hasUnsavedChanges = true;
+    }
+
+    function addEditableColumn() {
+        editableColumns = [...editableColumns, {
+            name: '',
+            data_type: 'text',
+            description: '',
+        }];
+        hasUnsavedChanges = true;
+    }
+
+    function deleteEditableColumn(index: number) {
+        editableColumns = editableColumns.filter((_, i) => i !== index);
+        hasUnsavedChanges = true;
+    }
 
     function generateSlug(label: string, currentId: string): string {
         // Convert to lowercase and replace spaces/special chars with underscores
@@ -494,50 +596,131 @@
                             </span>
                         </div>
                     {/if}
-                    <div
-                        class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
-                        style={`max-height:${columnPanelHeight}px`}
-                    >
-                        {#each modelDetails.columns as col}
-                            <div
-                                class="flex justify-between py-1.5 px-1 border-b border-slate-50 last:border-0 group hover:bg-slate-50 rounded-sm transition-colors"
-                                ondragover={onFieldDragOver}
-                                ondrop={(e) => onFieldDrop(col.name, e)}
-                                class:bg-blue-50={$draggingField?.nodeId !== id && $draggingField !== null}
-                                class:ring-2={$draggingField?.nodeId !== id && $draggingField !== null}
-                                class:ring-blue-300={$draggingField?.nodeId !== id && $draggingField !== null}
-                            >
-                                <span
-                                    class="font-medium text-slate-700 truncate pr-2 flex items-center gap-1.5"
-                                    title={col.name}
-                                >
-                                    <span 
-                                        class="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab select-none nodrag hover:text-[#26A69A]"
-                                        draggable="true"
-                                        onmousedown={(e) => e.stopPropagation()}
-                                        onpointerdown={(e) => e.stopPropagation()}
-                                        ondragstart={(e) => onFieldDragStart(col.name, e)}
-                                        ondragend={onFieldDragEnd}
-                                        class:cursor-grabbing={$draggingField?.nodeId === id && $draggingField?.fieldName === col.name}
-                                        title="Drag to link to another field"
+
+                    {#if schemaLoading}
+                        <div class="text-center text-slate-400 py-4 text-[10px] italic">
+                            Loading schema...
+                        </div>
+                    {:else}
+                        <div
+                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+                            style={`max-height:${columnPanelHeight}px`}
+                        >
+                            {#if editableColumns.length > 0}
+                                {#each editableColumns as col, index}
+                                    <div
+                                        class="p-1.5 border-b border-slate-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-slate-50"
+                                        class:bg-blue-50={$draggingField?.nodeId !== id && $draggingField !== null}
+                                        class:ring-2={$draggingField?.nodeId !== id && $draggingField !== null}
+                                        class:ring-blue-300={$draggingField?.nodeId !== id && $draggingField !== null}
+                                        ondragover={onFieldDragOver}
+                                        ondrop={(e) => onFieldDrop(col.name, e)}
                                     >
-                                        <Icon icon="lucide:link" class="w-3 h-3" />
-                                    </span>
-                                    {col.name}
-                                </span>
-                                <span
-                                    class="text-slate-400 text-[10px] uppercase font-mono"
-                                    >{col.type}</span
-                                >
+                                        <div class="flex gap-1.5 mb-1 items-center">
+                                            <span 
+                                                class="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-[#26A69A] pt-1"
+                                                draggable="true"
+                                                onmousedown={(e) => e.stopPropagation()}
+                                                onpointerdown={(e) => e.stopPropagation()}
+                                                ondragstart={(e) => onFieldDragStart(col.name, e)}
+                                                ondragend={onFieldDragEnd}
+                                                class:cursor-grabbing={$draggingField?.nodeId === id && $draggingField?.fieldName === col.name}
+                                                title="Drag to link to another field"
+                                            >
+                                                <Icon icon="lucide:link" class="w-3 h-3" />
+                                            </span>
+                                            <div class="flex-1 flex flex-col gap-1">
+                                                <div class="flex items-center gap-1">
+                                                    <input
+                                                        type="text"
+                                                        value={col.name}
+                                                        oninput={(e) =>
+                                                            updateEditableColumn(index, {
+                                                                name: (e.target as HTMLInputElement).value,
+                                                            })}
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] font-medium"
+                                                        placeholder="column_name"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={col.data_type || ''}
+                                                        oninput={(e) =>
+                                                            updateEditableColumn(index, {
+                                                                data_type: (e.target as HTMLInputElement).value,
+                                                            })}
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] uppercase text-slate-600 font-mono"
+                                                        placeholder="text"
+                                                    />
+                                                    <button
+                                                        onclick={() => deleteEditableColumn(index)}
+                                                        class="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
+                                                        title="Delete column"
+                                                    >
+                                                        <Icon icon="lucide:x" class="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={col.description || ''}
+                                                    oninput={(e) =>
+                                                        updateEditableColumn(index, {
+                                                            description: (e.target as HTMLInputElement).value,
+                                                        })}
+                                                    class="w-full px-0 text-[10px] text-slate-500 bg-transparent focus:outline-none border-none placeholder:text-slate-300"
+                                                    placeholder="Description (optional)"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                {/each}
+                            {:else}
+                                <div class="text-center text-slate-400 py-4 text-[10px] italic">
+                                    No columns defined
+                                </div>
+                            {/if}
+                        </div>
+
+                        <button
+                            onclick={addEditableColumn}
+                            class="mt-2 w-full text-xs text-[#26A69A] hover:bg-teal-50 p-1.5 rounded border border-teal-200 transition-colors font-medium flex items-center justify-center gap-1"
+                        >
+                            <Icon icon="lucide:plus" class="w-3 h-3" /> Add Column
+                        </button>
+
+                        {#if schemaError}
+                            <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-[10px]">
+                                {schemaError}
                             </div>
-                        {/each}
-                    </div>
-                    <button
-                        class="mt-2 w-full text-[10px] text-red-500 hover:bg-red-50 p-1.5 rounded border border-red-100 transition-colors font-medium"
-                        onclick={unbind}
-                    >
-                        Unbind Model
-                    </button>
+                        {/if}
+
+                        <div class="flex gap-2 mt-2">
+                            <button
+                                onclick={saveSchema}
+                                disabled={!hasUnsavedChanges || schemaSaving}
+                                class="flex-1 text-[10px] font-medium p-1.5 rounded border transition-colors flex items-center justify-center gap-1"
+                                class:text-[#26A69A]={hasUnsavedChanges && !schemaSaving}
+                                class:hover:bg-teal-50={hasUnsavedChanges && !schemaSaving}
+                                class:border-teal-200={hasUnsavedChanges && !schemaSaving}
+                                class:text-slate-400={!hasUnsavedChanges || schemaSaving}
+                                class:border-slate-200={!hasUnsavedChanges || schemaSaving}
+                                class:cursor-not-allowed={!hasUnsavedChanges || schemaSaving}
+                            >
+                                {#if schemaSaving}
+                                    <Icon icon="lucide:loader-2" class="w-3 h-3 animate-spin" />
+                                    Saving...
+                                {:else}
+                                    <Icon icon="lucide:save" class="w-3 h-3" />
+                                    Save to YAML
+                                {/if}
+                            </button>
+                            <button
+                                class="text-[10px] text-red-500 hover:bg-red-50 p-1.5 rounded border border-red-100 transition-colors font-medium"
+                                onclick={unbind}
+                            >
+                                Unbind
+                            </button>
+                        </div>
+                    {/if}
                 </div>
             {:else}
                 <!-- When not bound to dbt model: show concept view OR field editor based on view mode -->

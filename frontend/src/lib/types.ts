@@ -69,3 +69,17 @@ export interface FieldDragState {
     nodeLabel: string;
 }
 
+export interface ModelSchemaColumn {
+    name: string;
+    data_type?: string;
+    description?: string;
+    data_tests?: any[];
+}
+
+export interface ModelSchema {
+    model_name: string;
+    description: string;
+    columns: ModelSchemaColumn[];
+    file_path: string;
+}
+
