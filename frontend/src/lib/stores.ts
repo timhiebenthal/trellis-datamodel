@@ -8,6 +8,11 @@ export const dbtModels = writable<DbtModel[]>([]);
 export const viewMode = writable<'concept' | 'physical'>('concept');
 export const configStatus = writable<any>(null);
 
+// Filter and grouping stores
+export const folderFilter = writable<string | null>(null);
+export const tagFilter = writable<string[]>([]);
+export const groupByFolder = writable<boolean>(true);
+
 // Drag-and-drop state for field linking
 export interface FieldDragState {
     nodeId: string;

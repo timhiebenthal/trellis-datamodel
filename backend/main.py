@@ -208,6 +208,7 @@ async def get_manifest():
                     "description": node.get("description"),
                     "materialization": materialized,
                     "file_path": original_path,
+                    "tags": node.get("tags", []),
                 }
             )
 

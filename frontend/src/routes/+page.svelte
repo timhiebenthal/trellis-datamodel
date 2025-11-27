@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, untrack } from "svelte";
     import {
         nodes,
         edges,
@@ -12,6 +12,9 @@
         redo,
         canUndo,
         canRedo,
+        folderFilter,
+        tagFilter,
+        groupByFolder,
     } from "$lib/stores";
     import {
         getManifest,
@@ -177,21 +180,115 @@
                 }
             }
 
-            // Map data model to Svelte Flow format
-            $nodes = (dataModel.entities || []).map((e: any) => ({
-                id: e.id,
-                type: "entity",
-                position: e.position || { x: 0, y: 0 },
-                data: {
-                    label: e.label,
-                    description: e.description,
-                    dbt_model: e.dbt_model,
-                    drafted_fields: e.drafted_fields,
-                    width: e.width ?? 280,
-                    panelHeight: e.panel_height ?? e.panelHeight ?? 200,
-                    collapsed: e.collapsed ?? false,
-                },
-            })) as Node[];
+            // Helper to get folder and tags from dbt model
+            function getEntityMetadata(entity: any) {
+                if (!entity.dbt_model) return { folder: null, tags: [] };
+                
+                const model = models.find((m: any) => m.unique_id === entity.dbt_model);
+                if (!model) return { folder: null, tags: [] };
+                
+                // Extract folder (skip main path level)
+                let folder = null;
+                if (model.file_path) {
+                    let p = model.file_path.replace(/\\/g, '/');
+                    const lastSlash = p.lastIndexOf('/');
+                    const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
+                    let parts = dir.split('/').filter((x: string) => x !== "." && x !== "");
+                    if (parts[0] === "models") parts.shift();
+                    // Always skip the first folder level (e.g., "3_core") since it's the base layer
+                    if (parts.length > 0) parts.shift();
+                    if (parts.length > 0) {
+                        folder = parts.join('/');
+                    }
+                }
+                
+                return { folder, tags: model.tags || [] };
+            }
+
+            // Map data model to Svelte Flow format with metadata
+            const entityNodes = (dataModel.entities || []).map((e: any) => {
+                const metadata = getEntityMetadata(e);
+                return {
+                    id: e.id,
+                    type: "entity",
+                    position: e.position || { x: 0, y: 0 },
+                    data: {
+                        label: e.label,
+                        description: e.description,
+                        dbt_model: e.dbt_model,
+                        drafted_fields: e.drafted_fields,
+                        width: e.width ?? 280,
+                        panelHeight: e.panel_height ?? e.panelHeight ?? 200,
+                        collapsed: e.collapsed ?? false,
+                        folder: metadata.folder,
+                        tags: metadata.tags,
+                    },
+                    parentId: undefined, // Will be set if grouping is enabled
+                };
+            });
+
+            // Create group nodes if grouping is enabled
+            const groupNodes: Node[] = [];
+            if ($groupByFolder) {
+                const folderMap = new Map<string, any[]>();
+                
+                entityNodes.forEach((node: any) => {
+                    if (node.data.folder) {
+                        if (!folderMap.has(node.data.folder)) {
+                            folderMap.set(node.data.folder, []);
+                        }
+                        folderMap.get(node.data.folder)!.push(node);
+                    }
+                });
+
+                // Create group nodes for each folder
+                const PADDING = 40;
+                const HEADER_HEIGHT = 60;
+                
+                folderMap.forEach((children, folderPath) => {
+                    if (children.length === 0) return;
+                    
+                    const groupId = `group-${folderPath.replace(/\//g, '-')}`;
+                    
+                    // Calculate bounding box of children
+                    const minX = Math.min(...children.map(n => n.position.x));
+                    const minY = Math.min(...children.map(n => n.position.y));
+                    const maxX = Math.max(...children.map(n => n.position.x + (n.data.width || 280)));
+                    const maxY = Math.max(...children.map(n => n.position.y + (n.data.panelHeight || 200)));
+                    
+                    const groupX = minX - PADDING;
+                    const groupY = minY - PADDING - HEADER_HEIGHT;
+                    const groupWidth = maxX - minX + PADDING * 2;
+                    const groupHeight = maxY - minY + PADDING * 2 + HEADER_HEIGHT;
+                    
+                    groupNodes.push({
+                        id: groupId,
+                        type: "group",
+                        position: { x: groupX, y: groupY },
+                        style: `width: ${groupWidth}px; height: ${groupHeight}px;`,
+                        data: {
+                            label: folderPath.split('/').pop() || folderPath,
+                            description: `Folder: ${folderPath}`,
+                            width: groupWidth,
+                            height: groupHeight,
+                            collapsed: false,
+                        },
+                    });
+
+                    // Convert children to relative positions and set parent
+                    children.forEach((child: any) => {
+                        child.parentId = groupId;
+                        child.position = {
+                            x: child.position.x - groupX,
+                            y: child.position.y - groupY,
+                        };
+                        // Mark as extent parent so it stays within bounds
+                        child.extent = 'parent';
+                    });
+                });
+            }
+
+            $nodes = [...groupNodes, ...entityNodes] as Node[];
 
             const edgeCounts = new Map<string, number>();
             $edges = relationships.map((r: any) => {
@@ -278,17 +375,19 @@
                 // Convert back to data model format
                 const dataModel = {
                     version: 0.1,
-                    entities: currentNodes.map((n) => ({
-                        id: n.id,
-                        label: n.data.label,
-                        description: n.data.description,
-                        dbt_model: n.data.dbt_model,
-                        drafted_fields: n.data?.drafted_fields,
-                        position: n.position,
-                        width: n.data?.width,
-                        panel_height: n.data?.panelHeight,
-                        collapsed: n.data?.collapsed ?? false,
-                    })),
+                    entities: currentNodes
+                        .filter((n) => n.type === "entity") // Only save entity nodes, not group nodes
+                        .map((n) => ({
+                            id: n.id,
+                            label: n.data.label,
+                            description: n.data.description,
+                            dbt_model: n.data.dbt_model,
+                            drafted_fields: n.data?.drafted_fields,
+                            position: n.position,
+                            width: n.data?.width,
+                            panel_height: n.data?.panelHeight,
+                            collapsed: n.data?.collapsed ?? false,
+                        })),
                     relationships: currentEdges.map((e) => ({
                         source: e.source,
                         target: e.target,
@@ -309,6 +408,43 @@
                 saving = false;
             }
         }, 1000); // 1s debounce
+    });
+
+    // Apply filters to node visibility
+    $effect(() => {
+        if (loading) return;
+        
+        const activeFolder = $folderFilter;
+        const activeTags = $tagFilter;
+        
+        // Use untrack to prevent reading $nodes from creating a dependency
+        const currentNodes = untrack(() => $nodes);
+        
+        // Update visibility without triggering infinite loop
+        currentNodes.forEach(node => {
+            // Skip group nodes
+            if (node.type === "group") {
+                return;
+            }
+
+            // Check if node matches filters
+            let visible = true;
+            
+            if (activeFolder) {
+                visible = visible && node.data.folder === activeFolder;
+            }
+            
+            if (activeTags.length > 0) {
+                const nodeTags = node.data.tags || [];
+                visible = visible && activeTags.some(tag => nodeTags.includes(tag));
+            }
+            
+            // Update hidden property directly
+            node.hidden = !visible;
+        });
+        
+        // Trigger reactivity
+        $nodes = [...currentNodes];
     });
 
 </script>

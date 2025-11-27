@@ -12,6 +12,7 @@ export interface DbtModel {
     description?: string;
     materialization?: string;
     file_path?: string;
+    tags?: string[];
 }
 
 export interface TreeNode {
@@ -42,6 +43,8 @@ export interface EntityData {
     width?: number;
     panelHeight?: number;
     collapsed?: boolean;
+    folder?: string; // relative folder path (excluding main path)
+    tags?: string[];
 }
 
 // We'll use Svelte Flow types for nodes/edges in the actual components, 

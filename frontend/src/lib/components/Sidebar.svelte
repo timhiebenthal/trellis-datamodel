@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { dbtModels, configStatus } from "$lib/stores";
+    import { dbtModels, configStatus, folderFilter, tagFilter } from "$lib/stores";
     import type { DbtModel, TreeNode } from "$lib/types";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
@@ -12,13 +12,73 @@
     let searchTerm = $state("");
     let collapsed = $state(false);
 
+    // Extract all unique tags from models
+    let allTags = $derived(
+        Array.from(new Set($dbtModels.flatMap(m => m.tags || []))).sort()
+    );
+
+    // Apply search and filters
     let filteredModels = $derived(
-        $dbtModels.filter((m) =>
-            m.name.toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
+        $dbtModels.filter((m) => {
+            // Search filter
+            if (!m.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+                return false;
+            }
+            
+            // Folder filter
+            if ($folderFilter) {
+                const modelFolder = getModelFolder(m);
+                if (modelFolder !== $folderFilter) {
+                    return false;
+                }
+            }
+            
+            // Tag filter
+            if ($tagFilter.length > 0) {
+                const modelTags = m.tags || [];
+                const hasMatchingTag = $tagFilter.some(tag => modelTags.includes(tag));
+                if (!hasMatchingTag) {
+                    return false;
+                }
+            }
+            
+            return true;
+        })
     );
 
     let treeNodes = $derived(buildTree(filteredModels));
+
+    function getModelFolder(model: DbtModel): string | null {
+        if (!model.file_path) return null;
+        let p = model.file_path.replace(/\\/g, '/');
+        const lastSlash = p.lastIndexOf('/');
+        const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
+        let parts = dir.split('/').filter(x => x !== "." && x !== "");
+        if (parts[0] === "models") parts.shift();
+        // Skip the main folder (first part after models/)
+        if (parts.length > 1) {
+            parts.shift();
+            return parts.join('/');
+        }
+        return null;
+    }
+
+    function toggleTag(tag: string) {
+        if ($tagFilter.includes(tag)) {
+            $tagFilter = $tagFilter.filter(t => t !== tag);
+        } else {
+            $tagFilter = [...$tagFilter, tag];
+        }
+    }
+
+    function clearFilters() {
+        $folderFilter = null;
+        $tagFilter = [];
+    }
+
+    function hasActiveFilters() {
+        return $folderFilter !== null || $tagFilter.length > 0;
+    }
 
     function buildTree(models: DbtModel[]): TreeNode[] {
         const rootObj: any = { _files: [], _folders: {} };
@@ -117,6 +177,65 @@
                 class="w-full pl-8 pr-2 py-1.5 border border-slate-200 rounded bg-white text-sm focus:outline-none focus:ring-1 focus:ring-[#26A69A]"
             />
         </div>
+
+        <!-- Active Filters Display -->
+        {#if hasActiveFilters()}
+            <div class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-semibold text-blue-900">Active Filters</span>
+                    <button
+                        onclick={clearFilters}
+                        class="text-blue-600 hover:text-blue-800 transition-colors"
+                        title="Clear all filters"
+                    >
+                        <Icon icon="lucide:x" class="w-3 h-3" />
+                    </button>
+                </div>
+                {#if $folderFilter}
+                    <div class="flex items-center gap-1 text-blue-700">
+                        <Icon icon="lucide:folder" class="w-3 h-3" />
+                        <span>{$folderFilter}</span>
+                    </div>
+                {/if}
+                {#if $tagFilter.length > 0}
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        {#each $tagFilter as tag}
+                            <span class="px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded text-[10px]">
+                                {tag}
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+        {/if}
+
+        <!-- Tags Section -->
+        {#if allTags.length > 0}
+            <div class="mb-3">
+                <h3 class="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
+                    <Icon icon="lucide:tags" class="w-3 h-3" />
+                    Tags
+                </h3>
+                <div class="flex flex-wrap gap-1">
+                    {#each allTags as tag}
+                        <button
+                            onclick={() => toggleTag(tag)}
+                            class="px-2 py-1 text-xs rounded transition-colors border"
+                            class:bg-[#26A69A]={$tagFilter.includes(tag)}
+                            class:text-white={$tagFilter.includes(tag)}
+                            class:border-[#26A69A]={$tagFilter.includes(tag)}
+                            class:bg-white={!$tagFilter.includes(tag)}
+                            class:text-slate-700={!$tagFilter.includes(tag)}
+                            class:border-slate-200={!$tagFilter.includes(tag)}
+                            class:hover:border-[#26A69A]={!$tagFilter.includes(tag)}
+                            title="Filter by tag: {tag}"
+                        >
+                            {tag}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+        {/if}
 
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
             {#each treeNodes as node (node.path)}

@@ -17,11 +17,13 @@
 
     import { nodes, edges } from "$lib/stores";
     import EntityNode from "./EntityNode.svelte";
+    import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
     import Icon from "@iconify/svelte";
 
     const nodeTypes = {
         entity: EntityNode,
+        group: GroupNode,
     };
 
     const edgeTypes = {
