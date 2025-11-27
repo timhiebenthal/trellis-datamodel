@@ -41,17 +41,21 @@
         const offset = level * 20;
         return index % 2 === 1 ? offset : -offset;
     }
-    
+
     async function handleSyncDbt() {
         syncing = true;
         syncMessage = null;
         try {
             const result = await syncDbtTests();
             syncMessage = `✓ ${result.message}`;
-            setTimeout(() => { syncMessage = null; }, 3000);
+            setTimeout(() => {
+                syncMessage = null;
+            }, 3000);
         } catch (e) {
-            syncMessage = `✗ ${e instanceof Error ? e.message : 'Sync failed'}`;
-            setTimeout(() => { syncMessage = null; }, 5000);
+            syncMessage = `✗ ${e instanceof Error ? e.message : "Sync failed"}`;
+            setTimeout(() => {
+                syncMessage = null;
+            }, 5000);
         } finally {
             syncing = false;
         }
@@ -65,25 +69,29 @@
             if (inferred.length > 0) {
                 let addedCount = 0;
                 const newEdges = [...$edges];
-                
+
                 inferred.forEach((r: any) => {
-                    const exists = newEdges.some(e => 
-                        e.source === r.source && 
-                        e.target === r.target && 
-                        e.data?.source_field === r.source_field &&
-                        e.data?.target_field === r.target_field
+                    const exists = newEdges.some(
+                        (e) =>
+                            e.source === r.source &&
+                            e.target === r.target &&
+                            e.data?.source_field === r.source_field &&
+                            e.data?.target_field === r.target_field,
                     );
-                    
+
                     if (!exists) {
-                        const parallelEdges = newEdges.filter(e => 
-                             (e.source === r.source && e.target === r.target) ||
-                             (e.source === r.target && e.target === r.source)
+                        const parallelEdges = newEdges.filter(
+                            (e) =>
+                                (e.source === r.source &&
+                                    e.target === r.target) ||
+                                (e.source === r.target &&
+                                    e.target === r.source),
                         );
                         const currentCount = parallelEdges.length;
-                        
+
                         const baseId = `e${r.source}-${r.target}`;
-                        const edgeId = `${baseId}-${Date.now()}-${currentCount}`; 
-                        
+                        const edgeId = `${baseId}-${Date.now()}-${currentCount}`;
+
                         newEdges.push({
                             id: edgeId,
                             source: r.source,
@@ -102,23 +110,31 @@
                         addedCount++;
                     }
                 });
-                
+
                 if (addedCount > 0) {
                     $edges = newEdges;
                     syncMessage = `✓ Added ${addedCount} new`;
-                    setTimeout(() => { syncMessage = null; }, 3000);
+                    setTimeout(() => {
+                        syncMessage = null;
+                    }, 3000);
                 } else {
                     syncMessage = "No new found";
-                    setTimeout(() => { syncMessage = null; }, 3000);
+                    setTimeout(() => {
+                        syncMessage = null;
+                    }, 3000);
                 }
             } else {
                 syncMessage = "No relationships in dbt";
-                setTimeout(() => { syncMessage = null; }, 3000);
+                setTimeout(() => {
+                    syncMessage = null;
+                }, 3000);
             }
         } catch (e) {
             console.error(e);
             syncMessage = "✗ Failed to infer";
-            setTimeout(() => { syncMessage = null; }, 5000);
+            setTimeout(() => {
+                syncMessage = null;
+            }, 5000);
         } finally {
             syncing = false;
         }
@@ -172,36 +188,45 @@
             // If no relationships in data model, try to infer from dbt yml files
             let relationships = dataModel.relationships || [];
             if (relationships.length === 0) {
-                console.log("No relationships found in data model, attempting to infer from dbt yml files...");
+                console.log(
+                    "No relationships found in data model, attempting to infer from dbt yml files...",
+                );
                 const inferred = await inferRelationships();
                 if (inferred.length > 0) {
                     relationships = inferred;
-                    console.log(`Inferred ${inferred.length} relationships from dbt yml files`);
+                    console.log(
+                        `Inferred ${inferred.length} relationships from dbt yml files`,
+                    );
                 }
             }
 
             // Helper to get folder and tags from dbt model
             function getEntityMetadata(entity: any) {
                 if (!entity.dbt_model) return { folder: null, tags: [] };
-                
-                const model = models.find((m: any) => m.unique_id === entity.dbt_model);
+
+                const model = models.find(
+                    (m: any) => m.unique_id === entity.dbt_model,
+                );
                 if (!model) return { folder: null, tags: [] };
-                
+
                 // Extract folder (skip main path level)
                 let folder = null;
                 if (model.file_path) {
-                    let p = model.file_path.replace(/\\/g, '/');
-                    const lastSlash = p.lastIndexOf('/');
-                    const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
-                    let parts = dir.split('/').filter((x: string) => x !== "." && x !== "");
+                    let p = model.file_path.replace(/\\/g, "/");
+                    const lastSlash = p.lastIndexOf("/");
+                    const dir =
+                        lastSlash !== -1 ? p.substring(0, lastSlash) : "";
+                    let parts = dir
+                        .split("/")
+                        .filter((x: string) => x !== "." && x !== "");
                     if (parts[0] === "models") parts.shift();
                     // Always skip the first folder level (e.g., "3_core") since it's the base layer
                     if (parts.length > 0) parts.shift();
                     if (parts.length > 0) {
-                        folder = parts.join('/');
+                        folder = parts.join("/");
                     }
                 }
-                
+
                 return { folder, tags: model.tags || [] };
             }
 
@@ -232,7 +257,7 @@
             const groupNodes: Node[] = [];
             if ($groupByFolder) {
                 const folderMap = new Map<string, any[]>();
-                
+
                 entityNodes.forEach((node: any) => {
                     if (node.data.folder) {
                         if (!folderMap.has(node.data.folder)) {
@@ -246,42 +271,68 @@
                 const PADDING = 40;
                 const HEADER_HEIGHT = 60;
                 const GROUP_SPACING = 50; // Minimum spacing between groups
-                
-                const tempGroups: Array<{x: number, y: number, width: number, height: number, node: any}> = [];
-                
+
+                const tempGroups: Array<{
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
+                    node: any;
+                }> = [];
+
                 folderMap.forEach((children, folderPath) => {
                     if (children.length === 0) return;
-                    
-                    const groupId = `group-${folderPath.replace(/\//g, '-')}`;
-                    
+
+                    const groupId = `group-${folderPath.replace(/\//g, "-")}`;
+
                     // Calculate bounding box of children
-                    const minX = Math.min(...children.map(n => n.position.x));
-                    const minY = Math.min(...children.map(n => n.position.y));
-                    const maxX = Math.max(...children.map(n => n.position.x + (n.data.width || 280)));
-                    const maxY = Math.max(...children.map(n => n.position.y + (n.data.panelHeight || 200)));
-                    
+                    const minX = Math.min(...children.map((n) => n.position.x));
+                    const minY = Math.min(...children.map((n) => n.position.y));
+                    const maxX = Math.max(
+                        ...children.map(
+                            (n) => n.position.x + (n.data.width || 280),
+                        ),
+                    );
+                    const maxY = Math.max(
+                        ...children.map(
+                            (n) => n.position.y + (n.data.panelHeight || 200),
+                        ),
+                    );
+
                     let groupX = minX - PADDING;
                     let groupY = minY - PADDING - HEADER_HEIGHT;
                     const groupWidth = maxX - minX + PADDING * 2;
-                    const groupHeight = maxY - minY + PADDING * 2 + HEADER_HEIGHT;
-                    
+                    const groupHeight =
+                        maxY - minY + PADDING * 2 + HEADER_HEIGHT;
+
                     // Check for overlaps with existing groups and adjust position
                     for (const existing of tempGroups) {
-                        const overlapX = groupX < existing.x + existing.width + GROUP_SPACING && 
-                                        groupX + groupWidth + GROUP_SPACING > existing.x;
-                        const overlapY = groupY < existing.y + existing.height + GROUP_SPACING && 
-                                        groupY + groupHeight + GROUP_SPACING > existing.y;
-                        
+                        const overlapX =
+                            groupX <
+                                existing.x + existing.width + GROUP_SPACING &&
+                            groupX + groupWidth + GROUP_SPACING > existing.x;
+                        const overlapY =
+                            groupY <
+                                existing.y + existing.height + GROUP_SPACING &&
+                            groupY + groupHeight + GROUP_SPACING > existing.y;
+
                         if (overlapX && overlapY) {
                             // Move this group to the right of the overlapping group
-                            groupX = existing.x + existing.width + GROUP_SPACING;
+                            groupX =
+                                existing.x + existing.width + GROUP_SPACING;
                             // If still overlapping vertically, move down
-                            if (groupY < existing.y + existing.height + GROUP_SPACING) {
-                                groupY = existing.y + existing.height + GROUP_SPACING;
+                            if (
+                                groupY <
+                                existing.y + existing.height + GROUP_SPACING
+                            ) {
+                                groupY =
+                                    existing.y +
+                                    existing.height +
+                                    GROUP_SPACING;
                             }
                         }
                     }
-                    
+
                     const groupNode = {
                         id: groupId,
                         type: "group",
@@ -289,15 +340,21 @@
                         style: `width: ${groupWidth}px; height: ${groupHeight}px;`,
                         zIndex: 1, // Groups should be behind entities
                         data: {
-                            label: folderPath.split('/').pop() || folderPath,
+                            label: folderPath.split("/").pop() || folderPath,
                             description: `Folder: ${folderPath}`,
                             width: groupWidth,
                             height: groupHeight,
                             collapsed: false,
                         },
                     };
-                    
-                    tempGroups.push({ x: groupX, y: groupY, width: groupWidth, height: groupHeight, node: groupNode });
+
+                    tempGroups.push({
+                        x: groupX,
+                        y: groupY,
+                        width: groupWidth,
+                        height: groupHeight,
+                        node: groupNode,
+                    });
                     groupNodes.push(groupNode);
 
                     // Convert children to relative positions and set parent
@@ -308,7 +365,7 @@
                             y: child.position.y - groupY,
                         };
                         // Mark as extent parent so it stays within bounds
-                        child.extent = 'parent';
+                        child.extent = "parent";
                     });
                 });
             }
@@ -318,7 +375,9 @@
             const edgeCounts = new Map<string, number>();
             $edges = relationships.map((r: any) => {
                 const pairKey =
-                    r.source < r.target ? `${r.source}-${r.target}` : `${r.target}-${r.source}`;
+                    r.source < r.target
+                        ? `${r.source}-${r.target}`
+                        : `${r.target}-${r.source}`;
                 const currentCount = edgeCounts.get(pairKey) ?? 0;
                 edgeCounts.set(pairKey, currentCount + 1);
 
@@ -343,6 +402,25 @@
                 };
             }) as Edge[];
 
+            // Deduplicate edges on load to clean up any existing bad state
+            const uniqueEdges = new Map<string, Edge>();
+            $edges.forEach((edge) => {
+                // Create a unique key based on content, ignoring ID
+                // Key: source|target|source_field|target_field
+                // We sort source/target to handle bidirectional duplicates if any (though usually direction matters)
+                // But for now let's stick to exact direction match unless it's a generic relationship
+                const key = `${edge.source}|${edge.target}|${edge.data?.source_field || ""}|${edge.data?.target_field || ""}`;
+
+                if (!uniqueEdges.has(key)) {
+                    uniqueEdges.set(key, edge);
+                } else {
+                    console.warn(
+                        `Removed duplicate edge on load: ${edge.id} (duplicate of ${uniqueEdges.get(key)?.id})`,
+                    );
+                }
+            });
+            $edges = Array.from(uniqueEdges.values());
+
             lastSavedState = JSON.stringify({ nodes: $nodes, edges: $edges });
             initHistory();
         } catch (e) {
@@ -354,7 +432,7 @@
 
         // Keyboard shortcut for undo/redo
         function handleKeydown(e: KeyboardEvent) {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+            if ((e.metaKey || e.ctrlKey) && e.key === "z") {
                 e.preventDefault();
                 if (e.shiftKey) {
                     redo();
@@ -363,13 +441,13 @@
                 }
             }
             // Ctrl+Y as alternative redo
-            if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+            if ((e.metaKey || e.ctrlKey) && e.key === "y") {
                 e.preventDefault();
                 redo();
             }
         }
-        window.addEventListener('keydown', handleKeydown);
-        return () => window.removeEventListener('keydown', handleKeydown);
+        window.addEventListener("keydown", handleKeydown);
+        return () => window.removeEventListener("keydown", handleKeydown);
     });
 
     // Auto-save logic
@@ -382,7 +460,10 @@
         const currentNodes = $nodes;
         const currentEdges = $edges;
 
-        console.log("State changed:", { nodes: currentNodes.length, edges: currentEdges.length });
+        console.log("State changed:", {
+            nodes: currentNodes.length,
+            edges: currentEdges.length,
+        });
 
         const state = JSON.stringify({
             nodes: currentNodes,
@@ -438,15 +519,15 @@
     // Apply filters to node visibility
     $effect(() => {
         if (loading) return;
-        
+
         const activeFolder = $folderFilter;
         const activeTags = $tagFilter;
-        
+
         // Use untrack to prevent reading $nodes from creating a dependency
         const currentNodes = untrack(() => $nodes);
-        
+
         // Update visibility without triggering infinite loop
-        currentNodes.forEach(node => {
+        currentNodes.forEach((node) => {
             // Skip group nodes
             if (node.type === "group") {
                 return;
@@ -454,41 +535,52 @@
 
             // Check if node matches filters
             let visible = true;
-            
+
             if (activeFolder) {
                 visible = visible && node.data.folder === activeFolder;
             }
-            
+
             if (activeTags.length > 0) {
                 const nodeTags = node.data.tags || [];
-                visible = visible && activeTags.some(tag => nodeTags.includes(tag));
+                visible =
+                    visible && activeTags.some((tag) => nodeTags.includes(tag));
             }
-            
+
             // Update hidden property directly
             node.hidden = !visible;
         });
-        
+
         // Trigger reactivity
         $nodes = [...currentNodes];
     });
-
 </script>
 
-<div class="flex flex-col h-screen overflow-hidden font-sans text-slate-900 bg-slate-50">
+<div
+    class="flex flex-col h-screen overflow-hidden font-sans text-slate-900 bg-slate-50"
+>
     <!-- Header -->
     <header
         class="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between z-20 shadow-sm shrink-0"
     >
         <!-- Brand -->
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-[#0f172a] rounded-lg flex items-center justify-center text-white shadow-sm">
+            <div
+                class="w-8 h-8 bg-[#0f172a] rounded-lg flex items-center justify-center text-white shadow-sm"
+            >
                 <Icon icon="lucide:box" class="w-5 h-5" />
             </div>
             <div class="flex flex-col">
-                <h1 class="font-bold text-lg text-[#0f172a] leading-tight tracking-tight">Trellis</h1>
-                <span class="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Data Model UI</span>
+                <h1
+                    class="font-bold text-lg text-[#0f172a] leading-tight tracking-tight"
+                >
+                    Trellis
+                </h1>
+                <span
+                    class="text-[10px] text-slate-500 font-medium tracking-wider uppercase"
+                    >Data Model UI</span
+                >
             </div>
-            
+
             {#if saving}
                 <span class="text-xs text-slate-400 animate-pulse ml-2"
                     >Saving...</span
@@ -500,7 +592,9 @@
         </div>
 
         <!-- View Switcher -->
-        <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200/60">
+        <div
+            class="flex bg-slate-100 rounded-lg p-1 border border-slate-200/60"
+        >
             <button
                 class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
                 class:bg-[#0f172a]={$viewMode === "concept"}
@@ -526,23 +620,30 @@
                 Physical
             </button>
         </div>
-        
+
         <!-- Actions -->
         <div class="flex items-center gap-3">
             {#if syncMessage}
-                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200">
-                    {#if syncMessage.startsWith('✓')}
+                <div
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200"
+                >
+                    {#if syncMessage.startsWith("✓")}
                         <div class="w-2 h-2 rounded-full bg-green-500"></div>
-                        <span class="text-xs font-medium text-green-700">{syncMessage.substring(2)}</span>
-                    {:else if syncMessage.startsWith('✗')}
+                        <span class="text-xs font-medium text-green-700"
+                            >{syncMessage.substring(2)}</span
+                        >
+                    {:else if syncMessage.startsWith("✗")}
                         <div class="w-2 h-2 rounded-full bg-red-500"></div>
-                        <span class="text-xs font-medium text-red-700">{syncMessage.substring(2)}</span>
+                        <span class="text-xs font-medium text-red-700"
+                            >{syncMessage.substring(2)}</span
+                        >
                     {:else}
-                        <span class="text-xs text-slate-600">{syncMessage}</span>
+                        <span class="text-xs text-slate-600">{syncMessage}</span
+                        >
                     {/if}
                 </div>
             {/if}
-            
+
             <div class="h-6 w-px bg-slate-200 mx-1"></div>
 
             <button
@@ -554,7 +655,7 @@
                 <Icon icon="lucide:download" class="w-4 h-4" />
                 Pull from dbt
             </button>
-            
+
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}

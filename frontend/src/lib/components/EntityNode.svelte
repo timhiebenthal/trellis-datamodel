@@ -5,9 +5,19 @@
         useSvelteFlow,
         type NodeProps,
     } from "@xyflow/svelte";
-    import { viewMode, dbtModels, nodes, edges, draggingField } from "$lib/stores";
+    import {
+        viewMode,
+        dbtModels,
+        nodes,
+        edges,
+        draggingField,
+    } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn } from "$lib/types";
-    import { inferRelationships, getModelSchema, updateModelSchema } from "$lib/api";
+    import {
+        inferRelationships,
+        getModelSchema,
+        updateModelSchema,
+    } from "$lib/api";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
 
@@ -55,26 +65,28 @@
 
     async function loadSchema() {
         if (!modelDetails) return;
-        
+
         schemaLoading = true;
         schemaError = null;
-        
+
         try {
             const schema = await getModelSchema(modelDetails.name);
-            
+
             if (schema && schema.columns) {
                 // Use columns from schema (includes descriptions)
-                editableColumns = schema.columns.map((col: ModelSchemaColumn) => ({
-                    name: col.name,
-                    data_type: col.data_type || 'text',
-                    description: col.description || '',
-                }));
+                editableColumns = schema.columns.map(
+                    (col: ModelSchemaColumn) => ({
+                        name: col.name,
+                        data_type: col.data_type || "text",
+                        description: col.description || "",
+                    }),
+                );
             } else {
                 // Fallback to manifest columns if schema not found
                 editableColumns = modelDetails.columns.map((col) => ({
                     name: col.name,
-                    data_type: col.type || 'text',
-                    description: '',
+                    data_type: col.type || "text",
+                    description: "",
                 }));
             }
             hasUnsavedChanges = false;
@@ -84,8 +96,8 @@
             // Fallback to manifest columns
             editableColumns = modelDetails.columns.map((col) => ({
                 name: col.name,
-                data_type: col.type || 'text',
-                description: '',
+                data_type: col.type || "text",
+                description: "",
             }));
         } finally {
             schemaLoading = false;
@@ -94,19 +106,19 @@
 
     async function saveSchema() {
         if (!modelDetails) return;
-        
+
         schemaSaving = true;
         schemaError = null;
-        
+
         try {
             await updateModelSchema(
                 modelDetails.name,
-                editableColumns.map(col => ({
+                editableColumns.map((col) => ({
                     name: col.name,
                     data_type: col.data_type,
                     description: col.description,
                 })),
-                data.description
+                data.description,
             );
             hasUnsavedChanges = false;
         } catch (e: any) {
@@ -117,19 +129,25 @@
         }
     }
 
-    function updateEditableColumn(index: number, updates: Partial<ModelSchemaColumn>) {
+    function updateEditableColumn(
+        index: number,
+        updates: Partial<ModelSchemaColumn>,
+    ) {
         editableColumns = editableColumns.map((col, i) =>
-            i === index ? { ...col, ...updates } : col
+            i === index ? { ...col, ...updates } : col,
         );
         hasUnsavedChanges = true;
     }
 
     function addEditableColumn() {
-        editableColumns = [...editableColumns, {
-            name: '',
-            data_type: 'text',
-            description: '',
-        }];
+        editableColumns = [
+            ...editableColumns,
+            {
+                name: "",
+                data_type: "text",
+                description: "",
+            },
+        ];
         hasUnsavedChanges = true;
     }
 
@@ -186,12 +204,10 @@
                     updatedEdge.target = newId;
                 }
                 // Update edge ID if it was based on source-target pattern
-                if (
-                    updatedEdge.source !== edge.source ||
-                    updatedEdge.target !== edge.target
-                ) {
-                    updatedEdge.id = `e${updatedEdge.source}-${updatedEdge.target}`;
-                }
+                // FIXED: Do NOT update edge ID. Changing IDs causes duplicates on reload because
+                // the backend saves the new ID, but might also keep the old one if not handled perfectly,
+                // or more likely, the "baseId" logic in Canvas/Page creates collisions.
+                // Keeping the ID stable is safer.
                 return updatedEdge;
             });
 
@@ -234,25 +250,28 @@
         }
 
         updateNodeData(id, updates);
-        
+
         // Auto-create relationships from yml relationship tests
         try {
             const inferred = await inferRelationships();
-            
+
             // Build model name -> entity ID map from current canvas state
             // Include the model we just bound (since data model hasn't saved yet)
             const modelToEntity: Record<string, string> = {};
             for (const node of $nodes) {
-                const boundModel = node.id === id ? model.unique_id : node.data?.dbt_model;
-                if (boundModel && typeof boundModel === 'string') {
+                const boundModel =
+                    node.id === id ? model.unique_id : node.data?.dbt_model;
+                if (boundModel && typeof boundModel === "string") {
                     // Extract model name from "model.project.name" -> "name"
-                    const modelName = boundModel.includes('.') ? boundModel.split('.').pop()! : boundModel;
+                    const modelName = boundModel.includes(".")
+                        ? boundModel.split(".").pop()!
+                        : boundModel;
                     modelToEntity[modelName] = node.id;
                 }
                 // Also map entity ID to itself
                 modelToEntity[node.id] = node.id;
             }
-            
+
             function getParallelOffset(index: number): number {
                 if (index === 0) return 0;
                 const level = Math.ceil(index / 2);
@@ -264,31 +283,39 @@
                 // Remap source/target using current canvas bindings
                 const sourceEntityId = modelToEntity[rel.source] || rel.source;
                 const targetEntityId = modelToEntity[rel.target] || rel.target;
-                
+
                 // Check if this relationship involves the current entity
                 if (sourceEntityId !== id && targetEntityId !== id) continue;
-                
+
                 // Check if both entities exist on the canvas
-                const sourceExists = $nodes.some((n) => n.id === sourceEntityId);
-                const targetExists = $nodes.some((n) => n.id === targetEntityId);
+                const sourceExists = $nodes.some(
+                    (n) => n.id === sourceEntityId,
+                );
+                const targetExists = $nodes.some(
+                    (n) => n.id === targetEntityId,
+                );
                 if (!sourceExists || !targetExists) continue;
-                
+
                 // Check if edge with same field mapping already exists
                 const edgeExists = $edges.some(
                     (e) =>
-                        ((e.source === sourceEntityId && e.target === targetEntityId) ||
-                        (e.source === targetEntityId && e.target === sourceEntityId)) &&
+                        ((e.source === sourceEntityId &&
+                            e.target === targetEntityId) ||
+                            (e.source === targetEntityId &&
+                                e.target === sourceEntityId)) &&
                         e.data?.source_field === rel.source_field &&
-                        e.data?.target_field === rel.target_field
+                        e.data?.target_field === rel.target_field,
                 );
                 if (edgeExists) continue;
-                
+
                 const existingBetweenPair = $edges.filter(
                     (e) =>
-                        (e.source === sourceEntityId && e.target === targetEntityId) ||
-                        (e.source === targetEntityId && e.target === sourceEntityId),
+                        (e.source === sourceEntityId &&
+                            e.target === targetEntityId) ||
+                        (e.source === targetEntityId &&
+                            e.target === sourceEntityId),
                 ).length;
-                
+
                 // Generate unique edge ID (allow multiple edges between same entities)
                 const baseId = `e${sourceEntityId}-${targetEntityId}`;
                 let edgeId = baseId;
@@ -297,7 +324,7 @@
                     edgeId = `${baseId}-${counter}`;
                     counter++;
                 }
-                
+
                 // Create new edge
                 const newEdge = {
                     id: edgeId,
@@ -378,20 +405,21 @@
 
     function unbind() {
         updateNodeData(id, { dbt_model: null });
-        
+
         // Clear field mappings on edges connected to this entity
         edges.update((list) =>
             list.map((edge) => {
                 if (edge.source === id || edge.target === id) {
                     // Create new data object without source_field and target_field
-                    const { source_field, target_field, ...restData } = (edge.data || {}) as Record<string, unknown>;
+                    const { source_field, target_field, ...restData } =
+                        (edge.data || {}) as Record<string, unknown>;
                     return {
                         ...edge,
                         data: restData,
                     };
                 }
                 return edge;
-            })
+            }),
         );
     }
 
@@ -432,7 +460,7 @@
 
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
-    
+
     function addDraftedField() {
         const newField: DraftedField = {
             name: "",
@@ -453,26 +481,26 @@
         const updatedFields = draftedFields.filter((_, i) => i !== index);
         updateNodeData(id, { drafted_fields: updatedFields });
     }
-    
+
     // Drag-and-drop for field linking
     function onFieldDragStart(fieldName: string, e: DragEvent) {
         e.stopPropagation(); // Prevent node drag
         if (!e.dataTransfer) return;
         e.dataTransfer.effectAllowed = "link";
         e.dataTransfer.setData("text/plain", fieldName); // Required for drag to work
-        
+
         $draggingField = {
             nodeId: id,
             fieldName: fieldName,
             nodeLabel: data.label || id,
         };
     }
-    
+
     function onFieldDragEnd(e: DragEvent) {
         e.stopPropagation();
         $draggingField = null;
     }
-    
+
     function onFieldDragOver(e: DragEvent) {
         if (!$draggingField) return;
         if ($draggingField.nodeId === id) return; // Same entity, no link
@@ -482,16 +510,62 @@
             e.dataTransfer.dropEffect = "link";
         }
     }
-    
+
     function onFieldDrop(targetFieldName: string, e: DragEvent) {
         e.preventDefault();
         e.stopPropagation(); // Prevent bubble to canvas
         if (!$draggingField || $draggingField.nodeId === id) return;
-        
+
         // Find or create an edge between the two entities
         const sourceNodeId = $draggingField.nodeId;
         const targetNodeId = id;
-        
+
+        // Check for existing edge with same source, target, and fields
+        const exists = $edges.some(
+            (e) =>
+                e.source === sourceNodeId &&
+                e.target === targetNodeId &&
+                e.data?.source_field === $draggingField?.fieldName &&
+                e.data?.target_field === targetFieldName,
+        );
+
+        if (exists) {
+            console.warn("Blocked duplicate field connection");
+            $draggingField = null;
+            return;
+        }
+
+        // Check for generic edge to reuse (any direction)
+        // A generic edge has no source_field/target_field defined
+        const genericEdge = $edges.find(
+            (e) =>
+                ((e.source === sourceNodeId && e.target === targetNodeId) ||
+                    (e.source === targetNodeId && e.target === sourceNodeId)) &&
+                !e.data?.source_field &&
+                !e.data?.target_field,
+        );
+
+        if (genericEdge) {
+            // Reuse this edge, enforcing the direction of the field drag
+            $edges = $edges.map((e) => {
+                if (e.id === genericEdge.id) {
+                    return {
+                        ...e,
+                        source: sourceNodeId,
+                        target: targetNodeId,
+                        data: {
+                            ...e.data,
+                            source_field: $draggingField!.fieldName,
+                            target_field: targetFieldName,
+                        },
+                    };
+                }
+                return e;
+            });
+            $draggingField = null;
+            return;
+        }
+
         // Create new edge with field mapping (always create new edge to support multiple relationships)
         const newEdge = {
             id: `e${sourceNodeId}-${targetNodeId}-${Date.now()}`,
@@ -506,7 +580,7 @@
             },
         };
         $edges = [...$edges, newEdge];
-        
+
         $draggingField = null;
     }
 </script>
@@ -544,9 +618,9 @@
                 class="text-slate-400 text-[10px] flex-shrink-0 select-none transition-transform duration-200"
             >
                 {#if isCollapsed}
-                     <Icon icon="lucide:chevron-right" class="w-4 h-4" />
+                    <Icon icon="lucide:chevron-right" class="w-4 h-4" />
                 {:else}
-                     <Icon icon="lucide:chevron-down" class="w-4 h-4" />
+                    <Icon icon="lucide:chevron-down" class="w-4 h-4" />
                 {/if}
             </span>
             <input
@@ -587,8 +661,13 @@
                         {modelDetails.schema}.{modelDetails.table}
                     </div>
                     {#if modelDetails.materialization}
-                        <div class="mb-2.5 text-slate-500 flex items-center gap-2">
-                            <span class="font-medium text-[10px] uppercase tracking-wider">Materialization</span>
+                        <div
+                            class="mb-2.5 text-slate-500 flex items-center gap-2"
+                        >
+                            <span
+                                class="font-medium text-[10px] uppercase tracking-wider"
+                                >Materialization</span
+                            >
                             <span
                                 class="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-semibold uppercase border border-slate-200"
                             >
@@ -598,7 +677,9 @@
                     {/if}
 
                     {#if schemaLoading}
-                        <div class="text-center text-slate-400 py-4 text-[10px] italic">
+                        <div
+                            class="text-center text-slate-400 py-4 text-[10px] italic"
+                        >
                             Loading schema...
                         </div>
                     {:else}
@@ -610,62 +691,106 @@
                                 {#each editableColumns as col, index}
                                     <div
                                         class="p-1.5 border-b border-slate-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-slate-50"
-                                        class:bg-blue-50={$draggingField?.nodeId !== id && $draggingField !== null}
-                                        class:ring-2={$draggingField?.nodeId !== id && $draggingField !== null}
-                                        class:ring-blue-300={$draggingField?.nodeId !== id && $draggingField !== null}
+                                        class:bg-blue-50={$draggingField?.nodeId !==
+                                            id && $draggingField !== null}
+                                        class:ring-2={$draggingField?.nodeId !==
+                                            id && $draggingField !== null}
+                                        class:ring-blue-300={$draggingField?.nodeId !==
+                                            id && $draggingField !== null}
                                         ondragover={onFieldDragOver}
                                         ondrop={(e) => onFieldDrop(col.name, e)}
                                     >
-                                        <div class="flex gap-1.5 mb-1 items-center">
-                                            <span 
+                                        <div
+                                            class="flex gap-1.5 mb-1 items-center"
+                                        >
+                                            <span
                                                 class="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-[#26A69A] pt-1"
                                                 draggable="true"
-                                                onmousedown={(e) => e.stopPropagation()}
-                                                onpointerdown={(e) => e.stopPropagation()}
-                                                ondragstart={(e) => onFieldDragStart(col.name, e)}
+                                                onmousedown={(e) =>
+                                                    e.stopPropagation()}
+                                                onpointerdown={(e) =>
+                                                    e.stopPropagation()}
+                                                ondragstart={(e) =>
+                                                    onFieldDragStart(
+                                                        col.name,
+                                                        e,
+                                                    )}
                                                 ondragend={onFieldDragEnd}
-                                                class:cursor-grabbing={$draggingField?.nodeId === id && $draggingField?.fieldName === col.name}
+                                                class:cursor-grabbing={$draggingField?.nodeId ===
+                                                    id &&
+                                                    $draggingField?.fieldName ===
+                                                        col.name}
                                                 title="Drag to link to another field"
                                             >
-                                                <Icon icon="lucide:link" class="w-3 h-3" />
+                                                <Icon
+                                                    icon="lucide:link"
+                                                    class="w-3 h-3"
+                                                />
                                             </span>
-                                            <div class="flex-1 flex flex-col gap-1">
-                                                <div class="flex items-center gap-1">
+                                            <div
+                                                class="flex-1 flex flex-col gap-1"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-1"
+                                                >
                                                     <input
                                                         type="text"
                                                         value={col.name}
                                                         oninput={(e) =>
-                                                            updateEditableColumn(index, {
-                                                                name: (e.target as HTMLInputElement).value,
-                                                            })}
+                                                            updateEditableColumn(
+                                                                index,
+                                                                {
+                                                                    name: (
+                                                                        e.target as HTMLInputElement
+                                                                    ).value,
+                                                                },
+                                                            )}
                                                         class="flex-1 px-1.5 py-0.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] font-medium"
                                                         placeholder="column_name"
                                                     />
                                                     <input
                                                         type="text"
-                                                        value={col.data_type || ''}
+                                                        value={col.data_type ||
+                                                            ""}
                                                         oninput={(e) =>
-                                                            updateEditableColumn(index, {
-                                                                data_type: (e.target as HTMLInputElement).value,
-                                                            })}
+                                                            updateEditableColumn(
+                                                                index,
+                                                                {
+                                                                    data_type: (
+                                                                        e.target as HTMLInputElement
+                                                                    ).value,
+                                                                },
+                                                            )}
                                                         class="w-20 px-1 py-0.5 text-[10px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] uppercase text-slate-600 font-mono"
                                                         placeholder="text"
                                                     />
                                                     <button
-                                                        onclick={() => deleteEditableColumn(index)}
+                                                        onclick={() =>
+                                                            deleteEditableColumn(
+                                                                index,
+                                                            )}
                                                         class="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
                                                         title="Delete column"
                                                     >
-                                                        <Icon icon="lucide:x" class="w-3 h-3" />
+                                                        <Icon
+                                                            icon="lucide:x"
+                                                            class="w-3 h-3"
+                                                        />
                                                     </button>
                                                 </div>
                                                 <input
                                                     type="text"
-                                                    value={col.description || ''}
+                                                    value={col.description ||
+                                                        ""}
                                                     oninput={(e) =>
-                                                        updateEditableColumn(index, {
-                                                            description: (e.target as HTMLInputElement).value,
-                                                        })}
+                                                        updateEditableColumn(
+                                                            index,
+                                                            {
+                                                                description: (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                            },
+                                                        )}
                                                     class="w-full px-0 text-[10px] text-slate-500 bg-transparent focus:outline-none border-none placeholder:text-slate-300"
                                                     placeholder="Description (optional)"
                                                 />
@@ -674,7 +799,9 @@
                                     </div>
                                 {/each}
                             {:else}
-                                <div class="text-center text-slate-400 py-4 text-[10px] italic">
+                                <div
+                                    class="text-center text-slate-400 py-4 text-[10px] italic"
+                                >
                                     No columns defined
                                 </div>
                             {/if}
@@ -688,7 +815,9 @@
                         </button>
 
                         {#if schemaError}
-                            <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-[10px]">
+                            <div
+                                class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-[10px]"
+                            >
                                 {schemaError}
                             </div>
                         {/if}
@@ -698,15 +827,24 @@
                                 onclick={saveSchema}
                                 disabled={!hasUnsavedChanges || schemaSaving}
                                 class="flex-1 text-[10px] font-medium p-1.5 rounded border transition-colors flex items-center justify-center gap-1"
-                                class:text-[#26A69A]={hasUnsavedChanges && !schemaSaving}
-                                class:hover:bg-teal-50={hasUnsavedChanges && !schemaSaving}
-                                class:border-teal-200={hasUnsavedChanges && !schemaSaving}
-                                class:text-slate-400={!hasUnsavedChanges || schemaSaving}
-                                class:border-slate-200={!hasUnsavedChanges || schemaSaving}
-                                class:cursor-not-allowed={!hasUnsavedChanges || schemaSaving}
+                                class:text-[#26A69A]={hasUnsavedChanges &&
+                                    !schemaSaving}
+                                class:hover:bg-teal-50={hasUnsavedChanges &&
+                                    !schemaSaving}
+                                class:border-teal-200={hasUnsavedChanges &&
+                                    !schemaSaving}
+                                class:text-slate-400={!hasUnsavedChanges ||
+                                    schemaSaving}
+                                class:border-slate-200={!hasUnsavedChanges ||
+                                    schemaSaving}
+                                class:cursor-not-allowed={!hasUnsavedChanges ||
+                                    schemaSaving}
                             >
                                 {#if schemaSaving}
-                                    <Icon icon="lucide:loader-2" class="w-3 h-3 animate-spin" />
+                                    <Icon
+                                        icon="lucide:loader-2"
+                                        class="w-3 h-3 animate-spin"
+                                    />
                                     Saving...
                                 {:else}
                                     <Icon icon="lucide:save" class="w-3 h-3" />
@@ -730,7 +868,10 @@
                         <div
                             class="mb-2 p-2 bg-amber-50 border border-amber-100 rounded text-amber-800 text-[10px] flex items-center gap-2"
                         >
-                            <Icon icon="lucide:alert-triangle" class="w-3 h-3" />
+                            <Icon
+                                icon="lucide:alert-triangle"
+                                class="w-3 h-3"
+                            />
                             Generic datatypes (draft mode)
                         </div>
 
@@ -742,75 +883,125 @@
                                 {#each draftedFields as field, index}
                                     <div
                                         class="p-1.5 border-b border-slate-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-slate-50"
-                                        class:bg-blue-50={$draggingField?.nodeId !== id && $draggingField !== null}
-                                        class:ring-2={$draggingField?.nodeId !== id && $draggingField !== null}
-                                        class:ring-blue-300={$draggingField?.nodeId !== id && $draggingField !== null}
+                                        class:bg-blue-50={$draggingField?.nodeId !==
+                                            id && $draggingField !== null}
+                                        class:ring-2={$draggingField?.nodeId !==
+                                            id && $draggingField !== null}
+                                        class:ring-blue-300={$draggingField?.nodeId !==
+                                            id && $draggingField !== null}
                                         ondragover={onFieldDragOver}
-                                        ondrop={(e) => onFieldDrop(field.name, e)}
+                                        ondrop={(e) =>
+                                            onFieldDrop(field.name, e)}
                                     >
                                         <div
                                             class="flex gap-1.5 mb-1 items-center"
                                         >
-                                            <span 
+                                            <span
                                                 class="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-[#26A69A] pt-1"
                                                 draggable="true"
-                                                onmousedown={(e) => e.stopPropagation()}
-                                                onpointerdown={(e) => e.stopPropagation()}
-                                                ondragstart={(e) => onFieldDragStart(field.name, e)}
+                                                onmousedown={(e) =>
+                                                    e.stopPropagation()}
+                                                onpointerdown={(e) =>
+                                                    e.stopPropagation()}
+                                                ondragstart={(e) =>
+                                                    onFieldDragStart(
+                                                        field.name,
+                                                        e,
+                                                    )}
                                                 ondragend={onFieldDragEnd}
-                                                class:cursor-grabbing={$draggingField?.nodeId === id && $draggingField?.fieldName === field.name}
+                                                class:cursor-grabbing={$draggingField?.nodeId ===
+                                                    id &&
+                                                    $draggingField?.fieldName ===
+                                                        field.name}
                                                 title="Drag to link to another field"
                                             >
-                                                <Icon icon="lucide:link" class="w-3 h-3" />
+                                                <Icon
+                                                    icon="lucide:link"
+                                                    class="w-3 h-3"
+                                                />
                                             </span>
-                                            <div class="flex-1 flex flex-col gap-1">
-                                                <div class="flex items-center gap-1">
-                                                     <input
+                                            <div
+                                                class="flex-1 flex flex-col gap-1"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-1"
+                                                >
+                                                    <input
                                                         type="text"
                                                         value={field.name}
                                                         oninput={(e) =>
-                                                            updateDraftedField(index, {
-                                                                name: (
-                                                                    e.target as HTMLInputElement
-                                                                ).value,
-                                                            })}
+                                                            updateDraftedField(
+                                                                index,
+                                                                {
+                                                                    name: (
+                                                                        e.target as HTMLInputElement
+                                                                    ).value,
+                                                                },
+                                                            )}
                                                         class="flex-1 px-1.5 py-0.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] font-medium"
                                                         placeholder="field_name"
                                                     />
                                                     <select
                                                         value={field.datatype}
                                                         onchange={(e) =>
-                                                            updateDraftedField(index, {
-                                                                datatype: (
-                                                                    e.target as HTMLSelectElement
-                                                                ).value as any,
-                                                            })}
+                                                            updateDraftedField(
+                                                                index,
+                                                                {
+                                                                    datatype: (
+                                                                        e.target as HTMLSelectElement
+                                                                    )
+                                                                        .value as any,
+                                                                },
+                                                            )}
                                                         class="w-20 px-1 py-0.5 text-[10px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] uppercase text-slate-600 font-mono"
                                                     >
-                                                        <option value="text">text</option>
-                                                        <option value="int">int</option>
-                                                        <option value="float">float</option>
-                                                        <option value="bool">bool</option>
-                                                        <option value="date">date</option>
-                                                        <option value="timestamp">timestamp</option>
+                                                        <option value="text"
+                                                            >text</option
+                                                        >
+                                                        <option value="int"
+                                                            >int</option
+                                                        >
+                                                        <option value="float"
+                                                            >float</option
+                                                        >
+                                                        <option value="bool"
+                                                            >bool</option
+                                                        >
+                                                        <option value="date"
+                                                            >date</option
+                                                        >
+                                                        <option
+                                                            value="timestamp"
+                                                            >timestamp</option
+                                                        >
                                                     </select>
                                                     <button
                                                         onclick={() =>
-                                                            deleteDraftedField(index)}
+                                                            deleteDraftedField(
+                                                                index,
+                                                            )}
                                                         class="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
-                                                        title="Delete field">
-                                                        <Icon icon="lucide:x" class="w-3 h-3" />
+                                                        title="Delete field"
+                                                    >
+                                                        <Icon
+                                                            icon="lucide:x"
+                                                            class="w-3 h-3"
+                                                        />
                                                     </button>
                                                 </div>
                                                 <input
                                                     type="text"
-                                                    value={field.description || ""}
+                                                    value={field.description ||
+                                                        ""}
                                                     oninput={(e) =>
-                                                        updateDraftedField(index, {
-                                                            description: (
-                                                                e.target as HTMLInputElement
-                                                            ).value,
-                                                        })}
+                                                        updateDraftedField(
+                                                            index,
+                                                            {
+                                                                description: (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                            },
+                                                        )}
                                                     class="w-full px-0 text-[10px] text-slate-500 bg-transparent focus:outline-none border-none placeholder:text-slate-300"
                                                     placeholder="Description (optional)"
                                                 />
@@ -833,7 +1024,6 @@
                         >
                             <Icon icon="lucide:plus" class="w-3 h-3" /> Add Field
                         </button>
-
                     </div>
                 {:else}
                     <!-- Concept View -->
@@ -849,14 +1039,15 @@
                         >
                             <span
                                 class="truncate font-medium flex items-center gap-1"
-                                title={boundModelName}>
+                                title={boundModelName}
+                            >
                                 <Icon icon="lucide:link" class="w-3 h-3" />
                                 {boundModelName}</span
                             >
                             <button
                                 onclick={unbind}
                                 class="text-teal-600 hover:text-red-500 ml-1 px-1 transition-colors"
-                                >
+                            >
                                 <Icon icon="lucide:x" class="w-3 h-3" />
                             </button>
                         </div>

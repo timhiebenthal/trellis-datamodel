@@ -25,6 +25,7 @@
 		"vite": "^7.1.10"
 	},
 	"dependencies": {
+		"@iconify/svelte": "^5.1.0",
 		"@xyflow/svelte": "^1.4.2"
 	}
 }
