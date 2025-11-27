@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
     // Track recently created edges to prevent duplicates (persists across component remounts)
     const recentConnections = new Set<string>();
 </script>
@@ -15,7 +15,7 @@
         type Edge,
     } from "@xyflow/svelte";
 
-    import { nodes, edges } from "$lib/stores";
+    import { nodes, edges, viewMode } from "$lib/stores";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
@@ -39,30 +39,36 @@
 
     function onConnect(connection: Connection) {
         const connectionKey = `${connection.source}-${connection.target}`;
-        console.log(`[${Date.now()}] onConnect triggered for ${connectionKey}`, connection);
-        
+        console.log(
+            `[${Date.now()}] onConnect triggered for ${connectionKey}`,
+            connection,
+        );
+
         // Check if this exact connection was just made
         if (recentConnections.has(connectionKey)) {
             console.warn("Blocked duplicate connection:", connectionKey);
             return;
         }
-        
+
         // Mark as recently created, clear after 1 second
         recentConnections.add(connectionKey);
         setTimeout(() => recentConnections.delete(connectionKey), 1000);
 
         // Check if a generic edge (no field mapping) already exists between these nodes
         // This prevents double creation if the store hasn't updated yet but we have a logical duplicate
-        const genericEdgeExists = $edges.some(e => 
-            ((e.source === connection.source && e.target === connection.target) ||
-             (e.source === connection.target && e.target === connection.source)) &&
-            !e.data?.source_field && 
-            !e.data?.target_field
+        const genericEdgeExists = $edges.some(
+            (e) =>
+                ((e.source === connection.source &&
+                    e.target === connection.target) ||
+                    (e.source === connection.target &&
+                        e.target === connection.source)) &&
+                !e.data?.source_field &&
+                !e.data?.target_field,
         );
 
         if (genericEdgeExists) {
-             console.warn("Blocked duplicate generic edge:", connectionKey);
-             return;
+            console.warn("Blocked duplicate generic edge:", connectionKey);
+            return;
         }
 
         // Generate unique edge ID
@@ -76,8 +82,10 @@
 
         const existingBetweenPair = $edges.filter(
             (e) =>
-                (e.source === connection.source && e.target === connection.target) ||
-                (e.source === connection.target && e.target === connection.source),
+                (e.source === connection.source &&
+                    e.target === connection.target) ||
+                (e.source === connection.target &&
+                    e.target === connection.source),
         ).length;
 
         const edge: Edge = {
@@ -118,11 +126,14 @@
     function addEntity() {
         const label = "New Entity";
         const id = generateSlug(label);
-        
+
         // Find max zIndex to place new entity on top
         // Groups have zIndex 1, entities should start at 10+ to be above groups
-        const maxZIndex = Math.max(...$nodes.map(n => n.zIndex || (n.type === "group" ? 1 : 10)), 10);
-        
+        const maxZIndex = Math.max(
+            ...$nodes.map((n) => n.zIndex || (n.type === "group" ? 1 : 10)),
+            10,
+        );
+
         const newNode: Node = {
             id,
             type: "entity",
@@ -166,6 +177,132 @@
             $edges = $edges.filter((e) => !idsToRemove.has(e.id));
         }
     }
+
+    // Track dragging state to prevent updates interrupting drag
+    let isDragging = false;
+
+    function onNodeDragStart(event: any, node: Node) {
+        console.log("Drag start:", node.id);
+        isDragging = true;
+    }
+
+    function onNodeDragStop(event: any, node: Node) {
+        console.log("Drag stop:", node.id);
+        isDragging = false;
+        // Force update after drag
+        updateGroupSizes();
+    }
+
+    // Auto-resize groups to fit children
+    function updateGroupSizes() {
+        // Skip updates during drag to prevent interruption
+        // Check both manual state and store state
+        if (isDragging || $nodes.some((n) => n.dragging)) return;
+
+        const groups = $nodes.filter(
+            (n) => n.type === "group" && !n.data.collapsed,
+        );
+        if (groups.length === 0) return;
+
+        const updates = new Map<string, { width: number; height: number }>();
+
+        for (const group of groups) {
+            const children = $nodes.filter(
+                (n) => n.parentId === group.id && !n.hidden,
+            );
+            if (children.length === 0) continue;
+
+            let maxX = 0;
+            let maxY = 0;
+
+            for (const child of children) {
+                // Use measured dimensions if available and valid
+                // Fallback to data dimensions or defaults
+                const measuredWidth = child.measured?.width;
+                const measuredHeight = child.measured?.height;
+
+                const width =
+                    measuredWidth && measuredWidth > 0
+                        ? measuredWidth
+                        : ((child.data?.width as number) ?? 320);
+
+                // For height, if measured is small (e.g. collapsed state) but data says it should be expanded,
+                // we might want to trust data? But measured is usually truth.
+                // However, if just expanded, measured might be old.
+                // We'll trust measured if it's substantial, otherwise check data.
+                let height = measuredHeight ?? 0;
+
+                // If height is missing or suspiciously small (<50) and it's not collapsed, estimate
+                if ((!height || height < 50) && !child.data?.collapsed) {
+                    let estimatedHeight = (child.data?.panelHeight as number)
+                        ? (child.data.panelHeight as number) + 80 // Header + padding
+                        : 300;
+
+                    // Add extra height for physical view metadata if bound
+                    if ($viewMode === "physical" && child.data?.dbt_model) {
+                        estimatedHeight += 80; // Schema/table + materialization badges
+                    }
+
+                    height = estimatedHeight;
+                } else if (!height) {
+                    height = 200;
+                }
+
+                const right = child.position.x + width;
+                const bottom = child.position.y + height;
+
+                if (right > maxX) maxX = right;
+                if (bottom > maxY) maxY = bottom;
+            }
+
+            // Add padding
+            const padding = 40; // Increased padding
+            const newWidth = Math.max(maxX + padding, 300); // Min width 300
+            const newHeight = Math.max(maxY + padding, 200); // Min height 200
+
+            const currentWidth = (group.data.width as number) ?? 0;
+            const currentHeight = (group.data.height as number) ?? 0;
+
+            // Only update if difference is significant
+            if (
+                Math.abs(newWidth - currentWidth) > 5 ||
+                Math.abs(newHeight - currentHeight) > 5
+            ) {
+                updates.set(group.id, { width: newWidth, height: newHeight });
+            }
+        }
+
+        if (updates.size > 0) {
+            $nodes = $nodes.map((n) => {
+                if (updates.has(n.id)) {
+                    const u = updates.get(n.id)!;
+                    return {
+                        ...n,
+                        data: { ...n.data, width: u.width, height: u.height },
+                    };
+                }
+                return n;
+            });
+        }
+    }
+
+    $effect(() => {
+        // Track nodes and viewMode to trigger updates
+        const _ = $nodes;
+        const __ = $viewMode;
+
+        // Run immediately
+        updateGroupSizes();
+
+        // Run after a delay to catch layout updates (e.g. after expand animation/render)
+        const timer1 = setTimeout(updateGroupSizes, 50);
+        const timer2 = setTimeout(updateGroupSizes, 300);
+
+        return () => {
+            clearTimeout(timer1);
+            clearTimeout(timer2);
+        };
+    });
 </script>
 
 <div class="flex-1 h-full relative w-full">
@@ -176,6 +313,8 @@
         {edgeTypes}
         onconnect={onConnect}
         onedgesdelete={onEdgesDelete}
+        onnodedragstart={onNodeDragStart}
+        onnodedragstop={onNodeDragStop}
         defaultEdgeOptions={{ type: "custom" }}
         fitView
         class="bg-slate-50"
@@ -201,8 +340,13 @@
                 <div
                     class="bg-white/90 backdrop-blur-sm p-8 rounded-xl border border-slate-200 shadow-xl text-center max-w-md mx-4"
                 >
-                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                         <Icon icon="lucide:palette" class="w-8 h-8 text-slate-400" />
+                    <div
+                        class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4"
+                    >
+                        <Icon
+                            icon="lucide:palette"
+                            class="w-8 h-8 text-slate-400"
+                        />
                     </div>
                     <h3 class="text-xl font-bold text-slate-800 mb-2">
                         Start Designing

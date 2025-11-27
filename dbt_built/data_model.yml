@@ -24,7 +24,7 @@ entities:
     datatype: text
   position:
     x: 40
-    y: 158.0489321495793
+    y: 388.9585558934667
   width: 280
   panel_height: 200
   collapsed: true
@@ -33,20 +33,20 @@ entities:
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
   position:
-    x: 678.9207040495944
+    x: 626.167239265092
     y: 100
   width: 280
   panel_height: 200
-  collapsed: true
+  collapsed: false
 - id: calendar
   label: calendar
   description: ''
   dbt_model: model.nba_analytics.calendar
   position:
-    x: 33.13438636456567
-    y: 54.6717375015333
+    x: 50.48386616274263
+    y: 223.67157369326287
   width: 280
-  panel_height: 200
+  panel_height: 403.75
   collapsed: false
 relationships:
 - source: player
@@ -63,8 +63,8 @@ relationships:
   type: one_to_many
   source_field: home_team_id
   target_field: team_id
-  label_dx: -87.272705078125
-  label_dy: 121.21206665039062
+  label_dx: 55.227294921875
+  label_dy: 193.71206665039062
 - source: game
   target: team
   label: ''
@@ -73,3 +73,11 @@ relationships:
   target_field: team_id
   label_dx: 14.54541015625
   label_dy: 25.21197509765625
+- source: game
+  target: calendar
+  label: ''
+  type: one_to_many
+  source_field: game_day
+  target_field: calendar_date
+  label_dx: 0
+  label_dy: 0

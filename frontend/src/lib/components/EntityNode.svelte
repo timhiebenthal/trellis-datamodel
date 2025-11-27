@@ -652,7 +652,7 @@
 
     <!-- Body -->
     {#if !isCollapsed}
-        <div class="p-2.5">
+        <div class="p-2.5 nodrag">
             {#if $viewMode === "physical" && isBound && modelDetails}
                 <div class="text-xs">
                     <div
@@ -684,7 +684,7 @@
                         </div>
                     {:else}
                         <div
-                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
                         >
                             {#if editableColumns.length > 0}
@@ -876,7 +876,7 @@
                         </div>
 
                         <div
-                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
                         >
                             {#if draftedFields.length > 0}
