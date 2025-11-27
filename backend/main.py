@@ -7,6 +7,8 @@ import json
 import yaml
 import os
 
+from utils.yaml_handler import YamlHandler
+
 app = FastAPI()
 
 # CORS for development
@@ -507,37 +509,19 @@ async def sync_dbt_tests():
             # {entity_id}.yml in the first models_subdir.
             yml_path = os.path.join(models_dir, f"{entity_id}.yml")
 
-            if os.path.exists(yml_path):
-                with open(yml_path, "r") as f:
-                    schema = yaml.safe_load(f) or {"version": 2, "models": []}
-            else:
-                schema = {"version": 2, "models": []}
+            # Use YamlHandler for round-trip editing with comment preservation
+            handler = YamlHandler()
+            data = handler.load_file(yml_path)
 
-            models_list = schema.get("models", [])
-            model_entry = None
+            if not data:
+                data = {"version": 2, "models": []}
 
-            # Find existing model entry by name
-            for m in models_list:
-                if (
-                    m.get("name") == model_name
-                    or m.get("name") == entity.get("label")
-                    or m.get("name") == entity_id
-                ):
-                    model_entry = m
-                    break
-
-            if not model_entry:
-                model_entry = {"name": model_name, "columns": []}
-                models_list.append(model_entry)
-                schema["models"] = models_list
+            # Ensure model entry exists
+            model_entry = handler.ensure_model(data, model_name)
 
             # Sync description
             if entity.get("description"):
-                model_entry["description"] = entity.get("description")
-
-            # Ensure columns list exists
-            if "columns" not in model_entry:
-                model_entry["columns"] = []
+                handler.update_model_description(model_entry, entity.get("description"))
 
             # 1. Sync Drafted Fields
             drafted_fields = entity.get("drafted_fields", [])
@@ -549,21 +533,8 @@ async def sync_dbt_tests():
                 if not f_name:
                     continue
 
-                col_entry = None
-                for col in model_entry["columns"]:
-                    if col.get("name") == f_name:
-                        col_entry = col
-                        break
-
-                if not col_entry:
-                    col_entry = {"name": f_name}
-                    model_entry["columns"].append(col_entry)
-
-                # Update type/desc
-                if f_type:
-                    col_entry["data_type"] = f_type
-                if f_desc:
-                    col_entry["description"] = f_desc
+                col = handler.ensure_column(model_entry, f_name)
+                handler.update_column(col, data_type=f_type, description=f_desc)
 
             # 2. Sync Relationships (FKs)
             fk_list = fk_by_entity.get(entity_id, [])
@@ -572,35 +543,18 @@ async def sync_dbt_tests():
                 ref_entity = fk_info["ref_entity"]
                 ref_field = fk_info["ref_field"]
 
-                # Find or create column entry
-                col_entry = None
-                for col in model_entry["columns"]:
-                    if col.get("name") == fk_field:
-                        col_entry = col
-                        break
+                # Ensure column exists
+                col = handler.ensure_column(model_entry, fk_field)
 
-                if not col_entry:
-                    col_entry = {"name": fk_field, "data_type": "text"}
-                    model_entry["columns"].append(col_entry)
+                # Set default data type if not already set
+                if "data_type" not in col:
+                    col["data_type"] = "text"
 
                 # Add/update relationship test
-                rel_test = {
-                    "relationships": {
-                        "to": f"ref('{ref_entity}')",
-                        "field": ref_field,
-                    }
-                }
+                handler.add_relationship_test(col, ref_entity, ref_field)
 
-                # Check if data_tests exists and update
-                data_tests = col_entry.get("data_tests", [])
-                # Remove any existing relationship test for this column
-                data_tests = [t for t in data_tests if "relationships" not in t]
-                data_tests.append(rel_test)
-                col_entry["data_tests"] = data_tests
-
-            # Write updated yml
-            with open(yml_path, "w") as f:
-                yaml.dump(schema, f, default_flow_style=False, sort_keys=False)
+            # Write updated yml with round-trip preservation
+            handler.save_file(yml_path, data)
 
             updated_files.append(yml_path)
 
@@ -618,6 +572,194 @@ async def sync_dbt_tests():
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Error syncing dbt tests: {str(e)}"
+        )
+
+
+class ModelSchemaRequest(BaseModel):
+    columns: List[Dict[str, Any]]
+    description: Optional[str] = None
+
+
+@app.get("/api/models/{model_name}/schema")
+async def get_model_schema(model_name: str):
+    """
+    Get the schema (columns, description) for a specific model from its YAML file.
+    Uses the manifest to find the original file path.
+    """
+    try:
+        if not DBT_PROJECT_PATH:
+            raise HTTPException(
+                status_code=400,
+                detail="dbt_project_path is not configured. Please set it in config.yml",
+            )
+
+        if not os.path.exists(MANIFEST_PATH):
+            raise HTTPException(
+                status_code=404, detail=f"Manifest not found at {MANIFEST_PATH}"
+            )
+
+        # Load manifest to find the model's original file path
+        with open(MANIFEST_PATH, "r") as f:
+            manifest = json.load(f)
+
+        # Find the model in the manifest
+        model_node = None
+        for key, node in manifest.get("nodes", {}).items():
+            if (
+                node.get("resource_type") == "model"
+                and node.get("name") == model_name
+            ):
+                model_node = node
+                break
+
+        if not model_node:
+            raise HTTPException(
+                status_code=404, detail=f"Model '{model_name}' not found in manifest"
+            )
+
+        # Get the original file path (e.g., "models/3_core/game.sql")
+        original_file_path = model_node.get("original_file_path", "")
+        if not original_file_path:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No original_file_path found for model '{model_name}'",
+            )
+
+        # Convert .sql to .yml (same directory, same base name)
+        sql_path = os.path.join(DBT_PROJECT_PATH, original_file_path)
+        base_path = os.path.splitext(sql_path)[0]
+        yml_path = f"{base_path}.yml"
+
+        # Load the YAML file using YamlHandler
+        handler = YamlHandler()
+        data = handler.load_file(yml_path)
+
+        if not data:
+            # File doesn't exist yet - return empty schema
+            return {
+                "model_name": model_name,
+                "description": "",
+                "columns": [],
+                "file_path": yml_path,
+            }
+
+        # Find the model entry
+        model_entry = handler.find_model(data, model_name)
+        if not model_entry:
+            return {
+                "model_name": model_name,
+                "description": "",
+                "columns": [],
+                "file_path": yml_path,
+            }
+
+        # Extract columns
+        columns = handler.get_columns(model_entry)
+
+        return {
+            "model_name": model_name,
+            "description": model_entry.get("description", ""),
+            "columns": columns,
+            "file_path": yml_path,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Error reading model schema: {str(e)}"
+        )
+
+
+@app.post("/api/models/{model_name}/schema")
+async def update_model_schema(model_name: str, request: ModelSchemaRequest):
+    """
+    Update the schema (columns, description) for a specific model in its YAML file.
+    Uses the manifest to find the original file path.
+    Preserves comments and existing structure.
+    """
+    try:
+        if not DBT_PROJECT_PATH:
+            raise HTTPException(
+                status_code=400,
+                detail="dbt_project_path is not configured. Please set it in config.yml",
+            )
+
+        if not os.path.exists(MANIFEST_PATH):
+            raise HTTPException(
+                status_code=404, detail=f"Manifest not found at {MANIFEST_PATH}"
+            )
+
+        # Load manifest to find the model's original file path
+        with open(MANIFEST_PATH, "r") as f:
+            manifest = json.load(f)
+
+        # Find the model in the manifest
+        model_node = None
+        for key, node in manifest.get("nodes", {}).items():
+            if (
+                node.get("resource_type") == "model"
+                and node.get("name") == model_name
+            ):
+                model_node = node
+                break
+
+        if not model_node:
+            raise HTTPException(
+                status_code=404, detail=f"Model '{model_name}' not found in manifest"
+            )
+
+        # Get the original file path (e.g., "models/3_core/game.sql")
+        original_file_path = model_node.get("original_file_path", "")
+        if not original_file_path:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No original_file_path found for model '{model_name}'",
+            )
+
+        # Convert .sql to .yml (same directory, same base name)
+        sql_path = os.path.join(DBT_PROJECT_PATH, original_file_path)
+        base_path = os.path.splitext(sql_path)[0]
+        yml_path = f"{base_path}.yml"
+
+        # Load or create the YAML file using YamlHandler
+        handler = YamlHandler()
+        data = handler.load_file(yml_path)
+
+        if not data:
+            # Create new YAML structure
+            data = {"version": 2, "models": []}
+
+        # Ensure model entry exists
+        model_entry = handler.ensure_model(data, model_name)
+
+        # Update description if provided
+        if request.description is not None:
+            handler.update_model_description(model_entry, request.description)
+
+        # Update columns
+        handler.update_columns_batch(model_entry, request.columns)
+
+        # Save the file
+        handler.save_file(yml_path, data)
+
+        return {
+            "status": "success",
+            "message": f"Schema updated for model '{model_name}'",
+            "file_path": yml_path,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Error updating model schema: {str(e)}"
         )
 
 
