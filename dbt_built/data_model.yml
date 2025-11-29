@@ -43,8 +43,8 @@ entities:
   description: ''
   dbt_model: model.nba_analytics.calendar
   position:
-    x: 50.48386616274263
-    y: 223.67157369326287
+    x: -956.167239265092
+    y: -578.9585558934667
   width: 280
   panel_height: 403.75
   collapsed: false
