@@ -14,3 +14,5 @@ frontend/.svelte-kit
 frontend/build
 frontend/.env
 .DS_Store
+backend/utils/__pycache__/yaml_handler.cpython-312.pyc
+backend/utils/__pycache__/__init__.cpython-312.pyc
