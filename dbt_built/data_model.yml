@@ -37,14 +37,14 @@ entities:
     y: 100
   width: 280
   panel_height: 200
-  collapsed: false
+  collapsed: true
 - id: calendar
   label: calendar
   description: ''
   dbt_model: model.nba_analytics.calendar
   position:
-    x: -956.167239265092
-    y: -578.9585558934667
+    x: 40
+    y: 100
   width: 280
   panel_height: 403.75
   collapsed: false

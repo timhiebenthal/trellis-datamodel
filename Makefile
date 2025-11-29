@@ -45,3 +45,15 @@ prod:
 	@echo "Starting backend server..."
 	python -m uv run python backend/main.py
 
+
+unit-test:
+	@echo "Running unit tests..."
+	cd frontend && npm run test:unit
+
+e2e-test:
+	@echo "Running E2E tests..."
+	cd frontend && npm run test:e2e
+
+all-test:
+	@echo "Running all tests..."
+	cd frontend && npm run test
