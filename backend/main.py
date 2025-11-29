@@ -267,6 +267,7 @@ class DbtSchemaRequest(BaseModel):
     model_name: str
     fields: List[Dict[str, str]]
     description: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 
 @app.post("/api/dbt-schema")
@@ -379,6 +380,9 @@ async def save_dbt_schema(request: DbtSchemaRequest):
         if entity_description:
             model_dict["description"] = entity_description
 
+        # Include tags if provided
+        if request.tags:
+            model_dict["tags"] = request.tags
         schema_content = {
             "version": 2,
             "models": [model_dict],
@@ -579,6 +583,7 @@ async def sync_dbt_tests():
 class ModelSchemaRequest(BaseModel):
     columns: List[Dict[str, Any]]
     description: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 
 @app.get("/api/models/{model_name}/schema")
@@ -675,7 +680,7 @@ async def get_model_schema(model_name: str):
 @app.post("/api/models/{model_name}/schema")
 async def update_model_schema(model_name: str, request: ModelSchemaRequest):
     """
-    Update the schema (columns, description) for a specific model in its YAML file.
+    Update the schema (columns, description, tags) for a specific model in its YAML file.
     Uses the manifest to find the original file path.
     Preserves comments and existing structure.
     """
@@ -737,6 +742,10 @@ async def update_model_schema(model_name: str, request: ModelSchemaRequest):
 
         # Update columns
         handler.update_columns_batch(model_entry, request.columns)
+
+        # Update tags if provided
+        if request.tags is not None:
+            handler.update_model_tags(model_entry, request.tags)
 
         # Save the file
         handler.save_file(yml_path, data)

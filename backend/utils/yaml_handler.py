@@ -83,38 +83,51 @@ class YamlHandler:
     def ensure_model(self, data: Dict, model_name: str) -> CommentedMap:
         """
         Ensure a model entry exists in the YAML data, creating it if necessary.
-        
+        Preserve existing tags if present.
+
         Args:
             data: Parsed YAML data
             model_name: Name of the model
-            
+
         Returns:
             Model entry (existing or newly created)
         """
         if "version" not in data:
             data["version"] = 2
-        
+
         if "models" not in data:
             data["models"] = CommentedSeq()
-        
+
         model = self.find_model(data, model_name)
         if not model:
             model = CommentedMap()
             model["name"] = model_name
+            # Initialize tags as empty list for new models
+            model["tags"] = []
             data["models"].append(model)
-        
+        # Ensure tags key exists for existing models
+        if "tags" not in model:
+            model["tags"] = []
         return model
 
     def update_model_description(self, model: CommentedMap, description: Optional[str]) -> None:
         """
         Update the description of a model.
-        
+
         Args:
             model: Model entry
             description: New description (or None to skip)
         """
         if description:
             model["description"] = description
+
+    def get_model_tags(self, model: CommentedMap) -> List[str]:
+        """Return the list of tags for a model, defaulting to empty list."""
+        return list(model.get("tags", []))
+
+    def update_model_tags(self, model: CommentedMap, tags: List[str]) -> None:
+        """Replace the tags list for a model."""
+        model["tags"] = tags
 
     def find_column(self, model: CommentedMap, column_name: str) -> Optional[CommentedMap]:
         """
