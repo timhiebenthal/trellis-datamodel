@@ -578,21 +578,26 @@
             // Check if node matches filters
             let visible = true;
 
-            if (activeFolder) {
+            if (activeFolder.length > 0) {
                 if (!model) {
                     visible = false;
                 } else {
                     const folder = getModelFolder(model);
-                    visible = visible && folder === activeFolder;
+                    visible =
+                        visible &&
+                        folder !== null &&
+                        activeFolder.includes(folder);
                 }
             }
 
-            if (activeTags) {
+            if (activeTags.length > 0) {
                 if (!model) {
                     visible = false;
                 } else {
                     const nodeTags = model.tags || [];
-                    visible = visible && nodeTags.includes(activeTags);
+                    visible =
+                        visible &&
+                        activeTags.some((tag) => nodeTags.includes(tag));
                 }
             }
 

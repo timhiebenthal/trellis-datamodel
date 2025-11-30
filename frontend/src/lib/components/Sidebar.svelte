@@ -42,17 +42,20 @@
             }
 
             // Folder filter
-            if ($folderFilter) {
+            if ($folderFilter.length > 0) {
                 const modelFolder = getModelFolder(m);
-                if (modelFolder !== $folderFilter) {
+                if (!modelFolder || !$folderFilter.includes(modelFolder)) {
                     return false;
                 }
             }
 
             // Tag filter
-            if ($tagFilter) {
+            if ($tagFilter.length > 0) {
                 const modelTags = m.tags || [];
-                if (!modelTags.includes($tagFilter)) {
+                const hasMatch = $tagFilter.some((tag) =>
+                    modelTags.includes(tag),
+                );
+                if (!hasMatch) {
                     return false;
                 }
             }
@@ -76,6 +79,35 @@
             return parts.join("/");
         }
         return null;
+    }
+
+    function toggleFolder(folder: string) {
+        if ($folderFilter.includes(folder)) {
+            $folderFilter = $folderFilter.filter((f) => f !== folder);
+        } else {
+            $folderFilter = [...$folderFilter, folder];
+        }
+    }
+
+    function toggleTag(tag: string) {
+        if ($tagFilter.includes(tag)) {
+            $tagFilter = $tagFilter.filter((t) => t !== tag);
+        } else {
+            $tagFilter = [...$tagFilter, tag];
+        }
+    }
+
+    function removeFolder(folder: string) {
+        $folderFilter = $folderFilter.filter((f) => f !== folder);
+    }
+
+    function removeTag(tag: string) {
+        $tagFilter = $tagFilter.filter((t) => t !== tag);
+    }
+
+    function clearAllFilters() {
+        $folderFilter = [];
+        $tagFilter = [];
     }
 
     function buildTree(models: DbtModel[]): TreeNode[] {
@@ -185,14 +217,25 @@
         </div>
 
         <!-- Filters Section -->
-        <div class="mb-3 space-y-2">
-            <h3
-                class="text-xs font-bold text-slate-800 uppercase tracking-wide mb-2"
-            >
-                Filters
-            </h3>
+        <div class="mb-3 space-y-3">
+            <div class="flex items-center justify-between">
+                <h3
+                    class="text-xs font-bold text-slate-800 uppercase tracking-wide"
+                >
+                    Filters
+                </h3>
+                {#if $folderFilter.length > 0 || $tagFilter.length > 0}
+                    <button
+                        onclick={clearAllFilters}
+                        class="text-[10px] text-slate-500 hover:text-red-600 transition-colors"
+                        title="Clear all filters"
+                    >
+                        Clear all
+                    </button>
+                {/if}
+            </div>
 
-            <!-- Folder Dropdown -->
+            <!-- Folder Filter -->
             {#if allFolders.length > 0}
                 <div>
                     <label
@@ -202,30 +245,55 @@
                         <Icon icon="lucide:circle-dot" class="w-3 h-3" />
                         Filter by Folder
                     </label>
+
+                    <!-- Selected folders as chips -->
+                    {#if $folderFilter.length > 0}
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            {#each $folderFilter as folder}
+                                <span
+                                    class="inline-flex items-center gap-1 px-2 py-1 bg-[#26A69A] text-white rounded text-[10px] font-medium"
+                                >
+                                    {folder}
+                                    <button
+                                        onclick={() => removeFolder(folder)}
+                                        class="hover:text-red-200 transition-colors"
+                                        title="Remove {folder}"
+                                    >
+                                        <Icon icon="lucide:x" class="w-3 h-3" />
+                                    </button>
+                                </span>
+                            {/each}
+                        </div>
+                    {/if}
+
+                    <!-- Dropdown to add folders -->
                     <div class="relative">
                         <select
                             id="folder-select"
-                            bind:value={$folderFilter}
-                            class="w-full pl-2 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer"
-                            class:pr-16={$folderFilter}
-                            class:pr-8={!$folderFilter}
-                            class:text-[#26A69A]={$folderFilter}
-                            class:font-semibold={$folderFilter}
+                            value=""
+                            onchange={(e) => {
+                                const val = e.currentTarget.value;
+                                if (val) {
+                                    toggleFolder(val);
+                                    e.currentTarget.value = "";
+                                }
+                            }}
+                            class="w-full pl-2 pr-8 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer"
                         >
-                            <option value={null}>All Folders</option>
+                            <option value="" disabled selected>
+                                {$folderFilter.length > 0
+                                    ? "Add folder..."
+                                    : "All Folders"}
+                            </option>
                             {#each allFolders as folder}
-                                <option value={folder}>{folder}</option>
+                                <option
+                                    value={folder}
+                                    disabled={$folderFilter.includes(folder)}
+                                >
+                                    {folder}
+                                </option>
                             {/each}
                         </select>
-                        {#if $folderFilter}
-                            <button
-                                onclick={() => ($folderFilter = null)}
-                                class="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-600 transition-colors"
-                                title="Clear filter"
-                            >
-                                <Icon icon="lucide:x" class="w-3 h-3" />
-                            </button>
-                        {/if}
                         <div
                             class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
                         >
@@ -235,7 +303,7 @@
                 </div>
             {/if}
 
-            <!-- Tag Dropdown -->
+            <!-- Tag Filter -->
             <div>
                 <label
                     for="tag-select"
@@ -244,35 +312,60 @@
                     <Icon icon="lucide:circle-dot" class="w-3 h-3" />
                     Filter by Tag
                 </label>
+
+                <!-- Selected tags as chips -->
+                {#if $tagFilter.length > 0}
+                    <div class="flex flex-wrap gap-1 mb-2">
+                        {#each $tagFilter as tag}
+                            <span
+                                class="inline-flex items-center gap-1 px-2 py-1 bg-[#26A69A] text-white rounded text-[10px] font-medium"
+                            >
+                                {tag}
+                                <button
+                                    onclick={() => removeTag(tag)}
+                                    class="hover:text-red-200 transition-colors"
+                                    title="Remove {tag}"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
+
+                <!-- Dropdown to add tags -->
                 <div class="relative">
                     <select
                         id="tag-select"
-                        bind:value={$tagFilter}
+                        value=""
                         disabled={allTags.length === 0}
-                        class="w-full pl-2 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
-                        class:pr-16={$tagFilter}
-                        class:pr-8={!$tagFilter}
-                        class:text-[#26A69A]={$tagFilter}
-                        class:font-semibold={$tagFilter}
+                        onchange={(e) => {
+                            const val = e.currentTarget.value;
+                            if (val) {
+                                toggleTag(val);
+                                e.currentTarget.value = "";
+                            }
+                        }}
+                        class="w-full pl-2 pr-8 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
-                        <option value={null}>
-                            {allTags.length === 0
-                                ? "No tags found"
-                                : "All Tags"}
+                        <option value="" disabled selected>
+                            {#if allTags.length === 0}
+                                No tags found
+                            {:else if $tagFilter.length > 0}
+                                Add tag...
+                            {:else}
+                                All Tags
+                            {/if}
                         </option>
                         {#each allTags as tag}
-                            <option value={tag}>{tag}</option>
+                            <option
+                                value={tag}
+                                disabled={$tagFilter.includes(tag)}
+                            >
+                                {tag}
+                            </option>
                         {/each}
                     </select>
-                    {#if $tagFilter}
-                        <button
-                            onclick={() => ($tagFilter = null)}
-                            class="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-600 transition-colors"
-                            title="Clear filter"
-                        >
-                            <Icon icon="lucide:x" class="w-3 h-3" />
-                        </button>
-                    {/if}
                     <div
                         class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
                     >

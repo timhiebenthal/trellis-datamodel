@@ -72,35 +72,38 @@ const mockNodes = [
 describe('Sidebar Filtering Logic', () => {
     beforeEach(() => {
         dbtModels.set(mockModels);
-        folderFilter.set(null);
-        tagFilter.set(null);
+        folderFilter.set([]);
+        tagFilter.set([]);
         nodes.set(mockNodes);
     });
 
     it('initializes with correct mock data', () => {
         expect(get(dbtModels)).toHaveLength(3);
         expect(get(nodes)).toHaveLength(4);
-        expect(get(folderFilter)).toBeNull();
-        expect(get(tagFilter)).toBeNull();
+        expect(get(folderFilter)).toEqual([]);
+        expect(get(tagFilter)).toEqual([]);
     });
 
     it('folder filter updates correctly', () => {
-        folderFilter.set('all');
-        expect(get(folderFilter)).toBe('all');
+        folderFilter.set(['all']);
+        expect(get(folderFilter)).toEqual(['all']);
 
-        folderFilter.set(null);
-        expect(get(folderFilter)).toBeNull();
+        folderFilter.set(['all', 'staging']);
+        expect(get(folderFilter)).toEqual(['all', 'staging']);
+
+        folderFilter.set([]);
+        expect(get(folderFilter)).toEqual([]);
     });
 
     it('tag filter updates correctly', () => {
-        tagFilter.set('core');
-        expect(get(tagFilter)).toBe('core');
+        tagFilter.set(['core']);
+        expect(get(tagFilter)).toEqual(['core']);
 
-        tagFilter.set('pii');
-        expect(get(tagFilter)).toBe('pii');
+        tagFilter.set(['core', 'pii']);
+        expect(get(tagFilter)).toEqual(['core', 'pii']);
 
-        tagFilter.set(null);
-        expect(get(tagFilter)).toBeNull();
+        tagFilter.set([]);
+        expect(get(tagFilter)).toEqual([]);
     });
 
     it('does not cause infinite updates when filters change', () => {
@@ -111,7 +114,7 @@ describe('Sidebar Filtering Logic', () => {
         nodeSubscriber.mockClear();
 
         // Change folder filter
-        folderFilter.set('all');
+        folderFilter.set(['all']);
 
         // Should only trigger once, not infinitely
         // Wait a bit to ensure no additional calls
