@@ -676,6 +676,24 @@
                         </div>
                     {/if}
 
+                    {#if modelDetails.tags && modelDetails.tags.length > 0}
+                        <div
+                            class="mb-2.5 text-slate-500 flex items-center gap-2 flex-wrap"
+                        >
+                            <span
+                                class="font-medium text-[10px] uppercase tracking-wider"
+                                >Tags</span
+                            >
+                            {#each modelDetails.tags as tag}
+                                <span
+                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100"
+                                >
+                                    {tag}
+                                </span>
+                            {/each}
+                        </div>
+                    {/if}
+
                     {#if schemaLoading}
                         <div
                             class="text-center text-slate-400 py-4 text-[10px] italic"

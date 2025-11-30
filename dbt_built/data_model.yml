@@ -24,7 +24,7 @@ entities:
     datatype: text
   position:
     x: 40
-    y: 388.9585558934667
+    y: 488.9585558934667
   width: 280
   panel_height: 200
   collapsed: true
@@ -33,7 +33,7 @@ entities:
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
   position:
-    x: 626.167239265092
+    x: 666
     y: 100
   width: 280
   panel_height: 200
@@ -43,11 +43,11 @@ entities:
   description: ''
   dbt_model: model.nba_analytics.calendar
   position:
-    x: 40
-    y: 100
+    x: -996
+    y: -678.9585558934667
   width: 280
   panel_height: 403.75
-  collapsed: false
+  collapsed: true
 relationships:
 - source: player
   target: team

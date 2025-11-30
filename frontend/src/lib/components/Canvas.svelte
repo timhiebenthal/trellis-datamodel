@@ -240,7 +240,7 @@
 
                     // Add extra height for physical view metadata if bound
                     if ($viewMode === "physical" && child.data?.dbt_model) {
-                        estimatedHeight += 80; // Schema/table + materialization badges
+                        estimatedHeight += 100; // Schema/table + materialization badges + tags
                     }
 
                     height = estimatedHeight;

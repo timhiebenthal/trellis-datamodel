@@ -57,3 +57,7 @@ e2e-test:
 all-test:
 	@echo "Running all tests..."
 	cd frontend && npm run test
+
+dbt_refresh:
+	@echo "Refreshing dbt artifacts ..."
+	cd dbt_built && uv run dbt run && uv run dbt docs generate

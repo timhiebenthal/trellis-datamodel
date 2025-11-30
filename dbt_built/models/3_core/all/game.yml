@@ -2,6 +2,8 @@ version: 2
 models:
 - name: game
   description: A game where two teams compete
+  config:
+    tags: [game]
   columns:
   - name: game_id
     data_type: text

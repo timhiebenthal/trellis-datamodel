@@ -10,7 +10,7 @@ export const configStatus = writable<any>(null);
 
 // Filter and grouping stores
 export const folderFilter = writable<string | null>(null);
-export const tagFilter = writable<string[]>([]);
+export const tagFilter = writable<string | null>(null);
 export const groupByFolder = writable<boolean>(true);
 
 // Drag-and-drop state for field linking
@@ -43,7 +43,7 @@ function updateCanUndoRedo() {
 
 export function pushHistory() {
     if (isUndoRedoAction) return;
-    
+
     // Debounce rapid changes (e.g., dragging)
     if (pushDebounceTimeout) clearTimeout(pushDebounceTimeout);
     pushDebounceTimeout = setTimeout(() => {
@@ -51,12 +51,12 @@ export function pushHistory() {
             nodes: structuredClone(get(nodes)),
             edges: structuredClone(get(edges)),
         };
-        
+
         // Remove any redo states if we're not at the end
         if (historyIndex < history.length - 1) {
             history = history.slice(0, historyIndex + 1);
         }
-        
+
         history.push(state);
         if (history.length > MAX_HISTORY) {
             history.shift();
@@ -78,7 +78,7 @@ export function initHistory() {
 
 export function undo() {
     if (historyIndex <= 0) return;
-    
+
     isUndoRedoAction = true;
     historyIndex--;
     const state = history[historyIndex];
@@ -90,7 +90,7 @@ export function undo() {
 
 export function redo() {
     if (historyIndex >= history.length - 1) return;
-    
+
     isUndoRedoAction = true;
     historyIndex++;
     const state = history[historyIndex];
