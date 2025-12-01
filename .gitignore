@@ -1,6 +1,5 @@
 nba-data/__marimo__/session/data.py.json
 # nba-data/data/*
-backend/__pycache__/main.cpython-312.pyc
 backend/backend.log
 nba-data/__marimo__/session/pull_data.py.json
 dbt_built/logs/dbt.log
@@ -14,5 +13,14 @@ frontend/.svelte-kit
 frontend/build
 frontend/.env
 .DS_Store
-backend/utils/__pycache__/yaml_handler.cpython-312.pyc
-backend/utils/__pycache__/__init__.cpython-312.pyc
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/

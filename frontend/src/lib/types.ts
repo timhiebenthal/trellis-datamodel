@@ -47,12 +47,43 @@ export interface EntityData {
     tags?: string[];
 }
 
-// We'll use Svelte Flow types for nodes/edges in the actual components, 
-// but for API/Persistence we treat them as generic objects or define a schema.
+/**
+ * Entity as persisted in the data model YAML.
+ * This is the serialization format, not the Svelte Flow node format.
+ */
+export interface Entity {
+    id: string;
+    label: string;
+    description?: string;
+    dbt_model?: string;
+    drafted_fields?: DraftedField[];
+    position: { x: number; y: number };
+    width?: number;
+    panel_height?: number;
+    collapsed?: boolean;
+}
+
+/**
+ * Relationship as persisted in the data model YAML.
+ */
+export interface Relationship {
+    source: string;
+    target: string;
+    label?: string;
+    type: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many';
+    source_field?: string;
+    target_field?: string;
+    label_dx?: number;
+    label_dy?: number;
+}
+
+/**
+ * The data model structure as persisted in YAML.
+ */
 export interface DataModel {
     version: number;
-    entities: any[];
-    relationships: any[];
+    entities: Entity[];
+    relationships: Relationship[];
 }
 
 export interface ConfigStatus {
@@ -72,11 +103,18 @@ export interface FieldDragState {
     nodeLabel: string;
 }
 
+export interface RelationshipTest {
+    relationships: {
+        to: string;
+        field: string;
+    };
+}
+
 export interface ModelSchemaColumn {
     name: string;
     data_type?: string;
     description?: string;
-    data_tests?: any[];
+    data_tests?: RelationshipTest[];
 }
 
 export interface ModelSchema {

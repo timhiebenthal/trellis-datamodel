@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import type { Node, Edge } from '@xyflow/svelte';
-import type { DbtModel } from './types';
+import type { DbtModel, FieldDragState } from './types';
 
 export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
@@ -14,11 +14,6 @@ export const tagFilter = writable<string[]>([]);
 export const groupByFolder = writable<boolean>(true);
 
 // Drag-and-drop state for field linking
-export interface FieldDragState {
-    nodeId: string;
-    fieldName: string;
-    nodeLabel: string;
-}
 export const draggingField = writable<FieldDragState | null>(null);
 
 // Undo/Redo history management

@@ -18,6 +18,7 @@
         getModelSchema,
         updateModelSchema,
     } from "$lib/api";
+    import { getParallelOffset, generateSlug } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
 
@@ -156,31 +157,6 @@
         hasUnsavedChanges = true;
     }
 
-    function generateSlug(label: string, currentId: string): string {
-        // Convert to lowercase and replace spaces/special chars with underscores
-        let slug = label
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/^_+|_+$/g, ""); // trim leading/trailing underscores
-
-        // If empty after cleaning, use a default
-        if (!slug) slug = "entity";
-
-        // Ensure uniqueness by checking existing node IDs (excluding current node)
-        let finalSlug = slug;
-        let counter = 1;
-        while (
-            $nodes.some(
-                (node) => node.id === finalSlug && node.id !== currentId,
-            )
-        ) {
-            finalSlug = `${slug}_${counter}`;
-            counter++;
-        }
-
-        return finalSlug;
-    }
-
     function updateLabel(e: Event) {
         const label = (e.target as HTMLInputElement).value;
         // Just update the label without changing ID (for real-time typing)
@@ -190,7 +166,7 @@
     function updateIdFromLabel(e: Event) {
         // Called on blur - update the ID based on final label
         const label = (e.target as HTMLInputElement).value;
-        const newId = generateSlug(label, id);
+        const newId = generateSlug(label, $nodes.map((n) => n.id), id);
 
         // If ID changes, update the node and all relationships
         if (newId !== id) {
@@ -255,31 +231,24 @@
         try {
             const inferred = await inferRelationships();
 
-            // Build model name -> entity ID map from current canvas state
-            // Include the model we just bound (since data model hasn't saved yet)
-            const modelToEntity: Record<string, string> = {};
-            for (const node of $nodes) {
-                const boundModel =
-                    node.id === id ? model.unique_id : node.data?.dbt_model;
-                if (boundModel && typeof boundModel === "string") {
-                    // Extract model name from "model.project.name" -> "name"
-                    const modelName = boundModel.includes(".")
-                        ? boundModel.split(".").pop()!
-                        : boundModel;
-                    modelToEntity[modelName] = node.id;
+                // Build model name -> entity ID map from current canvas state
+                // Include the model we just bound (since data model hasn't saved yet)
+                const modelToEntity: Record<string, string> = {};
+                for (const node of $nodes) {
+                    const boundModel =
+                        node.id === id ? model.unique_id : node.data?.dbt_model;
+                    if (boundModel && typeof boundModel === "string") {
+                        // Extract model name from "model.project.name" -> "name"
+                        const modelName = boundModel.includes(".")
+                            ? boundModel.split(".").pop()!
+                            : boundModel;
+                        modelToEntity[modelName] = node.id;
+                    }
+                    // Also map entity ID to itself
+                    modelToEntity[node.id] = node.id;
                 }
-                // Also map entity ID to itself
-                modelToEntity[node.id] = node.id;
-            }
 
-            function getParallelOffset(index: number): number {
-                if (index === 0) return 0;
-                const level = Math.ceil(index / 2);
-                const offset = level * 20;
-                return index % 2 === 1 ? offset : -offset;
-            }
-
-            for (const rel of inferred) {
+                for (const rel of inferred) {
                 // Remap source/target using current canvas bindings
                 const sourceEntityId = modelToEntity[rel.source] || rel.source;
                 const targetEntityId = modelToEntity[rel.target] || rel.target;

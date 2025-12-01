@@ -6,6 +6,7 @@
         tagFilter,
     } from "$lib/stores";
     import type { DbtModel, TreeNode } from "$lib/types";
+    import { getModelFolder } from "$lib/utils";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -23,7 +24,7 @@
             new Set(
                 $dbtModels
                     .map((m) => getModelFolder(m))
-                    .filter((f) => f !== null),
+                    .filter((f): f is string => f !== null),
             ),
         ).sort(),
     );
@@ -65,21 +66,6 @@
     );
 
     let treeNodes = $derived(buildTree(filteredModels));
-
-    function getModelFolder(model: DbtModel): string | null {
-        if (!model.file_path) return null;
-        let p = model.file_path.replace(/\\/g, "/");
-        const lastSlash = p.lastIndexOf("/");
-        const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
-        let parts = dir.split("/").filter((x) => x !== "." && x !== "");
-        if (parts[0] === "models") parts.shift();
-        // Skip the main folder (first part after models/)
-        if (parts.length > 1) {
-            parts.shift();
-            return parts.join("/");
-        }
-        return null;
-    }
 
     function toggleFolder(folder: string) {
         if ($folderFilter.includes(folder)) {

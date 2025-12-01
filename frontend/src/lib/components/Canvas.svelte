@@ -16,6 +16,7 @@
     } from "@xyflow/svelte";
 
     import { nodes, edges, viewMode } from "$lib/stores";
+    import { getParallelOffset, generateSlug } from "$lib/utils";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
@@ -29,13 +30,6 @@
     const edgeTypes = {
         custom: CustomEdge,
     };
-
-    function getParallelOffset(index: number): number {
-        if (index === 0) return 0;
-        const level = Math.ceil(index / 2);
-        const offset = level * 20;
-        return index % 2 === 1 ? offset : -offset;
-    }
 
     function onConnect(connection: Connection) {
         const connectionKey = `${connection.source}-${connection.target}`;
@@ -105,27 +99,9 @@
         $edges = [...$edges, edge];
     }
 
-    function generateSlug(label: string): string {
-        // Convert to lowercase and replace spaces/special chars with underscores
-        let slug = label
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/^_+|_+$/g, ""); // trim leading/trailing underscores
-
-        // Ensure uniqueness by checking existing node IDs
-        let finalSlug = slug;
-        let counter = 1;
-        while ($nodes.some((node) => node.id === finalSlug)) {
-            finalSlug = `${slug}_${counter}`;
-            counter++;
-        }
-
-        return finalSlug;
-    }
-
     function addEntity() {
         const label = "New Entity";
-        const id = generateSlug(label);
+        const id = generateSlug(label, $nodes.map((n) => n.id));
 
         // Find max zIndex to place new entity on top
         // Groups have zIndex 1, entities should start at 10+ to be above groups

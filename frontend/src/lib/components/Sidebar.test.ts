@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { get } from 'svelte/store';
 import { dbtModels, folderFilter, tagFilter, nodes } from '$lib/stores';
+import { getModelFolder } from '$lib/utils';
 
 // Mock DbtModel data
 const mockModels = [
     {
         unique_id: 'model.project.users',
         name: 'users',
+        schema: 'public',
+        table: 'users',
         file_path: 'models/3_core/all/users.sql',
         tags: ['core', 'pii'],
         columns: [],
@@ -15,6 +18,8 @@ const mockModels = [
     {
         unique_id: 'model.project.orders',
         name: 'orders',
+        schema: 'public',
+        table: 'orders',
         file_path: 'models/3_core/all/orders.sql',
         tags: ['core'],
         columns: [],
@@ -23,6 +28,8 @@ const mockModels = [
     {
         unique_id: 'model.project.staging_users',
         name: 'stg_users',
+        schema: 'public',
+        table: 'stg_users',
         file_path: 'models/2_int/staging/stg_users.sql',
         tags: ['staging'],
         columns: [],
@@ -132,26 +139,16 @@ describe('Sidebar Filtering Logic', () => {
 
 describe('Filter Helper Functions', () => {
     it('extracts folder correctly from file path', () => {
-        // Helper function to extract folder (mirroring the logic in +page.svelte)
-        function getModelFolder(filePath: string): string | null {
-            if (!filePath) return null;
-            let p = filePath.replace(/\\/g, "/");
-            const lastSlash = p.lastIndexOf("/");
-            const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
-            let parts = dir.split("/").filter((x: string) => x !== "." && x !== "");
-            if (parts[0] === "models") parts.shift();
-            // Skip the main folder (first part after models/)
-            if (parts.length > 1) {
-                parts.shift();
-                return parts.join("/");
-            }
-            return null;
-        }
+        // Use the utility function from utils.ts
+        const model1 = { file_path: 'models/3_core/all/users.sql' } as any;
+        const model2 = { file_path: 'models/2_int/staging/stg_users.sql' } as any;
+        const model3 = { file_path: 'models/1_stg/raw.sql' } as any;
+        const model4 = { file_path: '' } as any;
 
-        expect(getModelFolder('models/3_core/all/users.sql')).toBe('all');
-        expect(getModelFolder('models/2_int/staging/stg_users.sql')).toBe('staging');
-        expect(getModelFolder('models/1_stg/raw.sql')).toBeNull();
-        expect(getModelFolder('')).toBeNull();
+        expect(getModelFolder(model1)).toBe('all');
+        expect(getModelFolder(model2)).toBe('staging');
+        expect(getModelFolder(model3)).toBeNull();
+        expect(getModelFolder(model4)).toBeNull();
     });
 
     it('matches tags correctly', () => {

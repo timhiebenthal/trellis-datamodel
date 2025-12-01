@@ -1,6 +1,26 @@
-import type { DbtModel, DataModel, DraftedField } from './types';
+import type { DbtModel, DataModel, DraftedField, ConfigStatus, ModelSchema, Relationship } from './types';
 
-const API_BASE = 'http://localhost:8000/api';
+/**
+ * API base URL. Can be configured via PUBLIC_API_URL environment variable.
+ * Defaults to http://localhost:8000/api for local development.
+ * 
+ * To override, set PUBLIC_API_URL in your .env file:
+ *   PUBLIC_API_URL=http://your-backend-url/api
+ */
+function getApiBase(): string {
+    // Try to access the environment variable if available
+    try {
+        // @ts-ignore - dynamic import not available at build time
+        if (typeof import.meta.env?.PUBLIC_API_URL === 'string' && import.meta.env.PUBLIC_API_URL) {
+            return import.meta.env.PUBLIC_API_URL;
+        }
+    } catch {
+        // Ignore - env not available
+    }
+    return 'http://localhost:8000/api';
+}
+
+const API_BASE = getApiBase();
 
 export async function getManifest(): Promise<DbtModel[]> {
     try {
@@ -38,7 +58,7 @@ export async function saveDataModel(dataModel: DataModel): Promise<void> {
     if (!res.ok) throw new Error(`Failed to save data model: ${res.status}`);
 }
 
-export async function getConfigStatus(): Promise<any> {
+export async function getConfigStatus(): Promise<ConfigStatus> {
     try {
         const res = await fetch(`${API_BASE}/config-status`);
         if (!res.ok) throw new Error(`Status: ${res.status}`);
@@ -47,11 +67,17 @@ export async function getConfigStatus(): Promise<any> {
         console.error("Error fetching config status:", e);
         return {
             config_present: false,
+            dbt_project_path: '',
+            manifest_path: '',
+            catalog_path: '',
+            manifest_exists: false,
+            catalog_exists: false,
+            data_model_exists: false,
         };
     }
 }
 
-export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[], description?: string): Promise<any> {
+export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[], description?: string): Promise<{ status: string; file_path: string; message: string }> {
     const res = await fetch(`${API_BASE}/dbt-schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,7 +95,7 @@ export async function saveDbtSchema(entityId: string, modelName: string, fields:
     return await res.json();
 }
 
-export async function inferRelationships(): Promise<any[]> {
+export async function inferRelationships(): Promise<Relationship[]> {
     try {
         const res = await fetch(`${API_BASE}/infer-relationships`);
         if (!res.ok) {
@@ -96,7 +122,7 @@ export async function syncDbtTests(): Promise<{ status: string; message: string;
     return await res.json();
 }
 
-export async function getModelSchema(modelName: string): Promise<any> {
+export async function getModelSchema(modelName: string): Promise<ModelSchema | null> {
     try {
         const res = await fetch(`${API_BASE}/models/${modelName}/schema`);
         if (!res.ok) {
@@ -110,7 +136,7 @@ export async function getModelSchema(modelName: string): Promise<any> {
     }
 }
 
-export async function updateModelSchema(modelName: string, columns: any[], description?: string): Promise<any> {
+export async function updateModelSchema(modelName: string, columns: { name: string; data_type?: string; description?: string }[], description?: string): Promise<{ status: string; message: string; file_path: string }> {
     const res = await fetch(`${API_BASE}/models/${modelName}/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

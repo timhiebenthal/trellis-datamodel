@@ -24,6 +24,7 @@
         inferRelationships,
         syncDbtTests,
     } from "$lib/api";
+    import { getParallelOffset, getModelFolder } from "$lib/utils";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
@@ -34,13 +35,6 @@
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
     let lastSavedState = "";
-
-    function getParallelOffset(index: number): number {
-        if (index === 0) return 0;
-        const level = Math.ceil(index / 2);
-        const offset = level * 20;
-        return index % 2 === 1 ? offset : -offset;
-    }
 
     async function handleSyncDbt() {
         syncing = true;
@@ -210,25 +204,7 @@
                     );
                     if (!model) return { folder: null, tags: [] };
 
-                    // Extract folder (skip main path level)
-                    let folder = null;
-                    if (model.file_path) {
-                        let p = model.file_path.replace(/\\/g, "/");
-                        const lastSlash = p.lastIndexOf("/");
-                        const dir =
-                            lastSlash !== -1 ? p.substring(0, lastSlash) : "";
-                        let parts = dir
-                            .split("/")
-                            .filter((x: string) => x !== "." && x !== "");
-                        if (parts[0] === "models") parts.shift();
-                        // Always skip the first folder level (e.g., "3_core") since it's the base layer
-                        if (parts.length > 0) parts.shift();
-                        if (parts.length > 0) {
-                            folder = parts.join("/");
-                        }
-                    }
-
-                    return { folder, tags: model.tags || [] };
+                    return { folder: getModelFolder(model), tags: model.tags || [] };
                 }
 
                 // Map data model to Svelte Flow format with metadata
@@ -540,24 +516,6 @@
         const activeFolder = $folderFilter;
         const activeTags = $tagFilter;
         const models = $dbtModels; // Dependency on dbtModels
-
-        // Helper to get folder from model
-        function getModelFolder(model: any): string | null {
-            if (!model.file_path) return null;
-            let p = model.file_path.replace(/\\/g, "/");
-            const lastSlash = p.lastIndexOf("/");
-            const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
-            let parts = dir
-                .split("/")
-                .filter((x: string) => x !== "." && x !== "");
-            if (parts[0] === "models") parts.shift();
-            // Skip the main folder (first part after models/)
-            if (parts.length > 1) {
-                parts.shift();
-                return parts.join("/");
-            }
-            return null;
-        }
 
         // Use untrack to read current nodes and edges without creating dependency
         const currentNodes = untrack(() => $nodes);
