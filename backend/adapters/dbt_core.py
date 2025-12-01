@@ -116,10 +116,12 @@ class DbtCoreAdapter:
 
             if catalog_node:
                 for col in catalog_node.get("columns", {}).values():
-                    columns.append({
-                        "name": col.get("name"),
-                        "type": col.get("type") or col.get("data_type"),
-                    })
+                    columns.append(
+                        {
+                            "name": col.get("name"),
+                            "type": col.get("type") or col.get("data_type"),
+                        }
+                    )
             else:
                 for col_name, col_data in node.get("columns", {}).items():
                     columns.append({"name": col_name, "type": col_data.get("type")})
@@ -128,17 +130,19 @@ class DbtCoreAdapter:
             config = node.get("config", {})
             materialized = config.get("materialized", "view")
 
-            models.append({
-                "unique_id": unique_id,
-                "name": node.get("name"),
-                "schema": node.get("schema"),
-                "table": node.get("alias", node.get("name")),
-                "columns": columns,
-                "description": node.get("description"),
-                "materialization": materialized,
-                "file_path": original_path,
-                "tags": node.get("tags", []),
-            })
+            models.append(
+                {
+                    "unique_id": unique_id,
+                    "name": node.get("name"),
+                    "schema": node.get("schema"),
+                    "table": node.get("alias", node.get("name")),
+                    "columns": columns,
+                    "description": node.get("description"),
+                    "materialization": materialized,
+                    "file_path": original_path,
+                    "tags": node.get("tags", []),
+                }
+            )
 
         models.sort(key=lambda x: x["name"])
         return models
@@ -287,16 +291,20 @@ class DbtCoreAdapter:
                             elif to_ref.startswith('ref("') and to_ref.endswith('")'):
                                 target_model = to_ref[5:-2]
 
-                            target_entity_id = model_to_entity.get(target_model, target_model)
+                            target_entity_id = model_to_entity.get(
+                                target_model, target_model
+                            )
 
-                            relationships.append({
-                                "source": target_entity_id,
-                                "target": entity_id,
-                                "label": "",
-                                "type": "one_to_many",
-                                "source_field": target_field,
-                                "target_field": column.get("name"),
-                            })
+                            relationships.append(
+                                {
+                                    "source": target_entity_id,
+                                    "target": entity_id,
+                                    "label": "",
+                                    "type": "one_to_many",
+                                    "source_field": target_field,
+                                    "target_field": column.get("name"),
+                                }
+                            )
             except Exception as e:
                 print(f"Warning: Could not parse {filename}: {e}")
                 continue
@@ -305,7 +313,12 @@ class DbtCoreAdapter:
         seen: set[tuple] = set()
         unique_relationships: list[Relationship] = []
         for rel in relationships:
-            key = (rel["source"], rel["target"], rel.get("source_field"), rel.get("target_field"))
+            key = (
+                rel["source"],
+                rel["target"],
+                rel.get("source_field"),
+                rel.get("target_field"),
+            )
             if key not in seen:
                 seen.add(key)
                 unique_relationships.append(rel)
@@ -340,11 +353,13 @@ class DbtCoreAdapter:
             ref_entity = source_id if fk_on_target else target_id
             ref_field = source_field if fk_on_target else target_field
 
-            fk_by_entity.setdefault(fk_entity, []).append({
-                "fk_field": fk_field,
-                "ref_entity": ref_entity,
-                "ref_field": ref_field,
-            })
+            fk_by_entity.setdefault(fk_entity, []).append(
+                {
+                    "fk_field": fk_field,
+                    "ref_entity": ref_entity,
+                    "ref_field": ref_field,
+                }
+            )
 
         models_dir = self._get_models_dir()
         os.makedirs(models_dir, exist_ok=True)
@@ -370,7 +385,9 @@ class DbtCoreAdapter:
             model_entry = self.yaml_handler.ensure_model(data, model_name)
 
             if entity.get("description"):
-                self.yaml_handler.update_model_description(model_entry, entity.get("description"))
+                self.yaml_handler.update_model_description(
+                    model_entry, entity.get("description")
+                )
 
             # Sync Drafted Fields
             drafted_fields = entity.get("drafted_fields", [])
@@ -383,7 +400,9 @@ class DbtCoreAdapter:
                     continue
 
                 col = self.yaml_handler.ensure_column(model_entry, f_name)
-                self.yaml_handler.update_column(col, data_type=f_type, description=f_desc)
+                self.yaml_handler.update_column(
+                    col, data_type=f_type, description=f_desc
+                )
 
             # Sync Relationships (FKs)
             fk_list = fk_by_entity.get(entity_id, [])
@@ -505,4 +524,3 @@ class DbtCoreAdapter:
             yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
 
         return Path(output_path)
-
