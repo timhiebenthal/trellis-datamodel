@@ -772,14 +772,15 @@
 </script>
 
 <div
-    class="rounded-lg border bg-white shadow-sm hover:shadow-md relative transition-shadow duration-200"
-    class:border-[#26A69A]={selected || isBound}
-    class:border-slate-300={!isBound && !selected && !isDragOver}
+    class="rounded-lg border bg-white shadow-sm hover:shadow-md relative transition-all duration-200"
+    class:border-primary-500={isBound && !selected}
+    class:border-gray-300={!isBound && !selected && !isDragOver}
     class:ring-2={selected || isDragOver}
-    class:ring-[#26A69A]={selected}
+    class:ring-primary-500={selected}
     class:ring-opacity-50={selected}
-    class:ring-blue-200={isDragOver && !selected}
-    class:border-blue-500={isDragOver && !selected}
+    class:border-primary-600={selected}
+    class:ring-primary-200={isDragOver && !selected}
+    class:border-primary-400={isDragOver && !selected}
     style={`width:${nodeWidth}px`}
     ondrop={onDrop}
     ondragover={onDragOver}
@@ -790,18 +791,18 @@
     <Handle
         type="target"
         position={Position.Top}
-        class="!bg-slate-400 !w-2 !h-2"
+        class="!bg-gray-400 !w-2 !h-2"
     />
 
     <!-- Header -->
     <div
-        class="p-2.5 border-b border-slate-100 bg-slate-50/50 rounded-t-lg flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
+        class="p-2.5 border-b border-gray-100 bg-gray-50/50 rounded-t-lg flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
         onclick={toggleCollapse}
         title={isCollapsed ? "Click to expand" : "Click to collapse"}
     >
         <div class="flex items-center gap-2 flex-1 min-w-0">
             <span
-                class="text-slate-400 text-[10px] flex-shrink-0 select-none transition-transform duration-200"
+                class="text-gray-400 text-[10px] flex-shrink-0 select-none transition-transform duration-200"
             >
                 {#if isCollapsed}
                     <Icon icon="lucide:chevron-right" class="w-4 h-4" />
@@ -814,21 +815,26 @@
                 oninput={updateLabel}
                 onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}
-                class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#26A69A] rounded px-1.5 py-0.5 text-sm text-slate-800"
+                class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm text-gray-800"
                 placeholder="Entity Name"
             />
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
             {#if isBound}
                 <div
-                    class="w-2 h-2 rounded-full bg-[#26A69A]"
+                    class="w-2 h-2 rounded-full bg-primary-500"
                     title="Bound to {boundModelName}"
+                ></div>
+            {:else}
+                <div
+                    class="w-2 h-2 rounded-full bg-amber-500"
+                    title="Draft mode (not bound to dbt model)"
                 ></div>
             {/if}
             <button
                 onclick={handleDeleteClick}
                 aria-label="Delete entity {data.label}"
-                class="text-slate-400 hover:text-red-600 transition-colors px-1.5 py-0.5 rounded hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500"
+                class="text-gray-400 hover:text-danger-600 transition-colors px-1.5 py-0.5 rounded hover:bg-danger-50 focus:outline-none focus:ring-1 focus:ring-danger-500"
                 title="Delete entity"
             >
                 <Icon icon="lucide:x" class="w-4 h-4" />
@@ -842,20 +848,20 @@
             {#if $viewMode === "logical" && isBound && modelDetails}
                 <div class="text-xs">
                     <div
-                        class="font-mono text-slate-500 mb-2.5 bg-slate-50 p-1.5 rounded border border-slate-100 break-all text-[11px]"
+                        class="font-mono text-gray-500 mb-2.5 bg-gray-50 p-1.5 rounded border border-gray-100 break-all text-[11px]"
                     >
                         {modelDetails.schema}.{modelDetails.table}
                     </div>
                     {#if modelDetails.materialization}
                         <div
-                            class="mb-2.5 text-slate-500 flex items-center gap-2"
+                            class="mb-2.5 text-gray-500 flex items-center gap-2"
                         >
                             <span
                                 class="font-medium text-[10px] uppercase tracking-wider"
                                 >Materialization</span
                             >
                             <span
-                                class="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-semibold uppercase border border-slate-200"
+                                class="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-semibold uppercase border border-gray-200"
                             >
                                 {modelDetails.materialization}
                             </span>
@@ -864,7 +870,7 @@
 
                     <!-- Model Tabs (when multiple models are bound) -->
                     {#if allBoundModels.length > 1}
-                        <div class="mb-2.5 flex items-center gap-1 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                        <div class="mb-2.5 flex items-center gap-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                             {#each allBoundModels as modelId, index}
                                 {@const isActive = activeModelIndex === index}
                                 {@const isPrimary = index === 0}
@@ -875,13 +881,13 @@
                                     <button
                                         onclick={() => activeModelIndex = index}
                                         class="px-2 py-1 text-[10px] rounded border transition-colors whitespace-nowrap flex items-center gap-1"
-                                        class:bg-[#26A69A]={isActive}
+                                        class:bg-primary-500={isActive}
                                         class:text-white={isActive}
-                                        class:border-[#26A69A]={isActive}
+                                        class:border-primary-500={isActive}
                                         class:bg-white={!isActive}
-                                        class:text-slate-600={!isActive}
-                                        class:border-slate-300={!isActive}
-                                        class:hover:bg-slate-50={!isActive}
+                                        class:text-gray-600={!isActive}
+                                        class:border-gray-300={!isActive}
+                                        class:hover:bg-gray-50={!isActive}
                                         title={modelId}
                                     >
                                         {modelName}
@@ -895,7 +901,7 @@
                                                 e.stopPropagation();
                                                 removeAdditionalModel(index - 1);
                                             }}
-                                            class="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity bg-white rounded-full border border-slate-200 p-0.5"
+                                            class="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 hover:text-danger-500 transition-opacity bg-white rounded-full border border-gray-200 p-0.5"
                                             title="Remove model"
                                         >
                                             <Icon icon="lucide:x" class="w-2 h-2" />
@@ -905,7 +911,7 @@
                             {/each}
                             <!-- Add model button -->
                             <button
-                                class="px-2 py-1 text-[10px] rounded border border-dashed border-slate-300 text-slate-500 hover:border-[#26A69A] hover:text-[#26A69A] transition-colors flex items-center gap-1 flex-shrink-0"
+                                class="px-2 py-1 text-[10px] rounded border border-dashed border-gray-300 text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center gap-1 flex-shrink-0"
                                 title="Drag a dbt model from the sidebar to add it"
                             >
                                 <Icon icon="lucide:plus" class="w-3 h-3" />
@@ -923,7 +929,7 @@
                         {/if}
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span
-                                class="font-medium text-[10px] uppercase tracking-wider text-slate-500"
+                                class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
                                 >Tags</span
                             >
                             {#each entityTags as tag}
@@ -973,19 +979,19 @@
 
                     {#if schemaLoading}
                         <div
-                            class="text-center text-slate-400 py-4 text-[10px] italic"
+                            class="text-center text-gray-400 py-4 text-[10px] italic"
                         >
                             Loading schema...
                         </div>
                     {:else}
                         <div
-                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent nodrag"
+                            class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
                         >
                             {#if editableColumns.length > 0}
                                 {#each editableColumns as col, index}
                                     <div
-                                        class="p-1.5 border-b border-slate-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-slate-50"
+                                        class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
                                         class:bg-blue-50={$draggingField?.nodeId !==
                                             id && $draggingField !== null}
                                         class:ring-2={$draggingField?.nodeId !==
@@ -999,7 +1005,7 @@
                                             class="flex gap-1.5 mb-1 items-center"
                                         >
                                             <span
-                                                class="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-[#26A69A] pt-1"
+                                                class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
                                                 draggable="true"
                                                 onmousedown={(e) =>
                                                     e.stopPropagation()}
@@ -1040,7 +1046,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] font-medium"
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="column_name"
                                                     />
                                                     <input
@@ -1056,7 +1062,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] uppercase text-slate-600 font-mono"
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
                                                         placeholder="text"
                                                     />
                                                     <button
@@ -1064,7 +1070,7 @@
                                                             deleteEditableColumn(
                                                                 index,
                                                             )}
-                                                        class="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
+                                                        class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
                                                         title="Delete column"
                                                     >
                                                         <Icon
@@ -1086,7 +1092,7 @@
                                                                 ).value,
                                                             },
                                                         )}
-                                                    class="w-full px-0 text-[10px] text-slate-500 bg-transparent focus:outline-none border-none placeholder:text-slate-300"
+                                                    class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
                                                     placeholder="Description (optional)"
                                                 />
                                             </div>
@@ -1095,7 +1101,7 @@
                                 {/each}
                             {:else}
                                 <div
-                                    class="text-center text-slate-400 py-4 text-[10px] italic"
+                                    class="text-center text-gray-400 py-4 text-[10px] italic"
                                 >
                                     No columns defined
                                 </div>
@@ -1104,14 +1110,14 @@
 
                         <button
                             onclick={addEditableColumn}
-                            class="mt-2 w-full text-xs text-[#26A69A] hover:bg-teal-50 p-1.5 rounded border border-teal-200 transition-colors font-medium flex items-center justify-center gap-1"
+                            class="mt-2 w-full text-xs text-primary-600 hover:bg-primary-50 p-1.5 rounded border border-primary-200 transition-colors font-medium flex items-center justify-center gap-1"
                         >
                             <Icon icon="lucide:plus" class="w-3 h-3" /> Add Column
                         </button>
 
                         {#if schemaError}
                             <div
-                                class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-[10px]"
+                                class="mt-2 p-2 bg-danger-50 border border-danger-200 rounded text-danger-800 text-[10px]"
                             >
                                 {schemaError}
                             </div>
@@ -1122,15 +1128,15 @@
                                 onclick={saveSchema}
                                 disabled={!hasUnsavedChanges || schemaSaving}
                                 class="flex-1 text-[10px] font-medium p-1.5 rounded border transition-colors flex items-center justify-center gap-1"
-                                class:text-[#26A69A]={hasUnsavedChanges &&
+                                class:text-primary-600={hasUnsavedChanges &&
                                     !schemaSaving}
-                                class:hover:bg-teal-50={hasUnsavedChanges &&
+                                class:hover:bg-primary-50={hasUnsavedChanges &&
                                     !schemaSaving}
-                                class:border-teal-200={hasUnsavedChanges &&
+                                class:border-primary-200={hasUnsavedChanges &&
                                     !schemaSaving}
-                                class:text-slate-400={!hasUnsavedChanges ||
+                                class:text-gray-400={!hasUnsavedChanges ||
                                     schemaSaving}
-                                class:border-slate-200={!hasUnsavedChanges ||
+                                class:border-gray-200={!hasUnsavedChanges ||
                                     schemaSaving}
                                 class:cursor-not-allowed={!hasUnsavedChanges ||
                                     schemaSaving}
@@ -1147,7 +1153,7 @@
                                 {/if}
                             </button>
                             <button
-                                class="text-[10px] text-red-500 hover:bg-red-50 p-1.5 rounded border border-red-100 transition-colors font-medium"
+                                class="text-[10px] text-danger-500 hover:bg-danger-50 p-1.5 rounded border border-danger-100 transition-colors font-medium"
                                 onclick={unbind}
                             >
                                 Unbind
@@ -1180,7 +1186,7 @@
                             {/if}
                             <div class="flex items-center gap-2 flex-wrap mb-1">
                                 <span
-                                    class="font-medium text-[10px] uppercase tracking-wider text-slate-500"
+                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
                                     >Tags</span
                                 >
                                 {#each entityTags as tag}
@@ -1229,13 +1235,13 @@
                         </div>
 
                         <div
-                            class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent nodrag"
+                            class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
                         >
                             {#if draftedFields.length > 0}
                                 {#each draftedFields as field, index}
                                     <div
-                                        class="p-1.5 border-b border-slate-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-slate-50"
+                                        class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
                                         class:bg-blue-50={$draggingField?.nodeId !==
                                             id && $draggingField !== null}
                                         class:ring-2={$draggingField?.nodeId !==
@@ -1250,7 +1256,7 @@
                                             class="flex gap-1.5 mb-1 items-center"
                                         >
                                             <span
-                                                class="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-[#26A69A] pt-1"
+                                                class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
                                                 draggable="true"
                                                 onmousedown={(e) =>
                                                     e.stopPropagation()}
@@ -1291,7 +1297,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] font-medium"
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="field_name"
                                                     />
                                                     <select
@@ -1306,7 +1312,7 @@
                                                                         .value as any,
                                                                 },
                                                             )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#26A69A] uppercase text-slate-600 font-mono"
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
                                                     >
                                                         <option value="text"
                                                             >text</option
@@ -1333,7 +1339,7 @@
                                                             deleteDraftedField(
                                                                 index,
                                                             )}
-                                                        class="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
+                                                        class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
                                                         title="Delete field"
                                                     >
                                                         <Icon
@@ -1355,7 +1361,7 @@
                                                                 ).value,
                                                             },
                                                         )}
-                                                    class="w-full px-0 text-[10px] text-slate-500 bg-transparent focus:outline-none border-none placeholder:text-slate-300"
+                                                    class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
                                                     placeholder="Description (optional)"
                                                 />
                                             </div>
@@ -1364,7 +1370,7 @@
                                 {/each}
                             {:else}
                                 <div
-                                    class="text-center text-slate-400 py-4 text-[10px] italic"
+                                    class="text-center text-gray-400 py-4 text-[10px] italic"
                                 >
                                     No fields defined
                                 </div>
@@ -1373,7 +1379,7 @@
 
                         <button
                             onclick={addDraftedField}
-                            class="mt-2 w-full text-xs text-[#26A69A] hover:bg-teal-50 p-1.5 rounded border border-teal-200 transition-colors font-medium flex items-center justify-center gap-1"
+                            class="mt-2 w-full text-xs text-primary-600 hover:bg-primary-50 p-1.5 rounded border border-primary-200 transition-colors font-medium flex items-center justify-center gap-1"
                         >
                             <Icon icon="lucide:plus" class="w-3 h-3" /> Add Field
                         </button>
@@ -1383,7 +1389,7 @@
                     <textarea
                         value={data.description || ""}
                         oninput={updateDescription}
-                        class="w-full text-xs text-slate-600 resize-y min-h-[60px] bg-slate-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#26A69A] rounded p-1.5 border border-slate-200"
+                        class="w-full text-xs text-gray-600 resize-y min-h-[60px] bg-gray-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded p-1.5 border border-gray-200"
                         placeholder="Description..."
                     ></textarea>
 
@@ -1397,7 +1403,7 @@
                         {/if}
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span
-                                class="font-medium text-[10px] uppercase tracking-wider text-slate-500"
+                                class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
                                 >Tags</span
                             >
                             {#each entityTags as tag}
@@ -1447,7 +1453,7 @@
                     {#if isBound}
                         <div class="mt-2 space-y-1.5">
                             <div
-                                class="text-xs text-[#26A69A] flex items-center justify-between bg-teal-50 p-1.5 rounded border border-teal-100"
+                                class="text-xs text-primary-600 flex items-center justify-between bg-primary-50 p-1.5 rounded border border-primary-100"
                             >
                                 <span
                                     class="truncate font-medium flex items-center gap-1"
@@ -1458,20 +1464,20 @@
                                 >
                                 <button
                                     onclick={unbind}
-                                    class="text-teal-600 hover:text-red-500 ml-1 px-1 transition-colors"
+                                    class="text-primary-600 hover:text-danger-500 ml-1 px-1 transition-colors"
                                 >
                                     <Icon icon="lucide:x" class="w-3 h-3" />
                                 </button>
                             </div>
                             {#if additionalModels.length > 0}
-                                <div class="text-[10px] text-slate-500 flex items-center gap-1 flex-wrap">
+                                <div class="text-[10px] text-gray-500 flex items-center gap-1 flex-wrap">
                                     <span class="uppercase tracking-wide">Also bound:</span>
                                     {#each additionalModels as modelId}
                                         <span
-                                            class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-600 flex items-center gap-1"
+                                            class="px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-600 flex items-center gap-1"
                                             title={modelId}
                                         >
-                                            <Icon icon="lucide:layers" class="w-3 h-3 text-slate-400" />
+                                            <Icon icon="lucide:layers" class="w-3 h-3 text-gray-400" />
                                             {getModelShortName(modelId)}
                                         </span>
                                     {/each}
@@ -1480,7 +1486,7 @@
                         </div>
                     {:else}
                         <div
-                            class="mt-2 text-[10px] text-slate-400 text-center border border-dashed border-slate-300 rounded p-3 bg-slate-50 pointer-events-none"
+                            class="mt-2 text-[10px] text-gray-400 text-center border border-dashed border-gray-300 rounded p-3 bg-gray-50 pointer-events-none"
                         >
                             Drag dbt model here
                         </div>
@@ -1493,7 +1499,7 @@
     <Handle
         type="source"
         position={Position.Bottom}
-        class="!bg-slate-400 !w-2 !h-2"
+        class="!bg-gray-400 !w-2 !h-2"
     />
 
     <div

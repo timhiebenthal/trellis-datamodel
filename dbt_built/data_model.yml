@@ -17,7 +17,7 @@ entities:
     y: 100
   width: 317.818115234375
   panel_height: 480
-  collapsed: false
+  collapsed: true
   tags:
   - '123'
 - id: team
@@ -50,10 +50,10 @@ entities:
 - id: calendar
   label: calendar
   description: ''
-  dbt_model: model.nba_analytics.calendar
+  dbt_model: null
   position:
-    x: 40
-    y: 100
+    x: 24
+    y: 64
   width: 280
   panel_height: 403.75
   collapsed: false
@@ -88,7 +88,5 @@ relationships:
   target: calendar
   label: ''
   type: one_to_many
-  source_field: game_day
-  target_field: calendar_date
   label_dx: 0
   label_dy: 0

@@ -701,7 +701,7 @@
             <button
                 onclick={handleInferFromDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Import relationship tests from dbt yml files"
             >
                 <Icon icon="lucide:download" class="w-4 h-4" />

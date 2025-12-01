@@ -173,13 +173,13 @@
 </script>
 
 <aside
-    class="bg-slate-50 h-full p-3 flex flex-col border-r border-slate-200 overflow-hidden flex-shrink-0 sidebar transition-all duration-300"
+    class="bg-gray-50 h-full p-3 flex flex-col border-r border-gray-200 overflow-hidden flex-shrink-0 sidebar transition-all duration-300"
     style={`width:${collapsed ? 48 : width}px`}
 >
     {#if collapsed}
         <button
             onclick={toggleCollapse}
-            class="w-full h-10 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded transition-colors"
+            class="w-full h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
             title="Expand sidebar"
         >
             <Icon icon="lucide:chevron-right" class="w-5 h-5" />
@@ -187,13 +187,13 @@
     {:else}
         <div class="flex items-center justify-between mb-3">
             <h2
-                class="text-sm font-bold text-[#0f172a] uppercase tracking-wide"
+                class="text-sm font-bold text-gray-900 uppercase tracking-wide"
             >
                 Explorer
             </h2>
             <button
                 onclick={toggleCollapse}
-                class="text-slate-400 hover:text-slate-700 p-1 hover:bg-slate-200 rounded transition-colors"
+                class="text-gray-400 hover:text-gray-700 p-1 hover:bg-gray-200 rounded transition-colors"
                 title="Collapse sidebar"
             >
                 <Icon icon="lucide:chevron-left" class="w-4 h-4" />
@@ -201,14 +201,14 @@
         </div>
 
         <div class="relative mb-3">
-            <div class="absolute left-2.5 top-2 text-slate-400">
+            <div class="absolute left-2.5 top-2 text-gray-400">
                 <Icon icon="lucide:search" class="w-4 h-4" />
             </div>
             <input
                 type="text"
                 placeholder="Search models..."
                 bind:value={searchTerm}
-                class="w-full pl-8 pr-2 py-1.5 border border-slate-200 rounded bg-white text-sm focus:outline-none focus:ring-1 focus:ring-[#26A69A]"
+                class="w-full pl-8 pr-2 py-1.5 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
             />
         </div>
 
@@ -216,14 +216,14 @@
         <div class="mb-3 space-y-3">
             <div class="flex items-center justify-between">
                 <h3
-                    class="text-xs font-bold text-slate-800 uppercase tracking-wide"
+                    class="text-xs font-bold text-gray-800 uppercase tracking-wide"
                 >
                     Filters
                 </h3>
                 {#if $folderFilter.length > 0 || $tagFilter.length > 0}
                     <button
                         onclick={clearAllFilters}
-                        class="text-[10px] text-slate-500 hover:text-red-600 transition-colors"
+                        class="text-[10px] text-gray-500 hover:text-danger-600 transition-colors"
                         title="Clear all filters"
                     >
                         Clear all
@@ -236,7 +236,7 @@
                 <div>
                     <label
                         for="folder-select"
-                        class="text-xs text-slate-600 mb-1 flex items-center gap-1"
+                        class="text-xs text-gray-600 mb-1 flex items-center gap-1"
                     >
                         <Icon icon="lucide:circle-dot" class="w-3 h-3" />
                         Filter by Folder
@@ -247,12 +247,12 @@
                         <div class="flex flex-wrap gap-1 mb-2">
                             {#each $folderFilter as folder}
                                 <span
-                                    class="inline-flex items-center gap-1 px-2 py-1 bg-[#26A69A] text-white rounded text-[10px] font-medium"
+                                    class="inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium"
                                 >
                                     {folder}
                                     <button
                                         onclick={() => removeFolder(folder)}
-                                        class="hover:text-red-200 transition-colors"
+                                        class="hover:text-primary-200 transition-colors"
                                         title="Remove {folder}"
                                     >
                                         <Icon icon="lucide:x" class="w-3 h-3" />
@@ -274,7 +274,7 @@
                                     e.currentTarget.value = "";
                                 }
                             }}
-                            class="w-full pl-2 pr-8 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer"
+                            class="w-full pl-2 pr-8 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 appearance-none cursor-pointer"
                         >
                             <option value="" disabled selected>
                                 {$folderFilter.length > 0
@@ -291,7 +291,7 @@
                             {/each}
                         </select>
                         <div
-                            class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
                         >
                             <Icon icon="lucide:chevron-down" class="w-3 h-3" />
                         </div>
@@ -303,7 +303,7 @@
             <div>
                 <label
                     for="tag-select"
-                    class="text-xs text-slate-600 mb-1 flex items-center gap-1"
+                    class="text-xs text-gray-600 mb-1 flex items-center gap-1"
                 >
                     <Icon icon="lucide:circle-dot" class="w-3 h-3" />
                     Filter by Tag
@@ -314,12 +314,12 @@
                     <div class="flex flex-wrap gap-1 mb-2">
                         {#each $tagFilter as tag}
                             <span
-                                class="inline-flex items-center gap-1 px-2 py-1 bg-[#26A69A] text-white rounded text-[10px] font-medium"
+                                class="inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium"
                             >
                                 {tag}
                                 <button
                                     onclick={() => removeTag(tag)}
-                                    class="hover:text-red-200 transition-colors"
+                                    class="hover:text-primary-200 transition-colors"
                                     title="Remove {tag}"
                                 >
                                     <Icon icon="lucide:x" class="w-3 h-3" />
@@ -342,7 +342,7 @@
                                 e.currentTarget.value = "";
                             }
                         }}
-                        class="w-full pl-2 pr-8 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                        class="w-full pl-2 pr-8 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 appearance-none cursor-pointer disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                     >
                         <option value="" disabled selected>
                             {allTags.length === 0
@@ -361,7 +361,7 @@
                         {/each}
                     </select>
                     <div
-                        class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
                     >
                         <Icon icon="lucide:chevron-down" class="w-3 h-3" />
                     </div>
@@ -370,7 +370,7 @@
         </div>
 
         <!-- Separator -->
-        <div class="border-t border-slate-200 mb-3"></div>
+        <div class="border-t border-gray-200 mb-3"></div>
 
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
             {#each treeNodes as node (node.path)}
@@ -380,15 +380,15 @@
                 {#if loading}
                     <div class="text-center mt-10">
                         <div
-                            class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#0f172a] mb-2"
+                            class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mb-2"
                         ></div>
-                        <div class="text-slate-500 text-sm italic">
+                        <div class="text-gray-500 text-sm italic">
                             Loading...
                         </div>
                     </div>
                 {:else if $dbtModels.length === 0}
                     <div class="text-center mt-10 px-2">
-                        <div class="text-slate-500 text-sm mb-4">
+                        <div class="text-gray-500 text-sm mb-4">
                             No models found
                         </div>
                         {#if $configStatus && (!$configStatus.config_present || !$configStatus.dbt_project_path || !$configStatus.manifest_exists)}
@@ -439,7 +439,7 @@
                     </div>
                 {:else}
                     <div
-                        class="text-slate-400 text-sm text-center mt-10 italic"
+                        class="text-gray-400 text-sm text-center mt-10 italic"
                     >
                         No matches found
                     </div>
