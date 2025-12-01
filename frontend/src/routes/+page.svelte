@@ -28,6 +28,7 @@
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
+    import type { DbtModel } from "$lib/types";
     import Icon from "@iconify/svelte";
 
     let loading = $state(true);
@@ -533,31 +534,42 @@
                 return node;
             }
 
-            // Find associated model
-            const model = models.find(
+            // Find all associated models (primary + additional)
+            const primaryModel = models.find(
                 (m) => m.unique_id === node.data.dbt_model,
             );
+            const additionalModelIds = (node.data?.additional_models as string[]) || [];
+            const additionalModels = additionalModelIds
+                .map((id) => models.find((m) => m.unique_id === id))
+                .filter((m): m is DbtModel => m !== undefined);
+            const allBoundModels = primaryModel
+                ? [primaryModel, ...additionalModels]
+                : additionalModels;
 
             // Check if node matches filters
             let visible = true;
 
             if (activeFolder.length > 0) {
-                if (!model) {
+                if (allBoundModels.length === 0) {
                     visible = false;
                 } else {
-                    const folder = getModelFolder(model);
+                    // Entity is visible if ANY bound model matches the folder filter
+                    const matchingFolders = allBoundModels
+                        .map((m) => getModelFolder(m))
+                        .filter((f): f is string => f !== null);
                     visible =
                         visible &&
-                        folder !== null &&
-                        activeFolder.includes(folder);
+                        matchingFolders.some((folder) =>
+                            activeFolder.includes(folder),
+                        );
                 }
             }
 
             if (activeTags.length > 0) {
-                // Combine tags from dbt model (manifest) and entity data (user-added)
-                const modelTags = model?.tags || [];
+                // Combine tags from all bound models (manifest) and entity data (user-added)
+                const allModelTags = allBoundModels.flatMap((m) => m.tags || []);
                 const entityTags = (node.data?.tags as string[]) || [];
-                const nodeTags = [...new Set([...modelTags, ...entityTags])];
+                const nodeTags = [...new Set([...allModelTags, ...entityTags])];
                 
                 visible =
                     visible &&
@@ -596,52 +608,52 @@
 </script>
 
 <div
-    class="flex flex-col h-screen overflow-hidden font-sans text-slate-900 bg-slate-50"
+    class="flex flex-col h-screen overflow-hidden font-sans text-gray-900 bg-gray-50"
 >
     <!-- Header -->
     <header
-        class="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between z-20 shadow-sm shrink-0"
+        class="h-16 bg-white border-b border-gray-200 flex items-center px-6 justify-between z-20 shadow-sm shrink-0"
     >
         <!-- Brand -->
         <div class="flex items-center gap-3">
             <div
-                class="w-8 h-8 bg-[#0f172a] rounded-lg flex items-center justify-center text-white shadow-sm"
+                class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white shadow-sm"
             >
                 <Icon icon="lucide:box" class="w-5 h-5" />
             </div>
             <div class="flex flex-col">
                 <h1
-                    class="font-bold text-lg text-[#0f172a] leading-tight tracking-tight"
+                    class="font-bold text-lg text-gray-900 leading-tight tracking-tight"
                 >
                     Trellis
                 </h1>
                 <span
-                    class="text-[10px] text-slate-500 font-medium tracking-wider uppercase"
+                    class="text-[10px] text-gray-500 font-medium tracking-wider uppercase"
                     >Data Model UI</span
                 >
             </div>
 
             {#if saving}
-                <span class="text-xs text-slate-400 animate-pulse ml-2"
+                <span class="text-xs text-gray-400 animate-pulse ml-2"
                     >Saving...</span
                 >
             {/if}
             {#if loading}
-                <span class="text-xs text-blue-400 ml-2">Loading...</span>
+                <span class="text-xs text-primary-500 ml-2">Loading...</span>
             {/if}
         </div>
 
         <!-- View Switcher -->
         <div
-            class="flex bg-slate-100 rounded-lg p-1 border border-slate-200/60"
+            class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60"
         >
             <button
                 class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-[#0f172a]={$viewMode === "conceptual"}
-                class:text-white={$viewMode === "conceptual"}
+                class:bg-white={$viewMode === "conceptual"}
+                class:text-primary-600={$viewMode === "conceptual"}
                 class:shadow-sm={$viewMode === "conceptual"}
-                class:text-slate-500={$viewMode !== "conceptual"}
-                class:hover:text-slate-900={$viewMode !== "conceptual"}
+                class:text-gray-500={$viewMode !== "conceptual"}
+                class:hover:text-gray-900={$viewMode !== "conceptual"}
                 onclick={() => ($viewMode = "conceptual")}
             >
                 <Icon icon="octicon:workflow-16" class="w-4 h-4" />
@@ -649,11 +661,11 @@
             </button>
             <button
                 class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-[#0f172a]={$viewMode === "logical"}
-                class:text-white={$viewMode === "logical"}
+                class:bg-white={$viewMode === "logical"}
+                class:text-primary-600={$viewMode === "logical"}
                 class:shadow-sm={$viewMode === "logical"}
-                class:text-slate-500={$viewMode !== "logical"}
-                class:hover:text-slate-900={$viewMode !== "logical"}
+                class:text-gray-500={$viewMode !== "logical"}
+                class:hover:text-gray-900={$viewMode !== "logical"}
                 onclick={() => ($viewMode = "logical")}
             >
                 <Icon icon="lucide:database" class="w-4 h-4" />
@@ -665,31 +677,31 @@
         <div class="flex items-center gap-3">
             {#if syncMessage}
                 <div
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200"
                 >
                     {#if syncMessage.startsWith("✓")}
-                        <div class="w-2 h-2 rounded-full bg-green-500"></div>
-                        <span class="text-xs font-medium text-green-700"
+                        <div class="w-2 h-2 rounded-full bg-success-500"></div>
+                        <span class="text-xs font-medium text-success-700"
                             >{syncMessage.substring(2)}</span
                         >
                     {:else if syncMessage.startsWith("✗")}
-                        <div class="w-2 h-2 rounded-full bg-red-500"></div>
-                        <span class="text-xs font-medium text-red-700"
+                        <div class="w-2 h-2 rounded-full bg-danger-500"></div>
+                        <span class="text-xs font-medium text-danger-700"
                             >{syncMessage.substring(2)}</span
                         >
                     {:else}
-                        <span class="text-xs text-slate-600">{syncMessage}</span
+                        <span class="text-xs text-gray-600">{syncMessage}</span
                         >
                     {/if}
                 </div>
             {/if}
 
-            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+            <div class="h-6 w-px bg-gray-200 mx-1"></div>
 
             <button
                 onclick={handleInferFromDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Import relationship tests from dbt yml files"
             >
                 <Icon icon="lucide:download" class="w-4 h-4" />
@@ -699,7 +711,7 @@
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Sync entity & field-definitions and relationship-tests to dbt schema.yml files"
             >
                 {#if syncing}
