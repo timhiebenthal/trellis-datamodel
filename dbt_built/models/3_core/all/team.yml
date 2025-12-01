@@ -1,11 +1,15 @@
 version: 2
 models:
 - name: team
-  description: A Basketball Team in the NBA
+  description: A Basketball Team competing in the NBA League
   columns:
   - name: team_id
     data_type: text
     description: 'unique ID of the team '
+    data_tests:
+    - relationships:
+        to: ref('game')
+        field: away_team_id
   - name: team_name
     data_type: text
     description: Full Name of the Team (e.g. Los Angeles Lakers)
@@ -15,3 +19,5 @@ models:
   - name: abbrevation
     data_type: text
     description: 3-letter abbrevation (e.g. LAC)
+  config:
+    tags: []

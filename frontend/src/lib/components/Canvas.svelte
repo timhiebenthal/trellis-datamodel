@@ -10,6 +10,7 @@
         Background,
         BackgroundVariant,
         MiniMap,
+        SelectionMode,
         type Node,
         type Connection,
         type Edge,
@@ -293,6 +294,7 @@
         onnodedragstop={onNodeDragStop}
         defaultEdgeOptions={{ type: "custom" }}
         fitView
+        selectionMode={SelectionMode.Partial}
         class="bg-slate-50"
     >
         <Controls />

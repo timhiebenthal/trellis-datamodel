@@ -4,9 +4,16 @@ models:
   columns:
   - name: calendar_date
     data_type: text
+    data_tests:
+    - relationships:
+        to: ref('game')
+        field: game_day
   - name: calender_week
     data_type: text
     description: ISO week number
   - name: year_month
     data_type: text
     description: yyyy-MM syntax
+  config:
+    tags:
+    - '123'

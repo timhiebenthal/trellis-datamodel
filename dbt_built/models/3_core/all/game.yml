@@ -3,7 +3,9 @@ models:
 - name: game
   description: A game where two teams compete
   config:
-    tags: [game]
+    tags:
+    - game
+    - zzz
   columns:
   - name: game_id
     data_type: text
@@ -30,5 +32,4 @@ models:
         field: team_id
   - name: matchup
     data_type: text
-    description: '"{home_team_abbrevation} - {away_team_abbrevation}" syntax (like
-      "LAC - PHX"'
+    description: '"{home_team_abbrevation} - {away_team_abbrevation}" syntax (like "LAC - PHX"'

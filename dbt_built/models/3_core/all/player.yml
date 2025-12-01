@@ -1,7 +1,7 @@
 version: 2
 models:
 - name: player
-  description: The players competing in the NBA
+  description: Players competing in the NBA
   columns:
   - name: player_id
     data_type: text
@@ -18,3 +18,7 @@ models:
     - relationships:
         to: ref('team')
         field: team_id
+    description: current team's ID
+  config:
+    tags:
+    - '123'
