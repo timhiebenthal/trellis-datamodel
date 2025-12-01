@@ -349,13 +349,11 @@
                         class="w-full pl-2 pr-8 py-1.5 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#26A69A] appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
                         <option value="" disabled selected>
-                            {#if allTags.length === 0}
-                                No tags found
-                            {:else if $tagFilter.length > 0}
-                                Add tag...
-                            {:else}
-                                All Tags
-                            {/if}
+                            {allTags.length === 0
+                                ? "No tags found"
+                                : $tagFilter.length > 0
+                                  ? "Add tag..."
+                                  : "All Tags"}
                         </option>
                         {#each allTags as tag}
                             <option
