@@ -95,6 +95,7 @@ The backend hosts the compiled frontend at http://localhost:8000.
 ## Configuration
 Edit `config.yml` at the project root to configure paths:
 
+- `framework`: Transformation framework to use. Currently supported: `dbt-core`. Future: `dbt-fusion`, `sqlmesh`, `bruin`, `pydantic`. Defaults to `dbt-core`.
 - `dbt_project_path`: Path to your dbt project directory (relative to `config.yml` or absolute). **Required**.
 - `dbt_manifest_path`: Path to `manifest.json` (relative to `dbt_project_path` or absolute). Defaults to `target/manifest.json`.
 - `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
@@ -103,6 +104,7 @@ Edit `config.yml` at the project root to configure paths:
 
 **Example `config.yml`:**
 ```yaml
+framework: dbt-core
 dbt_project_path: "./dbt_built"
 dbt_manifest_path: "target/manifest.json"
 dbt_catalog_path: "target/catalog.json"

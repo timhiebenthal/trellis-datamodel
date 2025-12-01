@@ -1,5 +1,5 @@
 """
-dbt Data Model UI - FastAPI Backend
+Data Model UI - FastAPI Backend
 
 This is the main entry point for the backend API.
 Routes are organized into separate modules under the routes/ directory.
@@ -11,9 +11,9 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from config import FRONTEND_BUILD_DIR, print_config
-from routes import manifest_router, data_model_router, dbt_schema_router
+from routes import manifest_router, data_model_router, schema_router
 
-app = FastAPI(title="dbt Data Model UI", version="0.1.0")
+app = FastAPI(title="Data Model UI", version="0.1.0")
 
 # CORS for development
 app.add_middleware(
@@ -27,7 +27,7 @@ app.add_middleware(
 # Include routers
 app.include_router(manifest_router)
 app.include_router(data_model_router)
-app.include_router(dbt_schema_router)
+app.include_router(schema_router)
 
 # Print config on startup
 print_config()

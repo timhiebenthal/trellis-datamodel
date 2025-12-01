@@ -1,4 +1,8 @@
-# Configuration for dbt data model UI
+# Configuration for data model UI
+
+# Transformation framework: dbt-core, dbt-fusion, sqlmesh, bruin, pydantic
+# (currently only dbt-core is implemented)
+framework: dbt-core
 
 # Path to the dbt project directory (relative to this config file or absolute)
 # dbt_project_path: "./dbt_concept"

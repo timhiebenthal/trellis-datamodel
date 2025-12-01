@@ -1,5 +1,5 @@
 """
-Configuration loading for the dbt Data Model UI backend.
+Configuration loading for the Data Model UI backend.
 Centralizes all path resolution logic.
 
 For testing, set environment variable DATAMODEL_TEST_DIR to a temp directory path.
@@ -18,6 +18,7 @@ _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
 if _TEST_DIR:
     # Test mode: use temp directory paths
     CONFIG_PATH = os.path.join(_TEST_DIR, "config.yml")
+    FRAMEWORK: str = os.environ.get("DATAMODEL_FRAMEWORK", "dbt-core")
     MANIFEST_PATH: str = os.environ.get(
         "DATAMODEL_MANIFEST_PATH", os.path.join(_TEST_DIR, "manifest.json")
     )
@@ -33,6 +34,7 @@ if _TEST_DIR:
 else:
     # Production mode: use config.yml
     CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
+    FRAMEWORK: str = "dbt-core"
     MANIFEST_PATH: str = ""
     CATALOG_PATH: str = ""
     DATA_MODEL_PATH: str = os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
@@ -45,7 +47,7 @@ else:
 
 def load_config() -> None:
     """Load and resolve all paths from config.yml."""
-    global MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -57,6 +59,9 @@ def load_config() -> None:
     try:
         with open(CONFIG_PATH, "r") as f:
             config = yaml.safe_load(f) or {}
+
+        # 0. Get framework (defaults to dbt-core)
+        FRAMEWORK = config.get("framework", "dbt-core")
 
         # 1. Get dbt_project_path (Required for resolving other paths)
         if "dbt_project_path" in config:
@@ -111,7 +116,8 @@ def load_config() -> None:
 def print_config() -> None:
     """Print current configuration for debugging."""
     print(f"Using Config: {CONFIG_PATH}")
-    print(f"dbt Project Path: {DBT_PROJECT_PATH}")
+    print(f"Framework: {FRAMEWORK}")
+    print(f"Project Path: {DBT_PROJECT_PATH}")
     print(f"Looking for manifest at: {MANIFEST_PATH}")
     print(f"Looking for catalog at: {CATALOG_PATH}")
     print(f"Looking for data model at: {DATA_MODEL_PATH}")
