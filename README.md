@@ -89,11 +89,25 @@ uv run python main.py
 The backend hosts the compiled frontend at http://localhost:8000.
 
 ## dbt Metadata
-- The repo ships with an empty `dbt/target/` scaffold. Drop `manifest.json` and `catalog.json` there (or point `config.yml` to a full dbt project) to power the ERD modeller.
+- The repo ships with example dbt projects (`dbt_built/`, `dbt_concept/`). Drop `manifest.json` and `catalog.json` into your dbt project's `target/` directory (or point `config.yml` to your dbt project) to power the ERD modeller.
 - Without these artifacts, the UI loads but shows no dbt models.
 
 ## Configuration
-- `dbt_manifest_path`: defaults to `../dbt/target/manifest.json` (relative to `backend/`).
-- `dbt_catalog_path`: defaults to `../dbt/target/catalog.json` (relative to `backend/`).
-- `data_model_file`: saved under `dbt_project_path` (defaults to `data_model.yml`).
+Edit `config.yml` at the project root to configure paths:
+
+- `dbt_project_path`: Path to your dbt project directory (relative to `config.yml` or absolute). **Required**.
+- `dbt_manifest_path`: Path to `manifest.json` (relative to `dbt_project_path` or absolute). Defaults to `target/manifest.json`.
+- `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
+- `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
+- `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
+
+**Example `config.yml`:**
+```yaml
+dbt_project_path: "./dbt_built"
+dbt_manifest_path: "target/manifest.json"
+dbt_catalog_path: "target/catalog.json"
+data_model_file: "data_model.yml"
+dbt_model_paths:
+  - "3_core"
+```
 
