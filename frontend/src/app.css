@@ -2,3 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Completely hide selection boxes - we use click-only multi-select */
+.svelte-flow__selection,
+.react-flow__selection,
+.xy-flow__selection {
+    display: none !important;
+    pointer-events: none !important;
+}
+
