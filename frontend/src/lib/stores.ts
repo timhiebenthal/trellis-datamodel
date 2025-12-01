@@ -5,7 +5,7 @@ import type { DbtModel } from './types';
 export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
 export const dbtModels = writable<DbtModel[]>([]);
-export const viewMode = writable<'concept' | 'physical'>('concept');
+export const viewMode = writable<'conceptual' | 'logical'>('conceptual');
 export const configStatus = writable<any>(null);
 
 // Filter and grouping stores

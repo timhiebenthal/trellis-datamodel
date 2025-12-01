@@ -673,27 +673,27 @@
         >
             <button
                 class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-[#0f172a]={$viewMode === "concept"}
-                class:text-white={$viewMode === "concept"}
-                class:shadow-sm={$viewMode === "concept"}
-                class:text-slate-500={$viewMode !== "concept"}
-                class:hover:text-slate-900={$viewMode !== "concept"}
-                onclick={() => ($viewMode = "concept")}
+                class:bg-[#0f172a]={$viewMode === "conceptual"}
+                class:text-white={$viewMode === "conceptual"}
+                class:shadow-sm={$viewMode === "conceptual"}
+                class:text-slate-500={$viewMode !== "conceptual"}
+                class:hover:text-slate-900={$viewMode !== "conceptual"}
+                onclick={() => ($viewMode = "conceptual")}
             >
                 <Icon icon="octicon:workflow-16" class="w-4 h-4" />
                 Conceptual
             </button>
             <button
                 class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-[#0f172a]={$viewMode === "physical"}
-                class:text-white={$viewMode === "physical"}
-                class:shadow-sm={$viewMode === "physical"}
-                class:text-slate-500={$viewMode !== "physical"}
-                class:hover:text-slate-900={$viewMode !== "physical"}
-                onclick={() => ($viewMode = "physical")}
+                class:bg-[#0f172a]={$viewMode === "logical"}
+                class:text-white={$viewMode === "logical"}
+                class:shadow-sm={$viewMode === "logical"}
+                class:text-slate-500={$viewMode !== "logical"}
+                class:hover:text-slate-900={$viewMode !== "logical"}
+                onclick={() => ($viewMode = "logical")}
             >
                 <Icon icon="lucide:database" class="w-4 h-4" />
-                Physical
+                Logical
             </button>
         </div>
 

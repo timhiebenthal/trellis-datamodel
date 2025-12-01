@@ -1,20 +1,20 @@
 # dbt Data Model UI
 
-A local-first tool to bridge Conceptual Data Modeling and Physical dbt Implementation.
+A local-first tool to bridge Conceptual Data Modeling and Logical dbt Implementation.
 
 ## Motivation
 
 **Current dbt workflow pains:**
 - ERD diagrams live in separate tools (Lucidchart, draw.io) and quickly become stale
 - Data transformations are done isolated from the conceptual data model.
-- No single view connecting business concepts to physical schema
+- No single view connecting business concepts to logical schema
 - Stakeholders can't easily understand model structure without technical context
 
 **How Trellis helps:**
 - Visual data model that stays in sync — reads directly from `manifest.json` / `catalog.json`
 - Sketch entities and with their fields and auto-generate schema.yml's for dbt
 - Draw relationships on canvas → auto-generates dbt `relationships` tests
-- Two views: **Conceptual** (entity names, descriptions) and **Physical** (columns, types, materializations) to jump between high-level architect and execution-view.
+- Two views: **Conceptual** (entity names, descriptions) and **Logical** (columns, types, materializations) to jump between high-level architect and execution-view.
 
 **Two Ways of getting started** 
 - Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  

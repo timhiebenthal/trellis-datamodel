@@ -653,7 +653,7 @@
     <!-- Body -->
     {#if !isCollapsed}
         <div class="p-2.5 nodrag">
-            {#if $viewMode === "physical" && isBound && modelDetails}
+            {#if $viewMode === "logical" && isBound && modelDetails}
                 <div class="text-xs">
                     <div
                         class="font-mono text-slate-500 mb-2.5 bg-slate-50 p-1.5 rounded border border-slate-100 break-all text-[11px]"
@@ -879,9 +879,9 @@
                     {/if}
                 </div>
             {:else}
-                <!-- When not bound to dbt model: show concept view OR field editor based on view mode -->
-                {#if $viewMode === "physical"}
-                    <!-- Physical View - Field Editor -->
+                <!-- When not bound to dbt model: show conceptual view OR field editor based on view mode -->
+                {#if $viewMode === "logical"}
+                    <!-- Logical View - Field Editor -->
                     <div class="text-xs">
                         <div
                             class="mb-2 p-2 bg-amber-50 border border-amber-100 rounded text-amber-800 text-[10px] flex items-center gap-2"
@@ -1044,7 +1044,7 @@
                         </button>
                     </div>
                 {:else}
-                    <!-- Concept View -->
+                    <!-- Conceptual View -->
                     <textarea
                         value={data.description || ""}
                         oninput={updateDescription}
@@ -1093,7 +1093,7 @@
         title="Drag to resize width"
     ></div>
 
-    {#if $viewMode === "physical"}
+    {#if $viewMode === "logical"}
         <div
             class="height-resize-handle"
             onpointerdown={(event) => startDimensionResize(event, "height")}

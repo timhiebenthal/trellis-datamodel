@@ -269,8 +269,8 @@
     <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">
       {relationText}
     </div>
-    <!-- Field mappings - only show in Physical view when fields are set -->
-    {#if $viewMode === "physical" && (sourceField || targetField)}
+    <!-- Field mappings - only show in Logical view when fields are set -->
+    {#if $viewMode === "logical" && (sourceField || targetField)}
     <div class="text-[9px] text-slate-500 text-center border-t border-slate-100 pt-1 mt-1">
       <span class="font-mono"><span class="text-slate-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
       <span class="text-slate-400 mx-1">→</span>

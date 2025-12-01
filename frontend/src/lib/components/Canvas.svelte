@@ -238,8 +238,8 @@
                         ? (child.data.panelHeight as number) + 80 // Header + padding
                         : 300;
 
-                    // Add extra height for physical view metadata if bound
-                    if ($viewMode === "physical" && child.data?.dbt_model) {
+                    // Add extra height for logical view metadata if bound
+                    if ($viewMode === "logical" && child.data?.dbt_model) {
                         estimatedHeight += 100; // Schema/table + materialization badges + tags
                     }
 
