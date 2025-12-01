@@ -4,6 +4,8 @@ entities:
   label: Player
   description: Players competing in the NBA
   dbt_model: model.nba_analytics.player
+  additional_models:
+  - model.nba_analytics.player_history
   drafted_fields:
   - name: player_id
     datatype: text
@@ -11,7 +13,7 @@ entities:
     datatype: text
     description: current team's ID
   position:
-    x: 397.2873602469505
+    x: 211.28736024695053
     y: 100
   width: 317.818115234375
   panel_height: 480
@@ -27,18 +29,18 @@ entities:
     datatype: text
   position:
     x: 40
-    y: 1388.6991768395378
+    y: 1084.6991768395378
   width: 280
   panel_height: 200
-  collapsed: true
+  collapsed: false
   tags: []
 - id: game
   label: Game
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
   position:
-    x: 682.232307266477
-    y: 938.6307582958043
+    x: 534.232307266477
+    y: 1038.6307582958043
   width: 280
   panel_height: 200
   collapsed: false
@@ -50,8 +52,8 @@ entities:
   description: ''
   dbt_model: model.nba_analytics.calendar
   position:
-    x: -1012.2323072664772
-    y: -740.0684185437335
+    x: 40
+    y: 100
   width: 280
   panel_height: 403.75
   collapsed: false

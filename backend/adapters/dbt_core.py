@@ -84,6 +84,11 @@ class DbtCoreAdapter:
             if dbt_model:
                 model_name = dbt_model.split(".")[-1] if "." in dbt_model else dbt_model
                 model_to_entity[model_name] = entity_id
+            # Map additional models to the same entity
+            additional_models = entity.get("additional_models", [])
+            for add_model in additional_models:
+                model_name = add_model.split(".")[-1] if "." in add_model else add_model
+                model_to_entity[model_name] = entity_id
             if entity_id:
                 model_to_entity[entity_id] = entity_id
         return model_to_entity

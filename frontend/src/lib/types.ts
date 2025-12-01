@@ -39,6 +39,7 @@ export interface EntityData {
     label: string;
     description?: string;
     dbt_model?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
+    additional_models?: string[]; // additional dbt models bound to this entity
     drafted_fields?: DraftedField[]; // User-defined fields when no dbt model is bound
     width?: number;
     panelHeight?: number;
@@ -56,6 +57,7 @@ export interface Entity {
     label: string;
     description?: string;
     dbt_model?: string;
+    additional_models?: string[];
     drafted_fields?: DraftedField[];
     position: { x: number; y: number };
     width?: number;

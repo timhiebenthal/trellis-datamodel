@@ -1,0 +1,20 @@
+version: 2
+models:
+- name: player_history
+  description: Players competing in the NBA
+  columns:
+  - name: valid_from
+    data_type: TIMESTAMP
+    description: start timestamp
+  - name: valid_to
+    data_type: TIMESTAMP
+    description: end timestamp
+  - name: player_id
+    data_type: BIGINT
+  - name: full_name
+    data_type: VARCHAR
+  - name: team_id
+    data_type: INTEGER
+  config:
+    tags:
+    - '123'

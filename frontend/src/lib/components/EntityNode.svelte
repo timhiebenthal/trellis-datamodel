@@ -37,6 +37,12 @@
 
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
+    let additionalModels = $derived((data.additional_models as string[]) || []);
+    let allBoundModels = $derived(
+        boundModelName ? [boundModelName, ...additionalModels] : []
+    );
+    let activeModelIndex = $state(0); // ephemeral, defaults to primary
+    let activeModelId = $derived(allBoundModels[activeModelIndex] || boundModelName);
     let isBound = $derived(!!boundModelName);
     let isCollapsed = $derived(data.collapsed ?? false);
     const DEFAULT_WIDTH = 320;
@@ -50,8 +56,26 @@
 
     // Find model details by unique_id (e.g. "model.elmo.entity_booking")
     let modelDetails = $derived(
-        isBound ? $dbtModels.find((m) => m.unique_id === boundModelName) : null,
+        activeModelId ? $dbtModels.find((m) => m.unique_id === activeModelId) : null,
     );
+
+    // Reset active index when models change
+    $effect(() => {
+        if (allBoundModels.length > 0 && activeModelIndex >= allBoundModels.length) {
+            activeModelIndex = 0;
+        }
+    });
+
+    // Reset to primary model when switching to logical view
+    let previousViewMode = $state<'conceptual' | 'logical'>('conceptual');
+    $effect(() => {
+        const currentViewMode = $viewMode;
+        // Only reset when switching FROM conceptual TO logical
+        if (previousViewMode === "conceptual" && currentViewMode === "logical" && allBoundModels.length > 0) {
+            activeModelIndex = 0;
+        }
+        previousViewMode = currentViewMode;
+    });
 
     // Schema editing state for bound models
     let editableColumns = $state<ModelSchemaColumn[]>([]);
@@ -60,9 +84,9 @@
     let schemaError = $state<string | null>(null);
     let hasUnsavedChanges = $state(false);
 
-    // Fetch schema when model is bound
+    // Fetch schema when active model changes
     $effect(() => {
-        if (isBound && modelDetails) {
+        if (activeModelId && modelDetails) {
             loadSchema();
         } else {
             editableColumns = [];
@@ -78,8 +102,10 @@
 
         try {
             const schema = await getModelSchema(modelDetails.name);
+            const hasSchemaColumns =
+                Array.isArray(schema?.columns) && schema.columns.length > 0;
 
-            if (schema && schema.columns) {
+            if (hasSchemaColumns) {
                 // Use columns from schema (includes descriptions)
                 editableColumns = schema.columns.map(
                     (col: ModelSchemaColumn) => ({
@@ -97,16 +123,19 @@
                 }));
             }
 
-            // Load tags from schema.yml (source of truth for bound entities)
-            // schema.tags can be undefined, empty array, or have tags
-            if (schema && Array.isArray(schema.tags)) {
-                updateNodeData(id, { tags: schema.tags });
-            } else if (modelDetails.tags && modelDetails.tags.length > 0) {
-                // Fallback to manifest tags if schema.yml doesn't have tags
-                updateNodeData(id, { tags: modelDetails.tags });
-            } else {
-                // Clear tags if schema.yml exists but has no tags
-                updateNodeData(id, { tags: [] });
+            // Only sync tags from dbt schema for the primary model
+            if (activeModelIndex === 0) {
+                // Load tags from schema.yml (source of truth for bound entities)
+                // schema.tags can be undefined, empty array, or have tags
+                if (schema && Array.isArray(schema.tags)) {
+                    updateNodeData(id, { tags: schema.tags });
+                } else if (modelDetails.tags && modelDetails.tags.length > 0) {
+                    // Fallback to manifest tags if schema.yml doesn't have tags
+                    updateNodeData(id, { tags: modelDetails.tags });
+                } else {
+                    // Clear tags if schema.yml exists but has no tags
+                    updateNodeData(id, { tags: [] });
+                }
             }
 
             hasUnsavedChanges = false;
@@ -177,6 +206,29 @@
         hasUnsavedChanges = true;
     }
 
+    function addAdditionalModel(modelId: string) {
+        const current = (data.additional_models as string[]) || [];
+        if (!current.includes(modelId)) {
+            updateNodeData(id, { additional_models: [...current, modelId] });
+        }
+    }
+
+    function removeAdditionalModel(index: number) {
+        const current = (data.additional_models as string[]) || [];
+        const newModels = current.filter((_, i) => i !== index);
+        updateNodeData(id, { additional_models: newModels.length > 0 ? newModels : undefined });
+        // Reset to primary if we removed the active model
+        if (activeModelIndex > 0 && activeModelIndex === index + 1) {
+            activeModelIndex = 0;
+        } else if (activeModelIndex > index + 1) {
+            activeModelIndex--;
+        }
+    }
+
+    function getModelShortName(modelId: string): string {
+        return modelId.includes(".") ? modelId.split(".").pop()! : modelId;
+    }
+
     function updateLabel(e: Event) {
         const label = (e.target as HTMLInputElement).value;
         // Just update the label without changing ID (for real-time typing)
@@ -238,14 +290,23 @@
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
 
-        // Store the full unique_id (e.g. "model.elmo.entity_booking")
-        const updates: Record<string, unknown> = { dbt_model: model.unique_id };
-        const hasDescription = (data.description || "").trim().length > 0;
-        if (!hasDescription && (model.description || "").trim().length > 0) {
-            updates.description = model.description;
+        // If primary model exists, add as additional model; otherwise set as primary
+        let newlyAddedModelId: string | null = null;
+        if (boundModelName) {
+            addAdditionalModel(model.unique_id);
+            newlyAddedModelId = model.unique_id;
+            // Switch to the newly added model (will be at index = current additional_models.length + 1)
+            const currentAdditional = (data.additional_models as string[]) || [];
+            activeModelIndex = currentAdditional.length + 1;
+        } else {
+            // Store the full unique_id (e.g. "model.elmo.entity_booking")
+            const updates: Record<string, unknown> = { dbt_model: model.unique_id };
+            const hasDescription = (data.description || "").trim().length > 0;
+            if (!hasDescription && (model.description || "").trim().length > 0) {
+                updates.description = model.description;
+            }
+            updateNodeData(id, updates);
         }
-
-        updateNodeData(id, updates);
 
         // Auto-create relationships from yml relationship tests
         try {
@@ -255,14 +316,35 @@
                 // Include the model we just bound (since data model hasn't saved yet)
                 const modelToEntity: Record<string, string> = {};
                 for (const node of $nodes) {
-                    const boundModel =
-                        node.id === id ? model.unique_id : node.data?.dbt_model;
-                    if (boundModel && typeof boundModel === "string") {
-                        // Extract model name from "model.project.name" -> "name"
-                        const modelName = boundModel.includes(".")
-                            ? boundModel.split(".").pop()!
-                            : boundModel;
-                        modelToEntity[modelName] = node.id;
+                    let boundModels: string[] = [];
+                    if (node.id === id) {
+                        // Current node: include the model we just added
+                        if (boundModelName) {
+                            const currentAdditional = (data.additional_models as string[]) || [];
+                            boundModels = [boundModelName, ...currentAdditional];
+                            if (newlyAddedModelId) {
+                                boundModels.push(newlyAddedModelId);
+                            }
+                        } else {
+                            boundModels = [model.unique_id];
+                        }
+                    } else {
+                        // Other nodes: get all bound models
+                        const primary = node.data?.dbt_model;
+                        const additional = (node.data?.additional_models as string[]) || [];
+                        if (primary) {
+                            boundModels = [primary, ...additional];
+                        }
+                    }
+                    
+                    for (const boundModel of boundModels) {
+                        if (boundModel && typeof boundModel === "string") {
+                            // Extract model name from "model.project.name" -> "name"
+                            const modelName = boundModel.includes(".")
+                                ? boundModel.split(".").pop()!
+                                : boundModel;
+                            modelToEntity[modelName] = node.id;
+                        }
                     }
                     // Also map entity ID to itself
                     modelToEntity[node.id] = node.id;
@@ -777,6 +859,57 @@
                             >
                                 {modelDetails.materialization}
                             </span>
+                        </div>
+                    {/if}
+
+                    <!-- Model Tabs (when multiple models are bound) -->
+                    {#if allBoundModels.length > 1}
+                        <div class="mb-2.5 flex items-center gap-1 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                            {#each allBoundModels as modelId, index}
+                                {@const isActive = activeModelIndex === index}
+                                {@const isPrimary = index === 0}
+                                {@const modelName = getModelShortName(modelId)}
+                                <div
+                                    class="group relative flex items-center"
+                                >
+                                    <button
+                                        onclick={() => activeModelIndex = index}
+                                        class="px-2 py-1 text-[10px] rounded border transition-colors whitespace-nowrap flex items-center gap-1"
+                                        class:bg-[#26A69A]={isActive}
+                                        class:text-white={isActive}
+                                        class:border-[#26A69A]={isActive}
+                                        class:bg-white={!isActive}
+                                        class:text-slate-600={!isActive}
+                                        class:border-slate-300={!isActive}
+                                        class:hover:bg-slate-50={!isActive}
+                                        title={modelId}
+                                    >
+                                        {modelName}
+                                        {#if isPrimary}
+                                            <span class="text-[8px] opacity-70" title="Primary model">●</span>
+                                        {/if}
+                                    </button>
+                                    {#if !isPrimary}
+                                        <button
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                removeAdditionalModel(index - 1);
+                                            }}
+                                            class="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity bg-white rounded-full border border-slate-200 p-0.5"
+                                            title="Remove model"
+                                        >
+                                            <Icon icon="lucide:x" class="w-2 h-2" />
+                                        </button>
+                                    {/if}
+                                </div>
+                            {/each}
+                            <!-- Add model button -->
+                            <button
+                                class="px-2 py-1 text-[10px] rounded border border-dashed border-slate-300 text-slate-500 hover:border-[#26A69A] hover:text-[#26A69A] transition-colors flex items-center gap-1 flex-shrink-0"
+                                title="Drag a dbt model from the sidebar to add it"
+                            >
+                                <Icon icon="lucide:plus" class="w-3 h-3" />
+                            </button>
                         </div>
                     {/if}
 
@@ -1312,22 +1445,38 @@
                         {/if}
                     </div>
                     {#if isBound}
-                        <div
-                            class="mt-2 text-xs text-[#26A69A] flex items-center justify-between bg-teal-50 p-1.5 rounded border border-teal-100"
-                        >
-                            <span
-                                class="truncate font-medium flex items-center gap-1"
-                                title={boundModelName}
+                        <div class="mt-2 space-y-1.5">
+                            <div
+                                class="text-xs text-[#26A69A] flex items-center justify-between bg-teal-50 p-1.5 rounded border border-teal-100"
                             >
-                                <Icon icon="lucide:link" class="w-3 h-3" />
-                                {boundModelName}</span
-                            >
-                            <button
-                                onclick={unbind}
-                                class="text-teal-600 hover:text-red-500 ml-1 px-1 transition-colors"
-                            >
-                                <Icon icon="lucide:x" class="w-3 h-3" />
-                            </button>
+                                <span
+                                    class="truncate font-medium flex items-center gap-1"
+                                    title={boundModelName}
+                                >
+                                    <Icon icon="lucide:link" class="w-3 h-3" />
+                                    {boundModelName}</span
+                                >
+                                <button
+                                    onclick={unbind}
+                                    class="text-teal-600 hover:text-red-500 ml-1 px-1 transition-colors"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </div>
+                            {#if additionalModels.length > 0}
+                                <div class="text-[10px] text-slate-500 flex items-center gap-1 flex-wrap">
+                                    <span class="uppercase tracking-wide">Also bound:</span>
+                                    {#each additionalModels as modelId}
+                                        <span
+                                            class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-600 flex items-center gap-1"
+                                            title={modelId}
+                                        >
+                                            <Icon icon="lucide:layers" class="w-3 h-3 text-slate-400" />
+                                            {getModelShortName(modelId)}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {/if}
                         </div>
                     {:else}
                         <div
