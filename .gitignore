@@ -24,3 +24,10 @@ __pycache__/
 venv/
 ENV/
 env/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Test artifacts
+.pytest_cache/

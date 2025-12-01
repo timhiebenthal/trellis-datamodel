@@ -1,6 +1,9 @@
 """
 Configuration loading for the dbt Data Model UI backend.
 Centralizes all path resolution logic.
+
+For testing, set environment variable DATAMODEL_TEST_DIR to a temp directory path.
+This will override all paths to use that directory.
 """
 
 import os
@@ -8,20 +11,45 @@ import yaml
 
 # Base directory (backend folder)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
 
-# Configuration values (populated by load_config)
-MANIFEST_PATH: str = ""
-CATALOG_PATH: str = ""
-DATA_MODEL_PATH: str = os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
-DBT_PROJECT_PATH: str = ""
-DBT_MODEL_PATHS: list[str] = ["3-entity"]
-FRONTEND_BUILD_DIR: str = os.path.abspath(os.path.join(BASE_DIR, "../frontend/build"))
+# Check for test mode - allows overriding config via environment
+_TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
+
+if _TEST_DIR:
+    # Test mode: use temp directory paths
+    CONFIG_PATH = os.path.join(_TEST_DIR, "config.yml")
+    MANIFEST_PATH: str = os.environ.get(
+        "DATAMODEL_MANIFEST_PATH", os.path.join(_TEST_DIR, "manifest.json")
+    )
+    CATALOG_PATH: str = os.environ.get(
+        "DATAMODEL_CATALOG_PATH", os.path.join(_TEST_DIR, "catalog.json")
+    )
+    DATA_MODEL_PATH: str = os.environ.get(
+        "DATAMODEL_DATA_MODEL_PATH", os.path.join(_TEST_DIR, "data_model.yml")
+    )
+    DBT_PROJECT_PATH: str = _TEST_DIR
+    DBT_MODEL_PATHS: list[str] = ["3_core"]
+    FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
+else:
+    # Production mode: use config.yml
+    CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
+    MANIFEST_PATH: str = ""
+    CATALOG_PATH: str = ""
+    DATA_MODEL_PATH: str = os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
+    DBT_PROJECT_PATH: str = ""
+    DBT_MODEL_PATHS: list[str] = ["3-entity"]
+    FRONTEND_BUILD_DIR: str = os.path.abspath(
+        os.path.join(BASE_DIR, "../frontend/build")
+    )
 
 
 def load_config() -> None:
     """Load and resolve all paths from config.yml."""
     global MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
+
+    # Skip loading config file in test mode (paths already set via environment)
+    if _TEST_DIR:
+        return
 
     if not os.path.exists(CONFIG_PATH):
         return
