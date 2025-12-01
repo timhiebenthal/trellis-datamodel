@@ -26,8 +26,14 @@
 
     let { data, id, selected } = $props<$$Props>();
 
-    const { updateNodeData } = useSvelteFlow();
+    const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
+
+    // Batch editing support
+    let selectedEntityNodes = $derived(
+        $nodes.filter((n) => n.selected && n.type === "entity" && n.id !== id)
+    );
+    let isBatchEditing = $derived(selected && selectedEntityNodes.length > 0);
 
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
@@ -90,6 +96,19 @@
                     description: "",
                 }));
             }
+
+            // Load tags from schema.yml (source of truth for bound entities)
+            // schema.tags can be undefined, empty array, or have tags
+            if (schema && Array.isArray(schema.tags)) {
+                updateNodeData(id, { tags: schema.tags });
+            } else if (modelDetails.tags && modelDetails.tags.length > 0) {
+                // Fallback to manifest tags if schema.yml doesn't have tags
+                updateNodeData(id, { tags: modelDetails.tags });
+            } else {
+                // Clear tags if schema.yml exists but has no tags
+                updateNodeData(id, { tags: [] });
+            }
+
             hasUnsavedChanges = false;
         } catch (e) {
             console.error("Error loading schema:", e);
@@ -120,6 +139,7 @@
                     description: col.description,
                 })),
                 data.description,
+                data.tags || [],
             );
             hasUnsavedChanges = false;
         } catch (e: any) {
@@ -427,6 +447,121 @@
         showDeleteModal = false;
     }
 
+    // Tag editing functionality
+    let entityTags = $derived((data.tags || []) as string[]);
+    let tagInput = $state("");
+    let showTagInput = $state(false);
+
+    function addTag(tag: string) {
+        const trimmed = tag.trim();
+        if (!trimmed || entityTags.includes(trimmed)) return;
+        const newTags = [...entityTags, trimmed];
+        updateNodeData(id, { tags: newTags });
+        if (isBound) {
+            hasUnsavedChanges = true;
+        }
+        tagInput = "";
+    }
+
+    function removeTag(tag: string) {
+        const newTags = entityTags.filter((t) => t !== tag);
+        updateNodeData(id, { tags: newTags });
+        if (isBound) {
+            hasUnsavedChanges = true;
+        }
+    }
+
+    function handleTagInputKeydown(e: KeyboardEvent) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (tagInput.trim()) {
+                addTag(tagInput);
+            }
+        } else if (e.key === "Escape") {
+            tagInput = "";
+            showTagInput = false;
+        } else if (e.key === ",") {
+            e.preventDefault();
+            const parts = tagInput.split(",");
+            parts.forEach((part) => {
+                if (part.trim()) {
+                    addTag(part.trim());
+                }
+            });
+            tagInput = "";
+        }
+    }
+
+    function handleTagInputBlur() {
+        if (tagInput.trim()) {
+            if (isBatchEditing) {
+                addTagToBatch(tagInput);
+            } else {
+                addTag(tagInput);
+            }
+        }
+        showTagInput = false;
+    }
+
+    function addTagToBatch(tag: string) {
+        const trimmed = tag.trim();
+        if (!trimmed) return;
+        
+        const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
+        allSelectedIds.forEach((nodeId) => {
+            const node = $nodes.find((n) => n.id === nodeId);
+            if (node && node.type === "entity") {
+                const currentTags = (node.data?.tags || []) as string[];
+                if (!currentTags.includes(trimmed)) {
+                    const newTags = [...currentTags, trimmed];
+                    updateNodeData(nodeId, { tags: newTags });
+                    // If this is the current node and it's bound, mark as having unsaved changes
+                    if (nodeId === id && isBound) {
+                        hasUnsavedChanges = true;
+                    }
+                }
+            }
+        });
+        tagInput = "";
+    }
+
+    function removeTagFromBatch(tag: string) {
+        const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
+        allSelectedIds.forEach((nodeId) => {
+            const node = $nodes.find((n) => n.id === nodeId);
+            if (node && node.type === "entity") {
+                const currentTags = (node.data?.tags || []) as string[];
+                const newTags = currentTags.filter((t) => t !== tag);
+                updateNodeData(nodeId, { tags: newTags });
+                // If this is the current node and it's bound, mark as having unsaved changes
+                if (nodeId === id && isBound) {
+                    hasUnsavedChanges = true;
+                }
+            }
+        });
+    }
+
+    function handleBatchTagInputKeydown(e: KeyboardEvent) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (tagInput.trim()) {
+                addTagToBatch(tagInput);
+            }
+        } else if (e.key === "Escape") {
+            tagInput = "";
+            showTagInput = false;
+        } else if (e.key === ",") {
+            e.preventDefault();
+            const parts = tagInput.split(",");
+            parts.forEach((part) => {
+                if (part.trim()) {
+                    addTagToBatch(part.trim());
+                }
+            });
+            tagInput = "";
+        }
+    }
+
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
 
@@ -645,23 +780,63 @@
                         </div>
                     {/if}
 
-                    {#if modelDetails.tags && modelDetails.tags.length > 0}
-                        <div
-                            class="mb-2.5 text-slate-500 flex items-center gap-2 flex-wrap"
-                        >
+                    <!-- Tags Editor -->
+                    <div class="mb-2.5">
+                        {#if isBatchEditing}
+                            <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
+                                <Icon icon="lucide:layers" class="w-3 h-3" />
+                                Batch editing {selectedEntityNodes.length + 1} entities
+                            </div>
+                        {/if}
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span
-                                class="font-medium text-[10px] uppercase tracking-wider"
+                                class="font-medium text-[10px] uppercase tracking-wider text-slate-500"
                                 >Tags</span
                             >
-                            {#each modelDetails.tags as tag}
+                            {#each entityTags as tag}
                                 <span
-                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100"
+                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
                                 >
                                     {tag}
+                                    <button
+                                        onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
+                                        class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
+                                        title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
+                                    >
+                                        <Icon icon="lucide:x" class="w-2.5 h-2.5" />
+                                    </button>
                                 </span>
                             {/each}
+                            {#if !showTagInput}
+                                <button
+                                    onclick={() => {
+                                        showTagInput = true;
+                                        setTimeout(() => {
+                                            const input = document.getElementById(`tag-input-${id}`) as HTMLInputElement;
+                                            input?.focus();
+                                        }, 0);
+                                    }}
+                                    class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
+                                    title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
+                                >
+                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
+                                    Add
+                                </button>
+                            {/if}
                         </div>
-                    {/if}
+                        {#if showTagInput}
+                            <input
+                                id="tag-input-{id}"
+                                type="text"
+                                bind:value={tagInput}
+                                onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
+                                onblur={handleTagInputBlur}
+                                placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
+                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                onclick={(e) => e.stopPropagation()}
+                            />
+                        {/if}
+                    </div>
 
                     {#if schemaLoading}
                         <div
@@ -862,6 +1037,64 @@
                             Generic datatypes (draft mode)
                         </div>
 
+                        <!-- Tags Editor for Unbound Entities -->
+                        <div class="mb-2.5">
+                            {#if isBatchEditing}
+                                <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
+                                    <Icon icon="lucide:layers" class="w-3 h-3" />
+                                    Batch editing {selectedEntityNodes.length + 1} entities
+                                </div>
+                            {/if}
+                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                <span
+                                    class="font-medium text-[10px] uppercase tracking-wider text-slate-500"
+                                    >Tags</span
+                                >
+                                {#each entityTags as tag}
+                                    <span
+                                        class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
+                                    >
+                                        {tag}
+                                        <button
+                                            onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
+                                            class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
+                                            title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
+                                        >
+                                            <Icon icon="lucide:x" class="w-2.5 h-2.5" />
+                                        </button>
+                                    </span>
+                                {/each}
+                                {#if !showTagInput}
+                                    <button
+                                        onclick={() => {
+                                            showTagInput = true;
+                                            setTimeout(() => {
+                                                const input = document.getElementById(`tag-input-unbound-${id}`) as HTMLInputElement;
+                                                input?.focus();
+                                            }, 0);
+                                        }}
+                                        class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
+                                        title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
+                                    >
+                                        <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
+                                        Add
+                                    </button>
+                                {/if}
+                            </div>
+                            {#if showTagInput}
+                                <input
+                                    id="tag-input-unbound-{id}"
+                                    type="text"
+                                    bind:value={tagInput}
+                                    onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
+                                    onblur={handleTagInputBlur}
+                                    placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
+                                    class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    onclick={(e) => e.stopPropagation()}
+                                />
+                            {/if}
+                        </div>
+
                         <div
                             class="overflow-y-auto border border-slate-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
@@ -1020,6 +1253,64 @@
                         class="w-full text-xs text-slate-600 resize-y min-h-[60px] bg-slate-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#26A69A] rounded p-1.5 border border-slate-200"
                         placeholder="Description..."
                     ></textarea>
+
+                    <!-- Tags Editor for Unbound Entities (Conceptual View) -->
+                    <div class="mt-2.5">
+                        {#if isBatchEditing}
+                            <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
+                                <Icon icon="lucide:layers" class="w-3 h-3" />
+                                Batch editing {selectedEntityNodes.length + 1} entities
+                            </div>
+                        {/if}
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <span
+                                class="font-medium text-[10px] uppercase tracking-wider text-slate-500"
+                                >Tags</span
+                            >
+                            {#each entityTags as tag}
+                                <span
+                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
+                                >
+                                    {tag}
+                                    <button
+                                        onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
+                                        class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
+                                        title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
+                                    >
+                                        <Icon icon="lucide:x" class="w-2.5 h-2.5" />
+                                    </button>
+                                </span>
+                            {/each}
+                            {#if !showTagInput}
+                                <button
+                                    onclick={() => {
+                                        showTagInput = true;
+                                        setTimeout(() => {
+                                            const input = document.getElementById(`tag-input-conceptual-${id}`) as HTMLInputElement;
+                                            input?.focus();
+                                        }, 0);
+                                    }}
+                                    class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
+                                    title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
+                                >
+                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
+                                    Add
+                                </button>
+                            {/if}
+                        </div>
+                        {#if showTagInput}
+                            <input
+                                id="tag-input-conceptual-{id}"
+                                type="text"
+                                bind:value={tagInput}
+                                onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
+                                onblur={handleTagInputBlur}
+                                placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
+                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                onclick={(e) => e.stopPropagation()}
+                            />
+                        {/if}
+                    </div>
                     {#if isBound}
                         <div
                             class="mt-2 text-xs text-[#26A69A] flex items-center justify-between bg-teal-50 p-1.5 rounded border border-teal-100"

@@ -197,19 +197,21 @@
 
                 // Helper to get folder and tags from dbt model
                 function getEntityMetadata(entity: any) {
-                    if (!entity.dbt_model) return { folder: null, tags: [] };
+                    if (!entity.dbt_model) return { folder: null };
 
                     const model = models.find(
                         (m: any) => m.unique_id === entity.dbt_model,
                     );
-                    if (!model) return { folder: null, tags: [] };
+                    if (!model) return { folder: null };
 
-                    return { folder: getModelFolder(model), tags: model.tags || [] };
+                    return { folder: getModelFolder(model) };
                 }
 
                 // Map data model to Svelte Flow format with metadata
                 const entityNodes = (dataModel.entities || []).map((e: any) => {
                     const metadata = getEntityMetadata(e);
+                    // Use tags from entity data if present, otherwise empty array
+                    const entityTags = e.tags || [];
                     return {
                         id: e.id,
                         type: "entity",
@@ -224,7 +226,7 @@
                             panelHeight: e.panel_height ?? e.panelHeight ?? 200,
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
-                            tags: metadata.tags,
+                            tags: entityTags,
                         },
                         parentId: undefined, // Will be set if grouping is enabled
                     };
@@ -486,6 +488,7 @@
                             width: n.data?.width,
                             panel_height: n.data?.panelHeight,
                             collapsed: n.data?.collapsed ?? false,
+                            tags: n.data?.tags || [],
                         })),
                     relationships: currentEdges.map((e) => ({
                         source: e.source,
@@ -549,14 +552,15 @@
             }
 
             if (activeTags.length > 0) {
-                if (!model) {
-                    visible = false;
-                } else {
-                    const nodeTags = model.tags || [];
-                    visible =
-                        visible &&
-                        activeTags.some((tag) => nodeTags.includes(tag));
-                }
+                // Combine tags from dbt model (manifest) and entity data (user-added)
+                const modelTags = model?.tags || [];
+                const entityTags = (node.data?.tags as string[]) || [];
+                const nodeTags = [...new Set([...modelTags, ...entityTags])];
+                
+                visible =
+                    visible &&
+                    nodeTags.length > 0 &&
+                    activeTags.some((tag) => nodeTags.includes(tag));
             }
 
             // Return updated node with hidden property

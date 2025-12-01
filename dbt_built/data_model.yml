@@ -15,6 +15,7 @@ entities:
   width: 317.818115234375
   panel_height: 480
   collapsed: false
+  tags: []
 - id: team
   label: Team
   description: A Basketball Team competing in the NBA League
@@ -28,26 +29,31 @@ entities:
   width: 280
   panel_height: 200
   collapsed: true
+  tags: []
 - id: game
   label: Game
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
   position:
-    x: 666
-    y: 100
+    x: 682.232307266477
+    y: 38.89013734973334
   width: 280
   panel_height: 200
   collapsed: true
+  tags:
+  - game
+  - abc
 - id: calendar
   label: calendar
   description: ''
   dbt_model: model.nba_analytics.calendar
   position:
-    x: -996
-    y: -678.9585558934667
+    x: 40
+    y: 100
   width: 280
   panel_height: 403.75
   collapsed: true
+  tags: []
 relationships:
 - source: player
   target: team

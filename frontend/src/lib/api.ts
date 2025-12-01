@@ -77,7 +77,7 @@ export async function getConfigStatus(): Promise<ConfigStatus> {
     }
 }
 
-export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[], description?: string): Promise<{ status: string; file_path: string; message: string }> {
+export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[], description?: string, tags?: string[]): Promise<{ status: string; file_path: string; message: string }> {
     const res = await fetch(`${API_BASE}/dbt-schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,7 +85,8 @@ export async function saveDbtSchema(entityId: string, modelName: string, fields:
             entity_id: entityId, 
             model_name: modelName, 
             fields,
-            description
+            description,
+            tags
         })
     });
     if (!res.ok) {
@@ -136,11 +137,11 @@ export async function getModelSchema(modelName: string): Promise<ModelSchema | n
     }
 }
 
-export async function updateModelSchema(modelName: string, columns: { name: string; data_type?: string; description?: string }[], description?: string): Promise<{ status: string; message: string; file_path: string }> {
+export async function updateModelSchema(modelName: string, columns: { name: string; data_type?: string; description?: string }[], description?: string, tags?: string[]): Promise<{ status: string; message: string; file_path: string }> {
     const res = await fetch(`${API_BASE}/models/${modelName}/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columns, description })
+        body: JSON.stringify({ columns, description, tags })
     });
     if (!res.ok) {
         const error = await res.text();

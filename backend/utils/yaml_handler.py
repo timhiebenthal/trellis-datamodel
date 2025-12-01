@@ -102,12 +102,8 @@ class YamlHandler:
         if not model:
             model = CommentedMap()
             model["name"] = model_name
-            # Initialize tags as empty list for new models
-            model["tags"] = []
             data["models"].append(model)
-        # Ensure tags key exists for existing models
-        if "tags" not in model:
-            model["tags"] = []
+        # Don't auto-create tags - let update_model_tags handle it when needed
         return model
 
     def update_model_description(self, model: CommentedMap, description: Optional[str]) -> None:
@@ -122,12 +118,44 @@ class YamlHandler:
             model["description"] = description
 
     def get_model_tags(self, model: CommentedMap) -> List[str]:
-        """Return the list of tags for a model, defaulting to empty list."""
-        return list(model.get("tags", []))
+        """Return the list of tags for a model, combining top-level and config tags."""
+        top_level_tags = list(model.get("tags", []))
+        config = model.get("config", {})
+        config_tags = list(config.get("tags", [])) if config else []
+        # Combine and deduplicate, preserving order
+        seen = set()
+        combined = []
+        for tag in top_level_tags + config_tags:
+            if tag not in seen:
+                seen.add(tag)
+                combined.append(tag)
+        return combined
 
     def update_model_tags(self, model: CommentedMap, tags: List[str]) -> None:
-        """Replace the tags list for a model."""
-        model["tags"] = tags
+        """Replace the tags list for a model, preserving the original location.
+        
+        Priority: 1) existing config.tags, 2) existing top-level tags, 3) config.tags (default)
+        Ensures tags are only in one location to avoid confusion.
+        """
+        config = model.get("config")
+        has_config_tags = config is not None and "tags" in config
+        has_top_level_tags = "tags" in model
+        
+        if has_config_tags:
+            # Update in config block (original location)
+            config["tags"] = tags
+            # Remove top-level tags if present to avoid duplication
+            if has_top_level_tags:
+                del model["tags"]
+        elif has_top_level_tags:
+            # Update existing top-level tags
+            model["tags"] = tags
+        else:
+            # Default: use config.tags (dbt convention)
+            if config is None:
+                model["config"] = CommentedMap()
+                config = model["config"]
+            config["tags"] = tags
 
     def find_column(self, model: CommentedMap, column_name: str) -> Optional[CommentedMap]:
         """

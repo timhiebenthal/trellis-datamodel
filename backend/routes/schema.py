@@ -99,6 +99,7 @@ async def get_model_schema(model_name: str):
             "model_name": schema.get("model_name", model_name),
             "description": schema.get("description", ""),
             "columns": schema.get("columns", []),
+            "tags": schema.get("tags", []),
             "file_path": schema.get("file_path", ""),
         }
 

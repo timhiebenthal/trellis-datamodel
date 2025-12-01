@@ -88,6 +88,21 @@ class DbtCoreAdapter:
                 model_to_entity[entity_id] = entity_id
         return model_to_entity
 
+    def _get_model_yml_path(self, model_name: str) -> Optional[str]:
+        """Get the yml file path for a model from the manifest."""
+        if not os.path.exists(self.manifest_path):
+            return None
+
+        manifest = self._load_manifest()
+        for key, node in manifest.get("nodes", {}).items():
+            if node.get("resource_type") == "model" and node.get("name") == model_name:
+                original_file_path = node.get("original_file_path", "")
+                if original_file_path:
+                    sql_path = os.path.join(self.project_path, original_file_path)
+                    base_path = os.path.splitext(sql_path)[0]
+                    return f"{base_path}.yml"
+        return None
+
     def get_models(self) -> list[ModelInfo]:
         """Parse dbt manifest and catalog to return available models."""
         if not os.path.exists(self.manifest_path):
@@ -178,6 +193,7 @@ class DbtCoreAdapter:
                 "model_name": model_name,
                 "description": "",
                 "columns": [],
+                "tags": [],
                 "file_path": yml_path,
             }
 
@@ -187,14 +203,17 @@ class DbtCoreAdapter:
                 "model_name": model_name,
                 "description": "",
                 "columns": [],
+                "tags": [],
                 "file_path": yml_path,
             }
 
         columns = self.yaml_handler.get_columns(model_entry)
+        tags = self.yaml_handler.get_model_tags(model_entry)
         return {
             "model_name": model_name,
             "description": model_entry.get("description", ""),
             "columns": columns,
+            "tags": tags,
             "file_path": yml_path,
         }
 
@@ -376,7 +395,13 @@ class DbtCoreAdapter:
             if dbt_model:
                 model_name = dbt_model.split(".")[-1] if "." in dbt_model else dbt_model
 
-            yml_path = os.path.join(models_dir, f"{entity_id}.yml")
+            # For bound entities, use the correct path from manifest
+            # For unbound entities, fall back to models_dir/{entity_id}.yml
+            yml_path = None
+            if dbt_model:
+                yml_path = self._get_model_yml_path(model_name)
+            if not yml_path:
+                yml_path = os.path.join(models_dir, f"{entity_id}.yml")
 
             data = self.yaml_handler.load_file(yml_path)
             if not data:
@@ -388,6 +413,11 @@ class DbtCoreAdapter:
                 self.yaml_handler.update_model_description(
                     model_entry, entity.get("description")
                 )
+
+            # Sync Tags
+            entity_tags = entity.get("tags")
+            if entity_tags is not None:
+                self.yaml_handler.update_model_tags(model_entry, entity_tags)
 
             # Sync Drafted Fields
             drafted_fields = entity.get("drafted_fields", [])

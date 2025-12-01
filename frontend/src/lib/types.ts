@@ -61,6 +61,7 @@ export interface Entity {
     width?: number;
     panel_height?: number;
     collapsed?: boolean;
+    tags?: string[];
 }
 
 /**
@@ -121,6 +122,7 @@ export interface ModelSchema {
     model_name: string;
     description: string;
     columns: ModelSchemaColumn[];
+    tags?: string[];
     file_path: string;
 }
 

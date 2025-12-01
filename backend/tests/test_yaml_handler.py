@@ -60,7 +60,8 @@ class TestYamlHandlerModelOperations:
         assert "version" in data
         assert data["version"] == 2
         assert model["name"] == "new_model"
-        assert model["tags"] == []
+        # Tags are not auto-created; update_model_tags handles them when needed
+        assert "tags" not in model
 
     def test_ensure_model_returns_existing(self):
         handler = YamlHandler()
@@ -88,6 +89,22 @@ class TestYamlHandlerModelOperations:
         model = CommentedMap({"name": "test", "tags": []})
         handler.update_model_tags(model, ["core", "pii"])
         assert model["tags"] == ["core", "pii"]
+
+    def test_update_model_tags_uses_config_as_default(self):
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test"})
+        handler.update_model_tags(model, ["core", "pii"])
+        # Should use config.tags as default when no tags exist
+        assert "tags" not in model
+        assert model["config"]["tags"] == ["core", "pii"]
+
+    def test_update_model_tags_preserves_config_location(self):
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test", "config": {"tags": ["old"]}})
+        handler.update_model_tags(model, ["new"])
+        # Should update in config.tags (original location)
+        assert model["config"]["tags"] == ["new"]
+        assert "tags" not in model
 
 
 class TestYamlHandlerColumnOperations:

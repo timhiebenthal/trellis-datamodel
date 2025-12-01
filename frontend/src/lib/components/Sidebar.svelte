@@ -4,6 +4,7 @@
         configStatus,
         folderFilter,
         tagFilter,
+        nodes,
     } from "$lib/stores";
     import type { DbtModel, TreeNode } from "$lib/types";
     import { getModelFolder } from "$lib/utils";
@@ -29,9 +30,18 @@
         ).sort(),
     );
 
-    // Extract all unique tags from models
+    // Extract all unique tags from models AND entity nodes on canvas
     let allTags = $derived(
-        Array.from(new Set($dbtModels.flatMap((m) => m.tags || []))).sort(),
+        Array.from(
+            new Set([
+                // Tags from dbt models (manifest.json)
+                ...$dbtModels.flatMap((m) => m.tags || []),
+                // Tags from entity nodes on canvas (user-added tags)
+                ...$nodes
+                    .filter((n) => n.type === "entity")
+                    .flatMap((n) => (n.data?.tags as string[]) || []),
+            ]),
+        ).sort(),
     );
 
     // Apply search and filters
