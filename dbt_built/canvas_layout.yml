@@ -3,14 +3,14 @@ entities:
   player:
     position:
       x: 40
-      y: 100
+      y: 75.34688346883469
     width: 317.818115234375
     panel_height: 480
     collapsed: false
   team:
     position:
-      x: 382.5403258373185
-      y: 112.55952629936925
+      x: 443
+      y: 99.11237182782455
     width: 280
     panel_height: 200
     collapsed: false
@@ -23,11 +23,11 @@ entities:
     collapsed: false
   calendar:
     position:
-      x: 833.8962139345529
-      y: 361.3494625101127
+      x: 857.4287342597562
+      y: 344.5405194206818
     width: 280
     panel_height: 403.75
-    collapsed: false
+    collapsed: true
 relationships:
   player-team-0:
     label_dx: 2.9091796875

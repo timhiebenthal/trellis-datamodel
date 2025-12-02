@@ -44,17 +44,17 @@ relationships:
   target_field: team_id
 - source: game
   target: team
-  label: ''
-  type: one_to_many
+  label: matches
+  type: many_to_one
   source_field: home_team_id
   target_field: team_id
 - source: game
   target: team
-  label: ''
-  type: one_to_many
+  label: matches
+  type: many_to_one
   source_field: away_team_id
   target_field: team_id
 - source: game
   target: calendar
-  label: ''
-  type: one_to_many
+  label: happens on
+  type: zero_or_many_to_one
