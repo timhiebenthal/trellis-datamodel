@@ -124,6 +124,23 @@ The following testing libraries are defined in `package.json` under `devDependen
 - [Testing Library](https://testing-library.com/) (DOM & Svelte testing utilities)
 - [jsdom](https://github.com/jsdom/jsdom) (DOM environment)
 
+> **Playwright system dependencies (Ubuntu/WSL2)**
+>
+> The browsers downloaded by Playwright need a handful of native libraries. Install them before running `npm run test:e2e`:
+>
+> ```bash
+> sudo apt-get update && sudo apt-get install -y \
+>   libxcursor1 libxdamage1 libgtk-3-0 libpangocairo-1.0-0 libpango-1.0-0 \
+>   libatk1.0-0 libcairo-gobject2 libcairo2 libgdk-pixbuf-2.0-0 libasound2 \
+>   libnspr4 libnss3 libgbm1 libgles2-mesa libgtk-4-1 libgraphene-1.0-0 \
+>   libxslt1.1 libwoff2dec0 libvpx7 libevent-2.1-7 libopus0 \
+>   libgstallocators-1.0-0 libgstapp-1.0-0 libgstpbutils-1.0-0 libgstaudio-1.0-0 \
+>   libgsttag-1.0-0 libgstvideo-1.0-0 libgstgl-1.0-0 libgstcodecparsers-1.0-0 \
+>   libgstfft-1.0-0 libflite1 libflite1-plugins libwebpdemux2 libavif13 \
+>   libharfbuzz-icu0 libwebpmux3 libenchant-2-2 libsecret-1-0 libhyphen0 \
+>   libwayland-server0 libmanette-0.2-0 libx264-163
+> ```
+
 **Running Tests:**
 ```bash
 cd frontend

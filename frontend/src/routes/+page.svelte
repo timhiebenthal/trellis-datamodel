@@ -25,6 +25,7 @@
         syncDbtTests,
     } from "$lib/api";
     import { getParallelOffset, getModelFolder } from "$lib/utils";
+    import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
@@ -133,6 +134,17 @@
         } finally {
             syncing = false;
         }
+    }
+
+    function handleAutoLayout() {
+        if (loading) return;
+        
+        const entityNodes = $nodes.filter((n) => n.type === "entity");
+        if (entityNodes.length === 0) return;
+
+        const layoutedNodes = applyDagreLayout($nodes, $edges);
+        $nodes = layoutedNodes;
+        // fitView prop on Canvas will automatically adjust the view
     }
     let sidebarWidth = $state(280);
     let resizingSidebar = $state(false);
@@ -413,6 +425,19 @@
                     }
                 });
                 $edges = Array.from(uniqueEdges.values());
+
+                // Auto-apply layout if all entity nodes are at default position (no saved layout)
+                const layoutCheckNodes = $nodes.filter((n) => n.type === "entity");
+                if (layoutCheckNodes.length > 0) {
+                    const allAtDefaultPosition = layoutCheckNodes.every(
+                        (n) => n.position.x === 0 && n.position.y === 0,
+                    );
+                    
+                    if (allAtDefaultPosition) {
+                        console.log("No saved positions found, applying auto-layout...");
+                        $nodes = applyDagreLayout($nodes, $edges);
+                    }
+                }
 
                 lastSavedState = JSON.stringify({
                     nodes: $nodes,
@@ -697,6 +722,16 @@
             {/if}
 
             <div class="h-6 w-px bg-gray-200 mx-1"></div>
+
+            <button
+                onclick={handleAutoLayout}
+                disabled={loading}
+                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                title="Automatically arrange entities and relationships for optimal readability"
+            >
+                <Icon icon="lucide:layout-grid" class="w-4 h-4" />
+                Auto Layout
+            </button>
 
             <button
                 onclick={handleInferFromDbt}

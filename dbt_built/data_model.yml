@@ -52,8 +52,8 @@ entities:
   description: ''
   dbt_model: null
   position:
-    x: 24
-    y: 64
+    x: 4.250677506775077
+    y: 195.0636856368564
   width: 280
   panel_height: 403.75
   collapsed: false
