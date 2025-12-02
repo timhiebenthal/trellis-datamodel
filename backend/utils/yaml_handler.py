@@ -2,6 +2,7 @@
 YAML Handler for round-trip editing of DBT schema files.
 Preserves comments, formatting, and structure while allowing updates.
 """
+
 import os
 from typing import Dict, List, Optional, Any
 from ruamel.yaml import YAML
@@ -20,16 +21,16 @@ class YamlHandler:
     def load_file(self, file_path: str) -> Optional[Dict]:
         """
         Load a YAML file with round-trip capabilities.
-        
+
         Args:
             file_path: Path to the YAML file
-            
+
         Returns:
             Parsed YAML content or None if file doesn't exist
         """
         if not os.path.exists(file_path):
             return None
-        
+
         try:
             with open(file_path, "r") as f:
                 return self.yaml.load(f)
@@ -40,14 +41,14 @@ class YamlHandler:
     def save_file(self, file_path: str, data: Dict) -> None:
         """
         Save YAML data to a file with round-trip preservation.
-        
+
         Args:
             file_path: Path to the YAML file
             data: YAML data to save
         """
         # Ensure directory exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
+
         # Write atomically using a temp file
         temp_path = f"{file_path}.tmp"
         try:
@@ -62,22 +63,22 @@ class YamlHandler:
     def find_model(self, data: Dict, model_name: str) -> Optional[CommentedMap]:
         """
         Find a specific model entry in the YAML data.
-        
+
         Args:
             data: Parsed YAML data
             model_name: Name of the model to find
-            
+
         Returns:
             Model entry or None if not found
         """
         if not data or "models" not in data:
             return None
-        
+
         models = data.get("models", [])
         for model in models:
             if model.get("name") == model_name:
                 return model
-        
+
         return None
 
     def ensure_model(self, data: Dict, model_name: str) -> CommentedMap:
@@ -106,7 +107,9 @@ class YamlHandler:
         # Don't auto-create tags - let update_model_tags handle it when needed
         return model
 
-    def update_model_description(self, model: CommentedMap, description: Optional[str]) -> None:
+    def update_model_description(
+        self, model: CommentedMap, description: Optional[str]
+    ) -> None:
         """
         Update the description of a model.
 
@@ -133,14 +136,14 @@ class YamlHandler:
 
     def update_model_tags(self, model: CommentedMap, tags: List[str]) -> None:
         """Replace the tags list for a model, preserving the original location.
-        
+
         Priority: 1) existing config.tags, 2) existing top-level tags, 3) config.tags (default)
         Ensures tags are only in one location to avoid confusion.
         """
         config = model.get("config")
         has_config_tags = config is not None and "tags" in config
         has_top_level_tags = "tags" in model
-        
+
         if has_config_tags:
             # Update in config block (original location)
             config["tags"] = tags
@@ -157,14 +160,16 @@ class YamlHandler:
                 config = model["config"]
             config["tags"] = tags
 
-    def find_column(self, model: CommentedMap, column_name: str) -> Optional[CommentedMap]:
+    def find_column(
+        self, model: CommentedMap, column_name: str
+    ) -> Optional[CommentedMap]:
         """
         Find a specific column entry in the model.
-        
+
         Args:
             model: Model entry
             column_name: Name of the column to find
-            
+
         Returns:
             Column entry or None if not found
         """
@@ -177,23 +182,23 @@ class YamlHandler:
     def ensure_column(self, model: CommentedMap, column_name: str) -> CommentedMap:
         """
         Ensure a column entry exists in the model, creating it if necessary.
-        
+
         Args:
             model: Model entry
             column_name: Name of the column
-            
+
         Returns:
             Column entry (existing or newly created)
         """
         if "columns" not in model:
             model["columns"] = CommentedSeq()
-        
+
         col = self.find_column(model, column_name)
         if not col:
             col = CommentedMap()
             col["name"] = column_name
             model["columns"].append(col)
-        
+
         return col
 
     def update_column(
@@ -204,7 +209,7 @@ class YamlHandler:
     ) -> None:
         """
         Update column properties.
-        
+
         Args:
             column: Column entry
             data_type: New data type (or None to skip)
@@ -223,7 +228,7 @@ class YamlHandler:
     ) -> None:
         """
         Add or update a relationship test for a column.
-        
+
         Args:
             column: Column entry
             target_model: Target model name (will be wrapped in ref())
@@ -231,20 +236,20 @@ class YamlHandler:
         """
         if "data_tests" not in column:
             column["data_tests"] = CommentedSeq()
-        
+
         data_tests = column["data_tests"]
-        
+
         # Remove existing relationship tests
         column["data_tests"] = CommentedSeq(
             [t for t in data_tests if "relationships" not in t]
         )
-        
+
         # Add new relationship test
         rel_test = CommentedMap()
         rel_test["relationships"] = CommentedMap()
         rel_test["relationships"]["to"] = f"ref('{target_model}')"
         rel_test["relationships"]["field"] = target_field
-        
+
         column["data_tests"].append(rel_test)
 
     def update_columns_batch(
@@ -254,7 +259,7 @@ class YamlHandler:
     ) -> None:
         """
         Update multiple columns at once.
-        
+
         Args:
             model: Model entry
             columns_data: List of column dicts with name, data_type, description
@@ -263,7 +268,7 @@ class YamlHandler:
             col_name = col_data.get("name")
             if not col_name:
                 continue
-            
+
             col = self.ensure_column(model, col_name)
             self.update_column(
                 col,
@@ -274,32 +279,30 @@ class YamlHandler:
     def get_columns(self, model: CommentedMap) -> List[Dict[str, Any]]:
         """
         Extract columns from a model as a list of dicts.
-        
+
         Args:
             model: Model entry
-            
+
         Returns:
             List of column dicts
         """
         columns = model.get("columns", [])
         result = []
-        
+
         for col in columns:
             col_dict = {
                 "name": col.get("name"),
                 "data_type": col.get("data_type"),
                 "description": col.get("description"),
             }
-            
+
             # Extract data_tests if present
             if "data_tests" in col:
                 col_dict["data_tests"] = []
                 for test in col.get("data_tests", []):
                     if isinstance(test, dict):
                         col_dict["data_tests"].append(dict(test))
-            
+
             result.append(col_dict)
-        
+
         return result
-
-

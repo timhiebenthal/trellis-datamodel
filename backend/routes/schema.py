@@ -39,9 +39,7 @@ async def save_dbt_schema(request: DbtSchemaRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error saving schema: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error saving schema: {str(e)}")
 
 
 @router.post("/sync-dbt-tests")
@@ -76,10 +74,9 @@ async def sync_dbt_tests():
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500, detail=f"Error syncing tests: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error syncing tests: {str(e)}")
 
 
 @router.get("/models/{model_name}/schema")
@@ -111,6 +108,7 @@ async def get_model_schema(model_name: str):
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Error reading model schema: {str(e)}"
@@ -149,6 +147,7 @@ async def update_model_schema(model_name: str, request: ModelSchemaRequest):
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Error updating model schema: {str(e)}"
@@ -174,8 +173,8 @@ async def infer_relationships():
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Error inferring relationships: {str(e)}"
         )
-
