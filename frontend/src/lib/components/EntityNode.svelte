@@ -788,11 +788,22 @@
     ondragleave={onDragLeave}
     role="presentation"
 >
-    <Handle
-        type="target"
-        position={Position.Top}
-        class="!bg-gray-400 !w-2 !h-2"
-    />
+    <!-- Handles on all 4 sides for flexible edge routing -->
+    <!-- Top -->
+    <Handle type="target" position={Position.Top} id="top-target" class="!bg-gray-400 !w-2 !h-2" />
+    <Handle type="source" position={Position.Top} id="top-source" class="!bg-gray-400 !w-2 !h-2" />
+    
+    <!-- Left -->
+    <Handle type="target" position={Position.Left} id="left-target" class="!bg-gray-400 !w-2 !h-2" />
+    <Handle type="source" position={Position.Left} id="left-source" class="!bg-gray-400 !w-2 !h-2" />
+    
+    <!-- Right -->
+    <Handle type="target" position={Position.Right} id="right-target" class="!bg-gray-400 !w-2 !h-2" />
+    <Handle type="source" position={Position.Right} id="right-source" class="!bg-gray-400 !w-2 !h-2" />
+    
+    <!-- Bottom -->
+    <Handle type="target" position={Position.Bottom} id="bottom-target" class="!bg-gray-400 !w-2 !h-2" />
+    <Handle type="source" position={Position.Bottom} id="bottom-source" class="!bg-gray-400 !w-2 !h-2" />
 
     <!-- Header -->
     <div
@@ -1496,11 +1507,6 @@
         </div>
     {/if}
 
-    <Handle
-        type="source"
-        position={Position.Bottom}
-        class="!bg-gray-400 !w-2 !h-2"
-    />
 
     <div
         class="width-resize-handle"

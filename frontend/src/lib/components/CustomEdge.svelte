@@ -56,40 +56,177 @@
   let dragStartX = 0;
   let dragStartY = 0;
 
-  // Get source and target node info for label display
+  // Get source and target node info
   const sourceNode = $derived($nodes.find(n => n.id === source));
   const targetNode = $derived($nodes.find(n => n.id === target));
 
-  // Determine if edge goes downward (source above target) or upward
-  const goesDown = $derived(targetY > sourceY);
-  
-  // Simple orthogonal edge path using handle positions directly
-  // sourceX/Y and targetX/Y are already the handle positions from SvelteFlow
-  // The horizontal segment Y position can be adjusted by dragging the label
-  const edgePath = $derived.by(() => {
-    // Apply parallel edge offset to create spacing between multiple edges
-    const offsetSourceX = sourceX + baseOffset;
-    const offsetTargetX = targetX + baseOffset;
+  // Helper to get node dimensions - prefer SvelteFlow's measured dimensions
+  function getNodeDimensions(node: any): { width: number; height: number } {
+    // Use SvelteFlow's measured dimensions if available (most accurate)
+    if (node?.measured?.width && node?.measured?.height) {
+      return { width: node.measured.width, height: node.measured.height };
+    }
     
-    // Horizontal segment Y - starts at midpoint, can be adjusted by label drag
-    const baseMidY = (sourceY + targetY) / 2;
-    const adjustedMidY = baseMidY + storedOffsetY + dragOffsetY;
+    // Fallback to data dimensions matching EntityNode.svelte defaults
+    const DEFAULT_WIDTH = 320;
+    if (!node) return { width: DEFAULT_WIDTH, height: 200 };
     
-    // Step path: vertical from source → horizontal at adjustedMidY → vertical to target
-    return `M ${offsetSourceX} ${sourceY} L ${offsetSourceX} ${adjustedMidY} L ${offsetTargetX} ${adjustedMidY} L ${offsetTargetX} ${targetY}`;
+    const width = (node.data?.width as number) || DEFAULT_WIDTH;
+    const panelHeight = (node.data?.panelHeight as number) || 200;
+    const collapsed = node.data?.collapsed ?? false;
+    
+    // Collapsed height: header (~40px)
+    // Expanded height: header + panel + tags + padding (~100px overhead)
+    const height = collapsed ? 40 : panelHeight + 100;
+    return { width, height };
+  }
+
+  // Helper to get absolute node position (accounting for parent groups)
+  function getNodeAbsolutePosition(node: any): { x: number; y: number } {
+    if (!node) return { x: 0, y: 0 };
+    
+    // Use SvelteFlow's positionAbsolute if available (handles nested nodes)
+    if (node.computed?.positionAbsolute) {
+      return { x: node.computed.positionAbsolute.x, y: node.computed.positionAbsolute.y };
+    }
+    if (node.positionAbsolute) {
+      return { x: node.positionAbsolute.x, y: node.positionAbsolute.y };
+    }
+    
+    // Fallback: manually calculate from position + parent offset
+    let x = node.position?.x ?? 0;
+    let y = node.position?.y ?? 0;
+    
+    if (node.parentId) {
+      const parent = $nodes.find(n => n.id === node.parentId);
+      if (parent) {
+        const parentPos = getNodeAbsolutePosition(parent);
+        x += parentPos.x;
+        y += parentPos.y;
+      }
+    }
+    return { x, y };
+  }
+
+  // Helper to get absolute node center
+  function getNodeCenter(node: any): { x: number; y: number } {
+    const pos = getNodeAbsolutePosition(node);
+    const dim = getNodeDimensions(node);
+    return {
+      x: pos.x + dim.width / 2,
+      y: pos.y + dim.height / 2
+    };
+  }
+
+  type Side = 'top' | 'bottom' | 'left' | 'right';
+
+  // Calculate optimal connection points on closest sides
+  const connectionInfo = $derived.by(() => {
+    const sourceCenter = getNodeCenter(sourceNode);
+    const targetCenter = getNodeCenter(targetNode);
+    const sourceDim = getNodeDimensions(sourceNode);
+    const targetDim = getNodeDimensions(targetNode);
+    
+    const dx = targetCenter.x - sourceCenter.x;
+    const dy = targetCenter.y - sourceCenter.y;
+    
+    let sourceSide: Side;
+    let targetSide: Side;
+    let sourcePoint: { x: number; y: number };
+    let targetPoint: { x: number; y: number };
+    
+    // Choose sides based on relative positions - pick closest pair
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal arrangement - use left/right sides
+      if (dx > 0) {
+        sourceSide = 'right';
+        targetSide = 'left';
+        sourcePoint = { x: sourceCenter.x + sourceDim.width / 2, y: sourceCenter.y };
+        targetPoint = { x: targetCenter.x - targetDim.width / 2, y: targetCenter.y };
+      } else {
+        sourceSide = 'left';
+        targetSide = 'right';
+        sourcePoint = { x: sourceCenter.x - sourceDim.width / 2, y: sourceCenter.y };
+        targetPoint = { x: targetCenter.x + targetDim.width / 2, y: targetCenter.y };
+      }
+    } else {
+      // Vertical arrangement - use top/bottom sides
+      if (dy > 0) {
+        sourceSide = 'bottom';
+        targetSide = 'top';
+        sourcePoint = { x: sourceCenter.x, y: sourceCenter.y + sourceDim.height / 2 };
+        targetPoint = { x: targetCenter.x, y: targetCenter.y - targetDim.height / 2 };
+      } else {
+        sourceSide = 'top';
+        targetSide = 'bottom';
+        sourcePoint = { x: sourceCenter.x, y: sourceCenter.y - sourceDim.height / 2 };
+        targetPoint = { x: targetCenter.x, y: targetCenter.y + targetDim.height / 2 };
+      }
+    }
+    
+    return { sourceSide, targetSide, sourcePoint, targetPoint };
   });
 
-  // Label position at the middle of the horizontal segment
+  // Build orthogonal edge path based on connection sides
+  const edgePath = $derived.by(() => {
+    const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
+    
+    let sX = sourcePoint.x;
+    let sY = sourcePoint.y;
+    let tX = targetPoint.x;
+    let tY = targetPoint.y;
+    
+    // Apply parallel edge offset perpendicular to exit direction
+    if (sourceSide === 'left' || sourceSide === 'right') {
+      sY += baseOffset;
+      tY += baseOffset;
+    } else {
+      sX += baseOffset;
+      tX += baseOffset;
+    }
+    
+    // Route based on connection configuration
+    if (sourceSide === 'right' && targetSide === 'left') {
+      // Horizontal: right → left
+      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
+      return `M ${sX} ${sY} L ${midX} ${sY} L ${midX} ${tY} L ${tX} ${tY}`;
+    } else if (sourceSide === 'left' && targetSide === 'right') {
+      // Horizontal: left → right
+      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
+      return `M ${sX} ${sY} L ${midX} ${sY} L ${midX} ${tY} L ${tX} ${tY}`;
+    } else if (sourceSide === 'bottom' && targetSide === 'top') {
+      // Vertical: down → up
+      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
+      return `M ${sX} ${sY} L ${sX} ${midY} L ${tX} ${midY} L ${tX} ${tY}`;
+    } else {
+      // Vertical: up → down
+      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
+      return `M ${sX} ${sY} L ${sX} ${midY} L ${tX} ${midY} L ${tX} ${tY}`;
+    }
+  });
+
+  // Label position at the middle of the edge
   const edgeLabelPos = $derived.by(() => {
-    const offsetSourceX = sourceX + baseOffset;
-    const offsetTargetX = targetX + baseOffset;
-    const baseMidY = (sourceY + targetY) / 2;
-    const adjustedMidY = baseMidY + storedOffsetY + dragOffsetY;
+    const { sourceSide, sourcePoint, targetPoint } = connectionInfo;
     
-    // Place label on the horizontal segment
-    const labelX = (offsetSourceX + offsetTargetX) / 2 + storedOffsetX + dragOffsetX;
+    let sX = sourcePoint.x;
+    let sY = sourcePoint.y;
+    let tX = targetPoint.x;
+    let tY = targetPoint.y;
     
-    return { x: labelX, y: adjustedMidY };
+    if (sourceSide === 'left' || sourceSide === 'right') {
+      sY += baseOffset;
+      tY += baseOffset;
+      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
+      const midY = (sY + tY) / 2;
+      return { x: midX, y: midY };
+    } else {
+      sX += baseOffset;
+      tX += baseOffset;
+      const midX = (sX + tX) / 2;
+      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
+      return { x: midX, y: midY };
+    }
   });
 
   // Use raw data.label for input value, default to empty
@@ -246,24 +383,50 @@
       : style
   );
   
-  // Crow's foot marker positions - at the handle positions (sourceX/Y and targetX/Y)
-  // Apply the same parallel edge offset
-  const sourceMarkerX = $derived(sourceX + baseOffset);
-  const targetMarkerX = $derived(targetX + baseOffset);
+  // Crow's foot marker positions and rotations based on connection sides
   const markerColor = $derived(selected ? '#26A69A' : '#64748b');
 
-  // Markers orientation depends on edge direction:
-  // - If edge goes DOWN (source above target): source marker points down (180°), target points up (0°)
-  // - If edge goes UP (source below target): source marker points up (0°), target points down (180°)
-  const sourceMarkerRotation = $derived(goesDown ? 180 : 0);
-  const targetMarkerRotation = $derived(goesDown ? 0 : 180);
-  
-  const sourceMarkerTransform = $derived(
-    `translate(${sourceMarkerX} ${sourceY}) rotate(${sourceMarkerRotation})`,
-  );
-  const targetMarkerTransform = $derived(
-    `translate(${targetMarkerX} ${targetY}) rotate(${targetMarkerRotation})`,
-  );
+  // Get rotation angle based on connection side
+  // Crow's feet always point TOWARD the node (per standard ERD notation)
+  // Reference: https://github.com/relliv/crows-foot-notations
+  // - bottom.svg: feet point UP (toward node above)
+  // - left.svg: feet point RIGHT (toward node on right)
+  function getSideRotation(side: Side): number {
+    switch (side) {
+      case 'bottom': return 0;    // Node above → feet point UP
+      case 'top': return 180;     // Node below → feet point DOWN
+      case 'left': return 270;    // Node to right → feet point RIGHT
+      case 'right': return 90;    // Node to left → feet point LEFT
+    }
+  }
+
+  const sourceMarkerTransform = $derived.by(() => {
+    const { sourceSide, sourcePoint } = connectionInfo;
+    let x = sourcePoint.x;
+    let y = sourcePoint.y;
+    
+    if (sourceSide === 'left' || sourceSide === 'right') {
+      y += baseOffset;
+    } else {
+      x += baseOffset;
+    }
+    
+    return `translate(${x} ${y}) rotate(${getSideRotation(sourceSide)})`;
+  });
+
+  const targetMarkerTransform = $derived.by(() => {
+    const { targetSide, targetPoint } = connectionInfo;
+    let x = targetPoint.x;
+    let y = targetPoint.y;
+    
+    if (targetSide === 'left' || targetSide === 'right') {
+      y += baseOffset;
+    } else {
+      x += baseOffset;
+    }
+    
+    return `translate(${x} ${y}) rotate(${getSideRotation(targetSide)})`;
+  });
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
