@@ -10,9 +10,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
+ * 
+ * NOTE: Backend must be started with DATAMODEL_DATA_MODEL_PATH pointing to test file:
+ * DATAMODEL_DATA_MODEL_PATH=$(pwd)/frontend/tests/test_data_model.yml make backend
  */
 export default defineConfig({
     testDir: './tests',
+    globalSetup: './tests/global-setup.ts',
+    globalTeardown: './tests/global-teardown.ts',
     /* Run tests in files in parallel - disabled locally to prevent WSL2 memory issues */
     fullyParallel: !!process.env.CI,
     /* Fail the build on CI if you accidentally left test.only in the source code. */

@@ -1,4 +1,4 @@
-.PHONY: setup backend frontend dev prod help
+.PHONY: setup backend frontend dev prod help test-backend
 
 help:
 	@echo "dbt Data Model UI Makefile"
@@ -10,12 +10,13 @@ help:
 	@echo "  make frontend    - Start frontend dev server (UI on http://localhost:5173)"
 	@echo "  make dev         - Start both backend and frontend (requires two terminals)"
 	@echo "  make prod        - Build frontend and run production backend server"
-	@echo "  make test-smoke  - Quick smoke test (catches 500 errors, runtime crashes)"
-	@echo "  make test-unit   - Run unit tests"
-	@echo "  make test-e2e    - Run E2E tests"
-	@echo "  make test-all    - Run all tests (check + smoke + unit + e2e)"
-	@echo "  make test-check  - Run TypeScript/compilation check"
-	@echo "  make help        - Show this help message"
+	@echo "  make test-smoke    - Quick smoke test (catches 500 errors, runtime crashes)"
+	@echo "  make test-unit     - Run unit tests"
+	@echo "  make test-e2e       - Run E2E tests (requires test backend)"
+	@echo "  make test-backend  - Start backend with test data for E2E tests"
+	@echo "  make test-all      - Run all tests (check + smoke + unit + e2e)"
+	@echo "  make test-check    - Run TypeScript/compilation check"
+	@echo "  make help          - Show this help message"
 
 install-uv:
 	@echo "Installing uv..."
@@ -61,7 +62,14 @@ test-unit:
 
 test-e2e:
 	@echo "Running E2E tests..."
+	@echo "Note: Backend should be running with test data:"
+	@echo "  DATAMODEL_DATA_MODEL_PATH=\$$(pwd)/frontend/tests/test_data_model.yml make backend"
 	cd frontend && npm run test:e2e
+
+test-backend:
+	@echo "Starting backend with test data file for E2E tests..."
+	@echo "Use this when running 'make test-e2e' or 'npm run test:e2e'"
+	DATAMODEL_DATA_MODEL_PATH=$$(pwd)/frontend/tests/test_data_model.yml python -m uv run python backend/main.py
 
 test-all:
 	@echo "Running all tests (check + smoke + unit + e2e)..."

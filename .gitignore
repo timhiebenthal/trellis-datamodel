@@ -31,3 +31,4 @@ build/
 
 # Test artifacts
 .pytest_cache/
+frontend/tests/test_data_model.yml

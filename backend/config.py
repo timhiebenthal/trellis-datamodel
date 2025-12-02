@@ -37,7 +37,11 @@ else:
     FRAMEWORK: str = "dbt-core"
     MANIFEST_PATH: str = ""
     CATALOG_PATH: str = ""
-    DATA_MODEL_PATH: str = os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
+    # Allow env var override for testing
+    DATA_MODEL_PATH: str = os.environ.get(
+        "DATAMODEL_DATA_MODEL_PATH",
+        os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
+    )
     DBT_PROJECT_PATH: str = ""
     DBT_MODEL_PATHS: list[str] = ["3-entity"]
     FRONTEND_BUILD_DIR: str = os.path.abspath(
@@ -96,8 +100,8 @@ def load_config() -> None:
             else:
                 CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
 
-        # 4. Resolve Data Model
-        if "data_model_file" in config:
+        # 4. Resolve Data Model (env var takes precedence)
+        if "DATAMODEL_DATA_MODEL_PATH" not in os.environ and "data_model_file" in config:
             p = config["data_model_file"]
             if not os.path.isabs(p):
                 base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)

@@ -1,4 +1,5 @@
 import type { Node, Edge } from "@xyflow/svelte";
+import ELK from "elkjs/lib/elk.bundled.js";
 
 export interface LayoutOptions {
     direction?: "TB" | "LR";
@@ -12,24 +13,17 @@ const DEFAULT_OPTIONS: Required<LayoutOptions> = {
     rankSpacing: 150,
 };
 
-// Lazy-loaded dagre instance (only loads on client-side when needed)
-let dagreModule: any = null;
+// Single ELK instance (lazy-loaded on client)
+let elkInstance: InstanceType<typeof ELK> | null = null;
 
-async function getDagre() {
-    if (typeof window === 'undefined') {
-        // SSR: return null, layout won't run on server anyway
-        return null;
+function getElk(): InstanceType<typeof ELK> | null {
+    if (typeof window === "undefined") {
+        return null; // SSR
     }
-    if (!dagreModule) {
-        try {
-            // Dynamic import - Vite will handle this with proper CommonJS interop
-            dagreModule = await import('@dagrejs/dagre');
-        } catch (e) {
-            console.error('Failed to load dagre:', e);
-            return null;
-        }
+    if (!elkInstance) {
+        elkInstance = new ELK();
     }
-    return dagreModule;
+    return elkInstance;
 }
 
 export async function applyDagreLayout(
@@ -45,59 +39,78 @@ export async function applyDagreLayout(
     const groupMap = new Map<string, Node>();
     groupNodes.forEach((g) => groupMap.set(g.id, g));
 
-    // Dynamically import dagre to avoid SSR/ESM issues
-    const dagre = await getDagre();
-    if (!dagre) {
-        // SSR or import failed - return nodes unchanged
-        return nodes;
+    const elk = getElk();
+    if (!elk) {
+        return nodes; // SSR fallback
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const g = new (dagre.graphlib.Graph as any)();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({
-        rankdir: opts.direction,
-        nodesep: opts.nodeSpacing,
-        ranksep: opts.rankSpacing,
-        marginx: 50,
-        marginy: 50,
-    });
 
-    entityNodes.forEach((node) => {
+    // Build ELK graph structure
+    const elkNodes = entityNodes.map((node) => {
         const width = (node.data?.width as number) || 280;
         const panelHeight = (node.data?.panelHeight as number) || 200;
         const collapsed = node.data?.collapsed ?? false;
         const height = collapsed ? 60 : panelHeight + 100;
-        g.setNode(node.id, { width, height });
-    });
-
-    edges.forEach((edge) => {
-        const sourceExists = entityNodes.some((n) => n.id === edge.source);
-        const targetExists = entityNodes.some((n) => n.id === edge.target);
-        if (sourceExists && targetExists) {
-            g.setEdge(edge.source, edge.target);
-        }
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dagre as any).layout(g);
-
-    const updatedNodes = nodes.map((node) => {
-        if (node.type !== "entity") return node;
-        const dagreNode = g.node(node.id);
-        if (!dagreNode) return node;
         return {
-            ...node,
-            position: {
-                x: dagreNode.x - dagreNode.width / 2,
-                y: dagreNode.y - dagreNode.height / 2,
-            },
+            id: node.id,
+            width,
+            height,
         };
     });
 
-    if (groupNodes.length > 0) {
-        return updateGroupPositions(updatedNodes, groupMap);
+    const elkEdges = edges
+        .filter((edge) => {
+            const sourceExists = entityNodes.some((n) => n.id === edge.source);
+            const targetExists = entityNodes.some((n) => n.id === edge.target);
+            return sourceExists && targetExists;
+        })
+        .map((edge, idx) => ({
+            id: edge.id || `e${idx}`,
+            sources: [edge.source],
+            targets: [edge.target],
+        }));
+
+    const graph = {
+        id: "root",
+        layoutOptions: {
+            "elk.algorithm": "layered",
+            "elk.direction": opts.direction === "LR" ? "RIGHT" : "DOWN",
+            "elk.spacing.nodeNode": String(opts.nodeSpacing),
+            "elk.layered.spacing.nodeNodeBetweenLayers": String(opts.rankSpacing),
+            "elk.padding": "[top=50,left=50,bottom=50,right=50]",
+        },
+        children: elkNodes,
+        edges: elkEdges,
+    };
+
+    try {
+        const layoutedGraph = await elk.layout(graph);
+
+        const positionMap = new Map<string, { x: number; y: number }>();
+        layoutedGraph.children?.forEach((elkNode) => {
+            positionMap.set(elkNode.id, {
+                x: elkNode.x ?? 0,
+                y: elkNode.y ?? 0,
+            });
+        });
+
+        const updatedNodes = nodes.map((node) => {
+            if (node.type !== "entity") return node;
+            const pos = positionMap.get(node.id);
+            if (!pos) return node;
+            return {
+                ...node,
+                position: { x: pos.x, y: pos.y },
+            };
+        });
+
+        if (groupNodes.length > 0) {
+            return updateGroupPositions(updatedNodes, groupMap);
+        }
+        return updatedNodes;
+    } catch (e) {
+        console.error("ELK layout failed:", e);
+        return nodes;
     }
-    return updatedNodes;
 }
 
 function updateGroupPositions(nodes: Node[], groupMap: Map<string, Node>): Node[] {
