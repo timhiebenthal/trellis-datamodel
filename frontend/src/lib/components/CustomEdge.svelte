@@ -389,26 +389,42 @@
   // Get rotation angle based on connection side
   // Crow's feet always point TOWARD the node (per standard ERD notation)
   // Reference: https://github.com/relliv/crows-foot-notations
-  // - bottom.svg: feet point UP (toward node above)
-  // - left.svg: feet point RIGHT (toward node on right)
+  // Markers are drawn with trident at negative Y (pointing UP at 0°)
+  // The side indicates which side of the NODE the connection is on
+  // - bottom: connection at bottom of node → marker points UP toward node → 0°
+  // - top: connection at top of node → marker points DOWN toward node → 180°
+  // - left: connection at left of node → marker points RIGHT toward node → 90°
+  // - right: connection at right of node → marker points LEFT toward node → -90°
   function getSideRotation(side: Side): number {
     switch (side) {
-      case 'bottom': return 0;    // Node above → feet point UP
-      case 'top': return 180;     // Node below → feet point DOWN
-      case 'left': return 270;    // Node to right → feet point RIGHT
-      case 'right': return 90;    // Node to left → feet point LEFT
+      case 'bottom': return 0;    // Marker points UP (toward node above)
+      case 'top': return 180;     // Marker points DOWN (toward node below)
+      case 'left': return 90;     // Marker points RIGHT (toward node on right)
+      case 'right': return -90;   // Marker points LEFT (toward node on left)
     }
   }
+
+  // Padding to offset markers slightly away from node border
+  const MARKER_PADDING = 8;
 
   const sourceMarkerTransform = $derived.by(() => {
     const { sourceSide, sourcePoint } = connectionInfo;
     let x = sourcePoint.x;
     let y = sourcePoint.y;
     
+    // Apply parallel edge offset
     if (sourceSide === 'left' || sourceSide === 'right') {
       y += baseOffset;
     } else {
       x += baseOffset;
+    }
+    
+    // Apply padding away from node border
+    switch (sourceSide) {
+      case 'top': y -= MARKER_PADDING; break;
+      case 'bottom': y += MARKER_PADDING; break;
+      case 'left': x -= MARKER_PADDING; break;
+      case 'right': x += MARKER_PADDING; break;
     }
     
     return `translate(${x} ${y}) rotate(${getSideRotation(sourceSide)})`;
@@ -419,10 +435,19 @@
     let x = targetPoint.x;
     let y = targetPoint.y;
     
+    // Apply parallel edge offset
     if (targetSide === 'left' || targetSide === 'right') {
       y += baseOffset;
     } else {
       x += baseOffset;
+    }
+    
+    // Apply padding away from node border
+    switch (targetSide) {
+      case 'top': y -= MARKER_PADDING; break;
+      case 'bottom': y += MARKER_PADDING; break;
+      case 'left': x -= MARKER_PADDING; break;
+      case 'right': x += MARKER_PADDING; break;
     }
     
     return `translate(${x} ${y}) rotate(${getSideRotation(targetSide)})`;
@@ -434,39 +459,49 @@
 <!-- Crow's foot notation markers - on VERTICAL segments near entities -->
 <!-- Crow's foot points AT the entity box, zero circle toward the middle of the edge -->
 <g class="crow-foot-markers">
+  <!-- Source marker: trident points TOWARD node (negative Y), circle AWAY (positive Y = toward edge) -->
   <g transform={sourceMarkerTransform}>
     {#if descriptors.source === 'one'}
-      <line x1="-6" y1="-2" x2="6" y2="-2" stroke={markerColor} stroke-width="2" />
+      <!-- Single bar perpendicular to edge -->
+      <line x1="-6" y1="0" x2="6" y2="0" stroke={markerColor} stroke-width="2" />
     {:else if descriptors.source === 'zero_or_one'}
+      <!-- Bar toward node, circle toward edge -->
       <line x1="-6" y1="-4" x2="6" y2="-4" stroke={markerColor} stroke-width="2" />
       <circle cx="0" cy="6" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
     {:else if descriptors.source === 'zero_or_many'}
-      <line x1="0" y1="2" x2="-5" y2="-6" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="2" x2="0" y2="-6" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="2" x2="5" y2="-6" stroke={markerColor} stroke-width="1.5" />
-      <circle cx="0" cy="10" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
+      <!-- Trident toward node (negative Y), circle toward edge (positive Y) -->
+      <line x1="0" y1="-2" x2="-5" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="0" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="5" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <circle cx="0" cy="8" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
     {:else}
-      <line x1="0" y1="4" x2="-5" y2="-5" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="4" x2="0" y2="-5" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="4" x2="5" y2="-5" stroke={markerColor} stroke-width="1.5" />
+      <!-- many: just trident toward node -->
+      <line x1="0" y1="-2" x2="-5" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="0" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="5" y2="-10" stroke={markerColor} stroke-width="1.5" />
     {/if}
   </g>
 
+  <!-- Target marker: trident points TOWARD node (negative Y), circle AWAY (positive Y = toward edge) -->
   <g transform={targetMarkerTransform}>
     {#if descriptors.target === 'one'}
-      <line x1="-6" y1="-2" x2="6" y2="-2" stroke={markerColor} stroke-width="2" />
+      <!-- Single bar perpendicular to edge -->
+      <line x1="-6" y1="0" x2="6" y2="0" stroke={markerColor} stroke-width="2" />
     {:else if descriptors.target === 'zero_or_one'}
-      <circle cx="0" cy="-6" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
-      <line x1="-6" y1="4" x2="6" y2="4" stroke={markerColor} stroke-width="2" />
+      <!-- Bar toward node, circle toward edge -->
+      <line x1="-6" y1="-4" x2="6" y2="-4" stroke={markerColor} stroke-width="2" />
+      <circle cx="0" cy="6" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
     {:else if descriptors.target === 'zero_or_many'}
-      <circle cx="0" cy="-10" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="-2" x2="-5" y2="6" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="-2" x2="0" y2="6" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="-2" x2="5" y2="6" stroke={markerColor} stroke-width="1.5" />
+      <!-- Trident toward node (negative Y), circle toward edge (positive Y) -->
+      <line x1="0" y1="-2" x2="-5" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="0" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="5" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <circle cx="0" cy="8" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
     {:else}
-      <line x1="0" y1="-4" x2="-5" y2="5" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="-4" x2="0" y2="5" stroke={markerColor} stroke-width="1.5" />
-      <line x1="0" y1="-4" x2="5" y2="5" stroke={markerColor} stroke-width="1.5" />
+      <!-- many: just trident toward node -->
+      <line x1="0" y1="-2" x2="-5" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="0" y2="-10" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="5" y2="-10" stroke={markerColor} stroke-width="1.5" />
     {/if}
   </g>
 </g>
