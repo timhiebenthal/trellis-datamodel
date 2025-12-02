@@ -1,8 +1,33 @@
 import { test, expect } from '@playwright/test';
+import { cleanupTestEntities } from './helpers';
 
 test.describe('Relationship (Edge) Interactions', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
+    });
+
+    test.afterEach(async ({ page }) => {
+        // Cleanup: Delete test entities
+        await cleanupTestEntities(page);
+        
+        // Also delete test-named entities
+        try {
+            const testEntities = ['Users', 'Orders'];
+            for (const name of testEntities) {
+                const entity = page.locator(`input[value="${name}"]`);
+                if (await entity.count() > 0) {
+                    await page.locator('.svelte-flow__node-entity').filter({ hasText: name }).hover();
+                    const deleteBtn = page.getByRole('button', { name: 'Delete entity' }).first();
+                    if (await deleteBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await deleteBtn.click();
+                        await page.getByRole('button', { name: 'Delete' }).click();
+                        await page.waitForTimeout(800);
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignore cleanup errors
+        }
     });
 
     test('create relationship between two entities', async ({ page }) => {

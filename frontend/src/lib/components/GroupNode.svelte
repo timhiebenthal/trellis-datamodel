@@ -8,9 +8,7 @@
     import { nodes, edges } from "$lib/stores";
     import Icon from "@iconify/svelte";
 
-    type $$Props = NodeProps;
-
-    let { data, id, selected } = $props<$$Props>();
+    let { data, id, selected }: NodeProps = $props();
 
     const { updateNodeData } = useSvelteFlow();
     let isCollapsed = $derived(data.collapsed ?? false);

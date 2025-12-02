@@ -12,7 +12,7 @@
         edges,
         draggingField,
     } from "$lib/stores";
-    import type { DbtModel, DraftedField, ModelSchemaColumn } from "$lib/types";
+    import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
         inferRelationships,
         getModelSchema,
@@ -22,9 +22,9 @@
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
 
-    type $$Props = NodeProps;
-
-    let { data, id, selected } = $props<$$Props>();
+    let { data: rawData, id, selected }: NodeProps = $props();
+    // Cast data to EntityData for proper typing
+    const data = rawData as unknown as EntityData;
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
@@ -330,7 +330,7 @@
                         }
                     } else {
                         // Other nodes: get all bound models
-                        const primary = node.data?.dbt_model;
+                        const primary = node.data?.dbt_model as string | undefined;
                         const additional = (node.data?.additional_models as string[]) || [];
                         if (primary) {
                             boundModels = [primary, ...additional];

@@ -1,8 +1,30 @@
 import { test, expect } from '@playwright/test';
+import { cleanupTestEntities } from './helpers';
 
 test.describe('Canvas Interactions', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
+    });
+
+    test.afterEach(async ({ page }) => {
+        // Cleanup: Delete test entities
+        await cleanupTestEntities(page);
+        
+        // Also delete "Orders" entity if it exists (from this test)
+        try {
+            const ordersEntity = page.locator('input[value="Orders"]');
+            if (await ordersEntity.count() > 0) {
+                await page.locator('.svelte-flow__node-entity').filter({ hasText: 'Orders' }).hover();
+                const deleteBtn = page.getByRole('button', { name: 'Delete entity' }).first();
+                if (await deleteBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    await deleteBtn.click();
+                    await page.getByRole('button', { name: 'Delete' }).click();
+                    await page.waitForTimeout(800);
+                }
+            }
+        } catch (e) {
+            // Ignore cleanup errors
+        }
     });
 
     test('create and delete entity', async ({ page }) => {

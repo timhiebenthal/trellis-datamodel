@@ -10,9 +10,10 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "test": "npm run check && npm run test:unit -- --run && npm run test:e2e",
+    "test": "npm run check && npm run test:smoke && npm run test:unit -- --run && npm run test:e2e",
     "test:unit": "vitest",
-    "test:e2e": "npm run check && playwright test"
+    "test:smoke": "playwright test tests/smoke.spec.ts",
+    "test:e2e": "npm run check && npm run test:smoke && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
@@ -35,6 +36,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.1",
+    "@dagrejs/graphlib": "^2.2.4",
     "@iconify/svelte": "^5.1.0",
     "@xyflow/svelte": "^1.4.2"
   }

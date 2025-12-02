@@ -157,13 +157,15 @@
     // Track dragging state to prevent updates interrupting drag
     let isDragging = false;
 
-    function onNodeDragStart(event: any, node: Node) {
-        console.log("Drag start:", node.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function onNodeDragStart(params: any) {
+        console.log("Drag start:", params.node?.id);
         isDragging = true;
     }
 
-    function onNodeDragStop(event: any, node: Node) {
-        console.log("Drag stop:", node.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function onNodeDragStop(params: any) {
+        console.log("Drag stop:", params.node?.id);
         isDragging = false;
         // Force update after drag
         updateGroupSizes();
@@ -288,7 +290,7 @@
         {nodeTypes}
         {edgeTypes}
         onconnect={onConnect}
-        onedgesdelete={onEdgesDelete}
+        ondelete={(params) => params.edges && onEdgesDelete(params.edges)}
         onnodedragstart={onNodeDragStart}
         onnodedragstop={onNodeDragStop}
         defaultEdgeOptions={{ type: "custom" }}

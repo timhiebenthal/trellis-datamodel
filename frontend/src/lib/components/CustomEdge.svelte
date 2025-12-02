@@ -7,8 +7,6 @@
   } from '@xyflow/svelte';
   import { edges, nodes, viewMode } from '$lib/stores';
 
-  type $$Props = EdgeProps;
-
   let { 
     id,
     source,
@@ -23,7 +21,7 @@
     markerEnd,
     data,
     selected
-  } = $props<$$Props>();
+  }: EdgeProps = $props();
 
   const { updateEdge: flowUpdateEdge } = useSvelteFlow();
 
@@ -149,8 +147,8 @@
   const sourceNode = $derived($nodes.find((node) => node.id === source));
   const targetNode = $derived($nodes.find((node) => node.id === target));
 
-  const sourceName = $derived(sourceNode?.data?.label || 'Source');
-  const targetName = $derived(targetNode?.data?.label || 'Target');
+  const sourceName = $derived((sourceNode?.data?.label as string) || 'Source');
+  const targetName = $derived((targetNode?.data?.label as string) || 'Target');
   const actionText = $derived(label?.trim() || 'relates to');
   
   const relationText = $derived(

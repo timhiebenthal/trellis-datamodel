@@ -136,13 +136,13 @@
         }
     }
 
-    function handleAutoLayout() {
+    async function handleAutoLayout() {
         if (loading) return;
         
         const entityNodes = $nodes.filter((n) => n.type === "entity");
         if (entityNodes.length === 0) return;
 
-        const layoutedNodes = applyDagreLayout($nodes, $edges);
+        const layoutedNodes = await applyDagreLayout($nodes, $edges);
         $nodes = layoutedNodes;
         // fitView prop on Canvas will automatically adjust the view
     }
@@ -435,7 +435,7 @@
                     
                     if (allAtDefaultPosition) {
                         console.log("No saved positions found, applying auto-layout...");
-                        $nodes = applyDagreLayout($nodes, $edges);
+                        $nodes = await applyDagreLayout($nodes, $edges);
                     }
                 }
 
@@ -507,26 +507,26 @@
                         .filter((n) => n.type === "entity") // Only save entity nodes, not group nodes
                         .map((n) => ({
                             id: n.id,
-                            label: n.data.label,
-                            description: n.data.description,
-                            dbt_model: n.data.dbt_model,
-                            additional_models: n.data?.additional_models,
-                            drafted_fields: n.data?.drafted_fields,
+                            label: n.data.label as string,
+                            description: n.data.description as string | undefined,
+                            dbt_model: n.data.dbt_model as string | undefined,
+                            additional_models: n.data?.additional_models as string[] | undefined,
+                            drafted_fields: n.data?.drafted_fields as any[] | undefined,
                             position: n.position,
-                            width: n.data?.width,
-                            panel_height: n.data?.panelHeight,
-                            collapsed: n.data?.collapsed ?? false,
-                            tags: n.data?.tags || [],
+                            width: n.data?.width as number | undefined,
+                            panel_height: n.data?.panelHeight as number | undefined,
+                            collapsed: (n.data?.collapsed as boolean) ?? false,
+                            tags: (n.data?.tags as string[]) || [],
                         })),
                     relationships: currentEdges.map((e) => ({
                         source: e.source,
                         target: e.target,
                         label: (e.data?.label as string) || "",
-                        type: (e.data?.type as string) || "one_to_many",
-                        source_field: e.data?.source_field,
-                        target_field: e.data?.target_field,
-                        label_dx: e.data?.label_dx,
-                        label_dy: e.data?.label_dy,
+                        type: (e.data?.type as 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many') || "one_to_many",
+                        source_field: e.data?.source_field as string | undefined,
+                        target_field: e.data?.target_field as string | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
                     })),
                 };
 

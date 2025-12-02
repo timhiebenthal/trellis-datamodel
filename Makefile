@@ -10,6 +10,11 @@ help:
 	@echo "  make frontend    - Start frontend dev server (UI on http://localhost:5173)"
 	@echo "  make dev         - Start both backend and frontend (requires two terminals)"
 	@echo "  make prod        - Build frontend and run production backend server"
+	@echo "  make test-smoke  - Quick smoke test (catches 500 errors, runtime crashes)"
+	@echo "  make test-unit   - Run unit tests"
+	@echo "  make test-e2e    - Run E2E tests"
+	@echo "  make test-all    - Run all tests (check + smoke + unit + e2e)"
+	@echo "  make test-check  - Run TypeScript/compilation check"
 	@echo "  make help        - Show this help message"
 
 install-uv:
@@ -46,17 +51,25 @@ prod:
 	python -m uv run python backend/main.py
 
 
-unit-test:
+test-smoke:
+	@echo "Running smoke test (catches 500 errors, runtime crashes)..."
+	cd frontend && npm run test:smoke
+
+test-unit:
 	@echo "Running unit tests..."
 	cd frontend && npm run test:unit
 
-e2e-test:
+test-e2e:
 	@echo "Running E2E tests..."
 	cd frontend && npm run test:e2e
 
-all-test:
-	@echo "Running all tests..."
+test-all:
+	@echo "Running all tests (check + smoke + unit + e2e)..."
 	cd frontend && npm run test
+
+test-check:
+	@echo "Running TypeScript/compilation check..."
+	cd frontend && npm run check
 
 dbt_refresh:
 	@echo "Refreshing dbt artifacts ..."

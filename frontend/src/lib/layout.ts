@@ -1,4 +1,3 @@
-import dagre from "@dagrejs/dagre";
 import type { Node, Edge } from "@xyflow/svelte";
 
 export interface LayoutOptions {
@@ -13,11 +12,31 @@ const DEFAULT_OPTIONS: Required<LayoutOptions> = {
     rankSpacing: 150,
 };
 
-export function applyDagreLayout(
+// Lazy-loaded dagre instance (only loads on client-side when needed)
+let dagreModule: any = null;
+
+async function getDagre() {
+    if (typeof window === 'undefined') {
+        // SSR: return null, layout won't run on server anyway
+        return null;
+    }
+    if (!dagreModule) {
+        try {
+            // Dynamic import - Vite will handle this with proper CommonJS interop
+            dagreModule = await import('@dagrejs/dagre');
+        } catch (e) {
+            console.error('Failed to load dagre:', e);
+            return null;
+        }
+    }
+    return dagreModule;
+}
+
+export async function applyDagreLayout(
     nodes: Node[],
     edges: Edge[],
     options: LayoutOptions = {},
-): Node[] {
+): Promise<Node[]> {
     const opts = { ...DEFAULT_OPTIONS, ...options };
     const entityNodes = nodes.filter((n) => n.type === "entity");
     if (entityNodes.length === 0) return nodes;
@@ -26,6 +45,12 @@ export function applyDagreLayout(
     const groupMap = new Map<string, Node>();
     groupNodes.forEach((g) => groupMap.set(g.id, g));
 
+    // Dynamically import dagre to avoid SSR/ESM issues
+    const dagre = await getDagre();
+    if (!dagre) {
+        // SSR or import failed - return nodes unchanged
+        return nodes;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const g = new (dagre.graphlib.Graph as any)();
     g.setDefaultEdgeLabel(() => ({}));
@@ -53,7 +78,8 @@ export function applyDagreLayout(
         }
     });
 
-    dagre.layout(g);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dagre as any).layout(g);
 
     const updatedNodes = nodes.map((node) => {
         if (node.type !== "entity") return node;

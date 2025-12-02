@@ -142,17 +142,43 @@ The following testing libraries are defined in `package.json` under `devDependen
 > ```
 
 **Running Tests:**
+
+The test suite has multiple levels to catch different types of issues:
+
 ```bash
 cd frontend
 
-# Run unit tests
+# Quick smoke test (catches 500 errors, runtime crashes, ESM issues)
+# Fastest way to verify the app loads without errors
+npm run test:smoke
+
+# TypeScript/compilation check
+npm run check
+
+# Unit tests
 npm run test:unit
 
-# Run E2E tests
+# E2E tests (includes smoke test + full test suite)
 npm run test:e2e
 
-# Run all tests
+# Run all tests (check + smoke + unit + e2e)
 npm run test
+```
+
+**Test Levels:**
+1. **`npm run check`** - TypeScript compilation errors
+2. **`npm run test:smoke`** - Runtime errors (500s, console errors, ESM issues) - **catches app crashes**
+3. **`npm run test:unit`** - Unit tests with Vitest
+4. **`npm run test:e2e`** - Full E2E tests with Playwright
+
+**Using Makefile:**
+```bash
+# From project root
+make test-smoke   # Quick smoke test
+make test-check   # TypeScript check
+make test-unit    # Unit tests
+make test-e2e     # E2E tests
+make test-all     # All tests
 ```
 
 ### Backend
