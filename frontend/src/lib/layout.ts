@@ -100,6 +100,8 @@ export async function applyDagreLayout(
             return {
                 ...node,
                 position: { x: pos.x, y: pos.y },
+                // Explicitly preserve data object to ensure collapsed state is maintained
+                data: node.data ? { ...node.data } : undefined,
             };
         });
 
@@ -196,12 +198,15 @@ function updateGroupPositions(nodes: Node[], groupMap: Map<string, Node>): Node[
         children.forEach((child) => {
             const childIndex = updatedNodes.findIndex((n) => n.id === child.id);
             if (childIndex !== -1) {
+                const childNode = updatedNodes[childIndex];
                 updatedNodes[childIndex] = {
-                    ...updatedNodes[childIndex],
+                    ...childNode,
                     position: {
                         x: child.position.x - groupX,
                         y: child.position.y - groupY,
                     },
+                    // Explicitly preserve data object
+                    data: childNode.data ? { ...childNode.data } : undefined,
                 };
             }
         });

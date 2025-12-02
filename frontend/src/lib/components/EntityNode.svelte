@@ -23,8 +23,8 @@
     import Icon from "@iconify/svelte";
 
     let { data: rawData, id, selected }: NodeProps = $props();
-    // Cast data to EntityData for proper typing
-    const data = rawData as unknown as EntityData;
+    // Cast data to EntityData for proper typing - use $derived to maintain reactivity
+    let data = $derived(rawData as unknown as EntityData);
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
