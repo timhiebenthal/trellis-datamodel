@@ -56,47 +56,40 @@
   let dragStartX = 0;
   let dragStartY = 0;
 
-  // Calculate total offset (base parallel + user drag)
-  const totalOffsetX = $derived(baseOffset + storedOffsetX + dragOffsetX);
-  const totalOffsetY = $derived(storedOffsetY + dragOffsetY);
+  // Get source and target node info for label display
+  const sourceNode = $derived($nodes.find(n => n.id === source));
+  const targetNode = $derived($nodes.find(n => n.id === target));
 
-  // Label position at midpoint plus offsets
-  const baseLabelX = $derived((sourceX + targetX) / 2);
-  const baseLabelY = $derived((sourceY + targetY) / 2);
-  const displayLabelX = $derived(baseLabelX + totalOffsetX);
-  const displayLabelY = $derived(baseLabelY + totalOffsetY);
-
-  // Create a custom path: source -> label -> target with straight segments
+  // Determine if edge goes downward (source above target) or upward
+  const goesDown = $derived(targetY > sourceY);
+  
+  // Simple orthogonal edge path using handle positions directly
+  // sourceX/Y and targetX/Y are already the handle positions from SvelteFlow
+  // The horizontal segment Y position can be adjusted by dragging the label
   const edgePath = $derived.by(() => {
-    const labelPosX = displayLabelX;
-    const labelPosY = displayLabelY;
+    // Apply parallel edge offset to create spacing between multiple edges
+    const offsetSourceX = sourceX + baseOffset;
+    const offsetTargetX = targetX + baseOffset;
     
-    // Calculate intermediate points for step path through label
-    const sourceExitY = sourceY + 20; // Exit below source
-    const targetEntryY = targetY - 20; // Enter above target
+    // Horizontal segment Y - starts at midpoint, can be adjusted by label drag
+    const baseMidY = (sourceY + targetY) / 2;
+    const adjustedMidY = baseMidY + storedOffsetY + dragOffsetY;
     
-    // Build path segments
-    let path = `M ${sourceX} ${sourceY}`;
+    // Step path: vertical from source → horizontal at adjustedMidY → vertical to target
+    return `M ${offsetSourceX} ${sourceY} L ${offsetSourceX} ${adjustedMidY} L ${offsetTargetX} ${adjustedMidY} L ${offsetTargetX} ${targetY}`;
+  });
+
+  // Label position at the middle of the horizontal segment
+  const edgeLabelPos = $derived.by(() => {
+    const offsetSourceX = sourceX + baseOffset;
+    const offsetTargetX = targetX + baseOffset;
+    const baseMidY = (sourceY + targetY) / 2;
+    const adjustedMidY = baseMidY + storedOffsetY + dragOffsetY;
     
-    // Go down from source
-    path += ` L ${sourceX} ${sourceExitY}`;
+    // Place label on the horizontal segment
+    const labelX = (offsetSourceX + offsetTargetX) / 2 + storedOffsetX + dragOffsetX;
     
-    // Go horizontal to label X position
-    path += ` L ${labelPosX} ${sourceExitY}`;
-    
-    // Go to label Y position
-    path += ` L ${labelPosX} ${labelPosY}`;
-    
-    // Continue to target entry level
-    path += ` L ${labelPosX} ${targetEntryY}`;
-    
-    // Go horizontal to target X
-    path += ` L ${targetX} ${targetEntryY}`;
-    
-    // Go down to target
-    path += ` L ${targetX} ${targetY}`;
-    
-    return path;
+    return { x: labelX, y: adjustedMidY };
   });
 
   // Use raw data.label for input value, default to empty
@@ -144,9 +137,7 @@
     relationshipTypes[type as keyof typeof relationshipTypes] || { source: 'one', target: 'many' }
   );
 
-  const sourceNode = $derived($nodes.find((node) => node.id === source));
-  const targetNode = $derived($nodes.find((node) => node.id === target));
-
+  // sourceNode and targetNode defined above for label names
   const sourceName = $derived((sourceNode?.data?.label as string) || 'Source');
   const targetName = $derived((targetNode?.data?.label as string) || 'Target');
   const actionText = $derived(label?.trim() || 'relates to');
@@ -255,14 +246,24 @@
       : style
   );
   
-  // Crow's foot marker positions - directly at the entity box connection points
-  // Source marker: right at the bottom of the source box
-  const sourceMarkerX = $derived(sourceX);
-  const sourceMarkerY = $derived(sourceY + 2);
+  // Crow's foot marker positions - at the handle positions (sourceX/Y and targetX/Y)
+  // Apply the same parallel edge offset
+  const sourceMarkerX = $derived(sourceX + baseOffset);
+  const targetMarkerX = $derived(targetX + baseOffset);
+  const markerColor = $derived(selected ? '#26A69A' : '#64748b');
+
+  // Markers orientation depends on edge direction:
+  // - If edge goes DOWN (source above target): source marker points down (180°), target points up (0°)
+  // - If edge goes UP (source below target): source marker points up (0°), target points down (180°)
+  const sourceMarkerRotation = $derived(goesDown ? 180 : 0);
+  const targetMarkerRotation = $derived(goesDown ? 0 : 180);
   
-  // Target marker: right at the top of the target box
-  const targetMarkerX = $derived(targetX);
-  const targetMarkerY = $derived(targetY - 2);
+  const sourceMarkerTransform = $derived(
+    `translate(${sourceMarkerX} ${sourceY}) rotate(${sourceMarkerRotation})`,
+  );
+  const targetMarkerTransform = $derived(
+    `translate(${targetMarkerX} ${targetY}) rotate(${targetMarkerRotation})`,
+  );
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
@@ -270,156 +271,46 @@
 <!-- Crow's foot notation markers - on VERTICAL segments near entities -->
 <!-- Crow's foot points AT the entity box, zero circle toward the middle of the edge -->
 <g class="crow-foot-markers">
-  <!-- Source marker - on vertical segment, crow's foot points UP toward source box -->
-  {#if descriptors.source === 'one'}
-    <!-- One: horizontal line crossing vertical edge -->
-    <line 
-      x1={sourceMarkerX - 5} y1={sourceMarkerY} 
-      x2={sourceMarkerX + 5} y2={sourceMarkerY}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="2"
-    />
-  {:else if descriptors.source === 'zero_or_one'}
-    <!-- Zero or One: horizontal line (toward box) + circle below (toward middle) -->
-    <line 
-      x1={sourceMarkerX - 5} y1={sourceMarkerY - 4} 
-      x2={sourceMarkerX + 5} y2={sourceMarkerY - 4}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="2"
-    />
-    <circle 
-      cx={sourceMarkerX} cy={sourceMarkerY + 6}
-      r="4"
-      fill="none"
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-  {:else if descriptors.source === 'zero_or_many'}
-    <!-- Zero or Many: crow's foot pointing UP + circle below -->
-    <line 
-      x1={sourceMarkerX} y1={sourceMarkerY + 2} 
-      x2={sourceMarkerX - 5} y2={sourceMarkerY - 6}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={sourceMarkerX} y1={sourceMarkerY + 2} 
-      x2={sourceMarkerX} y2={sourceMarkerY - 6}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={sourceMarkerX} y1={sourceMarkerY + 2} 
-      x2={sourceMarkerX + 5} y2={sourceMarkerY - 6}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <circle 
-      cx={sourceMarkerX} cy={sourceMarkerY + 10}
-      r="4"
-      fill="none"
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-  {:else}
-    <!-- Many: crow's foot pointing UP toward source box -->
-    <line 
-      x1={sourceMarkerX} y1={sourceMarkerY + 4} 
-      x2={sourceMarkerX - 5} y2={sourceMarkerY - 5}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={sourceMarkerX} y1={sourceMarkerY + 4} 
-      x2={sourceMarkerX} y2={sourceMarkerY - 5}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={sourceMarkerX} y1={sourceMarkerY + 4} 
-      x2={sourceMarkerX + 5} y2={sourceMarkerY - 5}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-  {/if}
-  
-  <!-- Target marker - on vertical segment, crow's foot points DOWN toward target box -->
-  {#if descriptors.target === 'one'}
-    <!-- One: horizontal line crossing vertical edge -->
-    <line 
-      x1={targetMarkerX - 5} y1={targetMarkerY} 
-      x2={targetMarkerX + 5} y2={targetMarkerY}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="2"
-    />
-  {:else if descriptors.target === 'zero_or_one'}
-    <!-- Zero or One: circle above (toward middle) + horizontal line below (toward box) -->
-    <circle 
-      cx={targetMarkerX} cy={targetMarkerY - 6}
-      r="4"
-      fill="none"
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={targetMarkerX - 5} y1={targetMarkerY + 4} 
-      x2={targetMarkerX + 5} y2={targetMarkerY + 4}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="2"
-    />
-  {:else if descriptors.target === 'zero_or_many'}
-    <!-- Zero or Many: circle above + crow's foot pointing DOWN -->
-    <circle 
-      cx={targetMarkerX} cy={targetMarkerY - 10}
-      r="4"
-      fill="none"
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={targetMarkerX} y1={targetMarkerY - 2} 
-      x2={targetMarkerX - 5} y2={targetMarkerY + 6}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={targetMarkerX} y1={targetMarkerY - 2} 
-      x2={targetMarkerX} y2={targetMarkerY + 6}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={targetMarkerX} y1={targetMarkerY - 2} 
-      x2={targetMarkerX + 5} y2={targetMarkerY + 6}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-  {:else}
-    <!-- Many: crow's foot pointing DOWN toward target box -->
-    <line 
-      x1={targetMarkerX} y1={targetMarkerY - 4} 
-      x2={targetMarkerX - 5} y2={targetMarkerY + 5}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={targetMarkerX} y1={targetMarkerY - 4} 
-      x2={targetMarkerX} y2={targetMarkerY + 5}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-    <line 
-      x1={targetMarkerX} y1={targetMarkerY - 4} 
-      x2={targetMarkerX + 5} y2={targetMarkerY + 5}
-      stroke={selected ? '#26A69A' : '#64748b'}
-      stroke-width="1.5"
-    />
-  {/if}
+  <g transform={sourceMarkerTransform}>
+    {#if descriptors.source === 'one'}
+      <line x1="-6" y1="-2" x2="6" y2="-2" stroke={markerColor} stroke-width="2" />
+    {:else if descriptors.source === 'zero_or_one'}
+      <line x1="-6" y1="-4" x2="6" y2="-4" stroke={markerColor} stroke-width="2" />
+      <circle cx="0" cy="6" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
+    {:else if descriptors.source === 'zero_or_many'}
+      <line x1="0" y1="2" x2="-5" y2="-6" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="2" x2="0" y2="-6" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="2" x2="5" y2="-6" stroke={markerColor} stroke-width="1.5" />
+      <circle cx="0" cy="10" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
+    {:else}
+      <line x1="0" y1="4" x2="-5" y2="-5" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="4" x2="0" y2="-5" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="4" x2="5" y2="-5" stroke={markerColor} stroke-width="1.5" />
+    {/if}
+  </g>
+
+  <g transform={targetMarkerTransform}>
+    {#if descriptors.target === 'one'}
+      <line x1="-6" y1="-2" x2="6" y2="-2" stroke={markerColor} stroke-width="2" />
+    {:else if descriptors.target === 'zero_or_one'}
+      <circle cx="0" cy="-6" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
+      <line x1="-6" y1="4" x2="6" y2="4" stroke={markerColor} stroke-width="2" />
+    {:else if descriptors.target === 'zero_or_many'}
+      <circle cx="0" cy="-10" r="4" fill="none" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="-5" y2="6" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="0" y2="6" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-2" x2="5" y2="6" stroke={markerColor} stroke-width="1.5" />
+    {:else}
+      <line x1="0" y1="-4" x2="-5" y2="5" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-4" x2="0" y2="5" stroke={markerColor} stroke-width="1.5" />
+      <line x1="0" y1="-4" x2="5" y2="5" stroke={markerColor} stroke-width="1.5" />
+    {/if}
+  </g>
 </g>
 
 {#if selected}
   <!-- Expanded view when selected - use EdgeLabel for proper positioning -->
-  <EdgeLabel x={displayLabelX} y={displayLabelY} style="background: transparent;">
+  <EdgeLabel x={edgeLabelPos.x} y={edgeLabelPos.y} style="background: transparent;">
     <div
       class="pointer-events-auto nodrag nopan bg-slate-50 px-2.5 py-2 rounded-lg shadow-lg border-2 border-[#26A69A] flex flex-col gap-1.5 cursor-move select-none transition-all duration-150"
       style="background: rgb(248 250 252);"
@@ -462,24 +353,26 @@
     class="edge-label-compact"
     onclick={selectThisEdge}
     onpointerdown={(e) => { e.stopPropagation(); startLabelDrag(e); }}
-    style="cursor: pointer;"
+    style="cursor: pointer; pointer-events: all;"
   >
     <!-- Background rectangle to mask the edge line - matches canvas bg -->
     <rect
-      x={displayLabelX - (displayLabel.length * 3.5) - 6}
-      y={displayLabelY - 9}
-      width={displayLabel.length * 7 + 12}
-      height="18"
+      x={edgeLabelPos.x - (displayLabel.length * 3.5) - 8}
+      y={edgeLabelPos.y - 10}
+      width={displayLabel.length * 7 + 16}
+      height="20"
       fill="#f8fafc"
-      rx="9"
-      ry="9"
+      stroke="#e2e8f0"
+      stroke-width="1"
+      rx="4"
+      ry="4"
     />
     <text
-      x={displayLabelX}
-      y={displayLabelY}
+      x={edgeLabelPos.x}
+      y={edgeLabelPos.y}
       text-anchor="middle"
       dominant-baseline="middle"
-      class="pointer-events-auto"
+      class="pointer-events-none"
       fill="#64748b"
       font-size="11"
       font-weight="500"

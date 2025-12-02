@@ -14,10 +14,10 @@ entities:
     description: current team's ID
   position:
     x: 40
-    y: 500
+    y: 100
   width: 317.818115234375
   panel_height: 480
-  collapsed: true
+  collapsed: false
   tags:
   - '123'
 - id: team
@@ -28,8 +28,8 @@ entities:
   - name: team_id
     datatype: text
   position:
-    x: 507.818115234375
-    y: 526.875
+    x: 377.818115234375
+    y: 625
   width: 280
   panel_height: 200
   collapsed: false
@@ -40,7 +40,7 @@ entities:
   dbt_model: model.nba_analytics.game
   position:
     x: 77.818115234375
-    y: 100
+    y: 700
   width: 280
   panel_height: 200
   collapsed: false
@@ -52,11 +52,11 @@ entities:
   description: ''
   dbt_model: null
   position:
-    x: 517.818115234375
-    y: 50
+    x: 902.818115234375
+    y: 925
   width: 280
   panel_height: 403.75
-  collapsed: false
+  collapsed: true
   tags:
   - '123'
 relationships:
@@ -66,8 +66,8 @@ relationships:
   type: many_to_one
   source_field: current_team_id
   target_field: team_id
-  label_dx: -123.1514892578125
-  label_dy: -25.212127685546875
+  label_dx: -209.45452880859375
+  label_dy: 28.1212158203125
 - source: game
   target: team
   label: ''
@@ -88,5 +88,5 @@ relationships:
   target: calendar
   label: ''
   type: one_to_many
-  label_dx: 0
-  label_dy: 0
+  label_dx: 33.9393310546875
+  label_dy: 36.8485107421875
