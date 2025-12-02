@@ -185,6 +185,9 @@
         const updates = new Map<string, { width: number; height: number }>();
 
         for (const group of groups) {
+            // Skip groups that have been manually resized
+            if (group.data?.manuallyResized) continue;
+            
             const children = $nodes.filter(
                 (n) => n.parentId === group.id && !n.hidden,
             );
