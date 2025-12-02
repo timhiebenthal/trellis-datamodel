@@ -113,3 +113,46 @@ dbt_model_paths:
   - "3_core"
 ```
 
+
+## Testing
+
+### Frontend
+**Testing Libraries:**
+The following testing libraries are defined in `package.json` under `devDependencies` and are automatically installed when you run `npm install`:
+- [Vitest](https://vitest.dev/) (Unit testing)
+- [Playwright](https://playwright.dev/) (End-to-End testing)
+- [Testing Library](https://testing-library.com/) (DOM & Svelte testing utilities)
+- [jsdom](https://github.com/jsdom/jsdom) (DOM environment)
+
+**Running Tests:**
+```bash
+cd frontend
+
+# Run unit tests
+npm run test:unit
+
+# Run E2E tests
+npm run test:e2e
+
+# Run all tests
+npm run test
+```
+
+### Backend
+**Testing Libraries:**
+The following testing libraries are defined in `pyproject.toml` under `[project.optional-dependencies]` in the `dev` group:
+- [pytest](https://docs.pytest.org/) (Testing framework)
+- [httpx](https://www.python-httpx.org/) (Async HTTP client for API testing)
+
+**Installation:**
+Unlike `npm`, `uv sync` does not install optional dependencies by default. To include the testing libraries, run:
+```bash
+cd backend
+uv sync --extra dev
+```
+
+**Running Tests:**
+```bash
+cd backend
+uv run pytest
+```
