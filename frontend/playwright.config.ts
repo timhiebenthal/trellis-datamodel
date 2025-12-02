@@ -1,18 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Path to test data file (isolated from production data)
+const TEST_DATA_MODEL_PATH = path.resolve(__dirname, 'tests/test_data_model.yml');
 
 /**
  * See https://playwright.dev/docs/test-configuration.
- * 
- * NOTE: Backend must be started with DATAMODEL_DATA_MODEL_PATH pointing to test file:
- * DATAMODEL_DATA_MODEL_PATH=$(pwd)/frontend/tests/test_data_model.yml make backend
  */
 export default defineConfig({
     testDir: './tests',
@@ -61,10 +58,20 @@ export default defineConfig({
               },
           ],
 
-    /* Run your local dev server before starting the tests */
-    webServer: {
-        command: 'npm run dev',
-        url: 'http://localhost:5173',
-        reuseExistingServer: !process.env.CI,
-    },
+    /* Start both frontend and backend servers for tests */
+    webServer: [
+        {
+            // Backend with test data file
+            command: `cd ${path.resolve(__dirname, '..')} && DATAMODEL_DATA_MODEL_PATH=${TEST_DATA_MODEL_PATH} uv run python backend/main.py`,
+            url: 'http://localhost:8000/health',
+            reuseExistingServer: !process.env.CI,
+            timeout: 30000,
+        },
+        {
+            // Frontend dev server
+            command: 'npm run dev',
+            url: 'http://localhost:5173',
+            reuseExistingServer: !process.env.CI,
+        },
+    ],
 });

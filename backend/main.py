@@ -24,6 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Health check endpoint for Playwright and monitoring
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 # Include routers
 app.include_router(manifest_router)
 app.include_router(data_model_router)

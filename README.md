@@ -178,29 +178,21 @@ npm run test
 make test-smoke     # Quick smoke test
 make test-check     # TypeScript check
 make test-unit      # Unit tests
-make test-backend   # Start backend with test data (Terminal 1)
-make test-e2e       # E2E tests (requires test backend in Terminal 1)
+make test-e2e       # E2E tests (auto-starts backend with test data)
 make test-all       # All tests
 ```
 
 **Test Data Isolation:**
-E2E tests use a separate test data file (`frontend/tests/test_data_model.yml`) to avoid polluting your production data model. The backend must be started with the `DATAMODEL_DATA_MODEL_PATH` environment variable pointing to the test file:
+E2E tests use a separate test data file (`frontend/tests/test_data_model.yml`) to avoid polluting your production data model. **Playwright automatically starts the backend** with the correct environment variable, so you don't need to manage it manually.
 
 ```bash
-# Terminal 1: Start backend with test data
-make test-backend
-# OR manually:
-# DATAMODEL_DATA_MODEL_PATH=$(pwd)/frontend/tests/test_data_model.yml make backend
-
-# Terminal 2: Run tests
+# Just run E2E tests - backend starts automatically with test data
 make test-e2e
 # OR:
 # cd frontend && npm run test:e2e
 ```
 
-The test data file is automatically cleaned before and after test runs. Your production `data_model.yml` remains untouched.
-
-**Note:** If you're running tests, make sure to start the backend with the test data file (`make test-backend`). For normal development, use `make backend` without the env var.
+The test data file is automatically cleaned before and after test runs via Playwright's `globalSetup` and `globalTeardown`. Your production `data_model.yml` remains untouched.
 
 ### Backend
 **Testing Libraries:**

@@ -28,8 +28,8 @@ entities:
   - name: team_id
     datatype: text
   position:
-    x: 377.818115234375
-    y: 625
+    x: 418
+    y: 380.0243902439024
   width: 280
   panel_height: 200
   collapsed: false
@@ -39,8 +39,8 @@ entities:
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
   position:
-    x: 77.818115234375
-    y: 700
+    x: 58.062017673399424
+    y: 653.9024390243902
   width: 280
   panel_height: 200
   collapsed: false
@@ -66,8 +66,8 @@ relationships:
   type: many_to_one
   source_field: current_team_id
   target_field: team_id
-  label_dx: -209.45452880859375
-  label_dy: 28.1212158203125
+  label_dx: 2.9091796875
+  label_dy: -5.818206787109375
 - source: game
   target: team
   label: ''

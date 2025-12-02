@@ -6,6 +6,16 @@
     useSvelteFlow
   } from '@xyflow/svelte';
   import { edges, nodes, viewMode } from '$lib/stores';
+  import {
+    getNodeDimensions,
+    getNodeAbsolutePosition,
+    getNodeCenter,
+    calculateConnectionInfo,
+    getSideRotation,
+    buildOrthogonalPath,
+    calculateMarkerPosition,
+    type Side
+  } from '$lib/edge-utils';
 
   let { 
     id,
@@ -60,150 +70,25 @@
   const sourceNode = $derived($nodes.find(n => n.id === source));
   const targetNode = $derived($nodes.find(n => n.id === target));
 
-  // Helper to get node dimensions - prefer SvelteFlow's measured dimensions
-  function getNodeDimensions(node: any): { width: number; height: number } {
-    // Use SvelteFlow's measured dimensions if available (most accurate)
-    if (node?.measured?.width && node?.measured?.height) {
-      return { width: node.measured.width, height: node.measured.height };
-    }
-    
-    // Fallback to data dimensions matching EntityNode.svelte defaults
-    const DEFAULT_WIDTH = 320;
-    if (!node) return { width: DEFAULT_WIDTH, height: 200 };
-    
-    const width = (node.data?.width as number) || DEFAULT_WIDTH;
-    const panelHeight = (node.data?.panelHeight as number) || 200;
-    const collapsed = node.data?.collapsed ?? false;
-    
-    // Collapsed height: header (~40px)
-    // Expanded height: header + panel + tags + padding (~100px overhead)
-    const height = collapsed ? 40 : panelHeight + 100;
-    return { width, height };
-  }
-
-  // Helper to get absolute node position (accounting for parent groups)
-  function getNodeAbsolutePosition(node: any): { x: number; y: number } {
-    if (!node) return { x: 0, y: 0 };
-    
-    // Use SvelteFlow's positionAbsolute if available (handles nested nodes)
-    if (node.computed?.positionAbsolute) {
-      return { x: node.computed.positionAbsolute.x, y: node.computed.positionAbsolute.y };
-    }
-    if (node.positionAbsolute) {
-      return { x: node.positionAbsolute.x, y: node.positionAbsolute.y };
-    }
-    
-    // Fallback: manually calculate from position + parent offset
-    let x = node.position?.x ?? 0;
-    let y = node.position?.y ?? 0;
-    
-    if (node.parentId) {
-      const parent = $nodes.find(n => n.id === node.parentId);
-      if (parent) {
-        const parentPos = getNodeAbsolutePosition(parent);
-        x += parentPos.x;
-        y += parentPos.y;
-      }
-    }
-    return { x, y };
-  }
-
-  // Helper to get absolute node center
-  function getNodeCenter(node: any): { x: number; y: number } {
-    const pos = getNodeAbsolutePosition(node);
-    const dim = getNodeDimensions(node);
-    return {
-      x: pos.x + dim.width / 2,
-      y: pos.y + dim.height / 2
-    };
-  }
-
-  type Side = 'top' | 'bottom' | 'left' | 'right';
-
-  // Calculate optimal connection points on closest sides
+  // Calculate optimal connection points using utility functions
   const connectionInfo = $derived.by(() => {
-    const sourceCenter = getNodeCenter(sourceNode);
-    const targetCenter = getNodeCenter(targetNode);
-    const sourceDim = getNodeDimensions(sourceNode);
-    const targetDim = getNodeDimensions(targetNode);
-    
-    const dx = targetCenter.x - sourceCenter.x;
-    const dy = targetCenter.y - sourceCenter.y;
-    
-    let sourceSide: Side;
-    let targetSide: Side;
-    let sourcePoint: { x: number; y: number };
-    let targetPoint: { x: number; y: number };
-    
-    // Choose sides based on relative positions - pick closest pair
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal arrangement - use left/right sides
-      if (dx > 0) {
-        sourceSide = 'right';
-        targetSide = 'left';
-        sourcePoint = { x: sourceCenter.x + sourceDim.width / 2, y: sourceCenter.y };
-        targetPoint = { x: targetCenter.x - targetDim.width / 2, y: targetCenter.y };
-      } else {
-        sourceSide = 'left';
-        targetSide = 'right';
-        sourcePoint = { x: sourceCenter.x - sourceDim.width / 2, y: sourceCenter.y };
-        targetPoint = { x: targetCenter.x + targetDim.width / 2, y: targetCenter.y };
-      }
-    } else {
-      // Vertical arrangement - use top/bottom sides
-      if (dy > 0) {
-        sourceSide = 'bottom';
-        targetSide = 'top';
-        sourcePoint = { x: sourceCenter.x, y: sourceCenter.y + sourceDim.height / 2 };
-        targetPoint = { x: targetCenter.x, y: targetCenter.y - targetDim.height / 2 };
-      } else {
-        sourceSide = 'top';
-        targetSide = 'bottom';
-        sourcePoint = { x: sourceCenter.x, y: sourceCenter.y - sourceDim.height / 2 };
-        targetPoint = { x: targetCenter.x, y: targetCenter.y + targetDim.height / 2 };
-      }
-    }
-    
-    return { sourceSide, targetSide, sourcePoint, targetPoint };
+    return calculateConnectionInfo(sourceNode, targetNode, $nodes);
   });
 
-  // Build orthogonal edge path based on connection sides
+  // Build the edge path
   const edgePath = $derived.by(() => {
     const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
-    
-    let sX = sourcePoint.x;
-    let sY = sourcePoint.y;
-    let tX = targetPoint.x;
-    let tY = targetPoint.y;
-    
-    // Apply parallel edge offset perpendicular to exit direction
-    if (sourceSide === 'left' || sourceSide === 'right') {
-      sY += baseOffset;
-      tY += baseOffset;
-    } else {
-      sX += baseOffset;
-      tX += baseOffset;
-    }
-    
-    // Route based on connection configuration
-    if (sourceSide === 'right' && targetSide === 'left') {
-      // Horizontal: right → left
-      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
-      return `M ${sX} ${sY} L ${midX} ${sY} L ${midX} ${tY} L ${tX} ${tY}`;
-    } else if (sourceSide === 'left' && targetSide === 'right') {
-      // Horizontal: left → right
-      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
-      return `M ${sX} ${sY} L ${midX} ${sY} L ${midX} ${tY} L ${tX} ${tY}`;
-    } else if (sourceSide === 'bottom' && targetSide === 'top') {
-      // Vertical: down → up
-      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
-      return `M ${sX} ${sY} L ${sX} ${midY} L ${tX} ${midY} L ${tX} ${tY}`;
-    } else {
-      // Vertical: up → down
-      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
-      return `M ${sX} ${sY} L ${sX} ${midY} L ${tX} ${midY} L ${tX} ${tY}`;
-    }
+    return buildOrthogonalPath(
+      sourcePoint,
+      targetPoint,
+      sourceSide,
+      targetSide,
+      baseOffset,
+      storedOffsetX + dragOffsetX,
+      storedOffsetY + dragOffsetY
+    );
   });
+
 
   // Label position at the middle of the edge
   const edgeLabelPos = $derived.by(() => {
@@ -386,71 +271,19 @@
   // Crow's foot marker positions and rotations based on connection sides
   const markerColor = $derived(selected ? '#26A69A' : '#64748b');
 
-  // Get rotation angle based on connection side
-  // Crow's feet always point TOWARD the node (per standard ERD notation)
-  // Reference: https://github.com/relliv/crows-foot-notations
-  // Markers are drawn with trident at negative Y (pointing UP at 0°)
-  // The side indicates which side of the NODE the connection is on
-  // - bottom: connection at bottom of node → marker points UP toward node → 0°
-  // - top: connection at top of node → marker points DOWN toward node → 180°
-  // - left: connection at left of node → marker points RIGHT toward node → 90°
-  // - right: connection at right of node → marker points LEFT toward node → -90°
-  function getSideRotation(side: Side): number {
-    switch (side) {
-      case 'bottom': return 0;    // Marker points UP (toward node above)
-      case 'top': return 180;     // Marker points DOWN (toward node below)
-      case 'left': return 90;     // Marker points RIGHT (toward node on right)
-      case 'right': return -90;   // Marker points LEFT (toward node on left)
-    }
-  }
-
   // Padding to offset markers slightly away from node border
   const MARKER_PADDING = 8;
 
   const sourceMarkerTransform = $derived.by(() => {
     const { sourceSide, sourcePoint } = connectionInfo;
-    let x = sourcePoint.x;
-    let y = sourcePoint.y;
-    
-    // Apply parallel edge offset
-    if (sourceSide === 'left' || sourceSide === 'right') {
-      y += baseOffset;
-    } else {
-      x += baseOffset;
-    }
-    
-    // Apply padding away from node border
-    switch (sourceSide) {
-      case 'top': y -= MARKER_PADDING; break;
-      case 'bottom': y += MARKER_PADDING; break;
-      case 'left': x -= MARKER_PADDING; break;
-      case 'right': x += MARKER_PADDING; break;
-    }
-    
-    return `translate(${x} ${y}) rotate(${getSideRotation(sourceSide)})`;
+    const pos = calculateMarkerPosition(sourcePoint, sourceSide, baseOffset, MARKER_PADDING);
+    return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(sourceSide)})`;
   });
 
   const targetMarkerTransform = $derived.by(() => {
     const { targetSide, targetPoint } = connectionInfo;
-    let x = targetPoint.x;
-    let y = targetPoint.y;
-    
-    // Apply parallel edge offset
-    if (targetSide === 'left' || targetSide === 'right') {
-      y += baseOffset;
-    } else {
-      x += baseOffset;
-    }
-    
-    // Apply padding away from node border
-    switch (targetSide) {
-      case 'top': y -= MARKER_PADDING; break;
-      case 'bottom': y += MARKER_PADDING; break;
-      case 'left': x -= MARKER_PADDING; break;
-      case 'right': x += MARKER_PADDING; break;
-    }
-    
-    return `translate(${x} ${y}) rotate(${getSideRotation(targetSide)})`;
+    const pos = calculateMarkerPosition(targetPoint, targetSide, baseOffset, MARKER_PADDING);
+    return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(targetSide)})`;
   });
 </script>
 
