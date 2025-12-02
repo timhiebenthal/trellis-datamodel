@@ -10,10 +10,4 @@ entities:
     datatype: text
   - name: draft_year
     datatype: int
-  position:
-    x: 227.52625706578056
-    y: 54.536449566008606
-  width: 483.636474609375
-  panel_height: 200
-  collapsed: true
 relationships: []

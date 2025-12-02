@@ -12,12 +12,6 @@ entities:
   - name: current_team_id
     datatype: text
     description: current team's ID
-  position:
-    x: 40
-    y: 100
-  width: 317.818115234375
-  panel_height: 480
-  collapsed: false
   tags:
   - '123'
 - id: team
@@ -27,23 +21,11 @@ entities:
   drafted_fields:
   - name: team_id
     datatype: text
-  position:
-    x: 418
-    y: 380.0243902439024
-  width: 280
-  panel_height: 200
-  collapsed: false
   tags: []
 - id: game
   label: Game
   description: A game where two teams compete
   dbt_model: model.nba_analytics.game
-  position:
-    x: 58.062017673399424
-    y: 653.9024390243902
-  width: 280
-  panel_height: 200
-  collapsed: false
   tags:
   - game
   - zzz
@@ -51,12 +33,6 @@ entities:
   label: calendar
   description: ''
   dbt_model: null
-  position:
-    x: 902.818115234375
-    y: 925
-  width: 280
-  panel_height: 403.75
-  collapsed: true
   tags:
   - '123'
 relationships:
@@ -66,27 +42,19 @@ relationships:
   type: many_to_one
   source_field: current_team_id
   target_field: team_id
-  label_dx: 2.9091796875
-  label_dy: -5.818206787109375
 - source: game
   target: team
   label: ''
   type: one_to_many
   source_field: home_team_id
   target_field: team_id
-  label_dx: 55.227294921875
-  label_dy: 193.71206665039062
 - source: game
   target: team
   label: ''
   type: one_to_many
   source_field: away_team_id
   target_field: team_id
-  label_dx: 14.54541015625
-  label_dy: 25.21197509765625
 - source: game
   target: calendar
   label: ''
   type: one_to_many
-  label_dx: 33.9393310546875
-  label_dy: 36.8485107421875

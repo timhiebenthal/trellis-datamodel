@@ -28,6 +28,12 @@ if _TEST_DIR:
     DATA_MODEL_PATH: str = os.environ.get(
         "DATAMODEL_DATA_MODEL_PATH", os.path.join(_TEST_DIR, "data_model.yml")
     )
+    CANVAS_LAYOUT_PATH: str = os.environ.get(
+        "DATAMODEL_CANVAS_LAYOUT_PATH", os.path.join(_TEST_DIR, "canvas_layout.yml")
+    )
+    CANVAS_LAYOUT_VERSION_CONTROL: bool = os.environ.get(
+        "DATAMODEL_CANVAS_LAYOUT_VERSION_CONTROL", "true"
+    ).lower() == "true"
     DBT_PROJECT_PATH: str = _TEST_DIR
     DBT_MODEL_PATHS: list[str] = ["3_core"]
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
@@ -42,6 +48,11 @@ else:
         "DATAMODEL_DATA_MODEL_PATH",
         os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
     )
+    CANVAS_LAYOUT_PATH: str = os.environ.get(
+        "DATAMODEL_CANVAS_LAYOUT_PATH",
+        os.path.abspath(os.path.join(BASE_DIR, "../canvas_layout.yml"))
+    )
+    CANVAS_LAYOUT_VERSION_CONTROL: bool = True
     DBT_PROJECT_PATH: str = ""
     DBT_MODEL_PATHS: list[str] = ["3-entity"]
     FRONTEND_BUILD_DIR: str = os.path.abspath(
@@ -51,7 +62,7 @@ else:
 
 def load_config() -> None:
     """Load and resolve all paths from config.yml."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -113,6 +124,26 @@ def load_config() -> None:
         if "dbt_model_paths" in config:
             DBT_MODEL_PATHS = config["dbt_model_paths"]
 
+        # 6. Resolve Canvas Layout (defaults to canvas_layout.yml next to data model)
+        if "canvas_layout_file" in config:
+            p = config["canvas_layout_file"]
+            if not os.path.isabs(p):
+                base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
+                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(base_path, p))
+            else:
+                CANVAS_LAYOUT_PATH = p
+        else:
+            # Default: canvas_layout.yml next to data_model.yml
+            if DATA_MODEL_PATH:
+                data_model_dir = os.path.dirname(DATA_MODEL_PATH)
+                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(data_model_dir, "canvas_layout.yml"))
+            else:
+                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(BASE_DIR, "../canvas_layout.yml"))
+
+        # 7. Canvas layout version control setting
+        if "canvas_layout_version_control" in config:
+            CANVAS_LAYOUT_VERSION_CONTROL = config["canvas_layout_version_control"]
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
@@ -125,6 +156,8 @@ def print_config() -> None:
     print(f"Looking for manifest at: {MANIFEST_PATH}")
     print(f"Looking for catalog at: {CATALOG_PATH}")
     print(f"Looking for data model at: {DATA_MODEL_PATH}")
+    print(f"Looking for canvas layout at: {CANVAS_LAYOUT_PATH}")
+    print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
     print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
 
 

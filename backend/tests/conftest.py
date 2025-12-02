@@ -35,6 +35,11 @@ def clean_test_files():
     if os.path.exists(data_model_path):
         os.remove(data_model_path)
     
+    # Clean canvas layout file before each test
+    canvas_layout_path = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
+    if os.path.exists(canvas_layout_path):
+        os.remove(canvas_layout_path)
+    
     # Clean manifest file
     manifest_path = os.path.join(_TEST_TEMP_DIR, "manifest.json")
     if os.path.exists(manifest_path):
@@ -60,6 +65,12 @@ def temp_dir():
 def temp_data_model_path():
     """Return path for the data model file (in session temp dir)."""
     return os.path.join(_TEST_TEMP_DIR, "data_model.yml")
+
+
+@pytest.fixture
+def temp_canvas_layout_path():
+    """Return path for the canvas layout file (in session temp dir)."""
+    return os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
 
 
 @pytest.fixture
