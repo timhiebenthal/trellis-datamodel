@@ -21,10 +21,6 @@ classifiers = [
     "Topic :: Database",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-[project.urls]
-Homepage = "https://github.com/timhiebenthal/trellis-datamodel"
-Repository = "https://github.com/timhiebenthal/trellis-datamodel"
-Issues = "https://github.com/timhiebenthal/trellis-datamodel/issues"
 dependencies = [
     "dbt-core>=1.6,<2.0",
     "fastapi>=0.121.3",
@@ -34,6 +30,11 @@ dependencies = [
     "typer>=0.9.0",
     "uvicorn>=0.38.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/timhiebenthal/trellis-datamodel"
+Repository = "https://github.com/timhiebenthal/trellis-datamodel"
+Issues = "https://github.com/timhiebenthal/trellis-datamodel/issues"
 
 [project.scripts]
 trellis = "trellis_datamodel.cli:app"
