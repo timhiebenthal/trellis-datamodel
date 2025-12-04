@@ -1,7 +1,7 @@
 """
-Trellis Data CLI
+Trellis CLI
 
-Command-line interface for running the Trellis Data server.
+Command-line interface for Trellis - visual data model editor for dbt projects.
 """
 
 import typer
@@ -14,20 +14,21 @@ from trellis_datamodel import __version__
 from trellis_datamodel.config import load_config, find_config_file, print_config
 
 app = typer.Typer(
-    name="trellis-datamodel",
-    help="Trellis Datamodel - Visual data model editor for dbt projects",
+    name="trellis",
+    help="Trellis - Visual data model editor for dbt projects",
     add_completion=False,
+    no_args_is_help=True,
 )
 
 
 @app.command()
-def serve(
+def run(
     port: int = typer.Option(8089, "--port", "-p", help="Port to run the server on"),
     config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"),
     no_browser: bool = typer.Option(False, "--no-browser", help="Don't open browser automatically"),
 ):
     """
-    Start the Trellis Data server.
+    Start the Trellis server.
     
     Looks for trellis.yml or config.yml in the current directory.
     """
@@ -74,6 +75,31 @@ def serve(
         reload=False,  # Disable reload in production
         log_level="info",
     )
+
+
+@app.command()
+def init():
+    """
+    Initialize a new trellis.yml config file in the current directory.
+    """
+    config_file = Path("trellis.yml")
+    if config_file.exists():
+        typer.echo(typer.style("trellis.yml already exists in this directory.", fg=typer.colors.YELLOW))
+        raise typer.Exit(1)
+    
+    default_config = """\
+# Trellis configuration
+framework: dbt-core
+dbt_project_path: "."
+dbt_manifest_path: "target/manifest.json"
+dbt_catalog_path: "target/catalog.json"
+data_model_file: "data_model.yml"
+dbt_model_paths: []  # Empty = include all models
+"""
+    config_file.write_text(default_config)
+    typer.echo(typer.style("✓ Created trellis.yml", fg=typer.colors.GREEN))
+    typer.echo("  Edit the file to configure your dbt project paths, then run:")
+    typer.echo(typer.style("  trellis run", fg=typer.colors.CYAN))
 
 
 if __name__ == "__main__":

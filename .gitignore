@@ -14,6 +14,11 @@ frontend/build
 frontend/.env
 .DS_Store
 
+# Bundled static files (built from frontend, not tracked in git)
+trellis_datamodel/static/_app/
+trellis_datamodel/static/index.html
+trellis_datamodel/static/robots.txt
+
 # Python
 __pycache__/
 *.py[cod]

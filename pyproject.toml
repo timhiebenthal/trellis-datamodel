@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "trellis-datamodel"
 version = "0.1.0"
@@ -15,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-trellis-datamodel = "trellis_datamodel.cli:app"
+trellis = "trellis_datamodel.cli:app"
 
 [project.optional-dependencies]
 dev = [
