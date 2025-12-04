@@ -165,3 +165,70 @@ class TestInferRelationships:
         assert rels[0]["target"] == "orders"
         assert rels[0]["source_field"] == "id"
         assert rels[0]["target_field"] == "user_id"
+
+    def test_infers_relationships_from_nested_directories(self, test_client, temp_dir):
+        # Ensure nested model directories are also scanned
+        nested_dir = os.path.join(temp_dir, "models", "3_core", "all")
+        os.makedirs(nested_dir, exist_ok=True)
+
+        schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "game",
+                    "columns": [
+                        {
+                            "name": "home_team_id",
+                            "data_type": "text",
+                            "data_tests": [
+                                {
+                                    "relationships": {
+                                        "to": "ref('team')",
+                                        "field": "team_id",
+                                    }
+                                }
+                            ],
+                        },
+                        {
+                            "name": "away_team_id",
+                            "data_type": "text",
+                            "data_tests": [
+                                {
+                                    "relationships": {
+                                        "to": "ref('team')",
+                                        "field": "team_id",
+                                    }
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+
+        with open(os.path.join(nested_dir, "game.yml"), "w") as f:
+            yaml.dump(schema, f)
+
+        response = test_client.get("/api/infer-relationships")
+        assert response.status_code == 200
+
+        rels = response.json()["relationships"]
+        assert len(rels) == 2
+        assert {"source": "team", "target": "game", "source_field": "team_id", "target_field": "home_team_id"} in [
+            {
+                "source": r["source"],
+                "target": r["target"],
+                "source_field": r["source_field"],
+                "target_field": r["target_field"],
+            }
+            for r in rels
+        ]
+        assert {"source": "team", "target": "game", "source_field": "team_id", "target_field": "away_team_id"} in [
+            {
+                "source": r["source"],
+                "target": r["target"],
+                "source_field": r["source_field"],
+                "target_field": r["target_field"],
+            }
+            for r in rels
+        ]

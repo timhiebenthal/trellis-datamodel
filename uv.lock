@@ -203,6 +203,12 @@ dev = [
     { name = "pytest" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "dbt-core", specifier = "==1.10" },
@@ -221,6 +227,12 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pytest", specifier = ">=9.0.1" },
+]
 
 [[package]]
 name = "dbt-adapters"

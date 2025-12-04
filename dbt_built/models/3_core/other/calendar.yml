@@ -4,10 +4,6 @@ models:
   columns:
   - name: calendar_date
     data_type: text
-    data_tests:
-    - relationships:
-        to: ref('game')
-        field: game_day
   - name: calender_week
     data_type: text
     description: ISO week number

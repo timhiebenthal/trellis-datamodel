@@ -280,58 +280,61 @@ class DbtCoreAdapter:
         model_to_entity = self._get_model_to_entity_map()
         relationships: list[Relationship] = []
 
-        for filename in os.listdir(models_dir):
-            if not filename.endswith((".yml", ".yaml")):
-                continue
+        for root, _, files in os.walk(models_dir):
+            for filename in files:
+                if not filename.endswith((".yml", ".yaml")):
+                    continue
 
-            filepath = os.path.join(models_dir, filename)
-            try:
-                with open(filepath, "r") as f:
-                    schema_data = yaml.safe_load(f) or {}
+                filepath = os.path.join(root, filename)
+                try:
+                    with open(filepath, "r") as f:
+                        schema_data = yaml.safe_load(f) or {}
 
-                models_list = schema_data.get("models", [])
-                for model in models_list:
-                    model_name = model.get("name")
-                    if not model_name:
-                        continue
+                    models_list = schema_data.get("models", [])
+                    for model in models_list:
+                        model_name = model.get("name")
+                        if not model_name:
+                            continue
 
-                    entity_id = model_to_entity.get(model_name, model_name)
+                        entity_id = model_to_entity.get(model_name, model_name)
 
-                    columns = model.get("columns", [])
-                    for column in columns:
-                        data_tests = column.get("data_tests", [])
-                        for test in data_tests:
-                            if "relationships" not in test:
-                                continue
+                        columns = model.get("columns", [])
+                        for column in columns:
+                            data_tests = column.get("data_tests", [])
+                            for test in data_tests:
+                                if "relationships" not in test:
+                                    continue
 
-                            rel_test = test["relationships"]
-                            to_ref = rel_test.get("to", "")
-                            target_field = rel_test.get("field", "")
+                                rel_test = test["relationships"]
+                                to_ref = rel_test.get("to", "")
+                                target_field = rel_test.get("field", "")
 
-                            # Parse ref('model_name')
-                            target_model = to_ref
-                            if to_ref.startswith("ref('") and to_ref.endswith("')"):
-                                target_model = to_ref[5:-2]
-                            elif to_ref.startswith('ref("') and to_ref.endswith('")'):
-                                target_model = to_ref[5:-2]
+                                # Parse ref('model_name')
+                                target_model = to_ref
+                                if to_ref.startswith("ref('") and to_ref.endswith("')"):
+                                    target_model = to_ref[5:-2]
+                                elif to_ref.startswith('ref("') and to_ref.endswith(
+                                    '")'
+                                ):
+                                    target_model = to_ref[5:-2]
 
-                            target_entity_id = model_to_entity.get(
-                                target_model, target_model
-                            )
+                                target_entity_id = model_to_entity.get(
+                                    target_model, target_model
+                                )
 
-                            relationships.append(
-                                {
-                                    "source": target_entity_id,
-                                    "target": entity_id,
-                                    "label": "",
-                                    "type": "one_to_many",
-                                    "source_field": target_field,
-                                    "target_field": column.get("name"),
-                                }
-                            )
-            except Exception as e:
-                print(f"Warning: Could not parse {filename}: {e}")
-                continue
+                                relationships.append(
+                                    {
+                                        "source": target_entity_id,
+                                        "target": entity_id,
+                                        "label": "",
+                                        "type": "one_to_many",
+                                        "source_field": target_field,
+                                        "target_field": column.get("name"),
+                                    }
+                                )
+                except Exception as e:
+                    print(f"Warning: Could not parse {filepath}: {e}")
+                    continue
 
         # Remove duplicates
         seen: set[tuple] = set()

@@ -43,18 +43,24 @@ relationships:
   source_field: current_team_id
   target_field: team_id
 - source: game
-  target: team
-  label: matches
-  type: many_to_one
-  source_field: home_team_id
-  target_field: team_id
-- source: game
-  target: team
-  label: matches
-  type: many_to_one
-  source_field: away_team_id
-  target_field: team_id
-- source: game
-  target: calendar
-  label: happens on
-  type: zero_or_many_to_one
+  target: game
+  label: ''
+  type: one_to_many
+- source: calendar
+  target: game
+  label: ''
+  type: one_to_many
+  source_field: calendar_date
+  target_field: game_day
+- source: team
+  target: game
+  label: ''
+  type: one_to_many
+  source_field: team_id
+  target_field: home_team_id
+- source: team
+  target: game
+  label: ''
+  type: one_to_many
+  source_field: team_id
+  target_field: away_team_id
