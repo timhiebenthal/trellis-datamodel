@@ -201,13 +201,20 @@
     updateEdge({ type: nextType });
   }
 
-  function selectThisEdge(e: MouseEvent) {
+  function selectThisEdge(e: Event) {
     e.stopPropagation();
     // Deselect all edges and select this one
     $edges = $edges.map(edge => ({
       ...edge,
       selected: edge.id === id
     }));
+  }
+  
+  function handleCompactLabelKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      selectThisEdge(e);
+    }
   }
   
   function deselectEdge() {
@@ -384,6 +391,9 @@
     class="edge-label-compact"
     onclick={selectThisEdge}
     onpointerdown={(e) => { e.stopPropagation(); startLabelDrag(e); }}
+    onkeydown={handleCompactLabelKeydown}
+    role="button"
+    tabindex="0"
     style="cursor: pointer; pointer-events: all;"
   >
     <!-- Background rectangle to mask the edge line - matches canvas bg -->

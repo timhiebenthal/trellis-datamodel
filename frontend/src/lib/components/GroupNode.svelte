@@ -20,8 +20,8 @@
     const MAX_WIDTH = 1200;
     const MIN_HEIGHT = 150;
     const MAX_HEIGHT = 900;
-    let nodeWidth = $derived(data.width ?? DEFAULT_WIDTH);
-    let nodeHeight = $derived(data.height ?? DEFAULT_HEIGHT);
+    let nodeWidth: number = $derived((data.width as number | undefined) ?? DEFAULT_WIDTH);
+    let nodeHeight: number = $derived((data.height as number | undefined) ?? DEFAULT_HEIGHT);
 
     function startDimensionResize(
         event: PointerEvent,
@@ -95,6 +95,13 @@
         });
     }
 
+    function handleCollapseKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleCollapse();
+        }
+    }
+
     // Count children
     let childCount = $derived(
         $nodes.filter(n => n.parentId === id).length
@@ -106,6 +113,9 @@
     <div
         class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-200 hover:bg-gray-300 border border-gray-300 rounded cursor-pointer transition-colors text-xs shadow-sm"
         onclick={toggleCollapse}
+        onkeydown={handleCollapseKeydown}
+        role="button"
+        tabindex="0"
     >
         <Icon icon="lucide:chevron-right" class="w-3 h-3 text-gray-600" />
         <Icon icon="lucide:folder" class="w-3 h-3 text-gray-600" />
@@ -121,6 +131,9 @@
         <div
             class="flex items-center gap-2 px-4 py-3.5 cursor-pointer hover:bg-gray-200/70 transition-colors rounded-t-xl"
             onclick={toggleCollapse}
+            onkeydown={handleCollapseKeydown}
+            role="button"
+            tabindex="0"
         >
             <Icon icon="lucide:chevron-down" class="w-4 h-4 text-gray-600" />
             <Icon icon="lucide:folder" class="w-4 h-4 text-gray-600" />

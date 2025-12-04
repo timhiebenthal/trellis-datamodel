@@ -494,12 +494,19 @@
         );
     }
 
-    function toggleCollapse(event: MouseEvent) {
+    function toggleCollapse(event: Event) {
         // Only toggle if clicking on the header background, not on the input
         if ((event.target as HTMLElement).tagName === "INPUT") {
             return;
         }
         updateNodeData(id, { collapsed: !isCollapsed });
+    }
+
+    function handleHeaderKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleCollapse(event);
+        }
     }
 
     function handleDeleteClick(event: MouseEvent) {
@@ -534,11 +541,19 @@
     let tagInput = $state("");
     let showTagInput = $state(false);
 
+    function getCurrentTags(nodeId: string): string[] {
+        const node = $nodes.find((n) => n.id === nodeId);
+        return ((node?.data?.tags as string[]) || []).slice();
+    }
+
     function addTag(tag: string) {
         const trimmed = tag.trim();
-        if (!trimmed || entityTags.includes(trimmed)) return;
-        const newTags = [...entityTags, trimmed];
-        updateNodeData(id, { tags: newTags });
+        if (!trimmed) return;
+
+        const currentTags = getCurrentTags(id);
+        if (currentTags.includes(trimmed)) return;
+
+        updateNodeData(id, { tags: [...currentTags, trimmed] });
         if (isBound) {
             hasUnsavedChanges = true;
         }
@@ -591,16 +606,12 @@
         
         const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
         allSelectedIds.forEach((nodeId) => {
-            const node = $nodes.find((n) => n.id === nodeId);
-            if (node && node.type === "entity") {
-                const currentTags = (node.data?.tags || []) as string[];
-                if (!currentTags.includes(trimmed)) {
-                    const newTags = [...currentTags, trimmed];
-                    updateNodeData(nodeId, { tags: newTags });
-                    // If this is the current node and it's bound, mark as having unsaved changes
-                    if (nodeId === id && isBound) {
-                        hasUnsavedChanges = true;
-                    }
+            const currentTags = getCurrentTags(nodeId);
+            if (!currentTags.includes(trimmed)) {
+                updateNodeData(nodeId, { tags: [...currentTags, trimmed] });
+                // If this is the current node and it's bound, mark as having unsaved changes
+                if (nodeId === id && isBound) {
+                    hasUnsavedChanges = true;
                 }
             }
         });
@@ -809,6 +820,9 @@
     <div
         class="p-2.5 border-b border-gray-100 bg-gray-50/50 rounded-t-lg flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
         onclick={toggleCollapse}
+        onkeydown={handleHeaderKeydown}
+        role="button"
+        tabindex="0"
         title={isCollapsed ? "Click to expand" : "Click to collapse"}
     >
         <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -1011,6 +1025,7 @@
                                             id && $draggingField !== null}
                                         ondragover={onFieldDragOver}
                                         ondrop={(e) => onFieldDrop(col.name, e)}
+                                        role="presentation"
                                     >
                                         <div
                                             class="flex gap-1.5 mb-1 items-center"
@@ -1033,6 +1048,9 @@
                                                     $draggingField?.fieldName ===
                                                         col.name}
                                                 title="Drag to link to another field"
+                                                role="presentation"
+                                                aria-hidden="true"
+                                                tabindex="-1"
                                             >
                                                 <Icon
                                                     icon="lucide:link"
@@ -1262,6 +1280,7 @@
                                         ondragover={onFieldDragOver}
                                         ondrop={(e) =>
                                             onFieldDrop(field.name, e)}
+                                        role="presentation"
                                     >
                                         <div
                                             class="flex gap-1.5 mb-1 items-center"
@@ -1284,6 +1303,9 @@
                                                     $draggingField?.fieldName ===
                                                         field.name}
                                                 title="Drag to link to another field"
+                                                role="presentation"
+                                                aria-hidden="true"
+                                                tabindex="-1"
                                             >
                                                 <Icon
                                                     icon="lucide:link"

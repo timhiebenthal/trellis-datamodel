@@ -32,13 +32,15 @@
         onclick={handleBackdropClick}
         onkeydown={handleKeydown}
         role="dialog"
+        tabindex="-1"
         aria-modal="true"
         aria-labelledby="delete-modal-title"
     >
         <!-- Modal -->
         <div
             class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
-            onclick={(e) => e.stopPropagation()}
+            role="document"
+            tabindex="-1"
         >
             <h2 id="delete-modal-title" class="text-lg font-semibold text-gray-900 mb-2">
                 Delete Entity?
