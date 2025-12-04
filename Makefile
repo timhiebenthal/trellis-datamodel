@@ -63,7 +63,7 @@ build-package:
 
 publish:
 	@echo "Publishing package to PyPI..."
-	python -m uv publish --token ${PYPI_TOKEN}
+	uv publish --token ${PYPI_TOKEN}
 
 test-smoke:
 	@echo "Running smoke test (catches 500 errors, runtime crashes)..."
