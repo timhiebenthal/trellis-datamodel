@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 import os
 
-from config import (
+from trellis_datamodel.config import (
     CONFIG_PATH,
     FRAMEWORK,
     MANIFEST_PATH,
@@ -11,7 +11,7 @@ from config import (
     DATA_MODEL_PATH,
     DBT_PROJECT_PATH,
 )
-from adapters import get_adapter
+from trellis_datamodel.adapters import get_adapter
 
 router = APIRouter(prefix="/api", tags=["manifest"])
 
@@ -56,3 +56,4 @@ async def get_manifest():
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading manifest: {str(e)}")
+

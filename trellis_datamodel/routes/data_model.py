@@ -5,8 +5,8 @@ import yaml
 import os
 from typing import Dict, Any, List, Tuple
 
-from config import DATA_MODEL_PATH, CANVAS_LAYOUT_PATH
-from models.schemas import DataModelUpdate
+from trellis_datamodel.config import DATA_MODEL_PATH, CANVAS_LAYOUT_PATH
+from trellis_datamodel.models.schemas import DataModelUpdate
 
 router = APIRouter(prefix="/api", tags=["data-model"])
 
@@ -219,3 +219,4 @@ async def save_data_model(data: DataModelUpdate):
         raise HTTPException(
             status_code=500, detail=f"Error saving data model: {str(e)}"
         )
+

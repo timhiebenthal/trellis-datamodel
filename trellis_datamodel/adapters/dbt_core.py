@@ -10,7 +10,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
-from utils.yaml_handler import YamlHandler
+from trellis_datamodel.utils.yaml_handler import YamlHandler
 from .base import (
     ColumnInfo,
     ColumnSchema,
@@ -562,3 +562,4 @@ class DbtCoreAdapter:
             yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
 
         return Path(output_path)
+

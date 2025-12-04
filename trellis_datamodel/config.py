@@ -1,5 +1,5 @@
 """
-Configuration loading for the Data Model UI backend.
+Configuration loading for Trellis Data.
 Centralizes all path resolution logic.
 
 For testing, set environment variable DATAMODEL_TEST_DIR to a temp directory path.
@@ -8,9 +8,8 @@ This will override all paths to use that directory.
 
 import os
 import yaml
-
-# Base directory (backend folder)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from pathlib import Path
+from typing import Optional
 
 # Check for test mode - allows overriding config via environment
 _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
@@ -38,35 +37,67 @@ if _TEST_DIR:
     DBT_MODEL_PATHS: list[str] = ["3_core"]
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
 else:
-    # Production mode: use config.yml
-    CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../config.yml"))
+    # Production mode: will be set by load_config()
+    CONFIG_PATH: str = ""
     FRAMEWORK: str = "dbt-core"
     MANIFEST_PATH: str = ""
     CATALOG_PATH: str = ""
-    # Allow env var override for testing
-    DATA_MODEL_PATH: str = os.environ.get(
-        "DATAMODEL_DATA_MODEL_PATH",
-        os.path.abspath(os.path.join(BASE_DIR, "../data_model.yml"))
-    )
-    CANVAS_LAYOUT_PATH: str = os.environ.get(
-        "DATAMODEL_CANVAS_LAYOUT_PATH",
-        os.path.abspath(os.path.join(BASE_DIR, "../canvas_layout.yml"))
-    )
+    DATA_MODEL_PATH: str = ""
+    CANVAS_LAYOUT_PATH: str = ""
     CANVAS_LAYOUT_VERSION_CONTROL: bool = True
     DBT_PROJECT_PATH: str = ""
-    DBT_MODEL_PATHS: list[str] = ["3-entity"]
-    FRONTEND_BUILD_DIR: str = os.path.abspath(
-        os.path.join(BASE_DIR, "../frontend/build")
-    )
+    DBT_MODEL_PATHS: list[str] = []
+    FRONTEND_BUILD_DIR: str = ""
 
 
-def load_config() -> None:
-    """Load and resolve all paths from config.yml."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL
+def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
+    """
+    Find config file in order of priority:
+    1. CLI override (--config)
+    2. trellis.yml in current directory
+    3. config.yml in current directory (fallback)
+    
+    Returns:
+        Path to config file or None if not found
+    """
+    if config_override:
+        if os.path.exists(config_override):
+            return os.path.abspath(config_override)
+        return None
+    
+    cwd = os.getcwd()
+    
+    # Try trellis.yml first
+    trellis_yml = os.path.join(cwd, "trellis.yml")
+    if os.path.exists(trellis_yml):
+        return os.path.abspath(trellis_yml)
+    
+    # Fallback to config.yml
+    config_yml = os.path.join(cwd, "config.yml")
+    if os.path.exists(config_yml):
+        return os.path.abspath(config_yml)
+    
+    return None
+
+
+def load_config(config_path: Optional[str] = None) -> None:
+    """Load and resolve all paths from config file."""
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
         return
+
+    # Find config file
+    if config_path:
+        CONFIG_PATH = config_path
+    else:
+        found_config = find_config_file()
+        if not found_config:
+            # No config found - use defaults
+            CONFIG_PATH = ""
+            return
+        CONFIG_PATH = found_config
 
     if not os.path.exists(CONFIG_PATH):
         return
@@ -99,7 +130,7 @@ def load_config() -> None:
             elif os.path.isabs(p):
                 MANIFEST_PATH = p
             else:
-                MANIFEST_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+                MANIFEST_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), p))
 
         # 3. Resolve Catalog
         if "dbt_catalog_path" in config:
@@ -109,7 +140,7 @@ def load_config() -> None:
             elif os.path.isabs(p):
                 CATALOG_PATH = p
             else:
-                CATALOG_PATH = os.path.abspath(os.path.join(BASE_DIR, p))
+                CATALOG_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), p))
 
         # 4. Resolve Data Model (env var takes precedence)
         if "DATAMODEL_DATA_MODEL_PATH" not in os.environ and "data_model_file" in config:
@@ -138,7 +169,7 @@ def load_config() -> None:
                 data_model_dir = os.path.dirname(DATA_MODEL_PATH)
                 CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(data_model_dir, "canvas_layout.yml"))
             else:
-                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(BASE_DIR, "../canvas_layout.yml"))
+                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), "canvas_layout.yml"))
 
         # 7. Canvas layout version control setting
         if "canvas_layout_version_control" in config:
@@ -160,6 +191,3 @@ def print_config() -> None:
     print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
     print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
 
-
-# Load config on import
-load_config()

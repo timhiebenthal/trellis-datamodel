@@ -6,7 +6,7 @@ Provides get_adapter() to instantiate the appropriate adapter based on config.
 
 from typing import Union
 
-from config import (
+from trellis_datamodel.config import (
     FRAMEWORK,
     MANIFEST_PATH,
     CATALOG_PATH,

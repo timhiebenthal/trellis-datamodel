@@ -1,36 +1,45 @@
 [project]
-name = "data-model-ui"
+name = "trellis-datamodel"
 version = "0.1.0"
-description = "Add your description here"
+description = "Visual data model editor for dbt projects"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "dbt-core==1.10",
-    "dbt-duckdb==1.10",
-    "duckdb>=1.4.2",
+    "dbt-core>=1.6,<2.0",
     "fastapi>=0.121.3",
-    "marimo>=0.18.0",
-    "nba-api>=1.11.3",
-    "pandas>=2.3.3",
     "python-dotenv>=1.2.1",
     "pyyaml>=6.0.3",
     "ruamel.yaml>=0.18.0",
-    "tqdm>=4.67.1",
+    "typer>=0.9.0",
     "uvicorn>=0.38.0",
 ]
+
+[project.scripts]
+trellis-datamodel = "trellis_datamodel.cli:app"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
     "httpx>=0.27.0",
 ]
+examples = [
+    "dbt-duckdb==1.10",
+    "duckdb>=1.4.2",
+    "marimo>=0.18.0",
+    "nba-api>=1.11.3",
+    "pandas>=2.3.3",
+    "tqdm>=4.67.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["backend*"]
+include = ["trellis_datamodel*"]
+
+[tool.setuptools.package-data]
+trellis_datamodel = ["static/**/*"]
 
 [tool.pytest.ini_options]
-testpaths = ["backend/tests"]
+testpaths = ["trellis_datamodel/tests"]
 pythonpath = ["."]
 
 [dependency-groups]

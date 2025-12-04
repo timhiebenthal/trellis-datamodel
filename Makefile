@@ -1,15 +1,16 @@
-.PHONY: setup backend frontend dev prod help
+.PHONY: setup backend frontend dev prod help build-package
 
 help:
-	@echo "dbt Data Model UI Makefile"
+	@echo "Trellis Data Makefile"
 	@echo ""
 	@echo "Available commands:"
-	@echo "  make install-uv  - Install uv package manager"
-	@echo "  make setup       - Install dependencies for backend and frontend"
-	@echo "  make backend     - Start backend server (API on http://localhost:8000)"
-	@echo "  make frontend    - Start frontend dev server (UI on http://localhost:5173)"
-	@echo "  make dev         - Start both backend and frontend (requires two terminals)"
-	@echo "  make prod        - Build frontend and run production backend server"
+	@echo "  make install-uv    - Install uv package manager"
+	@echo "  make setup         - Install dependencies for backend and frontend"
+	@echo "  make backend      - Start backend server (API on http://localhost:8089)"
+	@echo "  make frontend     - Start frontend dev server (UI on http://localhost:5173)"
+	@echo "  make dev          - Start both backend and frontend (requires two terminals)"
+	@echo "  make prod         - Build frontend and run production backend server"
+	@echo "  make build-package - Build frontend and package for distribution"
 	@echo "  make test-smoke    - Quick smoke test (catches 500 errors, runtime crashes)"
 	@echo "  make test-unit     - Run unit tests"
 	@echo "  make test-e2e      - Run E2E tests (auto-starts backend with test data)"
@@ -29,7 +30,7 @@ setup: install-uv
 
 backend:
 	@echo "Starting backend server..."
-	python -m uv run python backend/main.py
+	python -m uv run trellis-datamodel serve
 
 frontend:
 	@echo "Starting frontend dev server..."
@@ -48,7 +49,17 @@ prod:
 	@echo "Building frontend..."
 	cd frontend && npm run build
 	@echo "Starting backend server..."
-	python -m uv run python backend/main.py
+	python -m uv run trellis-datamodel serve
+
+build-package:
+	@echo "Building frontend..."
+	cd frontend && npm run build
+	@echo "Copying frontend build to package..."
+	rm -rf trellis_datamodel/static/*
+	cp -r frontend/build/* trellis_datamodel/static/
+	@echo "Building Python package..."
+	python -m uv build
+	@echo "Package built! Find wheels in dist/"
 
 
 test-smoke:

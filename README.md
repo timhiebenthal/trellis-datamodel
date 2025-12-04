@@ -1,4 +1,4 @@
-# dbt Data Model UI
+# Trellis Data
 
 A local-first tool to bridge Conceptual Data Modeling and Logical dbt Implementation.
 
@@ -29,21 +29,56 @@ A local-first tool to bridge Conceptual Data Modeling and Logical dbt Implementa
   - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
 
-## Quick Start
-The fastest way to get up and running:
+## Installation
+
+### Install from GitHub (for now)
 
 ```bash
-# 1. Install dependencies (first time only)
-cd backend && uv sync && cd ../frontend && npm install && cd ..
-
-# 2. Start backend (Terminal 1)
-cd backend && uv run python main.py
-
-# 3. Start frontend (Terminal 2 - open a new terminal)
-cd frontend && npm run dev
+pip install git+https://github.com/yourorg/trellis-datamodel.git
+# or with uv
+uv pip install git+https://github.com/yourorg/trellis-datamodel.git
 ```
 
-Then open **http://localhost:5173** in your browser to preview the application.
+### Install from local development
+
+```bash
+# Clone the repository
+git clone https://github.com/yourorg/trellis-datamodel.git
+cd trellis-datamodel
+
+# Install in editable mode
+pip install -e .
+# or with uv
+uv pip install -e .
+```
+
+## Quick Start
+
+1. **Navigate to your dbt project directory**
+   ```bash
+   cd /path/to/your/dbt-project
+   ```
+
+2. **Create a `trellis.yml` config file** (or use `config.yml` as fallback)
+   ```yaml
+   framework: dbt-core
+   dbt_project_path: "."
+   dbt_manifest_path: "target/manifest.json"
+   dbt_catalog_path: "target/catalog.json"
+   data_model_file: "data_model.yml"
+   dbt_model_paths: []  # Empty = include all models
+   ```
+
+3. **Start the server**
+   ```bash
+   trellis-datamodel serve
+   ```
+
+   The server will start on **http://localhost:8089** and automatically open your browser.
+
+## Development Setup
+
+For local development with hot reload:
 
 ## Install Dependencies
 Run these once per machine (or when dependencies change).
@@ -59,41 +94,57 @@ Run these once per machine (or when dependencies change).
    npm install
    ```
 
-## Running (Development)
-Run backend and frontend in separate terminals for hot reload.
-
 **Terminal 1 – Backend**
 ```bash
-cd backend
-uv run python main.py
+make backend
+# or
+trellis-datamodel serve
 ```
-Backend serves the API at http://localhost:8000.
+Backend serves the API at http://localhost:8089.
 
 **Terminal 2 – Frontend**
 ```bash
-cd frontend
-npm run dev
+make frontend
+# or
+cd frontend && npm run dev
 ```
-Frontend runs at http://localhost:5173.
+Frontend runs at http://localhost:5173 (for development with hot reload).
 
-## Running (Production-style)
-Build the frontend once, then serve via the backend.
+## Building for Distribution
+
+To build the package with bundled frontend:
 
 ```bash
-cd frontend
-npm run build
-
-cd ../backend
-uv run python main.py
+make build-package
 ```
-The backend hosts the compiled frontend at http://localhost:8000.
+
+This will:
+1. Build the frontend (`npm run build`)
+2. Copy static files to `trellis_datamodel/static/`
+3. Build the Python wheel (`uv build`)
+
+The wheel will be in `dist/` and can be installed with `pip install dist/trellis_datamodel-*.whl`.
+
+## CLI Options
+
+```bash
+trellis-datamodel serve [OPTIONS]
+
+Options:
+  --port, -p INTEGER    Port to run the server on [default: 8089]
+  --config, -c TEXT     Path to config file (trellis.yml or config.yml)
+  --no-browser          Don't open browser automatically
+  --help                Show help message
+```
 
 ## dbt Metadata
-- The repo ships with example dbt projects (`dbt_built/`, `dbt_concept/`). Drop `manifest.json` and `catalog.json` into your dbt project's `target/` directory (or point `config.yml` to your dbt project) to power the ERD modeller.
+- Generate `manifest.json` and `catalog.json` by running `dbt docs generate` in your dbt project.
+- The UI reads these artifacts to power the ERD modeller.
 - Without these artifacts, the UI loads but shows no dbt models.
 
 ## Configuration
-Edit `config.yml` at the project root to configure paths:
+
+Create a `trellis.yml` file (or `config.yml` as fallback) in your dbt project directory to configure paths:
 
 - `framework`: Transformation framework to use. Currently supported: `dbt-core`. Future: `dbt-fusion`, `sqlmesh`, `bruin`, `pydantic`. Defaults to `dbt-core`.
 - `dbt_project_path`: Path to your dbt project directory (relative to `config.yml` or absolute). **Required**.
@@ -102,7 +153,7 @@ Edit `config.yml` at the project root to configure paths:
 - `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
 - `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
 
-**Example `config.yml`:**
+**Example `trellis.yml`:**
 ```yaml
 framework: dbt-core
 dbt_project_path: "./dbt_built"

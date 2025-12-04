@@ -306,3 +306,4 @@ class YamlHandler:
             result.append(col_dict)
 
         return result
+

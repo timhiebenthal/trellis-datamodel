@@ -134,3 +134,4 @@ class TransformationAdapter(Protocol):
             List of paths to updated schema files.
         """
         ...
+

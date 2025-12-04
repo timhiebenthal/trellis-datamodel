@@ -4,9 +4,9 @@ from fastapi import APIRouter, HTTPException
 import yaml
 import os
 
-from config import DBT_PROJECT_PATH, DATA_MODEL_PATH
-from models.schemas import DbtSchemaRequest, ModelSchemaRequest
-from adapters import get_adapter
+from trellis_datamodel.config import DBT_PROJECT_PATH, DATA_MODEL_PATH
+from trellis_datamodel.models.schemas import DbtSchemaRequest, ModelSchemaRequest
+from trellis_datamodel.adapters import get_adapter
 
 router = APIRouter(prefix="/api", tags=["schema"])
 
@@ -178,3 +178,4 @@ async def infer_relationships():
         raise HTTPException(
             status_code=500, detail=f"Error inferring relationships: {str(e)}"
         )
+
