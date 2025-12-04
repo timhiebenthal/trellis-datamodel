@@ -24,13 +24,13 @@ install-uv:
 
 setup: install-uv
 	@echo "Installing backend dependencies..."
-	python -m uv sync
+	uv sync
 	@echo "Installing frontend dependencies..."
 	cd frontend && npm install
 
 backend:
 	@echo "Starting backend server..."
-	python -m uv run trellis-datamodel serve
+	uv run trellis serve
 
 frontend:
 	@echo "Starting frontend dev server..."
@@ -49,7 +49,7 @@ prod:
 	@echo "Building frontend..."
 	cd frontend && npm run build
 	@echo "Starting backend server..."
-	python -m uv run trellis-datamodel serve
+	uv run trellis serve
 
 build-package:
 	@echo "Building frontend..."
@@ -58,9 +58,12 @@ build-package:
 	rm -rf trellis_datamodel/static/*
 	cp -r frontend/build/* trellis_datamodel/static/
 	@echo "Building Python package..."
-	python -m uv build
+	uv build
 	@echo "Package built! Find wheels in dist/"
 
+publish:
+	@echo "Publishing package to PyPI..."
+	python -m uv publish --token ${PYPI_TOKEN}
 
 test-smoke:
 	@echo "Running smoke test (catches 500 errors, runtime crashes)..."
