@@ -1,11 +1,11 @@
 # Trellis Data
 
-A local-first tool to bridge Conceptual Data Modeling and Logical dbt Implementation.
+A local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and the physical Implementation (currently with dbt-core).
 
 ## Motivation
 
-**Current dbt workflow pains:**
-- ERD diagrams live in separate tools (Lucidchart, draw.io) and quickly become stale
+**Current workflow pains:**
+- ERD diagrams live in separate tools (Lucidchart, draw.io) and quickly become stale or unreadable for large projects
 - Data transformations are done isolated from the conceptual data model.
 - No single view connecting business concepts to logical schema
 - Stakeholders can't easily understand model structure without technical context
@@ -31,15 +31,15 @@ A local-first tool to bridge Conceptual Data Modeling and Logical dbt Implementa
 
 ## Installation
 
-### Install from GitHub (for now)
+### Install from PyPI
 
 ```bash
-pip install git+https://github.com/yourorg/trellis-datamodel.git
+pip install trellis-datamodel
 # or with uv
-uv pip install git+https://github.com/yourorg/trellis-datamodel.git
+uv pip install trellis-datamodel
 ```
 
-### Install from local development
+### Install from Source (Development)
 
 ```bash
 # Clone the repository
@@ -59,19 +59,15 @@ uv pip install -e .
    cd /path/to/your/dbt-project
    ```
 
-2. **Create a `trellis.yml` config file** (or use `config.yml` as fallback)
-   ```yaml
-   framework: dbt-core
-   dbt_project_path: "."
-   dbt_manifest_path: "target/manifest.json"
-   dbt_catalog_path: "target/catalog.json"
-   data_model_file: "data_model.yml"
-   dbt_model_paths: []  # Empty = include all models
+2. **Initialize configuration**
+   ```bash
+   trellis init
    ```
+   This creates a `trellis.yml` file. Edit it to point to your dbt manifest and catalog locations.
 
 3. **Start the server**
    ```bash
-   trellis-datamodel serve
+   trellis run
    ```
 
    The server will start on **http://localhost:8089** and automatically open your browser.
@@ -80,12 +76,11 @@ uv pip install -e .
 
 For local development with hot reload:
 
-## Install Dependencies
+### Install Dependencies
 Run these once per machine (or when dependencies change).
 
 1. **Backend**
    ```bash
-   cd backend
    uv sync
    ```
 2. **Frontend**
@@ -98,7 +93,7 @@ Run these once per machine (or when dependencies change).
 ```bash
 make backend
 # or
-trellis-datamodel serve
+uv run trellis run
 ```
 Backend serves the API at http://localhost:8089.
 
@@ -128,7 +123,7 @@ The wheel will be in `dist/` and can be installed with `pip install dist/trellis
 ## CLI Options
 
 ```bash
-trellis-datamodel serve [OPTIONS]
+trellis run [OPTIONS]
 
 Options:
   --port, -p INTEGER    Port to run the server on [default: 8089]
@@ -144,7 +139,9 @@ Options:
 
 ## Configuration
 
-Create a `trellis.yml` file (or `config.yml` as fallback) in your dbt project directory to configure paths:
+Run `trellis init` to create a starter `trellis.yml` file in your project.
+
+Options:
 
 - `framework`: Transformation framework to use. Currently supported: `dbt-core`. Future: `dbt-fusion`, `sqlmesh`, `bruin`, `pydantic`. Defaults to `dbt-core`.
 - `dbt_project_path`: Path to your dbt project directory (relative to `config.yml` or absolute). **Required**.
