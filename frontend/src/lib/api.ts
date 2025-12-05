@@ -8,14 +8,14 @@ import type { DbtModel, DataModel, DraftedField, ConfigStatus, ModelSchema, Rela
  *   PUBLIC_API_URL=http://your-backend-url/api
  */
 function getApiBase(): string {
-    // Try to access the environment variable if available
-    try {
-        // @ts-ignore - dynamic import not available at build time
-        if (typeof import.meta.env?.PUBLIC_API_URL === 'string' && import.meta.env.PUBLIC_API_URL) {
-            return import.meta.env.PUBLIC_API_URL;
-        }
-    } catch {
-        // Ignore - env not available
+    // Prefer Vite/SvelteKit public env var (build-time)
+    // Falls back to legacy PUBLIC_API_URL, then relative /api
+    const maybe =
+        import.meta.env?.VITE_PUBLIC_API_URL ??
+        import.meta.env?.PUBLIC_API_URL ??
+        '';
+    if (typeof maybe === 'string' && maybe.length > 0) {
+        return maybe;
     }
     // Use relative URL - works when frontend is served by the backend
     return '/api';
