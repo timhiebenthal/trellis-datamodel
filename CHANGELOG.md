@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.5] - 2025-12-06
+## [Unreleased]
+
+### Added
+- Added trellis_squared.svg as favicon and header logo
+- Logo is now bundled as an asset for reliable loading in production
+
+### Changed
+- Updated header branding to use lowercase "trellis" for consistency
+- Replaced iconify box icon with trellis_squared.svg logo in header
+
 ## [0.1.6] - 2025-12-06
 
 ### Fixed
