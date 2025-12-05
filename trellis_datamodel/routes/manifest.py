@@ -20,9 +20,14 @@ router = APIRouter(prefix="/api", tags=["manifest"])
 @router.get("/config-status")
 async def get_config_status():
     """Return configuration status for the frontend."""
-    # Check if config exists (either trellis.yml or config.yml)
-    found_config = find_config_file()
-    config_present = found_config is not None
+    # Check if config exists - use CONFIG_PATH from startup if available
+    # If CONFIG_PATH is set (loaded at startup), use that. Otherwise search.
+    if CONFIG_PATH and os.path.exists(CONFIG_PATH):
+        found_config = CONFIG_PATH
+        config_present = True
+    else:
+        found_config = find_config_file()
+        config_present = found_config is not None
 
     # Determine expected config filename for display
     if config_present:

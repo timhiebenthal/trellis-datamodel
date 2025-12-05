@@ -55,12 +55,19 @@ def run(
     if not config_path:
         found_config = find_config_file()
         if not found_config:
+            import os
+
+            cwd = os.getcwd()
+            expected_path = os.path.join(cwd, "trellis.yml")
             typer.echo(
                 typer.style(
-                    "Error: No config file found. Looking for trellis.yml or config.yml in current directory.",
+                    "Error: No config file found.",
                     fg=typer.colors.RED,
                 )
             )
+            typer.echo(f"   Expected location: {expected_path}")
+            typer.echo()
+            typer.echo("   Run 'trellis init' to create a starter config file.")
             raise typer.Exit(1)
         config_path = found_config
 
