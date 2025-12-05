@@ -62,7 +62,7 @@ export default defineConfig({
     webServer: [
         {
             // Backend with test data file
-            command: `cd ${path.resolve(__dirname, '..')} && DATAMODEL_DATA_MODEL_PATH=${TEST_DATA_MODEL_PATH} uv run trellis-datamodel serve --port 8000 --no-browser`,
+            command: `cd ${path.resolve(__dirname, '..')} && PYTHONPATH=. DATAMODEL_TEST_DIR=${path.dirname(TEST_DATA_MODEL_PATH)} DATAMODEL_DATA_MODEL_PATH=${TEST_DATA_MODEL_PATH} uv run python -m trellis_datamodel.cli run --port 8000 --no-browser`,
             url: 'http://localhost:8000/health',
             reuseExistingServer: !process.env.CI,
             timeout: 30000,
@@ -70,6 +70,10 @@ export default defineConfig({
         {
             // Frontend dev server
             command: 'npm run dev',
+            env: {
+                // Point frontend to backend API during tests (Vite public env)
+                VITE_PUBLIC_API_URL: 'http://localhost:8000/api',
+            },
             url: 'http://localhost:5173',
             reuseExistingServer: !process.env.CI,
         },

@@ -73,6 +73,55 @@ class TestSyncDbtTests:
         assert result["status"] == "success"
         assert len(result["files"]) == 2  # One for each entity
 
+    def test_syncs_using_dbt_model_names(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        Ensure relationship tests reference bound dbt model names, not raw entity IDs.
+        """
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "customer_entity",
+                    "label": "Customers",
+                    "dbt_model": "model.project.customers",
+                    "position": {"x": 0, "y": 0},
+                },
+                {
+                    "id": "order_entity",
+                    "label": "Orders",
+                    "dbt_model": "model.project.orders",
+                    "drafted_fields": [{"name": "customer_id", "datatype": "int"}],
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "customer_entity",
+                    "target": "order_entity",
+                    "type": "one_to_many",
+                    "source_field": "id",
+                    "target_field": "customer_id",
+                }
+            ],
+        }
+
+        # Persist data model
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # orders.yml should contain a relationship test pointing to customers (dbt model name)
+        orders_yml = os.path.join(temp_dir, "models", "3_core", "orders.yml")
+        assert os.path.exists(orders_yml)
+        with open(orders_yml, "r") as f:
+            schema = yaml.safe_load(f)
+
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert rel_tests == [{"relationships": {"to": "ref('customers')", "field": "id"}}]
+
 
 class TestGetModelSchema:
     """Tests for GET /api/models/{model_name}/schema endpoint."""
@@ -232,3 +281,63 @@ class TestInferRelationships:
             }
             for r in rels
         ]
+
+    def test_maps_additional_models_to_entity_ids(self, test_client, temp_dir, temp_data_model_path):
+        """
+        Relationship inference should translate additional_models to their entity IDs.
+        """
+        # Data model maps additional model to entity
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "customers",
+                    "label": "Customers",
+                    "additional_models": ["model.project.customers_alt"],
+                },
+                {
+                    "id": "orders",
+                    "label": "Orders",
+                },
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Create YML for additional model name with relationship test
+        models_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(models_dir, exist_ok=True)
+        schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "customers_alt",
+                    "columns": [
+                        {
+                            "name": "id",
+                            "data_type": "int",
+                            "data_tests": [
+                                {"relationships": {"to": "ref('orders')", "field": "order_id"}}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        with open(os.path.join(models_dir, "customers_alt.yml"), "w") as f:
+            yaml.dump(schema, f)
+
+        response = test_client.get("/api/infer-relationships")
+        assert response.status_code == 200
+
+        rels = response.json()["relationships"]
+        # Find the relationship coming from the additional model file
+        rel = next(
+            r
+            for r in rels
+            if r["source_field"] == "order_id"
+            and r["target_field"] == "id"
+            and r["target"] == "customers"
+            and r["source"] == "orders"
+        )
+        assert rel

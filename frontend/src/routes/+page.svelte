@@ -31,6 +31,7 @@
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { DbtModel } from "$lib/types";
     import Icon from "@iconify/svelte";
+    import logoHref from "$lib/assets/trellis_squared.svg?url";
 
     let loading = $state(true);
     let saving = $state(false);
@@ -641,16 +642,16 @@
     >
         <!-- Brand -->
         <div class="flex items-center gap-3">
-            <div
-                class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white shadow-sm"
-            >
-                <Icon icon="lucide:box" class="w-5 h-5" />
-            </div>
+            <img
+                src={logoHref}
+                alt="trellis logo"
+                class="w-8 h-8 rounded-lg shadow-sm"
+            />
             <div class="flex flex-col">
                 <h1
                     class="font-bold text-lg text-gray-900 leading-tight tracking-tight"
                 >
-                    Trellis
+                    trellis
                 </h1>
                 <span
                     class="text-[10px] text-gray-500 font-medium tracking-wider uppercase"

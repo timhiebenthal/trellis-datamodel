@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added trellis_squared.svg as favicon and header logo
+- Logo is now bundled as an asset for reliable loading in production
+
+### Changed
+- Updated header branding to use lowercase "trellis" for consistency
+- Replaced iconify box icon with trellis_squared.svg logo in header
+
+## [0.1.6] - 2025-12-06
+
+### Fixed
+- Backend now prefers the configured frontend build dir when bundled static assets are missing, so `/` serves the UI instead of returning 404 when running from source
+
+### Added
+- Regression test ensuring the server serves `index.html` from a configured frontend build directory
+
+## [0.1.5] - 2025-12-06
+
+### Fixed
+- Fixed relationship persistence to dbt schema.yml files - relationships now correctly use bound dbt model names instead of entity IDs when writing relationship tests
+- Fixed relationship auto-inference from existing dbt tests - adapter now properly loads config and maps model names (including additional_models) to entity IDs
+- Fixed adapter factory to use live config values instead of stale module-level constants, ensuring inference works after config is loaded
+
+### Added
+- Added regression tests for relationship sync and inference, including support for additional_models and bound/unbound entities
+
 ## [0.1.4] - 2025-12-05
 
 ### Fixed

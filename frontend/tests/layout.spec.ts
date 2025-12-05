@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities } from './helpers';
+import { cleanupTestEntities, resetDataModel } from './helpers';
 
 test.describe('Auto Layout', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
         // Collect console errors
         const consoleErrors: string[] = [];
         page.on('console', (msg) => {
@@ -11,6 +11,8 @@ test.describe('Auto Layout', () => {
             }
         });
 
+        // Start every test with a clean data model
+        await resetDataModel(request);
         await page.goto('/');
         
         // Wait for app to load
@@ -35,11 +37,13 @@ test.describe('Auto Layout', () => {
 
         // Get initial entity count
         const initialCount = await page.locator('.svelte-flow__node-entity').count();
-        
+
         // Create at least one entity if none exist
         if (initialCount === 0) {
-            await page.getByRole('button', { name: 'Add Entity' }).click();
-            await expect(page.locator('input[value="New Entity"]')).toBeVisible();
+            const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+            await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
+            await addEntityBtn.click();
+            await expect(page.getByPlaceholder('Entity Name').first()).toBeVisible({ timeout: 10000 });
         }
 
         // Click Auto Layout button
@@ -83,9 +87,11 @@ test.describe('Auto Layout', () => {
         const initialCount = await page.locator('.svelte-flow__node-entity').count();
         
         // Create entities to reach at least 3 total
+        const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+        await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
         const entitiesToAdd = Math.max(0, 3 - initialCount);
         for (let i = 0; i < entitiesToAdd; i++) {
-            await page.getByRole('button', { name: 'Add Entity' }).click();
+            await addEntityBtn.click();
             await page.waitForTimeout(200); // Small delay between clicks
         }
 

@@ -67,11 +67,24 @@ class DbtCoreAdapter:
 
     def _get_models_dir(self) -> str:
         """Get the models directory path."""
-        if self.model_paths and len(self.model_paths) > 0:
-            models_subdir = self.model_paths[0]
-        else:
-            models_subdir = "models"
-        return os.path.abspath(os.path.join(self.project_path, "models", models_subdir))
+        # Respect configured model_paths; default to top-level models dir
+        models_subdir = self.model_paths[0] if self.model_paths else ""
+        return os.path.abspath(
+            os.path.join(self.project_path, "models", models_subdir)
+        ).rstrip(os.sep)
+
+    def _entity_to_model_name(self, entity: dict[str, Any]) -> str:
+        """
+        Resolve the dbt model name for an entity.
+
+        Prefers the bound dbt_model (strips project prefix), otherwise falls back to
+        the entity ID so unbound entities still persist somewhere.
+        """
+        dbt_model = entity.get("dbt_model")
+        if dbt_model:
+            # dbt unique_id or ref may be "model.project.model_name" – take the last part
+            return dbt_model.split(".")[-1]
+        return entity.get("id") or ""
 
     def _get_model_to_entity_map(self) -> dict[str, str]:
         """Build mapping from model names to entity IDs."""
@@ -359,7 +372,11 @@ class DbtCoreAdapter:
     ) -> list[Path]:
         """Sync relationship definitions from data model to dbt yml files."""
         # Build entity lookup
-        entity_map = {e["id"]: e for e in entities}
+        entity_map = {e["id"]: e for e in entities if e.get("id")}
+        # Map entity_id -> dbt model name (best-effort)
+        entity_model_name: dict[str, str] = {
+            eid: self._entity_to_model_name(ent) for eid, ent in entity_map.items()
+        }
 
         # Group relationships by target entity (the one with the FK)
         fk_by_entity: dict[str, list[dict]] = {}
@@ -398,15 +415,12 @@ class DbtCoreAdapter:
             if not entity_id:
                 continue
 
-            model_name = entity_id
-            dbt_model = entity.get("dbt_model")
-            if dbt_model:
-                model_name = dbt_model.split(".")[-1] if "." in dbt_model else dbt_model
+            model_name = entity_model_name.get(entity_id, entity_id)
 
             # For bound entities, use the correct path from manifest
             # For unbound entities, fall back to models_dir/{entity_id}.yml
             yml_path = None
-            if dbt_model:
+            if entity.get("dbt_model"):
                 yml_path = self._get_model_yml_path(model_name)
             if not yml_path:
                 yml_path = os.path.join(models_dir, f"{entity_id}.yml")
@@ -449,12 +463,15 @@ class DbtCoreAdapter:
                 ref_entity = fk_info["ref_entity"]
                 ref_field = fk_info["ref_field"]
 
+                # Resolve reference model name (dbt model) for relationship test
+                ref_model_name = entity_model_name.get(ref_entity, ref_entity)
+
                 col = self.yaml_handler.ensure_column(model_entry, fk_field)
 
                 if "data_type" not in col:
                     col["data_type"] = "text"
 
-                self.yaml_handler.add_relationship_test(col, ref_entity, ref_field)
+                self.yaml_handler.add_relationship_test(col, ref_model_name, ref_field)
 
             self.yaml_handler.save_file(yml_path, data)
             updated_files.append(Path(yml_path))
@@ -488,6 +505,12 @@ class DbtCoreAdapter:
         # Build a map of field names to relationships for this entity
         relationships = data_model.get("relationships", [])
         field_to_relationship: dict[str, dict] = {}
+        # Map entity -> dbt model name for refs
+        entity_model_name = {
+            e.get("id"): self._entity_to_model_name(e)
+            for e in data_model.get("entities", [])
+            if e.get("id")
+        }
 
         for rel in relationships:
             source_id = rel.get("source")
@@ -525,10 +548,11 @@ class DbtCoreAdapter:
             field_name = field["name"]
             if field_name in field_to_relationship:
                 rel_info = field_to_relationship[field_name]
+                ref_model = entity_model_name.get(rel_info["target_entity"], rel_info["target_entity"])
                 column_dict["data_tests"] = [
                     {
                         "relationships": {
-                            "to": f"ref('{rel_info['target_entity']}')",
+                            "to": f"ref('{ref_model}')",
                             "field": rel_info["target_field"],
                         }
                     }
