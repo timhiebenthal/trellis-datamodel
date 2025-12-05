@@ -10,6 +10,7 @@ from trellis_datamodel.config import (
     CATALOG_PATH,
     DATA_MODEL_PATH,
     DBT_PROJECT_PATH,
+    find_config_file,
 )
 from trellis_datamodel.adapters import get_adapter
 
@@ -19,7 +20,17 @@ router = APIRouter(prefix="/api", tags=["manifest"])
 @router.get("/config-status")
 async def get_config_status():
     """Return configuration status for the frontend."""
-    config_present = os.path.exists(CONFIG_PATH)
+    # Check if config exists (either trellis.yml or config.yml)
+    found_config = find_config_file()
+    config_present = found_config is not None
+
+    # Determine expected config filename for display
+    if config_present:
+        config_filename = os.path.basename(found_config)
+    else:
+        # Default to trellis.yml (primary config file name)
+        config_filename = "trellis.yml"
+
     manifest_exists = os.path.exists(MANIFEST_PATH) if MANIFEST_PATH else False
     catalog_exists = os.path.exists(CATALOG_PATH) if CATALOG_PATH else False
     data_model_exists = os.path.exists(DATA_MODEL_PATH) if DATA_MODEL_PATH else False
@@ -34,6 +45,7 @@ async def get_config_status():
 
     return {
         "config_present": config_present,
+        "config_filename": config_filename,
         "framework": FRAMEWORK,
         "dbt_project_path": DBT_PROJECT_PATH,
         "manifest_path": MANIFEST_PATH,
@@ -56,4 +68,3 @@ async def get_manifest():
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading manifest: {str(e)}")
-

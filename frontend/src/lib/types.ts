@@ -91,6 +91,7 @@ export interface DataModel {
 
 export interface ConfigStatus {
     config_present: boolean;
+    config_filename?: string;
     dbt_project_path: string;
     manifest_path: string;
     catalog_path: string;
