@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.5] - 2025-12-06
+## [0.1.6] - 2025-12-06
+
+### Fixed
+- Backend now prefers the configured frontend build dir when bundled static assets are missing, so `/` serves the UI instead of returning 404 when running from source
+
+### Added
+- Regression test ensuring the server serves `index.html` from a configured frontend build directory
+
+## [0.1.5] - 2025-12-06
 
 ### Fixed
 - Fixed relationship persistence to dbt schema.yml files - relationships now correctly use bound dbt model names instead of entity IDs when writing relationship tests
