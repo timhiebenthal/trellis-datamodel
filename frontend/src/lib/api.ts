@@ -67,6 +67,7 @@ export async function getConfigStatus(): Promise<ConfigStatus> {
         console.error("Error fetching config status:", e);
         return {
             config_present: false,
+            config_filename: 'trellis.yml',
             dbt_project_path: '',
             manifest_path: '',
             catalog_path: '',

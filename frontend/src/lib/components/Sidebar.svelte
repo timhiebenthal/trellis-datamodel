@@ -423,7 +423,7 @@
                                     Setup Required
                                 </strong><br />
                                 {#if !$configStatus.config_present}
-                                    Missing <code>config.yml</code>.
+                                    Missing <code>{$configStatus.config_filename || 'trellis.yml'}</code>.
                                 {:else if !$configStatus.dbt_project_path}
                                     Set <code>dbt_project_path</code> in config.
                                 {:else if !$configStatus.manifest_exists}

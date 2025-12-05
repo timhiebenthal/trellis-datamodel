@@ -21,15 +21,33 @@ app = typer.Typer(
 )
 
 
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", help="Show version and exit"),
+):
+    """Trellis - Visual data model editor for dbt projects."""
+    if version:
+        typer.echo(__version__)
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+
 @app.command()
 def run(
     port: int = typer.Option(8089, "--port", "-p", help="Port to run the server on"),
-    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"),
-    no_browser: bool = typer.Option(False, "--no-browser", help="Don't open browser automatically"),
+    config: Optional[str] = typer.Option(
+        None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"
+    ),
+    no_browser: bool = typer.Option(
+        False, "--no-browser", help="Don't open browser automatically"
+    ),
 ):
     """
     Start the Trellis server.
-    
+
     Looks for trellis.yml or config.yml in the current directory.
     """
     # Load configuration
@@ -45,28 +63,30 @@ def run(
             )
             raise typer.Exit(1)
         config_path = found_config
-    
+
     load_config(config_path)
-    
+
     # Print startup info
-    typer.echo(typer.style(f"🌿 Trellis Data v{__version__}", fg=typer.colors.GREEN, bold=True))
+    typer.echo(
+        typer.style(f"🌿 Trellis Data v{__version__}", fg=typer.colors.GREEN, bold=True)
+    )
     typer.echo(f"   Loading config from {config_path}")
     print_config()
     typer.echo()
-    
+
     # Start server
     url = f"http://localhost:{port}"
     typer.echo(typer.style(f"   Server running at {url}", fg=typer.colors.CYAN))
     typer.echo("   Press Ctrl+C to stop")
     typer.echo()
-    
+
     # Open browser
     if not no_browser:
         try:
             webbrowser.open(url)
         except Exception:
             pass  # Ignore browser errors
-    
+
     # Run server
     uvicorn.run(
         "trellis_datamodel.server:app",
@@ -84,9 +104,13 @@ def init():
     """
     config_file = Path("trellis.yml")
     if config_file.exists():
-        typer.echo(typer.style("trellis.yml already exists in this directory.", fg=typer.colors.YELLOW))
+        typer.echo(
+            typer.style(
+                "trellis.yml already exists in this directory.", fg=typer.colors.YELLOW
+            )
+        )
         raise typer.Exit(1)
-    
+
     default_config = """\
 # Trellis configuration
 framework: dbt-core
@@ -104,4 +128,3 @@ dbt_model_paths: []  # Empty = include all models
 
 if __name__ == "__main__":
     app()
-
