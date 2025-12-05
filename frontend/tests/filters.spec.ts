@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { resetDataModel } from './helpers';
 
 test.describe('Sidebar Filter Interactions', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
+        // Ensure the backend starts empty for every test
+        await resetDataModel(request);
         await page.goto('/');
         // Wait for sidebar to load
         await expect(page.locator('aside')).toBeVisible();
@@ -79,29 +82,49 @@ test.describe('Sidebar Filter Interactions', () => {
 });
 
 test.describe('Model Tree View', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
+        await resetDataModel(request);
         await page.goto('/');
     });
 
     test('shows loading or models list', async ({ page }) => {
-        // Wait a bit for the app to load
-        await page.waitForTimeout(500);
-
-        // Should show either:
-        // 1. Models in tree view
-        // 2. "No models found" message
-        // 3. Loading spinner
         const sidebar = page.locator('aside');
         await expect(sidebar).toBeVisible();
 
-        // Check for any of the expected states
-        const hasModels = await page.locator('.sidebar [draggable="true"]').count() > 0;
-        const hasNoModelsMsg = await page.getByText('No models found').isVisible().catch(() => false);
-        const hasNoMatchesMsg = await page.getByText('No matches found').isVisible().catch(() => false);
-        const hasSetupMsg = await page.getByText('Setup Required').isVisible().catch(() => false);
+        // Allow extra time for slower CI environments to render the sidebar state
+        await expect
+            .poll(
+                async () => {
+                    const hasModels =
+                        (await page.locator('.sidebar [draggable="true"]').count()) > 0;
+                    const hasNoModelsMsg = await page
+                        .getByText('No models found')
+                        .isVisible()
+                        .catch(() => false);
+                    const hasNoMatchesMsg = await page
+                        .getByText('No matches found')
+                        .isVisible()
+                        .catch(() => false);
+                    const hasSetupMsg = await page
+                        .getByText('Setup Required')
+                        .isVisible()
+                        .catch(() => false);
+                    const isLoading = await page
+                        .getByText('Loading...')
+                        .isVisible()
+                        .catch(() => false);
 
-        // At least one state should be true
-        expect(hasModels || hasNoModelsMsg || hasNoMatchesMsg || hasSetupMsg).toBe(true);
+                    return (
+                        hasModels ||
+                        hasNoModelsMsg ||
+                        hasNoMatchesMsg ||
+                        hasSetupMsg ||
+                        isLoading
+                    );
+                },
+                { timeout: 5000 },
+            )
+            .toBe(true);
     });
 });
 

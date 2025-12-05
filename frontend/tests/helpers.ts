@@ -1,4 +1,20 @@
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
+
+const EMPTY_DATA_MODEL = {
+    version: 0.1,
+    entities: [],
+    relationships: [],
+};
+
+/**
+ * Reset the backend data model to an empty state via the API.
+ * This is faster and more reliable than driving the UI for cleanup.
+ */
+export async function resetDataModel(request: APIRequestContext): Promise<void> {
+    await request.post('/api/data-model', {
+        data: EMPTY_DATA_MODEL,
+    });
+}
 
 /**
  * Save the current data model state
@@ -32,27 +48,8 @@ export async function restoreDataModelState(page: Page, state: any): Promise<voi
  */
 export async function cleanupTestEntities(page: Page): Promise<void> {
     try {
-        // Wait a bit for any pending saves
-        await page.waitForTimeout(1500);
-        
-        const entities = page.locator('.svelte-flow__node-entity');
-        const count = await entities.count();
-        
-        // Delete in reverse order to avoid index shifting
-        for (let i = count - 1; i >= 0; i--) {
-            const entity = entities.nth(i);
-            const input = entity.locator('input[value="New Entity"]');
-            
-            if (await input.count() > 0) {
-                await entity.hover();
-                const deleteBtn = page.getByRole('button', { name: 'Delete entity' }).first();
-                if (await deleteBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-                    await deleteBtn.click();
-                    await page.getByRole('button', { name: 'Delete' }).click();
-                    await page.waitForTimeout(800); // Wait for deletion and save
-                }
-            }
-        }
+        // Prefer API reset to avoid UI flakiness and keep tests isolated.
+        await resetDataModel(page.request);
     } catch (e) {
         // Ignore cleanup errors - tests should still pass
         console.log('Cleanup warning (non-fatal):', e);

@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities } from './helpers';
+import { cleanupTestEntities, resetDataModel } from './helpers';
 
 test.describe('Canvas Interactions', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
+        // Ensure a clean data model before each test run
+        await resetDataModel(request);
         await page.goto('/');
     });
 

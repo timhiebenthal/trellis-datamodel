@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities } from './helpers';
+import { cleanupTestEntities, resetDataModel } from './helpers';
 
 test.describe('Auto Layout', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
         // Collect console errors
         const consoleErrors: string[] = [];
         page.on('console', (msg) => {
@@ -11,6 +11,8 @@ test.describe('Auto Layout', () => {
             }
         });
 
+        // Start every test with a clean data model
+        await resetDataModel(request);
         await page.goto('/');
         
         // Wait for app to load

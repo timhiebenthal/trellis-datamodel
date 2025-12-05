@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities } from './helpers';
+import { cleanupTestEntities, resetDataModel } from './helpers';
 
 test.describe('Relationship (Edge) Interactions', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
+        // Keep data model isolated between tests
+        await resetDataModel(request);
         await page.goto('/');
     });
 
