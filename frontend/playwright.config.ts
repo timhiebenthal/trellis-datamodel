@@ -70,6 +70,10 @@ export default defineConfig({
         {
             // Frontend dev server
             command: 'npm run dev',
+            env: {
+                // Point frontend to backend API during tests
+                PUBLIC_API_URL: 'http://localhost:8000/api',
+            },
             url: 'http://localhost:5173',
             reuseExistingServer: !process.env.CI,
         },
