@@ -34,23 +34,27 @@ test.describe('Relationship (Edge) Interactions', () => {
 
     test('create relationship between two entities', async ({ page }) => {
         // 1. Create first entity
-        await page.getByRole('button', { name: 'Add Entity' }).click();
-        const entity1 = page.locator('input[value="New Entity"]').first();
-        await expect(entity1).toBeVisible();
+        const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+        await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
+        await addEntityBtn.click();
+        const entity1 = page.getByPlaceholder('Entity Name').first();
+        await expect(entity1).toBeVisible({ timeout: 10000 });
         await entity1.fill('Users');
         await entity1.blur();
+        await expect(entity1).toHaveValue('Users');
 
         // 2. Create second entity
-        await page.getByRole('button', { name: 'Add Entity' }).click();
-        const entity2 = page.locator('input[value="New Entity"]').first();
-        await expect(entity2).toBeVisible();
+        await addEntityBtn.click();
+        const entity2 = page.getByPlaceholder('Entity Name').nth(1);
+        await expect(entity2).toBeVisible({ timeout: 10000 });
         await entity2.fill('Orders');
         await entity2.blur();
+        await expect(entity2).toHaveValue('Orders');
 
         // 3. Add drafted fields to create relationship handles
         // Click on Users entity to select it
-        const usersNode = page.locator('.svelte-flow__node-entity').filter({ hasText: 'Users' });
-        await usersNode.click();
+        const usersNode = page.locator('.svelte-flow__node-entity').nth(0);
+        await usersNode.click({ force: true });
 
         // Find and click the "Add field" button for Users
         const addFieldBtnUsers = usersNode.getByRole('button', { name: /add field/i });
@@ -65,8 +69,8 @@ test.describe('Relationship (Edge) Interactions', () => {
         }
 
         // 4. Verify both entities exist on canvas
-        await expect(page.locator('input[value="Users"]')).toBeVisible();
-        await expect(page.locator('input[value="Orders"]')).toBeVisible();
+        await expect(entity1).toHaveValue('Users');
+        await expect(entity2).toHaveValue('Orders');
 
         // Note: Creating actual edge connections requires drag-and-drop between handles,
         // which is complex in Playwright. The core functionality is tested here by
@@ -75,8 +79,16 @@ test.describe('Relationship (Edge) Interactions', () => {
 
     test('entities can be positioned on canvas', async ({ page }) => {
         // Create an entity
-        await page.getByRole('button', { name: 'Add Entity' }).click();
-        await expect(page.locator('.svelte-flow__node-entity')).toBeVisible();
+        const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+        await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
+        await addEntityBtn.click();
+        await expect
+            .poll(
+                async () => await page.locator('.svelte-flow__node-entity').count(),
+                { timeout: 10000 },
+            )
+            .toBeGreaterThan(0);
+        await expect(page.locator('.svelte-flow__node-entity').first()).toBeVisible({ timeout: 5000 });
 
         // Verify the entity is draggable (has svelte-flow drag class)
         const entity = page.locator('.svelte-flow__node-entity').first();

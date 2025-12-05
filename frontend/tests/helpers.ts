@@ -1,5 +1,8 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 
+// Playwright pages use the frontend baseURL (localhost:5173). Point API calls to the backend.
+const API_URL = process.env.VITE_PUBLIC_API_URL || 'http://localhost:8000/api';
+
 const EMPTY_DATA_MODEL = {
     version: 0.1,
     entities: [],
@@ -11,7 +14,7 @@ const EMPTY_DATA_MODEL = {
  * This is faster and more reliable than driving the UI for cleanup.
  */
 export async function resetDataModel(request: APIRequestContext): Promise<void> {
-    await request.post('/api/data-model', {
+    await request.post(`${API_URL}/data-model`, {
         data: EMPTY_DATA_MODEL,
     });
 }

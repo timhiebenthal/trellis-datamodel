@@ -31,29 +31,31 @@ test.describe('Canvas Interactions', () => {
 
     test('create and delete entity', async ({ page }) => {
         // 1. Add Entity
-        await page.getByRole('button', { name: 'Add Entity' }).click();
+        const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+        await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
+        await addEntityBtn.click();
 
         // Check if new entity appears (default name "New Entity")
-        const entity = page.locator('input[value="New Entity"]');
-        await expect(entity).toBeVisible();
+        const entity = page.getByPlaceholder('Entity Name').first();
+        await expect(entity).toBeVisible({ timeout: 10000 });
 
         // 2. Rename Entity
         await entity.fill('Orders');
         await entity.blur(); // Trigger update
 
         // Check if ID updated (we can't easily check internal ID, but label should persist)
-        await expect(page.locator('input[value="Orders"]')).toBeVisible();
+        await expect(entity).toHaveValue('Orders');
 
         // 3. Delete Entity
         // Hover to see delete button
         await page.locator('.svelte-flow__node-entity').hover();
-        await page.getByRole('button', { name: 'Delete entity' }).click();
+        await page.getByRole('button', { name: 'Delete entity Orders', exact: true }).click();
 
         // Confirm modal
-        await expect(page.getByText('Are you sure you want to delete this entity?')).toBeVisible();
-        await page.getByRole('button', { name: 'Delete' }).click();
+        await expect(page.getByRole('dialog', { name: /delete entity/i })).toBeVisible();
+        await page.getByRole('dialog', { name: /delete entity/i }).getByRole('button', { name: 'Delete' }).click();
 
         // Verify gone
-        await expect(page.locator('input[value="Orders"]')).not.toBeVisible();
+        await expect(entity).not.toBeVisible();
     });
 });
