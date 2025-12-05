@@ -12,7 +12,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 from importlib.resources import files
 
-from trellis_datamodel.config import FRONTEND_BUILD_DIR, print_config
+from trellis_datamodel import config as cfg
+from trellis_datamodel.config import print_config
 from trellis_datamodel.routes import manifest_router, data_model_router, schema_router
 
 
@@ -43,10 +44,17 @@ def create_app() -> FastAPI:
             static_dir_path = str(static_dir)
     except Exception:
         pass
-    
-    if not static_dir_path and os.path.exists(FRONTEND_BUILD_DIR):
-        static_dir_path = FRONTEND_BUILD_DIR
-    
+
+    # If package static is empty/missing index, prefer configured build dir
+    if static_dir_path:
+        index_candidate = os.path.join(static_dir_path, "index.html")
+        if not os.path.exists(index_candidate) and os.path.exists(
+            cfg.FRONTEND_BUILD_DIR
+        ):
+            static_dir_path = cfg.FRONTEND_BUILD_DIR
+    elif os.path.exists(cfg.FRONTEND_BUILD_DIR):
+        static_dir_path = cfg.FRONTEND_BUILD_DIR
+
     # Include API routers - these MUST be registered before mounting static files
     app.include_router(manifest_router)
     app.include_router(data_model_router)
@@ -80,7 +88,7 @@ def create_app() -> FastAPI:
     else:
         print(
             f"Warning: Frontend build not found. "
-            f"Bundled static files missing and {FRONTEND_BUILD_DIR} does not exist. "
+            f"Bundled static files missing and {cfg.FRONTEND_BUILD_DIR} does not exist. "
             f"Run 'npm run build' in frontend/ or install the package properly."
         )
 

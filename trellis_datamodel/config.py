@@ -175,6 +175,24 @@ def load_config(config_path: Optional[str] = None) -> None:
         if "canvas_layout_version_control" in config:
             CANVAS_LAYOUT_VERSION_CONTROL = config["canvas_layout_version_control"]
 
+        # 8. Frontend build directory
+        fe_env = os.environ.get("DATAMODEL_FRONTEND_BUILD_DIR")
+        if fe_env:
+            FRONTEND_BUILD_DIR = fe_env
+        elif "frontend_build_dir" in config:
+            p = config["frontend_build_dir"]
+            if not os.path.isabs(p):
+                FRONTEND_BUILD_DIR = os.path.abspath(
+                    os.path.join(os.path.dirname(CONFIG_PATH), p)
+                )
+            else:
+                FRONTEND_BUILD_DIR = p
+        else:
+            # Default: frontend/build next to config file (repo root)
+            FRONTEND_BUILD_DIR = os.path.abspath(
+                os.path.join(os.path.dirname(CONFIG_PATH), "frontend", "build")
+            )
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
