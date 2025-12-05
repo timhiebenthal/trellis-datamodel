@@ -641,11 +641,11 @@
     >
         <!-- Brand -->
         <div class="flex items-center gap-3">
-            <div
-                class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white shadow-sm"
-            >
-                <Icon icon="lucide:box" class="w-5 h-5" />
-            </div>
+            <img
+                src="/trellis_squared.svg"
+                alt="Trellis logo"
+                class="w-8 h-8 rounded-lg shadow-sm"
+            />
             <div class="flex flex-col">
                 <h1
                     class="font-bold text-lg text-gray-900 leading-tight tracking-tight"
