@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2025-12-06
+
+### Fixed
+- Fixed relationship persistence to dbt schema.yml files - relationships now correctly use bound dbt model names instead of entity IDs when writing relationship tests
+- Fixed relationship auto-inference from existing dbt tests - adapter now properly loads config and maps model names (including additional_models) to entity IDs
+- Fixed adapter factory to use live config values instead of stale module-level constants, ensuring inference works after config is loaded
+
+### Added
+- Added regression tests for relationship sync and inference, including support for additional_models and bound/unbound entities
+
 ## [0.1.4] - 2025-12-05
 
 ### Fixed
