@@ -23,6 +23,7 @@ classifiers = [
 ]
 dependencies = [
     "dbt-core>=1.6,<2.0",
+    "dbt-duckdb>=1.10.0",
     "fastapi>=0.121.3",
     "python-dotenv>=1.2.1",
     "pyyaml>=6.0.3",
