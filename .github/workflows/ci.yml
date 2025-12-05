@@ -41,3 +41,9 @@ jobs:
 
       - name: Run frontend e2e tests
         run: cd frontend && npm run test:e2e
+
+      - name: Build static files
+        run: |
+          cd frontend && npm run build
+          rm -rf trellis_datamodel/static/*
+          cp -r frontend/build/* trellis_datamodel/static/
