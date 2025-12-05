@@ -34,7 +34,7 @@ jobs:
         run: cd frontend && npm ci
 
       - name: Run Python tests
-        run: pytest
+        run: uv run pytest
 
       - name: Run frontend unit tests
         run: cd frontend && npm run test:unit
