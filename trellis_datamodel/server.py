@@ -4,10 +4,11 @@ Trellis Data - FastAPI Server
 This is the FastAPI application that serves the API and frontend.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 from importlib.resources import files
 
@@ -33,12 +34,7 @@ def create_app() -> FastAPI:
     def health_check():
         return {"status": "ok"}
 
-    # Include routers - MUST be before static files
-    app.include_router(manifest_router)
-    app.include_router(data_model_router)
-    app.include_router(schema_router)
-
-    # Find static files directory
+    # Find static files directory first
     static_dir_path = None
     try:
         # Try to get static files from package
@@ -51,21 +47,36 @@ def create_app() -> FastAPI:
     if not static_dir_path and os.path.exists(FRONTEND_BUILD_DIR):
         static_dir_path = FRONTEND_BUILD_DIR
     
+    # Include API routers - these MUST be registered before mounting static files
+    app.include_router(manifest_router)
+    app.include_router(data_model_router)
+    app.include_router(schema_router)
+    
+    # Mount static files AFTER API routes
+    # Important: app.mount() creates a sub-application, so we mount AFTER registering API routes
+    # However, mounted apps at "/" will intercept everything, so we need a different approach
     if static_dir_path:
-        # Serve static assets
+        # Serve static assets at /assets
         assets_path = os.path.join(static_dir_path, "assets")
         if os.path.exists(assets_path):
             app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
         
-        # SPA fallback - serve index.html for non-API routes
-        # This must be defined AFTER API routes so they take precedence
+        # Serve other static files (like favicon, etc.) at /_app
+        # SvelteKit builds put immutable assets in /_app
+        app_path = os.path.join(static_dir_path, "_app")
+        if os.path.exists(app_path):
+            app.mount("/_app", StaticFiles(directory=app_path), name="app")
+        
+        # Catch-all route for SPA - must be defined LAST
+        # FastAPI matches more specific routes first, so /api/* routes will match before this
         @app.get("/{full_path:path}", include_in_schema=False)
-        async def serve_frontend(full_path: str):
-            """Serve the SPA for all non-API routes."""
+        async def serve_spa(request: Request, full_path: str):
+            """Serve SPA index.html for non-API routes."""
+            # Serve index.html for all routes (API routes are already matched above)
             index_file = os.path.join(static_dir_path, "index.html")
             if os.path.exists(index_file):
                 return FileResponse(index_file)
-            return {"detail": "Not found"}
+            raise HTTPException(status_code=404, detail="Not found")
     else:
         print(
             f"Warning: Frontend build not found. "
