@@ -1,8 +1,8 @@
 import type { DbtModel, DataModel, DraftedField, ConfigStatus, ModelSchema, Relationship } from './types';
 
 /**
- * API base URL. Can be configured via PUBLIC_API_URL environment variable.
- * Defaults to http://localhost:8000/api for local development.
+ * API base URL. Uses relative URL when served from the same origin (production),
+ * or can be configured via PUBLIC_API_URL environment variable for development.
  * 
  * To override, set PUBLIC_API_URL in your .env file:
  *   PUBLIC_API_URL=http://your-backend-url/api
@@ -17,7 +17,8 @@ function getApiBase(): string {
     } catch {
         // Ignore - env not available
     }
-    return 'http://localhost:8000/api';
+    // Use relative URL - works when frontend is served by the backend
+    return '/api';
 }
 
 const API_BASE = getApiBase();

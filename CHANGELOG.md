@@ -5,11 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-12-05
+
+### Fixed
+- Fixed frontend API calls to use relative URL (`/api`) instead of hardcoded `localhost:8000`, allowing the app to work on any port
+- Improved CLI error message to show full expected path when trellis.yml is not found
+
 ## [0.1.3] - 2025-12-05
 
 ### Fixed
-- Fixed config-status API endpoint to use CONFIG_PATH from startup instead of re-searching from current working directory, preventing "Missing trellis.yml" error when config file exists
-- Improved CLI error message to show full expected path when trellis.yml is not found
+- Fixed config-status API endpoint to use CONFIG_PATH from startup instead of re-searching from current working directory
 
 ## [0.1.2] - 2025-12-05
 
