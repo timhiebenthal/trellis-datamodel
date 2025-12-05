@@ -1,3 +1,8 @@
 """Trellis Data - Visual data model editor for dbt projects."""
 
-__version__ = "0.1.4"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("trellis-datamodel")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
