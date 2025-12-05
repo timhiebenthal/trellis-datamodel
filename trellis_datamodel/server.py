@@ -33,13 +33,12 @@ def create_app() -> FastAPI:
     def health_check():
         return {"status": "ok"}
 
-    # Include routers
+    # Include routers - MUST be before static files
     app.include_router(manifest_router)
     app.include_router(data_model_router)
     app.include_router(schema_router)
 
-    # Mount static files (Frontend) - must be after API routes
-    # Try bundled static files first (from package), then fallback to local build
+    # Find static files directory
     static_dir_path = None
     try:
         # Try to get static files from package
@@ -53,9 +52,20 @@ def create_app() -> FastAPI:
         static_dir_path = FRONTEND_BUILD_DIR
     
     if static_dir_path:
-        # Mount static files with html=True for SPA routing
-        # FastAPI matches routes in order, so API routes registered above will take precedence
-        app.mount("/", StaticFiles(directory=static_dir_path, html=True), name="static")
+        # Serve static assets
+        assets_path = os.path.join(static_dir_path, "assets")
+        if os.path.exists(assets_path):
+            app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+        
+        # SPA fallback - serve index.html for non-API routes
+        # This must be defined AFTER API routes so they take precedence
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_frontend(full_path: str):
+            """Serve the SPA for all non-API routes."""
+            index_file = os.path.join(static_dir_path, "index.html")
+            if os.path.exists(index_file):
+                return FileResponse(index_file)
+            return {"detail": "Not found"}
     else:
         print(
             f"Warning: Frontend build not found. "
