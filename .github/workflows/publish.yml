@@ -6,12 +6,8 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  build-and-publish:
+  build:
     runs-on: ubuntu-latest
-    environment: pypi  # Must match PyPI trusted publisher config
-    permissions:
-      id-token: write  # Required for trusted publishing
-
     steps:
       - uses: actions/checkout@v4
 
@@ -41,9 +37,35 @@ jobs:
           rm -rf trellis_datamodel/static/*
           cp -r frontend/build/* trellis_datamodel/static/
 
+      - name: Version Check
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          python scripts/check_version.py
+
       - name: Build package
         run: uv build
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi  # Must match PyPI trusted publisher config
+    permissions:
+      id-token: write  # Required for trusted publishing
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
