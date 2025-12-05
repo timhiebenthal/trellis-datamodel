@@ -51,27 +51,39 @@ def run(
     Looks for trellis.yml or config.yml in the current directory.
     """
     # Load configuration
+    import os
+    
+    # Allow running without config file if test environment variables are set
+    is_test_mode = bool(os.environ.get("DATAMODEL_DATA_MODEL_PATH") or os.environ.get("DATAMODEL_TEST_DIR"))
+    
     config_path = config
     if not config_path:
         found_config = find_config_file()
         if not found_config:
-            import os
-
-            cwd = os.getcwd()
-            expected_path = os.path.join(cwd, "trellis.yml")
-            typer.echo(
-                typer.style(
-                    "Error: No config file found.",
-                    fg=typer.colors.RED,
+            if is_test_mode:
+                # Test mode: allow running without config file
+                config_path = None
+            else:
+                cwd = os.getcwd()
+                expected_path = os.path.join(cwd, "trellis.yml")
+                typer.echo(
+                    typer.style(
+                        "Error: No config file found.",
+                        fg=typer.colors.RED,
+                    )
                 )
-            )
-            typer.echo(f"   Expected location: {expected_path}")
-            typer.echo()
-            typer.echo("   Run 'trellis init' to create a starter config file.")
-            raise typer.Exit(1)
-        config_path = found_config
+                typer.echo(f"   Expected location: {expected_path}")
+                typer.echo()
+                typer.echo("   Run 'trellis init' to create a starter config file.")
+                raise typer.Exit(1)
+        else:
+            config_path = found_config
 
-    load_config(config_path)
+    if config_path:
+        load_config(config_path)
+    elif is_test_mode:
+        # Test mode: config will be loaded from environment variables
+        load_config(None)
 
     # Print startup info
     typer.echo(
@@ -102,6 +114,25 @@ def run(
         reload=False,  # Disable reload in production
         log_level="info",
     )
+
+
+@app.command(name="serve")
+def serve(
+    port: int = typer.Option(8089, "--port", "-p", help="Port to run the server on"),
+    config: Optional[str] = typer.Option(
+        None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"
+    ),
+    no_browser: bool = typer.Option(
+        False, "--no-browser", help="Don't open browser automatically"
+    ),
+):
+    """
+    Start the Trellis server (alias for 'run').
+
+    Looks for trellis.yml or config.yml in the current directory.
+    """
+    # Delegate to run function
+    run(port=port, config=config, no_browser=no_browser)
 
 
 @app.command()
