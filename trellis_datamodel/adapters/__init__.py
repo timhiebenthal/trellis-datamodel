@@ -6,14 +6,7 @@ Provides get_adapter() to instantiate the appropriate adapter based on config.
 
 from typing import Union
 
-from trellis_datamodel.config import (
-    FRAMEWORK,
-    MANIFEST_PATH,
-    CATALOG_PATH,
-    DBT_PROJECT_PATH,
-    DATA_MODEL_PATH,
-    DBT_MODEL_PATHS,
-)
+from trellis_datamodel import config as cfg
 from .base import TransformationAdapter
 from .dbt_core import DbtCoreAdapter
 
@@ -28,17 +21,18 @@ def get_adapter() -> Union[DbtCoreAdapter, TransformationAdapter]:
     Raises:
         ValueError: If the configured framework is not supported.
     """
-    if FRAMEWORK == "dbt-core":
+    # Always read from the live config module (cfg) to respect load_config()
+    if cfg.FRAMEWORK == "dbt-core":
         return DbtCoreAdapter(
-            manifest_path=MANIFEST_PATH,
-            catalog_path=CATALOG_PATH,
-            project_path=DBT_PROJECT_PATH,
-            data_model_path=DATA_MODEL_PATH,
-            model_paths=DBT_MODEL_PATHS,
+            manifest_path=cfg.MANIFEST_PATH,
+            catalog_path=cfg.CATALOG_PATH,
+            project_path=cfg.DBT_PROJECT_PATH,
+            data_model_path=cfg.DATA_MODEL_PATH,
+            model_paths=cfg.DBT_MODEL_PATHS,
         )
 
     raise ValueError(
-        f"Unknown framework: {FRAMEWORK}. "
+        f"Unknown framework: {cfg.FRAMEWORK}. "
         f"Supported frameworks: dbt-core"
     )
 
