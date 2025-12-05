@@ -47,6 +47,7 @@ jobs:
 
       - name: Build static files
         run: |
-          cd frontend && npm run build
-          rm -rf trellis_datamodel/static/*
-          cp -r frontend/build/* trellis_datamodel/static/
+          cd frontend
+          npm run build
+          rm -rf ../trellis_datamodel/static/*
+          cp -r build/* ../trellis_datamodel/static/
