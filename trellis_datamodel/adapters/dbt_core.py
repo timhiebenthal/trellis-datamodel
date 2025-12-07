@@ -332,6 +332,10 @@ class DbtCoreAdapter:
                                     "field", ""
                                 )
 
+                                # If either ref target or field is missing, skip and log for debugging
+                                if not to_ref or not target_field:
+                                    continue
+
                                 # Parse ref('model_name')
                                 target_model = to_ref
                                 if to_ref.startswith("ref('") and to_ref.endswith("')"):
