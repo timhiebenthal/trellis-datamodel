@@ -234,23 +234,29 @@ class YamlHandler:
             target_model: Target model name (will be wrapped in ref())
             target_field: Target field name
         """
-        if "data_tests" not in column:
-            column["data_tests"] = CommentedSeq()
+        existing_tests = CommentedSeq()
 
-        data_tests = column["data_tests"]
+        # Collect non-relationship tests from both tests and data_tests keys
+        for key in ("data_tests", "tests"):
+            if key in column:
+                for test in column.get(key, []):
+                    if isinstance(test, dict) and "relationships" in test:
+                        continue
+                    existing_tests.append(test)
 
-        # Remove existing relationship tests
-        column["data_tests"] = CommentedSeq(
-            [t for t in data_tests if "relationships" not in t]
-        )
-
-        # Add new relationship test
+        # Build new relationships test using recommended arguments block
         rel_test = CommentedMap()
         rel_test["relationships"] = CommentedMap()
-        rel_test["relationships"]["to"] = f"ref('{target_model}')"
-        rel_test["relationships"]["field"] = target_field
+        rel_test["relationships"]["arguments"] = CommentedMap()
+        rel_test["relationships"]["arguments"]["to"] = f"ref('{target_model}')"
+        rel_test["relationships"]["arguments"]["field"] = target_field
 
-        column["data_tests"].append(rel_test)
+        existing_tests.append(rel_test)
+
+        column["data_tests"] = existing_tests
+        # Drop tests key if present to avoid confusion
+        if "tests" in column:
+            del column["tests"]
 
     def update_columns_batch(
         self,
@@ -296,12 +302,17 @@ class YamlHandler:
                 "description": col.get("description"),
             }
 
-            # Extract data_tests if present
-            if "data_tests" in col:
-                col_dict["data_tests"] = []
-                for test in col.get("data_tests", []):
+            # Extract tests (supports both dbt's tests and data_tests keys)
+            collected_tests: list[dict[str, Any]] = []
+            for key in ("data_tests", "tests"):
+                if key not in col:
+                    continue
+                for test in col.get(key, []):
                     if isinstance(test, dict):
-                        col_dict["data_tests"].append(dict(test))
+                        collected_tests.append(dict(test))
+
+            if collected_tests:
+                col_dict["data_tests"] = collected_tests
 
             result.append(col_dict)
 

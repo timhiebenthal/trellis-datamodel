@@ -20,8 +20,9 @@ models:
         data_type: text
         data_tests:
         - relationships:
-            to: ref('team')
-            field: team_id
+            arguments:
+              to: ref('team')
+              field: team_id
         description: current team's ID
       config:
         tags:

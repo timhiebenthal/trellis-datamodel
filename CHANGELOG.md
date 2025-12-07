@@ -7,21 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2025-12-07
+
 ### Added
-- Added trellis_squared.svg as favicon and header logo
-- Logo is now bundled as an asset for reliable loading in production
+- Relationship inference now supports dbt `relationships` tests that use the `arguments` block, matching dbt’s official syntax
+- Added regression test to cover inference from `arguments`-based relationship definitions
+- Regression test ensuring the server serves `index.html` from a configured frontend build directory
+
+### Fixed
+- Backend now prefers the configured frontend build dir when bundled static assets are missing, so `/` serves the UI instead of returning 404 when running from source
+- Relationship inference now ignores malformed `relationships` tests that are missing `to`/`field`, preventing blank-source edges and noisy debug output
 
 ### Changed
 - Updated header branding to use lowercase "trellis" for consistency
 - Replaced iconify box icon with trellis_squared.svg logo in header
-
-## [0.1.6] - 2025-12-06
-
-### Fixed
-- Backend now prefers the configured frontend build dir when bundled static assets are missing, so `/` serves the UI instead of returning 404 when running from source
-
-### Added
-- Regression test ensuring the server serves `index.html` from a configured frontend build directory
 
 ## [0.1.5] - 2025-12-06
 
@@ -31,7 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed adapter factory to use live config values instead of stale module-level constants, ensuring inference works after config is loaded
 
 ### Added
+- Added trellis_squared.svg as favicon and header logo
+- Logo is now bundled as an asset for reliable loading in production
 - Added regression tests for relationship sync and inference, including support for additional_models and bound/unbound entities
+
+### Changed
+- Updated header branding to use lowercase "trellis" for consistency
+- Replaced iconify box icon with trellis_squared.svg logo in header
 
 ## [0.1.4] - 2025-12-05
 

@@ -202,8 +202,8 @@ class TestYamlHandlerRelationshipTests:
         assert "data_tests" in col
         assert len(col["data_tests"]) == 1
         rel = col["data_tests"][0]["relationships"]
-        assert rel["to"] == "ref('users')"
-        assert rel["field"] == "id"
+        assert rel["arguments"]["to"] == "ref('users')"
+        assert rel["arguments"]["field"] == "id"
 
     def test_add_relationship_test_replaces_existing(self):
         handler = YamlHandler()
@@ -225,4 +225,4 @@ class TestYamlHandlerRelationshipTests:
         # Should replace relationship but keep other tests
         assert len(col["data_tests"]) == 2
         rel_test = next(t for t in col["data_tests"] if "relationships" in t)
-        assert rel_test["relationships"]["to"] == "ref('new_model')"
+        assert rel_test["relationships"]["arguments"]["to"] == "ref('new_model')"

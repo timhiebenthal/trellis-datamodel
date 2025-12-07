@@ -65,9 +65,50 @@
             const inferred = await inferRelationships();
             if (inferred.length > 0) {
                 let addedCount = 0;
+                let addedNodes = 0;
                 const newEdges = [...$edges];
+                const existingEntityIds = new Set(
+                    $nodes.filter((n) => n.type === "entity").map((n) => n.id),
+                );
+
+                function maybeAddEntity(id: string | undefined | null) {
+                    if (!id) return;
+                    if (existingEntityIds.has(id)) return;
+
+                    const model =
+                        $dbtModels.find(
+                            (m) => m.unique_id === id || m.name === id,
+                        ) ?? null;
+                    const folder = model ? getModelFolder(model) : null;
+
+                    const newNode: Node = {
+                        id,
+                        type: "entity",
+                        position: { x: 200 + addedNodes * 60, y: 200 },
+                        zIndex: 10,
+                        data: {
+                            label: model?.name ?? id,
+                            description: model?.description ?? "",
+                            dbt_model: model?.unique_id ?? null,
+                            additional_models: model?.alias ? [model.alias] : [],
+                            drafted_fields: [],
+                            width: 280,
+                            panelHeight: 200,
+                            collapsed: false,
+                            folder,
+                            tags: model?.tags ?? [],
+                        },
+                    };
+
+                    $nodes = [...$nodes, newNode];
+                    existingEntityIds.add(id);
+                    addedNodes += 1;
+                }
 
                 inferred.forEach((r: any) => {
+                    maybeAddEntity(r.source);
+                    maybeAddEntity(r.target);
+
                     const exists = newEdges.some(
                         (e) =>
                             e.source === r.source &&
@@ -110,7 +151,12 @@
 
                 if (addedCount > 0) {
                     $edges = newEdges;
-                    syncMessage = `✓ Added ${addedCount} new`;
+                    syncMessage = `✓ Added ${addedCount} new${addedNodes ? `, ${addedNodes} nodes` : ""}`;
+                    setTimeout(() => {
+                        syncMessage = null;
+                    }, 3000);
+                } else if (addedNodes > 0) {
+                    syncMessage = `✓ Added ${addedNodes} nodes`;
                     setTimeout(() => {
                         syncMessage = null;
                     }, 3000);
