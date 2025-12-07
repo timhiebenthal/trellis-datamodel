@@ -313,15 +313,20 @@ class DbtCoreAdapter:
 
                         columns = model.get("columns", [])
                         for column in columns:
-                            data_tests = column.get("data_tests", [])
-                            for test in data_tests:
-                                if "relationships" not in test:
+                            test_blocks = []
+                            for key in ("tests", "data_tests"):
+                                value = column.get(key, [])
+                                if isinstance(value, list):
+                                    test_blocks.extend(value)
+
+                            for test in test_blocks:
+                                if not isinstance(test, dict) or "relationships" not in test:
                                     continue
 
                                 rel_test = test["relationships"]
                                 args = rel_test.get("arguments", {}) or {}
 
-                                # Support both top-level and arguments block
+                                # Support both the recommended arguments block and legacy top-level keys
                                 to_ref = rel_test.get("to", "") or args.get("to", "")
                                 target_field = rel_test.get("field", "") or args.get(
                                     "field", ""
@@ -557,8 +562,10 @@ class DbtCoreAdapter:
                 column_dict["data_tests"] = [
                     {
                         "relationships": {
-                            "to": f"ref('{ref_model}')",
-                            "field": rel_info["target_field"],
+                            "arguments": {
+                                "to": f"ref('{ref_model}')",
+                                "field": rel_info["target_field"],
+                            }
                         }
                     }
                 ]

@@ -121,7 +121,13 @@ class TestSyncDbtTests:
             schema = yaml.safe_load(f)
 
         rel_tests = schema["models"][0]["columns"][0]["data_tests"]
-        assert rel_tests == [{"relationships": {"to": "ref('customers')", "field": "id"}}]
+        assert rel_tests == [
+            {
+                "relationships": {
+                    "arguments": {"to": "ref('customers')", "field": "id"},
+                }
+            }
+        ]
 
 
 class TestGetModelSchema:
@@ -195,8 +201,12 @@ class TestInferRelationships:
                         {
                             "name": "user_id",
                             "data_type": "int",
-                            "data_tests": [
-                                {"relationships": {"to": "ref('users')", "field": "id"}}
+                            "tests": [
+                                {
+                                    "relationships": {
+                                        "arguments": {"to": "ref('users')", "field": "id"}
+                                    }
+                                }
                             ],
                         }
                     ],
@@ -233,8 +243,10 @@ class TestInferRelationships:
                             "data_tests": [
                                 {
                                     "relationships": {
-                                        "to": "ref('team')",
-                                        "field": "team_id",
+                                        "arguments": {
+                                            "to": "ref('team')",
+                                            "field": "team_id",
+                                        },
                                     }
                                 }
                             ],
@@ -245,8 +257,10 @@ class TestInferRelationships:
                             "data_tests": [
                                 {
                                     "relationships": {
-                                        "to": "ref('team')",
-                                        "field": "team_id",
+                                        "arguments": {
+                                            "to": "ref('team')",
+                                            "field": "team_id",
+                                        },
                                     }
                                 }
                             ],
@@ -368,7 +382,14 @@ class TestInferRelationships:
                             "name": "id",
                             "data_type": "int",
                             "data_tests": [
-                                {"relationships": {"to": "ref('orders')", "field": "order_id"}}
+                                {
+                                    "relationships": {
+                                        "arguments": {
+                                            "to": "ref('orders')",
+                                            "field": "order_id",
+                                        },
+                                    }
+                                }
                             ],
                         }
                     ],

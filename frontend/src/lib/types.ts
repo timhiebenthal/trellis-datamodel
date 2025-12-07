@@ -109,8 +109,12 @@ export interface FieldDragState {
 
 export interface RelationshipTest {
     relationships: {
-        to: string;
-        field: string;
+        arguments?: {
+            to: string;
+            field: string;
+        };
+        to?: string;
+        field?: string;
     };
 }
 
