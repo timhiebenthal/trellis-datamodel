@@ -319,8 +319,13 @@ class DbtCoreAdapter:
                                     continue
 
                                 rel_test = test["relationships"]
-                                to_ref = rel_test.get("to", "")
-                                target_field = rel_test.get("field", "")
+                                args = rel_test.get("arguments", {}) or {}
+
+                                # Support both top-level and arguments block
+                                to_ref = rel_test.get("to", "") or args.get("to", "")
+                                target_field = rel_test.get("field", "") or args.get(
+                                    "field", ""
+                                )
 
                                 # Parse ref('model_name')
                                 target_model = to_ref

@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated header branding to use lowercase "trellis" for consistency
 - Replaced iconify box icon with trellis_squared.svg logo in header
 
+## [0.1.7] - 2025-12-07
+
+### Added
+- Relationship inference now supports dbt `relationships` tests that use the `arguments` block, matching dbt’s official syntax
+- Added regression test to cover inference from `arguments`-based relationship definitions
+
 ## [0.1.6] - 2025-12-06
 
 ### Fixed

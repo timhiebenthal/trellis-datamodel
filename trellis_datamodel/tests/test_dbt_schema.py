@@ -1,5 +1,6 @@
 """Tests for dbt schema API endpoints."""
 import os
+import shutil
 import yaml
 import json
 import pytest
@@ -281,6 +282,56 @@ class TestInferRelationships:
             }
             for r in rels
         ]
+
+    def test_infers_relationships_with_arguments_block(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        The app should recognize dbt's arguments syntax for relationship tests.
+        """
+        models_dir = os.path.join(temp_dir, "models", "3_core")
+        # Clean out prior test artifacts to avoid cross-test contamination
+        shutil.rmtree(models_dir, ignore_errors=True)
+        os.makedirs(models_dir, exist_ok=True)
+
+        schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "orders",
+                    "columns": [
+                        {
+                            "name": "customer_id",
+                            "data_type": "int",
+                            "data_tests": [
+                                {
+                                    "relationships": {
+                                        "arguments": {
+                                            "to": "ref('customers')",
+                                            "field": "id",
+                                        },
+                                        "config": {"severity": "error"},
+                                    }
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with open(os.path.join(models_dir, "orders.yml"), "w") as f:
+            yaml.dump(schema, f)
+
+        response = test_client.get("/api/infer-relationships")
+        assert response.status_code == 200
+
+        rels = response.json()["relationships"]
+        assert len(rels) == 1
+        assert rels[0]["source"] == "customers"
+        assert rels[0]["target"] == "orders"
+        assert rels[0]["source_field"] == "id"
+        assert rels[0]["target_field"] == "customer_id"
 
     def test_maps_additional_models_to_entity_ids(self, test_client, temp_dir, temp_data_model_path):
         """
