@@ -167,6 +167,7 @@ class DbtCoreAdapter:
                 {
                     "unique_id": unique_id,
                     "name": node.get("name"),
+                    "version": node.get("version"),
                     "schema": node.get("schema"),
                     "table": node.get("alias", node.get("name")),
                     "columns": columns,

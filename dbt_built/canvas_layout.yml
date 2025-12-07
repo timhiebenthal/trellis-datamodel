@@ -3,21 +3,21 @@ entities:
   player:
     position:
       x: 40
-      y: 70
+      y: 100
     width: 317.818115234375
     panel_height: 480
     collapsed: false
   team:
     position:
-      x: 450.5305456610912
-      y: 83.77736549165121
+      x: 40
+      y: 100
     width: 280
     panel_height: 200
     collapsed: false
   game:
     position:
-      x: 883.3097664403119
-      y: 257.12987012987014
+      x: 472.77922077922074
+      y: 273.35250463821893
     width: 280
     panel_height: 200
     collapsed: false

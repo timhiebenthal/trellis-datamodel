@@ -21,6 +21,7 @@ class ModelInfo(TypedDict):
 
     unique_id: str
     name: str
+    version: Optional[int]
     schema: str
     table: str
     columns: list[ColumnInfo]
