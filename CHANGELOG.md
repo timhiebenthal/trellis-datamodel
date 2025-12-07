@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2025-12-07
+
 ### Added
 - Relationship inference now supports dbt `relationships` tests that use the `arguments` block, matching dbt’s official syntax
 - Added regression test to cover inference from `arguments`-based relationship definitions
