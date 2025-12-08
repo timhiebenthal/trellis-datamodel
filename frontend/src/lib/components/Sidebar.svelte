@@ -53,10 +53,7 @@
         $dbtModels.filter((m) => {
             // Search filter
             const label = getModelLabel(m);
-            if (
-                !m.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                !label.toLowerCase().includes(searchTerm.toLowerCase())
-            ) {
+            if (!label.toLowerCase().includes(searchTerm.toLowerCase())) {
                 return false;
             }
 
@@ -150,7 +147,6 @@
                     model: m,
                 };
             });
-            }));
 
             folderNodes.sort((a: TreeNode, b: TreeNode) =>
                 a.name.localeCompare(b.name),
