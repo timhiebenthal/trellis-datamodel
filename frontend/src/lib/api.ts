@@ -121,13 +121,18 @@ export async function inferRelationships(): Promise<Relationship[]> {
     try {
         const res = await fetch(`${API_BASE}/infer-relationships`);
         if (!res.ok) {
-            if (res.status === 404) return []; // Handle gracefully
+            // Handle 400 (no schema files) and 404 (endpoint not found) gracefully
+            if (res.status === 400 || res.status === 404) return [];
             throw new Error(`Status: ${res.status}`);
         }
         const data = await res.json();
         return data.relationships || [];
     } catch (e) {
-        console.error("Error inferring relationships:", e);
+        // Don't log expected errors (400 = no schema files, 404 = endpoint not found)
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        if (!errorMessage.includes('400') && !errorMessage.includes('404')) {
+            console.error("Error inferring relationships:", e);
+        }
         return [];
     }
 }
