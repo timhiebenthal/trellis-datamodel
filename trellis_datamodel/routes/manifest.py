@@ -20,17 +20,18 @@ from trellis_datamodel.adapters import get_adapter
 router = APIRouter(prefix="/api", tags=["manifest"])
 
 
+def _resolve_config_path() -> str | None:
+    """Resolve config file path, preferring CONFIG_PATH from startup, falling back to search."""
+    if CONFIG_PATH and os.path.exists(CONFIG_PATH):
+        return CONFIG_PATH
+    return find_config_file()
+
+
 @router.get("/config-status")
 async def get_config_status():
     """Return configuration status for the frontend."""
-    # Check if config exists - use CONFIG_PATH from startup if available
-    # If CONFIG_PATH is set (loaded at startup), use that. Otherwise search.
-    if CONFIG_PATH and os.path.exists(CONFIG_PATH):
-        found_config = CONFIG_PATH
-        config_present = True
-    else:
-        found_config = find_config_file()
-        config_present = found_config is not None
+    found_config = _resolve_config_path()
+    config_present = found_config is not None
 
     # Determine expected config filename for display
     if config_present:
@@ -70,10 +71,7 @@ async def get_config_info():
     """
     Return resolved config paths and their existence for transparency/debugging.
     """
-    if CONFIG_PATH and os.path.exists(CONFIG_PATH):
-        config_path = CONFIG_PATH
-    else:
-        config_path = find_config_file()
+    config_path = _resolve_config_path()
 
     adapter = get_adapter()
     try:
