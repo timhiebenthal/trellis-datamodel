@@ -297,6 +297,61 @@ class TestInferRelationships:
             for r in rels
         ]
 
+    def test_infers_relationships_across_multiple_model_paths(
+        self, test_client, temp_dir
+    ):
+        """
+        When multiple dbt model paths are configured (including with a models/ prefix),
+        all should be scanned.
+        """
+        from trellis_datamodel import config as cfg
+
+        # Add an extra model path and point to a different directory
+        extra_models_dir = os.path.join(temp_dir, "models", "3_entity")
+        os.makedirs(extra_models_dir, exist_ok=True)
+
+        original_paths = list(cfg.DBT_MODEL_PATHS)
+        try:
+            cfg.DBT_MODEL_PATHS = ["3_core", "models/3_entity"]
+
+            schema = {
+                "version": 2,
+                "models": [
+                    {
+                        "name": "opportunity",
+                        "columns": [
+                            {
+                                "name": "product_id",
+                                "data_tests": [
+                                    {
+                                        "relationships": {
+                                            "arguments": {
+                                                "to": "ref('product')",
+                                                "field": "product_id",
+                                            }
+                                        }
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+
+            with open(os.path.join(extra_models_dir, "opportunity.yml"), "w") as f:
+                yaml.dump(schema, f)
+
+            response = test_client.get("/api/infer-relationships")
+            assert response.status_code == 200
+
+            rels = response.json()["relationships"]
+            assert {"source": "product", "target": "opportunity"} in [
+                {"source": r["source"], "target": r["target"]} for r in rels
+            ]
+        finally:
+            cfg.DBT_MODEL_PATHS = original_paths
+            shutil.rmtree(extra_models_dir, ignore_errors=True)
+
     def test_infers_relationships_with_arguments_block(
         self, test_client, temp_dir, temp_data_model_path
     ):
