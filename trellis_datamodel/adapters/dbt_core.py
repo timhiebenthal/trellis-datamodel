@@ -87,10 +87,9 @@ class DbtCoreAdapter:
             if subdir.startswith(prefix):
                 subdir = subdir[len(prefix) :]
 
-            return (
-                os.path.abspath(os.path.join(self.project_path, "models", subdir))
-                .rstrip(os.sep)
-            )
+            return os.path.abspath(
+                os.path.join(self.project_path, "models", subdir)
+            ).rstrip(os.sep)
 
         if self.model_paths:
             # Remove duplicates while preserving order
@@ -107,9 +106,9 @@ class DbtCoreAdapter:
             os.path.abspath(os.path.join(self.project_path, "models")).rstrip(os.sep)
         ]
 
-    def _get_models_dir(self) -> str:
-        """Get the primary models directory path (kept for backwards compatibility)."""
-        return self._get_model_dirs()[0]
+    def get_model_dirs(self) -> list[str]:
+        """Public accessor for resolved model directories (used for diagnostics/UI)."""
+        return self._get_model_dirs()
 
     def _entity_to_model_name(self, entity: dict[str, Any]) -> str:
         """
@@ -360,17 +359,22 @@ class DbtCoreAdapter:
                                         test_blocks.extend(value)
 
                                 for test in test_blocks:
-                                    if not isinstance(test, dict) or "relationships" not in test:
+                                    if (
+                                        not isinstance(test, dict)
+                                        or "relationships" not in test
+                                    ):
                                         continue
 
                                     rel_test = test["relationships"]
                                     args = rel_test.get("arguments", {}) or {}
 
                                     # Support both the recommended arguments block and legacy top-level keys
-                                    to_ref = rel_test.get("to", "") or args.get("to", "")
-                                    target_field = rel_test.get("field", "") or args.get(
-                                        "field", ""
+                                    to_ref = rel_test.get("to", "") or args.get(
+                                        "to", ""
                                     )
+                                    target_field = rel_test.get(
+                                        "field", ""
+                                    ) or args.get("field", "")
 
                                     # If either ref target or field is missing, skip and log for debugging
                                     if not to_ref or not target_field:
@@ -378,7 +382,9 @@ class DbtCoreAdapter:
 
                                     # Parse ref('model_name')
                                     target_model = to_ref
-                                    if to_ref.startswith("ref('") and to_ref.endswith("')"):
+                                    if to_ref.startswith("ref('") and to_ref.endswith(
+                                        "')"
+                                    ):
                                         target_model = to_ref[5:-2]
                                     elif to_ref.startswith('ref("') and to_ref.endswith(
                                         '")'
@@ -464,7 +470,7 @@ class DbtCoreAdapter:
                 }
             )
 
-        models_dir = self._get_models_dir()
+        models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
 
         updated_files: list[Path] = []
@@ -607,7 +613,9 @@ class DbtCoreAdapter:
             field_name = field["name"]
             if field_name in field_to_relationship:
                 rel_info = field_to_relationship[field_name]
-                ref_model = entity_model_name.get(rel_info["target_entity"], rel_info["target_entity"])
+                ref_model = entity_model_name.get(
+                    rel_info["target_entity"], rel_info["target_entity"]
+                )
                 column_dict["data_tests"] = [
                     {
                         "relationships": {
@@ -637,7 +645,7 @@ class DbtCoreAdapter:
             "models": [model_dict],
         }
 
-        models_dir = self._get_models_dir()
+        models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
         output_path = os.path.join(models_dir, f"{entity_id}.yml")
 
@@ -647,4 +655,3 @@ class DbtCoreAdapter:
             yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
 
         return Path(output_path)
-
