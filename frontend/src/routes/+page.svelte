@@ -115,7 +115,7 @@
                             label: model?.name ?? id,
                             description: model?.description ?? "",
                             dbt_model: model?.unique_id ?? null,
-                            additional_models: model?.alias ? [model.alias] : [],
+                            additional_models: [],
                             drafted_fields: [],
                             width: 280,
                             panelHeight: 200,
