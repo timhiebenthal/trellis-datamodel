@@ -323,10 +323,12 @@ class DbtCoreAdapter:
 
     def infer_relationships(self) -> list[Relationship]:
         """Scan dbt yml files and infer entity relationships from relationship tests."""
+        model_dirs = self._get_model_dirs()
         model_to_entity = self._get_model_to_entity_map()
         relationships: list[Relationship] = []
+        yml_found = False
 
-        for models_dir in self._get_model_dirs():
+        for models_dir in model_dirs:
             if not os.path.exists(models_dir):
                 continue
 
@@ -334,6 +336,7 @@ class DbtCoreAdapter:
                 for filename in files:
                     if not filename.endswith((".yml", ".yaml")):
                         continue
+                    yml_found = True
 
                     filepath = os.path.join(root, filename)
                     try:
@@ -399,6 +402,11 @@ class DbtCoreAdapter:
                     except Exception as e:
                         print(f"Warning: Could not parse {filepath}: {e}")
                         continue
+
+        if not yml_found:
+            raise FileNotFoundError(
+                f"No schema yml files found under configured dbt model paths: {model_dirs}"
+            )
 
         # Remove duplicates
         seen: set[tuple] = set()

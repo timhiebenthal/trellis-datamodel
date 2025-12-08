@@ -184,8 +184,8 @@ class TestInferRelationships:
 
     def test_returns_empty_for_no_yml_files(self, test_client, temp_dir):
         response = test_client.get("/api/infer-relationships")
-        assert response.status_code == 200
-        assert response.json()["relationships"] == []
+        assert response.status_code == 400
+        assert "No schema yml files found" in response.json()["detail"]
 
     def test_infers_relationships_from_tests(self, test_client, temp_dir):
         # Create a YML file with relationship tests
