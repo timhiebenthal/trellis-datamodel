@@ -1,4 +1,5 @@
 """Tests for dbt schema API endpoints."""
+
 import os
 import shutil
 import yaml
@@ -41,7 +42,9 @@ class TestSaveDbtSchema:
 class TestSyncDbtTests:
     """Tests for POST /api/sync-dbt-tests endpoint."""
 
-    def test_syncs_relationship_tests(self, test_client, temp_dir, temp_data_model_path):
+    def test_syncs_relationship_tests(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
         # Create data model with entities and relationships
         data_model = {
             "version": 0.1,
@@ -204,7 +207,10 @@ class TestInferRelationships:
                             "tests": [
                                 {
                                     "relationships": {
-                                        "arguments": {"to": "ref('users')", "field": "id"}
+                                        "arguments": {
+                                            "to": "ref('users')",
+                                            "field": "id",
+                                        }
                                     }
                                 }
                             ],
@@ -278,7 +284,12 @@ class TestInferRelationships:
 
         rels = response.json()["relationships"]
         assert len(rels) == 2
-        assert {"source": "team", "target": "game", "source_field": "team_id", "target_field": "home_team_id"} in [
+        assert {
+            "source": "team",
+            "target": "game",
+            "source_field": "team_id",
+            "target_field": "home_team_id",
+        } in [
             {
                 "source": r["source"],
                 "target": r["target"],
@@ -287,7 +298,12 @@ class TestInferRelationships:
             }
             for r in rels
         ]
-        assert {"source": "team", "target": "game", "source_field": "team_id", "target_field": "away_team_id"} in [
+        assert {
+            "source": "team",
+            "target": "game",
+            "source_field": "team_id",
+            "target_field": "away_team_id",
+        } in [
             {
                 "source": r["source"],
                 "target": r["target"],
@@ -402,7 +418,9 @@ class TestInferRelationships:
         assert rels[0]["source_field"] == "id"
         assert rels[0]["target_field"] == "customer_id"
 
-    def test_maps_additional_models_to_entity_ids(self, test_client, temp_dir, temp_data_model_path):
+    def test_maps_additional_models_to_entity_ids(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
         """
         Relationship inference should translate additional_models to their entity IDs.
         """

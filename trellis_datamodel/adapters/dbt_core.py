@@ -65,9 +65,9 @@ class DbtCoreAdapter:
             print(f"Warning: Could not load data model: {e}")
             return {}
 
-    def _get_model_dirs(self) -> list[str]:
+    def get_model_dirs(self) -> list[str]:
         """
-        Get all configured models directory paths, normalizing common dbt prefixes.
+        Resolve configured models directories, normalizing common dbt prefixes.
 
         Users may configure entries like "3_core", "models/3_entity", or absolute
         paths. We normalize these to real directories so downstream scans work.
@@ -105,10 +105,6 @@ class DbtCoreAdapter:
         return [
             os.path.abspath(os.path.join(self.project_path, "models")).rstrip(os.sep)
         ]
-
-    def get_model_dirs(self) -> list[str]:
-        """Public accessor for resolved model directories (used for diagnostics/UI)."""
-        return self._get_model_dirs()
 
     def _entity_to_model_name(self, entity: dict[str, Any]) -> str:
         """
@@ -322,7 +318,7 @@ class DbtCoreAdapter:
 
     def infer_relationships(self) -> list[Relationship]:
         """Scan dbt yml files and infer entity relationships from relationship tests."""
-        model_dirs = self._get_model_dirs()
+        model_dirs = self.get_model_dirs()
         model_to_entity = self._get_model_to_entity_map()
         relationships: list[Relationship] = []
         yml_found = False

@@ -1,4 +1,12 @@
-import type { DbtModel, DataModel, DraftedField, ConfigStatus, ModelSchema, Relationship } from './types';
+import type {
+    DbtModel,
+    DataModel,
+    DraftedField,
+    ConfigStatus,
+    ConfigInfo,
+    ModelSchema,
+    Relationship,
+} from './types';
 
 /**
  * API base URL. Uses relative URL when served from the same origin (production),
@@ -76,6 +84,17 @@ export async function getConfigStatus(): Promise<ConfigStatus> {
             catalog_exists: false,
             data_model_exists: false,
         };
+    }
+}
+
+export async function getConfigInfo(): Promise<ConfigInfo | null> {
+    try {
+        const res = await fetch(`${API_BASE}/config-info`);
+        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching config info:", e);
+        return null;
     }
 }
 

@@ -180,4 +180,3 @@ async def infer_relationships():
         raise HTTPException(
             status_code=500, detail=f"Error inferring relationships: {str(e)}"
         )
-

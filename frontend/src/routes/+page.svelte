@@ -21,6 +21,7 @@
         getDataModel,
         saveDataModel,
         getConfigStatus,
+        getConfigInfo,
         inferRelationships,
         syncDbtTests,
     } from "$lib/api";
@@ -28,8 +29,9 @@
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
+    import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { DbtModel } from "$lib/types";
+    import type { ConfigInfo, DbtModel } from "$lib/types";
     import Icon from "@iconify/svelte";
     import logoHref from "$lib/assets/trellis_squared.svg?url";
 
@@ -38,6 +40,10 @@
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
     let lastSavedState = "";
+    let showConfigInfoModal = $state(false);
+    let configInfoLoading = $state(false);
+    let configInfoError = $state<string | null>(null);
+    let configInfo = $state<ConfigInfo | null>(null);
 
     async function handleSyncDbt() {
         syncing = true;
@@ -55,6 +61,25 @@
             }, 5000);
         } finally {
             syncing = false;
+        }
+    }
+
+    async function handleOpenConfigInfo() {
+        showConfigInfoModal = true;
+        configInfoLoading = true;
+        configInfoError = null;
+        try {
+            const info = await getConfigInfo();
+            if (!info) {
+                configInfoError = "Unable to fetch config info";
+            } else {
+                configInfo = info;
+            }
+        } catch (e) {
+            console.error(e);
+            configInfoError = "Unable to fetch config info";
+        } finally {
+            configInfoLoading = false;
         }
     }
 
@@ -771,6 +796,15 @@
             <div class="h-6 w-px bg-gray-200 mx-1"></div>
 
             <button
+                onclick={handleOpenConfigInfo}
+                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm"
+                title="Show resolved config paths"
+            >
+                <Icon icon="lucide:info" class="w-4 h-4" />
+                Config info
+            </button>
+
+            <button
                 onclick={handleAutoLayout}
                 disabled={loading}
                 class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
@@ -815,6 +849,15 @@
         ></div>
         <Canvas />
     </main>
+
+    <ConfigInfoModal
+        open={showConfigInfoModal}
+        info={configInfo}
+        loading={configInfoLoading}
+        error={configInfoError}
+        onClose={() => (showConfigInfoModal = false)}
+        onRetry={handleOpenConfigInfo}
+    />
 </div>
 
 <style>

@@ -101,6 +101,23 @@ export interface ConfigStatus {
     error?: string;
 }
 
+export interface ConfigInfo {
+    config_path?: string | null;
+    framework: string;
+    dbt_project_path: string;
+    manifest_path: string;
+    manifest_exists: boolean;
+    catalog_path: string;
+    catalog_exists: boolean;
+    data_model_path: string;
+    data_model_exists: boolean;
+    canvas_layout_path: string;
+    canvas_layout_exists: boolean;
+    frontend_build_dir: string;
+    model_paths_configured: string[];
+    model_paths_resolved: string[];
+}
+
 export interface FieldDragState {
     nodeId: string;
     fieldName: string;

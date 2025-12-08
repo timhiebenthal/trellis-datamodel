@@ -30,9 +30,10 @@ if _TEST_DIR:
     CANVAS_LAYOUT_PATH: str = os.environ.get(
         "DATAMODEL_CANVAS_LAYOUT_PATH", os.path.join(_TEST_DIR, "canvas_layout.yml")
     )
-    CANVAS_LAYOUT_VERSION_CONTROL: bool = os.environ.get(
-        "DATAMODEL_CANVAS_LAYOUT_VERSION_CONTROL", "true"
-    ).lower() == "true"
+    CANVAS_LAYOUT_VERSION_CONTROL: bool = (
+        os.environ.get("DATAMODEL_CANVAS_LAYOUT_VERSION_CONTROL", "true").lower()
+        == "true"
+    )
     DBT_PROJECT_PATH: str = _TEST_DIR
     DBT_MODEL_PATHS: list[str] = ["3_core"]
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
@@ -56,7 +57,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
     1. CLI override (--config)
     2. trellis.yml in current directory
     3. config.yml in current directory (fallback)
-    
+
     Returns:
         Path to config file or None if not found
     """
@@ -64,19 +65,19 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
         if os.path.exists(config_override):
             return os.path.abspath(config_override)
         return None
-    
+
     cwd = os.getcwd()
-    
+
     # Try trellis.yml first
     trellis_yml = os.path.join(cwd, "trellis.yml")
     if os.path.exists(trellis_yml):
         return os.path.abspath(trellis_yml)
-    
+
     # Fallback to config.yml
     config_yml = os.path.join(cwd, "config.yml")
     if os.path.exists(config_yml):
         return os.path.abspath(config_yml)
-    
+
     return None
 
 
@@ -130,7 +131,9 @@ def load_config(config_path: Optional[str] = None) -> None:
             elif os.path.isabs(p):
                 MANIFEST_PATH = p
             else:
-                MANIFEST_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), p))
+                MANIFEST_PATH = os.path.abspath(
+                    os.path.join(os.path.dirname(CONFIG_PATH), p)
+                )
 
         # 3. Resolve Catalog
         if "dbt_catalog_path" in config:
@@ -140,10 +143,15 @@ def load_config(config_path: Optional[str] = None) -> None:
             elif os.path.isabs(p):
                 CATALOG_PATH = p
             else:
-                CATALOG_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), p))
+                CATALOG_PATH = os.path.abspath(
+                    os.path.join(os.path.dirname(CONFIG_PATH), p)
+                )
 
         # 4. Resolve Data Model (env var takes precedence)
-        if "DATAMODEL_DATA_MODEL_PATH" not in os.environ and "data_model_file" in config:
+        if (
+            "DATAMODEL_DATA_MODEL_PATH" not in os.environ
+            and "data_model_file" in config
+        ):
             p = config["data_model_file"]
             if not os.path.isabs(p):
                 base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
@@ -167,9 +175,13 @@ def load_config(config_path: Optional[str] = None) -> None:
             # Default: canvas_layout.yml next to data_model.yml
             if DATA_MODEL_PATH:
                 data_model_dir = os.path.dirname(DATA_MODEL_PATH)
-                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(data_model_dir, "canvas_layout.yml"))
+                CANVAS_LAYOUT_PATH = os.path.abspath(
+                    os.path.join(data_model_dir, "canvas_layout.yml")
+                )
             else:
-                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), "canvas_layout.yml"))
+                CANVAS_LAYOUT_PATH = os.path.abspath(
+                    os.path.join(os.path.dirname(CONFIG_PATH), "canvas_layout.yml")
+                )
 
         # 7. Canvas layout version control setting
         if "canvas_layout_version_control" in config:
@@ -202,10 +214,10 @@ def print_config() -> None:
     print(f"Using Config: {CONFIG_PATH}")
     print(f"Framework: {FRAMEWORK}")
     print(f"Project Path: {DBT_PROJECT_PATH}")
+    print(f"Frontend build dir: {FRONTEND_BUILD_DIR}")
     print(f"Looking for manifest at: {MANIFEST_PATH}")
     print(f"Looking for catalog at: {CATALOG_PATH}")
     print(f"Looking for data model at: {DATA_MODEL_PATH}")
     print(f"Looking for canvas layout at: {CANVAS_LAYOUT_PATH}")
     print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
     print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
-
