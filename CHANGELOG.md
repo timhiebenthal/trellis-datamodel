@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-12-09
+
 ### Added
 - Added `/api/config-info` endpoint to expose resolved configuration paths for debugging
 - Added "Config info" modal in UI to display resolved paths, model directories, and file existence status

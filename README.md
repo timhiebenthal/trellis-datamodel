@@ -1,5 +1,7 @@
 # Trellis Data
 
+![Trellis Logo](resources/trellis_with_text.png)
+
 A local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and the physical Implementation (currently with dbt-core).
 
 ## Motivation
@@ -20,13 +22,24 @@ A local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and
 - Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  
 - Brownfield: document your existing data model by loading existing dbt models and utilize relationship tests to infer links
 
+## Vision
+
+trellis is currently designed and tested specifically for **dbt-core**, but the vision is to be tool-agnostic. As the saying goes: *"tools evolve, concepts don't"* — data modeling concepts persist regardless of the transformation framework you use.
+
+If this project gains traction, we're exploring support for:
+- **dbt-fusion** through adapter support
+- **Pydantic models** as a simple output format
+- Other frameworks like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) through adapter patterns, where compatibility allows
+
+This remains a vision for now — the current focus is on making Trellis work well with dbt-core.
+
 ## Prerequisites
 - **Node.js 22+ (or 20.19+) & npm**  
   - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
   - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
   - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
-- **Python 3.12+ & [uv](https://github.com/astral-sh/uv)**  
-  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it’s on your `$PATH`.
+- **Python 3.11+ & [uv](https://github.com/astral-sh/uv)**  
+  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it's on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
 
 ## Installation
@@ -43,7 +56,7 @@ uv pip install trellis-datamodel
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourorg/trellis-datamodel.git
+git clone https://github.com/timhiebenthal/trellis-datamodel.git
 cd trellis-datamodel
 
 # Install in editable mode
@@ -251,12 +264,14 @@ The following testing libraries are defined in `pyproject.toml` under `[project.
 **Installation:**
 Unlike `npm`, `uv sync` does not install optional dependencies by default. To include the testing libraries, run:
 ```bash
-cd backend
 uv sync --extra dev
 ```
 
 **Running Tests:**
 ```bash
-cd backend
 uv run pytest
 ```
+
+## Collaboration
+
+If you want to collaborate, reach out!
