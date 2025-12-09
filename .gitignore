@@ -1,5 +1,5 @@
 nba-data/__marimo__/session/data.py.json
-# nba-data/data/*
+nba-data/data/*
 backend/backend.log
 nba-data/__marimo__/session/pull_data.py.json
 dbt_built/logs/dbt.log

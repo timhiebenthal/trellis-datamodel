@@ -17,6 +17,10 @@ class YamlHandler:
         self.yaml.preserve_quotes = True
         self.yaml.default_flow_style = False
         self.yaml.width = 4096  # Prevent unwanted line wrapping
+        # Enforce clear nested indentation (lists under mappings indented +2)
+        self.yaml.indent(mapping=2, sequence=4, offset=2)
+        # Disallow indentless sequences so list items are indented under their parent keys
+        self.yaml.indentless_sequences = False
 
     def load_file(self, file_path: str) -> Optional[Dict]:
         """
@@ -107,6 +111,37 @@ class YamlHandler:
         # Don't auto-create tags - let update_model_tags handle it when needed
         return model
 
+    def set_latest_version(self, model: CommentedMap, version: int) -> None:
+        """Set or bump latest_version for a versioned model."""
+        existing = model.get("latest_version")
+        if existing is None or (isinstance(existing, int) and version > existing):
+            model["latest_version"] = version
+
+    def ensure_model_version(
+        self, model: CommentedMap, version: int
+    ) -> CommentedMap:
+        """
+        Ensure a version entry exists within a versioned model.
+
+        Args:
+            model: Model entry
+            version: Version number (e.g., 2)
+
+        Returns:
+            Version entry (existing or newly created)
+        """
+        if "versions" not in model or model.get("versions") is None:
+            model["versions"] = CommentedSeq()
+
+        for ver in model["versions"]:
+            if ver.get("v") == version:
+                return ver
+
+        ver_entry = CommentedMap()
+        ver_entry["v"] = version
+        model["versions"].append(ver_entry)
+        return ver_entry
+
     def update_model_description(
         self, model: CommentedMap, description: Optional[str]
     ) -> None:
@@ -133,6 +168,16 @@ class YamlHandler:
                 seen.add(tag)
                 combined.append(tag)
         return combined
+
+    def update_version_tags(self, version: CommentedMap, tags: List[str]) -> None:
+        """
+        Replace the tags list for a model version using config.tags (dbt convention).
+        """
+        config = version.get("config")
+        if config is None:
+            version["config"] = CommentedMap()
+            config = version["config"]
+        config["tags"] = tags
 
     def update_model_tags(self, model: CommentedMap, tags: List[str]) -> None:
         """Replace the tags list for a model, preserving the original location.

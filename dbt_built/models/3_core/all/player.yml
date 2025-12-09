@@ -1,25 +1,36 @@
 version: 2
 models:
 - name: player
+  latest_version: 2
   description: Players competing in the NBA
-  columns:
-  - name: player_id
-    data_type: text
-    description: unique ID
-  - name: full_name
-    data_type: text
-  - name: current_team
-    data_type: text
-  - name: draft_year
-    data_type: text
-  - name: current_team_id
-    data_type: text
-    data_tests:
-    - relationships:
-        arguments:
-          to: ref('team')
-          field: team_id
-    description: current team's ID
-  config:
-    tags:
-    - '123'
+  versions:
+    - v: 1
+      description: Players competing in the NBA
+      columns:
+      - name: player_id
+        data_type: text
+        description: unique ID
+      - name: full_name
+        data_type: text
+      - name: current_team
+        data_type: text
+      - name: draft_year
+        data_type: text
+      - name: current_team_id
+        data_type: text
+        data_tests:
+        - relationships:
+            arguments:
+              to: ref('team')
+              field: team_id
+        description: current team's ID
+      config:
+        tags:
+        - '123'
+    - v: 2
+      description: Players competing in the NBA
+      columns:
+      - include: all
+      config:
+        tags:
+        - '123'

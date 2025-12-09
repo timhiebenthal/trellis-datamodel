@@ -21,6 +21,7 @@ class ModelInfo(TypedDict):
 
     unique_id: str
     name: str
+    version: Optional[int]
     schema: str
     table: str
     columns: list[ColumnInfo]
@@ -76,12 +77,13 @@ class TransformationAdapter(Protocol):
         """
         ...
 
-    def get_model_schema(self, model_name: str) -> ModelSchema:
+    def get_model_schema(self, model_name: str, version: Optional[int] = None) -> ModelSchema:
         """
         Get the current schema definition for a specific model.
 
         Args:
             model_name: Name of the model to retrieve.
+            version: Optional version number to disambiguate versioned models.
 
         Returns:
             Model schema including columns and metadata.
@@ -94,12 +96,14 @@ class TransformationAdapter(Protocol):
         columns: list[ColumnSchema],
         description: Optional[str] = None,
         tags: Optional[list[str]] = None,
+        version: Optional[int] = None,
     ) -> Path:
         """
         Save/update the schema definition for a model.
 
         Args:
             model_name: Name of the model to update.
+            version: Optional version number to target for versioned models.
             columns: Column definitions to save.
             description: Optional model description.
             tags: Optional list of tags.

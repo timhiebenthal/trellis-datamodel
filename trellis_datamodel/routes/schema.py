@@ -80,7 +80,7 @@ async def sync_dbt_tests():
 
 
 @router.get("/models/{model_name}/schema")
-async def get_model_schema(model_name: str):
+async def get_model_schema(model_name: str, version: int | None = None):
     """Get the schema for a specific model from its YAML file."""
     try:
         if not DBT_PROJECT_PATH:
@@ -90,7 +90,7 @@ async def get_model_schema(model_name: str):
             )
 
         adapter = get_adapter()
-        schema = adapter.get_model_schema(model_name)
+        schema = adapter.get_model_schema(model_name, version=version)
 
         return {
             "model_name": schema.get("model_name", model_name),
@@ -131,6 +131,7 @@ async def update_model_schema(model_name: str, request: ModelSchemaRequest):
             columns=request.columns,
             description=request.description,
             tags=request.tags,
+            version=request.version,
         )
 
         return {

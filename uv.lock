@@ -1614,6 +1614,7 @@ version = "0.1.6"
 source = { editable = "." }
 dependencies = [
     { name = "dbt-core" },
+    { name = "dbt-duckdb" },
     { name = "fastapi" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
@@ -1645,6 +1646,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dbt-core", specifier = ">=1.10.5,<2.0" },
+    { name = "dbt-duckdb", specifier = ">=1.10.0" },
     { name = "dbt-duckdb", marker = "extra == 'examples'", specifier = "==1.10" },
     { name = "duckdb", marker = "extra == 'examples'", specifier = ">=1.4.2" },
     { name = "fastapi", specifier = ">=0.121.3" },

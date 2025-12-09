@@ -101,7 +101,10 @@
         schemaError = null;
 
         try {
-            const schema = await getModelSchema(modelDetails.name);
+            const schema = await getModelSchema(
+                modelDetails.name,
+                modelDetails.version ?? undefined,
+            );
             const hasSchemaColumns =
                 Array.isArray(schema?.columns) && schema.columns.length > 0;
 
@@ -169,6 +172,7 @@
                 })),
                 data.description,
                 data.tags || [],
+                modelDetails.version ?? undefined,
             );
             hasUnsavedChanges = false;
         } catch (e: any) {
