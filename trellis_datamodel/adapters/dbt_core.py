@@ -6,6 +6,7 @@ Handles parsing dbt manifest.json/catalog.json and generating dbt schema YAML fi
 
 import json
 import os
+import re
 import yaml
 from pathlib import Path
 from typing import Any, Optional
@@ -115,12 +116,43 @@ class DbtCoreAdapter:
         """
         dbt_model = entity.get("dbt_model")
         if dbt_model:
-            # dbt unique_id or ref may be "model.project.model_name" – take the last part
-            return dbt_model.split(".")[-1]
+            # dbt unique_id for versioned models looks like model.<project>.<name>.v2
+            parts = dbt_model.split(".")
+            if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
+                # Use the model name part (the element before the vN suffix)
+                return parts[-2]
+            return parts[-1]
         return entity.get("id") or ""
 
+    def _build_model_keys(self, base: str, version: Optional[str] = None) -> list[str]:
+        """
+        Generate a set of lookup keys for a model, including versioned variants.
+        """
+        keys = [base]
+        if version:
+            # Support common ref patterns:
+            # - ref('model', v=2)   -> base.v2
+            # - alias names         -> base_v2
+            # - fully qualified     -> base.v2 and base_v2
+            version_num = version.lstrip("v")
+            keys.extend(
+                [
+                    f"{base}.v{version_num}",
+                    f"{base}_v{version_num}",
+                    f"{base}v{version_num}",
+                ]
+            )
+        # Deduplicate while preserving order
+        seen = set()
+        ordered_keys = []
+        for k in keys:
+            if k not in seen:
+                seen.add(k)
+                ordered_keys.append(k)
+        return ordered_keys
+
     def _get_model_to_entity_map(self) -> dict[str, str]:
-        """Build mapping from model names to entity IDs."""
+        """Build mapping from model names (with version aliases) to entity IDs."""
         model_to_entity: dict[str, str] = {}
         data_model = self._load_data_model()
         entities = data_model.get("entities", [])
@@ -128,13 +160,32 @@ class DbtCoreAdapter:
             entity_id = entity.get("id")
             dbt_model = entity.get("dbt_model")
             if dbt_model:
-                model_name = dbt_model.split(".")[-1] if "." in dbt_model else dbt_model
-                model_to_entity[model_name] = entity_id
+                parts = dbt_model.split(".")
+                version_part = None
+                if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
+                    version_part = parts[-1].lstrip("v")
+                    base_name = parts[-2]
+                else:
+                    base_name = parts[-1]
+
+                # Map the raw unique_id as well as base/version variants
+                model_to_entity[dbt_model] = entity_id
+                for key in self._build_model_keys(base_name, version_part):
+                    model_to_entity[key] = entity_id
             # Map additional models to the same entity
             additional_models = entity.get("additional_models", [])
             for add_model in additional_models:
-                model_name = add_model.split(".")[-1] if "." in add_model else add_model
-                model_to_entity[model_name] = entity_id
+                parts = add_model.split(".")
+                version_part = None
+                if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
+                    version_part = parts[-1].lstrip("v")
+                    base_name = parts[-2]
+                else:
+                    base_name = parts[-1]
+
+                model_to_entity[add_model] = entity_id
+                for key in self._build_model_keys(base_name, version_part):
+                    model_to_entity[key] = entity_id
             if entity_id:
                 model_to_entity[entity_id] = entity_id
         return model_to_entity
@@ -148,10 +199,65 @@ class DbtCoreAdapter:
         for key, node in manifest.get("nodes", {}).items():
             if node.get("resource_type") == "model" and node.get("name") == model_name:
                 original_file_path = node.get("original_file_path", "")
-                if original_file_path:
-                    sql_path = os.path.join(self.project_path, original_file_path)
-                    base_path = os.path.splitext(sql_path)[0]
-                    return f"{base_path}.yml"
+                if not original_file_path:
+                    continue
+
+                sql_path = os.path.join(self.project_path, original_file_path)
+                base_path = os.path.splitext(sql_path)[0]
+                yml_path = f"{base_path}.yml"
+
+                # Common versioned layout: player_v2.sql + player.yml
+                if not os.path.exists(yml_path):
+                    base_path = re.sub(r"_v\d+$", "", base_path)
+                    yml_path = f"{base_path}.yml"
+
+                return yml_path
+        return None
+
+    def _extract_version_from_string(self, value: str) -> Optional[int]:
+        """Extract integer version from strings like 'model.proj.player.v2'."""
+        if not value:
+            return None
+
+        match = re.search(r"\.v(\d+)$", value)
+        if match:
+            return int(match.group(1))
+
+        if value.startswith("v") and value[1:].isdigit():
+            return int(value[1:])
+
+        return None
+
+    def _resolve_model_version(
+        self, model_name: str, entity_id: str, data_model: dict[str, Any]
+    ) -> Optional[int]:
+        """
+        Resolve target version from data model (dbt_model) or manifest node.
+
+        Prefers explicit dbt_model binding with .vN suffix, falls back to
+        manifest node version.
+        """
+        for entity in data_model.get("entities", []):
+            if entity.get("id") != entity_id:
+                continue
+            dbt_model = entity.get("dbt_model") or ""
+            # Check last token after split to support fully-qualified model IDs
+            last_token = dbt_model.split(".")[-1] if dbt_model else ""
+            version = self._extract_version_from_string(last_token)
+            if version is not None:
+                return version
+
+        if os.path.exists(self.manifest_path):
+            manifest = self._load_manifest()
+            for node in manifest.get("nodes", {}).values():
+                if node.get("resource_type") != "model":
+                    continue
+                if node.get("name") != model_name:
+                    continue
+                node_version = node.get("version")
+                if node_version:
+                    return int(node_version)
+
         return None
 
     def get_models(self) -> list[ModelInfo]:
@@ -317,6 +423,34 @@ class DbtCoreAdapter:
         self.yaml_handler.save_file(yml_path, data)
         return Path(yml_path)
 
+    def _parse_ref(self, ref_value: str) -> tuple[str, Optional[str]]:
+        """
+        Parse ref() targets, supporting optional version arguments.
+
+        Examples:
+            ref('player') -> ("player", None)
+            ref('player', v=1) -> ("player", "1")
+            ref("player", version=2) -> ("player", "2")
+        """
+        ref_pattern = r"ref\(\s*['\"]([^,'\"]+)['\"](?:\s*,\s*(?:v|version)\s*=\s*([0-9]+))?\s*\)"
+        match = re.fullmatch(ref_pattern, ref_value.strip())
+        if match:
+            return match.group(1), match.group(2)
+        return ref_value, None
+
+    def _resolve_entity_id(
+        self, model_to_entity: dict[str, str], base_name: str, version: Optional[str]
+    ) -> str:
+        """
+        Resolve an entity id using base model name plus optional version.
+        Falls back to the base name if no mapping is found.
+        """
+        for key in self._build_model_keys(base_name, version):
+            if key in model_to_entity:
+                return model_to_entity[key]
+        # Fallback: try the raw base name
+        return model_to_entity.get(base_name, base_name)
+
     def infer_relationships(self) -> list[Relationship]:
         """Scan dbt yml files and infer entity relationships from relationship tests."""
         model_dirs = self.get_model_dirs()
@@ -341,67 +475,76 @@ class DbtCoreAdapter:
 
                         models_list = schema_data.get("models", [])
                         for model in models_list:
-                            model_name = model.get("name")
-                            if not model_name:
+                            base_model_name = model.get("name")
+                            if not base_model_name:
                                 continue
 
-                            entity_id = model_to_entity.get(model_name, model_name)
-
-                            columns = model.get("columns", [])
-                            for column in columns:
-                                test_blocks = []
-                                for key in ("tests", "data_tests"):
-                                    value = column.get(key, [])
-                                    if isinstance(value, list):
-                                        test_blocks.extend(value)
-
-                                for test in test_blocks:
-                                    if (
-                                        not isinstance(test, dict)
-                                        or "relationships" not in test
-                                    ):
-                                        continue
-
-                                    rel_test = test["relationships"]
-                                    args = rel_test.get("arguments", {}) or {}
-
-                                    # Support both the recommended arguments block and legacy top-level keys
-                                    to_ref = rel_test.get("to", "") or args.get(
-                                        "to", ""
+                            # Versioned models may declare columns inside versions list
+                            version_entries = model.get("versions", [])
+                            versioned_columns = []
+                            if isinstance(version_entries, list) and version_entries:
+                                for ver in version_entries:
+                                    v_cols = ver.get("columns", [])
+                                    versioned_columns.append(
+                                        (
+                                            ver.get("v") or ver.get("version"),
+                                            v_cols,
+                                        )
                                     )
-                                    target_field = rel_test.get(
-                                        "field", ""
-                                    ) or args.get("field", "")
+                            else:
+                                versioned_columns.append((None, model.get("columns", [])))
 
-                                    # If either ref target or field is missing, skip and log for debugging
-                                    if not to_ref or not target_field:
-                                        continue
+                            for model_version, columns in versioned_columns:
+                                entity_id = self._resolve_entity_id(
+                                    model_to_entity, base_model_name, model_version
+                                )
 
-                                    # Parse ref('model_name')
-                                    target_model = to_ref
-                                    if to_ref.startswith("ref('") and to_ref.endswith(
-                                        "')"
-                                    ):
-                                        target_model = to_ref[5:-2]
-                                    elif to_ref.startswith('ref("') and to_ref.endswith(
-                                        '")'
-                                    ):
-                                        target_model = to_ref[5:-2]
+                                for column in columns or []:
+                                    test_blocks = []
+                                    for key in ("tests", "data_tests"):
+                                        value = column.get(key, [])
+                                        if isinstance(value, list):
+                                            test_blocks.extend(value)
 
-                                    target_entity_id = model_to_entity.get(
-                                        target_model, target_model
-                                    )
+                                    for test in test_blocks:
+                                        if (
+                                            not isinstance(test, dict)
+                                            or "relationships" not in test
+                                        ):
+                                            continue
 
-                                    relationships.append(
-                                        {
-                                            "source": target_entity_id,
-                                            "target": entity_id,
-                                            "label": "",
-                                            "type": "one_to_many",
-                                            "source_field": target_field,
-                                            "target_field": column.get("name"),
-                                        }
-                                    )
+                                        rel_test = test["relationships"]
+                                        args = rel_test.get("arguments", {}) or {}
+
+                                        # Support both the recommended arguments block and legacy top-level keys
+                                        to_ref = rel_test.get("to", "") or args.get(
+                                            "to", ""
+                                        )
+                                        target_field = rel_test.get(
+                                            "field", ""
+                                        ) or args.get("field", "")
+
+                                        # If either ref target or field is missing, skip and log for debugging
+                                        if not to_ref or not target_field:
+                                            continue
+
+                                        target_base, target_version = self._parse_ref(
+                                            to_ref
+                                        )
+                                        target_entity_id = self._resolve_entity_id(
+                                            model_to_entity, target_base, target_version
+                                        )
+
+                                        relationships.append(
+                                            {
+                                                "source": target_entity_id,
+                                                "target": entity_id,
+                                                "label": "",
+                                                "type": "one_to_many",
+                                                "source_field": target_field,
+                                                "target_field": column.get("name"),
+                                            }
+                                        )
                     except Exception as e:
                         print(f"Warning: Could not parse {filepath}: {e}")
                         continue
@@ -626,29 +769,53 @@ class DbtCoreAdapter:
 
             columns.append(column_dict)
 
-        model_dict: dict[str, Any] = {
-            "name": model_name,
-            "columns": columns,
-        }
+        target_version = self._resolve_model_version(
+            model_name=model_name, entity_id=entity_id, data_model=data_model
+        )
 
-        if entity_description:
-            model_dict["description"] = entity_description
+        # Prefer manifest-derived path; fall back to default models directory
+        yml_path = self._get_model_yml_path(model_name)
+        if not yml_path:
+            models_dir = self.get_model_dirs()[0]
+            os.makedirs(models_dir, exist_ok=True)
+            yml_path = os.path.join(models_dir, f"{entity_id}.yml")
 
-        if tags:
-            model_dict["tags"] = tags
+        data = self.yaml_handler.load_file(yml_path)
+        if not data:
+            data = {"version": 2, "models": []}
 
-        schema_content = {
-            "version": 2,
-            "models": [model_dict],
-        }
+        model_entry = self.yaml_handler.ensure_model(data, model_name)
 
-        models_dir = self.get_model_dirs()[0]
-        os.makedirs(models_dir, exist_ok=True)
-        output_path = os.path.join(models_dir, f"{entity_id}.yml")
+        if target_version is not None:
+            # Versioned model: update version block and latest_version
+            self.yaml_handler.set_latest_version(model_entry, target_version)
+            if entity_description:
+                self.yaml_handler.update_model_description(
+                    model_entry, entity_description
+                )
 
-        print(f"Writing dbt schema to: {output_path}")
+            version_entry = self.yaml_handler.ensure_model_version(
+                model_entry, target_version
+            )
+            self.yaml_handler.update_columns_batch(version_entry, columns)
 
-        with open(output_path, "w") as f:
-            yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
+            if entity_description:
+                self.yaml_handler.update_model_description(
+                    version_entry, entity_description
+                )
+            if tags is not None:
+                self.yaml_handler.update_version_tags(version_entry, tags)
+        else:
+            # Non-versioned model: update columns and metadata directly
+            if entity_description:
+                self.yaml_handler.update_model_description(
+                    model_entry, entity_description
+                )
 
-        return Path(output_path)
+            self.yaml_handler.update_columns_batch(model_entry, columns)
+
+            if tags is not None:
+                self.yaml_handler.update_model_tags(model_entry, tags)
+
+        self.yaml_handler.save_file(yml_path, data)
+        return Path(yml_path)

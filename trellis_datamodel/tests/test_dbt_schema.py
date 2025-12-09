@@ -38,6 +38,118 @@ class TestSaveDbtSchema:
         assert model["description"] == "User entity"
         assert len(model["columns"]) == 2
 
+    def test_preserves_versioned_models_and_versions(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        # Overwrite manifest with versioned model pointing to player_v2.sql
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        manifest_data = {
+            "nodes": {
+                "model.project.player.v1": {
+                    "unique_id": "model.project.player.v1",
+                    "resource_type": "model",
+                    "name": "player",
+                    "version": 1,
+                    "schema": "public",
+                    "alias": "player",
+                    "original_file_path": "models/3_core/all/player_v1.sql",
+                    "columns": {},
+                    "description": "Player v1",
+                    "config": {"materialized": "table"},
+                    "tags": [],
+                },
+                "model.project.player.v2": {
+                    "unique_id": "model.project.player.v2",
+                    "resource_type": "model",
+                    "name": "player",
+                    "version": 2,
+                    "schema": "public",
+                    "alias": "player",
+                    "original_file_path": "models/3_core/all/player_v2.sql",
+                    "columns": {},
+                    "description": "Player v2",
+                    "config": {"materialized": "table"},
+                    "tags": [],
+                },
+            }
+        }
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f)
+
+        # Existing schema with v1 definition (stored in player.yml)
+        models_dir = os.path.join(temp_dir, "models", "3_core", "all")
+        os.makedirs(models_dir, exist_ok=True)
+        yml_path = os.path.join(models_dir, "player.yml")
+        existing_schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "player",
+                    "latest_version": 1,
+                    "versions": [
+                        {
+                            "v": 1,
+                            "description": "v1 description",
+                            "columns": [{"name": "player_id", "data_type": "text"}],
+                        }
+                    ],
+                }
+            ],
+        }
+        with open(yml_path, "w") as f:
+            yaml.dump(existing_schema, f)
+
+        # Data model binds entity to v2
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "player",
+                    "label": "Player",
+                    "description": "Players competing in the NBA",
+                    "dbt_model": "model.project.player.v2",
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        request_data = {
+            "entity_id": "player",
+            "model_name": "player",
+            "fields": [
+                {
+                    "name": "player_uuid",
+                    "datatype": "text",
+                    "description": "New PK",
+                }
+            ],
+            "description": "Players v2",
+            "tags": ["core"],
+        }
+
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        with open(yml_path, "r") as f:
+            schema = yaml.safe_load(f)
+
+        model = schema["models"][0]
+        assert model["latest_version"] == 2
+
+        versions = {v["v"]: v for v in model["versions"]}
+        assert 1 in versions  # keep existing v1
+        assert 2 in versions  # add/update v2
+
+        # v1 is unchanged
+        assert versions[1]["columns"][0]["name"] == "player_id"
+
+        # v2 reflects new request
+        v2_columns = versions[2]["columns"]
+        assert v2_columns[0]["name"] == "player_uuid"
+        assert versions[2].get("config", {}).get("tags") == ["core"]
+
 
 class TestSyncDbtTests:
     """Tests for POST /api/sync-dbt-tests endpoint."""
@@ -486,3 +598,70 @@ class TestInferRelationships:
             and r["source"] == "orders"
         )
         assert rel
+
+    def test_resolves_versioned_refs_to_existing_entity(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        ref('model', v=1) should resolve to an entity bound to v2 (or vice-versa)
+        instead of creating a duplicate entity.
+        """
+        # Bind player to v2 in the data model
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "player",
+                    "label": "Player",
+                    "dbt_model": "model.test.player.v2",
+                },
+                {
+                    "id": "game_stats",
+                    "label": "Game Stats",
+                    "dbt_model": "model.test.game_stats",
+                },
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # YML with versioned ref to player v1
+        schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "game_stats",
+                    "columns": [
+                        {
+                            "name": "player_id",
+                            "data_tests": [
+                                {
+                                    "relationships": {
+                                        "arguments": {
+                                            "to": "ref('player', v=1)",
+                                            "field": "player_id",
+                                        }
+                                    }
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        models_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(models_dir, exist_ok=True)
+        with open(os.path.join(models_dir, "game_stats.yml"), "w") as f:
+            yaml.dump(schema, f)
+
+        response = test_client.get("/api/infer-relationships")
+        assert response.status_code == 200
+
+        rels = response.json()["relationships"]
+        assert len(rels) == 1
+        rel = rels[0]
+        assert rel["source"] == "player"
+        assert rel["target"] == "game_stats"
+        assert rel["source_field"] == "player_id"
+        assert rel["target_field"] == "player_id"
