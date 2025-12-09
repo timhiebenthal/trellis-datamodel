@@ -129,12 +129,14 @@ class DbtCoreAdapter:
         Generate a set of lookup keys for a model, including versioned variants.
         """
         keys = [base]
-        if version:
+        if version is not None:
+            # Version may come through as int from YAML; normalize to string
+            version_str = str(version)
             # Support common ref patterns:
             # - ref('model', v=2)   -> base.v2
             # - alias names         -> base_v2
             # - fully qualified     -> base.v2 and base_v2
-            version_num = version.lstrip("v")
+            version_num = version_str.lstrip("v")
             keys.extend(
                 [
                     f"{base}.v{version_num}",
