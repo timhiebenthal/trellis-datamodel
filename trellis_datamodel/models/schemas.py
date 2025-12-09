@@ -24,4 +24,5 @@ class ModelSchemaRequest(BaseModel):
     columns: List[Dict[str, Any]]
     description: Optional[str] = None
     tags: Optional[List[str]] = None
+    version: Optional[int] = None
 

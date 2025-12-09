@@ -302,6 +302,40 @@ class DbtCoreAdapter:
 
         return None
 
+    def _find_manifest_model_nodes(
+        self, manifest: dict[str, Any], model_name: str
+    ) -> list[dict[str, Any]]:
+        """Collect manifest nodes matching a given model name."""
+        return [
+            node
+            for node in manifest.get("nodes", {}).values()
+            if node.get("resource_type") == "model" and node.get("name") == model_name
+        ]
+
+    def _select_model_node(
+        self, candidates: list[dict[str, Any]], target_version: Optional[int]
+    ) -> Optional[dict[str, Any]]:
+        """
+        Choose the best matching manifest node.
+
+        Prefers an exact version match when requested; otherwise picks the
+        highest numbered version when available, or the first candidate.
+        """
+        if target_version is not None:
+            for node in candidates:
+                node_version = node.get("version")
+                if node_version is not None and int(node_version) == target_version:
+                    return node
+
+        if not candidates:
+            return None
+
+        versioned = [n for n in candidates if n.get("version") is not None]
+        if versioned:
+            return sorted(versioned, key=lambda n: n.get("version") or 0)[-1]
+
+        return candidates[0]
+
     def get_models(self) -> list[ModelInfo]:
         """Parse dbt manifest and catalog to return available models."""
         if not os.path.exists(self.manifest_path):
@@ -362,19 +396,17 @@ class DbtCoreAdapter:
         models.sort(key=lambda x: x["name"])
         return models
 
-    def get_model_schema(self, model_name: str) -> ModelSchema:
+    def get_model_schema(
+        self, model_name: str, version: Optional[int] = None
+    ) -> ModelSchema:
         """Get the current schema definition for a specific model from its YAML file."""
         if not os.path.exists(self.manifest_path):
             raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
 
         manifest = self._load_manifest()
 
-        # Find model in manifest
-        model_node = None
-        for key, node in manifest.get("nodes", {}).items():
-            if node.get("resource_type") == "model" and node.get("name") == model_name:
-                model_node = node
-                break
+        candidate_nodes = self._find_manifest_model_nodes(manifest, model_name)
+        model_node = self._select_model_node(candidate_nodes, target_version=version)
 
         if not model_node:
             raise ValueError(f"Model '{model_name}' not found in manifest")
@@ -403,14 +435,17 @@ class DbtCoreAdapter:
                 "file_path": yml_path,
             }
 
-        target_version = model_node.get("version")
+        target_version = version if version is not None else model_node.get("version")
         version_entry = None
-        if target_version is not None:
-            if model_entry.get("versions"):
-                for ver in model_entry.get("versions", []):
+        versions = model_entry.get("versions") or []
+        if versions:
+            if target_version is not None:
+                for ver in versions:
                     if ver.get("v") == target_version:
                         version_entry = ver
                         break
+            if version_entry is None:
+                version_entry = sorted(versions, key=lambda ver: ver.get("v") or 0)[-1]
 
         # Prefer versioned block if present
         node_for_schema = version_entry or model_entry
@@ -431,6 +466,7 @@ class DbtCoreAdapter:
         columns: list[ColumnSchema],
         description: Optional[str] = None,
         tags: Optional[list[str]] = None,
+        version: Optional[int] = None,
     ) -> Path:
         """Save/update the schema definition for a model."""
         if not os.path.exists(self.manifest_path):
@@ -438,12 +474,8 @@ class DbtCoreAdapter:
 
         manifest = self._load_manifest()
 
-        # Find model in manifest
-        model_node = None
-        for key, node in manifest.get("nodes", {}).items():
-            if node.get("resource_type") == "model" and node.get("name") == model_name:
-                model_node = node
-                break
+        candidate_nodes = self._find_manifest_model_nodes(manifest, model_name)
+        model_node = self._select_model_node(candidate_nodes, target_version=version)
 
         if not model_node:
             raise ValueError(f"Model '{model_name}' not found in manifest")
@@ -458,7 +490,7 @@ class DbtCoreAdapter:
 
         model_entry = self.yaml_handler.ensure_model(data, model_name)
 
-        target_version = model_node.get("version")
+        target_version = version if version is not None else model_node.get("version")
         if target_version is not None:
             # Versioned model: update version entry and keep latest_version in sync (non-decreasing)
             self.yaml_handler.set_latest_version(model_entry, target_version)

@@ -665,3 +665,123 @@ class TestInferRelationships:
         assert rel["target"] == "game_stats"
         assert rel["source_field"] == "player_id"
         assert rel["target_field"] == "player_id"
+
+
+class TestModelSchemaVersionHandling:
+    """Ensure schema read/write honors requested dbt model version."""
+
+    def _write_versioned_manifest(self, temp_dir: str):
+        manifest_data = {
+            "nodes": {
+                "model.project.player.v1": {
+                    "unique_id": "model.project.player.v1",
+                    "resource_type": "model",
+                    "name": "player",
+                    "version": 1,
+                    "schema": "public",
+                    "alias": "player",
+                    "original_file_path": "models/3_core/all/player_v1.sql",
+                    "columns": {},
+                    "description": "Player v1",
+                    "config": {"materialized": "table"},
+                    "tags": [],
+                },
+                "model.project.player.v2": {
+                    "unique_id": "model.project.player.v2",
+                    "resource_type": "model",
+                    "name": "player",
+                    "version": 2,
+                    "schema": "public",
+                    "alias": "player",
+                    "original_file_path": "models/3_core/all/player_v2.sql",
+                    "columns": {},
+                    "description": "Player v2",
+                    "config": {"materialized": "table"},
+                    "tags": [],
+                },
+            }
+        }
+
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f)
+
+    def _write_versioned_schema(self, temp_dir: str) -> str:
+        models_dir = os.path.join(temp_dir, "models", "3_core", "all")
+        os.makedirs(models_dir, exist_ok=True)
+        yml_path = os.path.join(models_dir, "player.yml")
+
+        existing_schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "player",
+                    "latest_version": 2,
+                    "versions": [
+                        {
+                            "v": 1,
+                            "description": "v1 description",
+                            "columns": [{"name": "player_id", "data_type": "text"}],
+                        },
+                        {
+                            "v": 2,
+                            "description": "v2 description",
+                            "columns": [{"name": "player_uuid", "data_type": "text"}],
+                        },
+                    ],
+                }
+            ],
+        }
+
+        with open(yml_path, "w") as f:
+            yaml.dump(existing_schema, f)
+
+        return yml_path
+
+    def test_get_model_schema_uses_requested_version(self, test_client, temp_dir):
+        self._write_versioned_manifest(temp_dir)
+        self._write_versioned_schema(temp_dir)
+
+        response = test_client.get(
+            "/api/models/player/schema", params={"version": 2}
+        )
+        assert response.status_code == 200
+
+        schema = response.json()
+        col_names = [col["name"] for col in schema["columns"]]
+        assert "player_uuid" in col_names
+        assert "player_id" not in col_names
+        assert schema["description"] == "v2 description"
+
+    def test_save_model_schema_targets_requested_version(self, test_client, temp_dir):
+        self._write_versioned_manifest(temp_dir)
+        yml_path = self._write_versioned_schema(temp_dir)
+
+        response = test_client.post(
+            "/api/models/player/schema",
+            json={
+                "columns": [
+                    {
+                        "name": "player_uuid",
+                        "data_type": "text",
+                        "description": "Updated PK",
+                    }
+                ],
+                "description": "Players v2 updated",
+                "tags": ["core"],
+                "version": 2,
+            },
+        )
+        assert response.status_code == 200
+
+        with open(yml_path, "r") as f:
+            updated = yaml.safe_load(f)
+
+        versions = {v["v"]: v for v in updated["models"][0]["versions"]}
+        assert versions[1]["columns"][0]["name"] == "player_id"
+
+        v2_cols = versions[2]["columns"]
+        assert v2_cols[0]["name"] == "player_uuid"
+        assert v2_cols[0]["description"] == "Updated PK"
+        assert versions[2].get("config", {}).get("tags") == ["core"]
+        assert updated["models"][0]["latest_version"] == 2
