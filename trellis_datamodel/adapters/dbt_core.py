@@ -190,29 +190,69 @@ class DbtCoreAdapter:
                 model_to_entity[entity_id] = entity_id
         return model_to_entity
 
-    def _get_model_yml_path(self, model_name: str) -> Optional[str]:
+    def _get_model_yml_path(
+        self, model_name: str, target_version: Optional[int] = None
+    ) -> Optional[str]:
         """Get the yml file path for a model from the manifest."""
         if not os.path.exists(self.manifest_path):
             return None
 
         manifest = self._load_manifest()
+        preferred_node: Optional[dict] = None
+        fallback_node: Optional[dict] = None
         for key, node in manifest.get("nodes", {}).items():
             if node.get("resource_type") == "model" and node.get("name") == model_name:
-                original_file_path = node.get("original_file_path", "")
-                if not original_file_path:
-                    continue
+                if target_version is not None and node.get("version") == target_version:
+                    preferred_node = node
+                    break
+                if fallback_node is None:
+                    fallback_node = node
 
-                sql_path = os.path.join(self.project_path, original_file_path)
-                base_path = os.path.splitext(sql_path)[0]
-                yml_path = f"{base_path}.yml"
+        node = preferred_node or fallback_node
+        if not node:
+            return None
 
-                # Common versioned layout: player_v2.sql + player.yml
-                if not os.path.exists(yml_path):
-                    base_path = re.sub(r"_v\d+$", "", base_path)
-                    yml_path = f"{base_path}.yml"
+        return self._derive_yml_path_from_node(node)
 
-                return yml_path
-        return None
+    def _normalize_patch_path(self, patch_path: str) -> str:
+        """
+        Convert a manifest patch_path (which may include a scheme) into an
+        absolute filesystem path rooted at the dbt project.
+        """
+        if "://" in patch_path:
+            patch_path = patch_path.split("://", 1)[1]
+
+        patch_path = patch_path.lstrip("/")
+
+        if os.path.isabs(patch_path):
+            return patch_path
+
+        # Default: resolve relative to the dbt project directory
+        base = self.project_path or "."
+        return os.path.abspath(os.path.join(base, patch_path))
+
+    def _derive_yml_path_from_node(self, node: dict) -> Optional[str]:
+        """
+        Determine the YAML file path for a manifest node, preferring patch_path.
+        """
+        patch_path = node.get("patch_path")
+        if patch_path:
+            return self._normalize_patch_path(patch_path)
+
+        original_file_path = node.get("original_file_path", "")
+        if not original_file_path:
+            return None
+
+        sql_path = os.path.join(self.project_path, original_file_path)
+        base_path = os.path.splitext(sql_path)[0]
+        yml_path = f"{base_path}.yml"
+
+        # Common versioned layout: player_v2.sql + player.yml
+        if not os.path.exists(yml_path):
+            base_path = re.sub(r"_v\d+$", "", base_path)
+            yml_path = f"{base_path}.yml"
+
+        return yml_path
 
     def _extract_version_from_string(self, value: str) -> Optional[int]:
         """Extract integer version from strings like 'model.proj.player.v2'."""
@@ -337,13 +377,9 @@ class DbtCoreAdapter:
         if not model_node:
             raise ValueError(f"Model '{model_name}' not found in manifest")
 
-        original_file_path = model_node.get("original_file_path", "")
-        if not original_file_path:
-            raise ValueError(f"No original_file_path found for model '{model_name}'")
-
-        sql_path = os.path.join(self.project_path, original_file_path)
-        base_path = os.path.splitext(sql_path)[0]
-        yml_path = f"{base_path}.yml"
+        yml_path = self._derive_yml_path_from_node(model_node)
+        if not yml_path:
+            raise ValueError(f"No patch_path or original_file_path found for model '{model_name}'")
 
         data = self.yaml_handler.load_file(yml_path)
         if not data:
@@ -365,11 +401,23 @@ class DbtCoreAdapter:
                 "file_path": yml_path,
             }
 
-        columns = self.yaml_handler.get_columns(model_entry)
-        tags = self.yaml_handler.get_model_tags(model_entry)
+        target_version = model_node.get("version")
+        version_entry = None
+        if target_version is not None:
+            if model_entry.get("versions"):
+                for ver in model_entry.get("versions", []):
+                    if ver.get("v") == target_version:
+                        version_entry = ver
+                        break
+
+        # Prefer versioned block if present
+        node_for_schema = version_entry or model_entry
+
+        columns = self.yaml_handler.get_columns(node_for_schema)
+        tags = self.yaml_handler.get_model_tags(node_for_schema)
         return {
             "model_name": model_name,
-            "description": model_entry.get("description", ""),
+            "description": node_for_schema.get("description", ""),
             "columns": columns,
             "tags": tags,
             "file_path": yml_path,
@@ -398,13 +446,9 @@ class DbtCoreAdapter:
         if not model_node:
             raise ValueError(f"Model '{model_name}' not found in manifest")
 
-        original_file_path = model_node.get("original_file_path", "")
-        if not original_file_path:
-            raise ValueError(f"No original_file_path found for model '{model_name}'")
-
-        sql_path = os.path.join(self.project_path, original_file_path)
-        base_path = os.path.splitext(sql_path)[0]
-        yml_path = f"{base_path}.yml"
+        yml_path = self._derive_yml_path_from_node(model_node)
+        if not yml_path:
+            raise ValueError(f"No patch_path or original_file_path found for model '{model_name}'")
 
         data = self.yaml_handler.load_file(yml_path)
         if not data:
@@ -412,13 +456,32 @@ class DbtCoreAdapter:
 
         model_entry = self.yaml_handler.ensure_model(data, model_name)
 
-        if description is not None:
-            self.yaml_handler.update_model_description(model_entry, description)
+        target_version = model_node.get("version")
+        if target_version is not None:
+            # Versioned model: update version entry and keep latest_version in sync (non-decreasing)
+            self.yaml_handler.set_latest_version(model_entry, target_version)
+            version_entry = self.yaml_handler.ensure_model_version(
+                model_entry, target_version
+            )
 
-        self.yaml_handler.update_columns_batch(model_entry, columns)
+            if description is not None:
+                self.yaml_handler.update_model_description(version_entry, description)
+                # Keep top-level description aligned when present
+                self.yaml_handler.update_model_description(model_entry, description)
 
-        if tags is not None:
-            self.yaml_handler.update_model_tags(model_entry, tags)
+            self.yaml_handler.update_columns_batch(version_entry, columns)
+
+            if tags is not None:
+                self.yaml_handler.update_version_tags(version_entry, tags)
+        else:
+            # Non-versioned model
+            if description is not None:
+                self.yaml_handler.update_model_description(model_entry, description)
+
+            self.yaml_handler.update_columns_batch(model_entry, columns)
+
+            if tags is not None:
+                self.yaml_handler.update_model_tags(model_entry, tags)
 
         self.yaml_handler.save_file(yml_path, data)
         return Path(yml_path)
@@ -774,7 +837,7 @@ class DbtCoreAdapter:
         )
 
         # Prefer manifest-derived path; fall back to default models directory
-        yml_path = self._get_model_yml_path(model_name)
+        yml_path = self._get_model_yml_path(model_name, target_version=target_version)
         if not yml_path:
             models_dir = self.get_model_dirs()[0]
             os.makedirs(models_dir, exist_ok=True)
