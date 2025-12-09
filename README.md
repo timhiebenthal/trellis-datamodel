@@ -275,3 +275,11 @@ uv run pytest
 ## Collaboration
 
 If you want to collaborate, reach out!
+
+## Contributing and CLA
+- Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow, testing, and PR guidelines.
+- All contributors must sign the CLA once per GitHub account. The CLA bot on pull requests will guide you; see [`CLA.md`](CLA.md) for details.
+
+## License
+- Trellis Datamodel is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+- See [`NOTICE`](NOTICE) for a summary of copyright and licensing information.

@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added "Config info" modal in UI to display resolved paths, model directories, and file existence status
 - Added clear error message when relationship inference finds no schema yml files in configured model paths
 - Added version-aware schema read/write: model schema endpoints now accept an optional version and frontend passes the active model version when fetching/saving YAML
+- Adopted GNU Affero General Public License v3.0 and added `LICENSE`/`NOTICE`.
+- Added CLA documentation and GitHub Action to enforce CLA signing on pull requests.
 
 ### Fixed
 - Fixed relationship inference to correctly handle `dbt_model_paths` entries with `models/` prefix (e.g., `models/3_entity`) by normalizing paths to prevent double-prepending

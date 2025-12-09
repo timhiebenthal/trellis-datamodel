@@ -1,0 +1,24 @@
+name: CLA
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CLA Assistant
+        uses: contributor-assistant/github-action@v2.4.0
+        with:
+          path-to-signatures: ".github/cla/signatures.json"
+          path-to-document: "CLA.md"
+          branch: "main"
+          allowlist: "timhiebenthal,dependabot[bot],github-actions[bot]"
+          remote-organization-name: "timhiebenthal"
+          remote-repository-name: "trellis-datamodel"
+
