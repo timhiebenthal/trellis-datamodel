@@ -20,7 +20,7 @@
     let collapsed = $state(false);
 
     function getModelLabel(model: DbtModel): string {
-        return model.version ? `${model.name} v${model.version}` : model.name;
+        return model.version ? `${model.name}.v${model.version}` : model.name;
     }
 
     // Extract all unique folders from models
