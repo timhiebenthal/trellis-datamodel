@@ -35,31 +35,33 @@ def create_app() -> FastAPI:
     def health_check():
         return {"status": "ok"}
 
-    # Find static files directory first
+    # Find static files directory
+    # Priority: 1) configured FRONTEND_BUILD_DIR, 2) package static dir (if it has index.html)
     static_dir_path = None
-    try:
-        # Try to get static files from package
-        static_dir = files("trellis_datamodel") / "static"
-        if static_dir.is_dir() and any(static_dir.iterdir()):
-            static_dir_path = str(static_dir)
-    except Exception:
-        pass
 
-    # If package static is empty/missing index, prefer configured build dir
-    if static_dir_path:
-        index_candidate = os.path.join(static_dir_path, "index.html")
-        if not os.path.exists(index_candidate) and os.path.exists(
-            cfg.FRONTEND_BUILD_DIR
-        ):
-            static_dir_path = cfg.FRONTEND_BUILD_DIR
-    elif os.path.exists(cfg.FRONTEND_BUILD_DIR):
+    # Check configured build dir first
+    if cfg.FRONTEND_BUILD_DIR and os.path.exists(
+        os.path.join(cfg.FRONTEND_BUILD_DIR, "index.html")
+    ):
         static_dir_path = cfg.FRONTEND_BUILD_DIR
+    else:
+        # Fall back to package static dir if it has index.html
+        try:
+            static_dir = files("trellis_datamodel") / "static"
+            if static_dir.is_dir():
+                pkg_index = str(static_dir / "index.html")
+                if os.path.exists(pkg_index):
+                    static_dir_path = str(static_dir)
+        except Exception:
+            pass
+
+    print(f"Serving frontend from: {static_dir_path}")
 
     # Include API routers - these MUST be registered before mounting static files
     app.include_router(manifest_router)
     app.include_router(data_model_router)
     app.include_router(schema_router)
-    
+
     # Mount static files AFTER API routes
     # Important: app.mount() creates a sub-application, so we mount AFTER registering API routes
     # However, mounted apps at "/" will intercept everything, so we need a different approach
@@ -68,13 +70,13 @@ def create_app() -> FastAPI:
         assets_path = os.path.join(static_dir_path, "assets")
         if os.path.exists(assets_path):
             app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-        
+
         # Serve other static files (like favicon, etc.) at /_app
         # SvelteKit builds put immutable assets in /_app
         app_path = os.path.join(static_dir_path, "_app")
         if os.path.exists(app_path):
             app.mount("/_app", StaticFiles(directory=app_path), name="app")
-        
+
         # Catch-all route for SPA - must be defined LAST
         # FastAPI matches more specific routes first, so /api/* routes will match before this
         @app.get("/{full_path:path}", include_in_schema=False)
@@ -85,6 +87,7 @@ def create_app() -> FastAPI:
             if os.path.exists(index_file):
                 return FileResponse(index_file)
             raise HTTPException(status_code=404, detail="Not found")
+
     else:
         print(
             f"Warning: Frontend build not found. "
@@ -96,4 +99,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

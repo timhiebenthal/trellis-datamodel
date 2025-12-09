@@ -9,22 +9,22 @@ entities:
     collapsed: false
   team:
     position:
-      x: 40
-      y: 355.21086452073547
+      x: 377.818115234375
+      y: 240
     width: 280
     panel_height: 200
     collapsed: false
   game:
     position:
-      x: 459.24967951665155
-      y: 100
+      x: 677.818115234375
+      y: 265
     width: 280
     panel_height: 200
     collapsed: false
   calendar:
     position:
-      x: 890.9350649350648
-      y: 1054.6270871985157
+      x: 50
+      y: 458.125
     width: 280
     panel_height: 403.75
     collapsed: false

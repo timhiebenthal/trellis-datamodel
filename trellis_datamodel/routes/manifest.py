@@ -4,12 +4,15 @@ from fastapi import APIRouter, HTTPException
 import os
 
 from trellis_datamodel.config import (
-    CONFIG_PATH,
-    FRAMEWORK,
-    MANIFEST_PATH,
+    CANVAS_LAYOUT_PATH,
     CATALOG_PATH,
+    CONFIG_PATH,
     DATA_MODEL_PATH,
+    DBT_MODEL_PATHS,
     DBT_PROJECT_PATH,
+    FRAMEWORK,
+    FRONTEND_BUILD_DIR,
+    MANIFEST_PATH,
     find_config_file,
 )
 from trellis_datamodel.adapters import get_adapter
@@ -17,17 +20,18 @@ from trellis_datamodel.adapters import get_adapter
 router = APIRouter(prefix="/api", tags=["manifest"])
 
 
+def _resolve_config_path() -> str | None:
+    """Resolve config file path, preferring CONFIG_PATH from startup, falling back to search."""
+    if CONFIG_PATH and os.path.exists(CONFIG_PATH):
+        return CONFIG_PATH
+    return find_config_file()
+
+
 @router.get("/config-status")
 async def get_config_status():
     """Return configuration status for the frontend."""
-    # Check if config exists - use CONFIG_PATH from startup if available
-    # If CONFIG_PATH is set (loaded at startup), use that. Otherwise search.
-    if CONFIG_PATH and os.path.exists(CONFIG_PATH):
-        found_config = CONFIG_PATH
-        config_present = True
-    else:
-        found_config = find_config_file()
-        config_present = found_config is not None
+    found_config = _resolve_config_path()
+    config_present = found_config is not None
 
     # Determine expected config filename for display
     if config_present:
@@ -59,6 +63,39 @@ async def get_config_status():
         "catalog_exists": catalog_exists,
         "data_model_exists": data_model_exists,
         "error": error,
+    }
+
+
+@router.get("/config-info")
+async def get_config_info():
+    """
+    Return resolved config paths and their existence for transparency/debugging.
+    """
+    config_path = _resolve_config_path()
+
+    adapter = get_adapter()
+    try:
+        model_dirs = adapter.get_model_dirs()  # type: ignore[attr-defined]
+    except Exception:
+        model_dirs = []
+
+    return {
+        "config_path": config_path,
+        "framework": FRAMEWORK,
+        "dbt_project_path": DBT_PROJECT_PATH,
+        "manifest_path": MANIFEST_PATH,
+        "manifest_exists": bool(MANIFEST_PATH and os.path.exists(MANIFEST_PATH)),
+        "catalog_path": CATALOG_PATH,
+        "catalog_exists": bool(CATALOG_PATH and os.path.exists(CATALOG_PATH)),
+        "data_model_path": DATA_MODEL_PATH,
+        "data_model_exists": bool(DATA_MODEL_PATH and os.path.exists(DATA_MODEL_PATH)),
+        "canvas_layout_path": CANVAS_LAYOUT_PATH,
+        "canvas_layout_exists": bool(
+            CANVAS_LAYOUT_PATH and os.path.exists(CANVAS_LAYOUT_PATH)
+        ),
+        "frontend_build_dir": FRONTEND_BUILD_DIR,
+        "model_paths_configured": DBT_MODEL_PATHS,
+        "model_paths_resolved": model_dirs,
     }
 
 
