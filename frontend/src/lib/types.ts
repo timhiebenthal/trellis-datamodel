@@ -6,6 +6,7 @@ export interface DbtColumn {
 export interface DbtModel {
     unique_id: string; // e.g. "model.elmo.entity_booking"
     name: string;
+    version?: number | null;
     schema: string;
     table: string;
     columns: DbtColumn[];

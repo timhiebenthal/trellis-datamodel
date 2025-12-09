@@ -19,6 +19,10 @@
     let searchTerm = $state("");
     let collapsed = $state(false);
 
+    function getModelLabel(model: DbtModel): string {
+        return model.version ? `${model.name}.v${model.version}` : model.name;
+    }
+
     // Extract all unique folders from models
     let allFolders = $derived(
         Array.from(
@@ -48,7 +52,8 @@
     let filteredModels = $derived(
         $dbtModels.filter((m) => {
             // Search filter
-            if (!m.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+            const label = getModelLabel(m);
+            if (!label.toLowerCase().includes(searchTerm.toLowerCase())) {
                 return false;
             }
 
@@ -131,13 +136,17 @@
             const folderNodes = Object.keys(obj._folders).map((key) =>
                 convert(obj._folders[key], key, path ? `${path}/${key}` : key),
             );
-            const fileNodes = obj._files.map((m: DbtModel) => ({
-                name: m.name,
-                path: path ? `${path}/${m.name}` : m.name,
-                type: "file",
-                children: [],
-                model: m,
-            }));
+            const fileNodes = obj._files.map((m: DbtModel) => {
+                const label = getModelLabel(m);
+                const filePath = path ? `${path}/${label}` : label;
+                return {
+                    name: label,
+                    path: filePath,
+                    type: "file",
+                    children: [],
+                    model: m,
+                };
+            });
 
             folderNodes.sort((a: TreeNode, b: TreeNode) =>
                 a.name.localeCompare(b.name),

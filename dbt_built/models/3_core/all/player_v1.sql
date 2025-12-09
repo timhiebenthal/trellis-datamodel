@@ -1,3 +1,5 @@
+{{ config(version=1) }}
+
 select 
     cast(player_id as text) as player_id,
     full_name,

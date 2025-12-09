@@ -65,9 +65,9 @@
         draggable="true"
         ondragstart={(e) => onDragStart(e, node.model!)}
         role="listitem"
-        title={`${node.model.name} (${node.model.schema}.${node.model.table})`}
+        title={`${node.name} (${node.model.schema}.${node.model.table})`}
     >
         <Icon icon="lucide:database" class="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
-        {node.model.name}
+        {node.name}
     </div>
 {/if}

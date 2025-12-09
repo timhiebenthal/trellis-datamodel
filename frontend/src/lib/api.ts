@@ -149,9 +149,10 @@ export async function syncDbtTests(): Promise<{ status: string; message: string;
     return await res.json();
 }
 
-export async function getModelSchema(modelName: string): Promise<ModelSchema | null> {
+export async function getModelSchema(modelName: string, version?: number): Promise<ModelSchema | null> {
     try {
-        const res = await fetch(`${API_BASE}/models/${modelName}/schema`);
+        const params = version !== undefined ? `?version=${version}` : "";
+        const res = await fetch(`${API_BASE}/models/${modelName}/schema${params}`);
         if (!res.ok) {
             if (res.status === 404) return null; // Model not found
             throw new Error(`Status: ${res.status}`);
@@ -163,11 +164,11 @@ export async function getModelSchema(modelName: string): Promise<ModelSchema | n
     }
 }
 
-export async function updateModelSchema(modelName: string, columns: { name: string; data_type?: string; description?: string }[], description?: string, tags?: string[]): Promise<{ status: string; message: string; file_path: string }> {
+export async function updateModelSchema(modelName: string, columns: { name: string; data_type?: string; description?: string }[], description?: string, tags?: string[], version?: number): Promise<{ status: string; message: string; file_path: string }> {
     const res = await fetch(`${API_BASE}/models/${modelName}/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columns, description, tags })
+        body: JSON.stringify({ columns, description, tags, version })
     });
     if (!res.ok) {
         const error = await res.text();

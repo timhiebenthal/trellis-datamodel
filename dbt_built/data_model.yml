@@ -12,8 +12,7 @@ entities:
   - name: current_team_id
     datatype: text
     description: current team's ID
-  tags:
-  - '123'
+  tags: []
 - id: team
   label: Team
   description: A Basketball Team competing in the NBA League
