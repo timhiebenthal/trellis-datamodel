@@ -413,7 +413,9 @@ class DbtCoreAdapter:
 
         yml_path = self._derive_yml_path_from_node(model_node)
         if not yml_path:
-            raise ValueError(f"No patch_path or original_file_path found for model '{model_name}'")
+            raise ValueError(
+                f"No patch_path or original_file_path found for model '{model_name}'"
+            )
 
         data = self.yaml_handler.load_file(yml_path)
         if not data:
@@ -482,7 +484,9 @@ class DbtCoreAdapter:
 
         yml_path = self._derive_yml_path_from_node(model_node)
         if not yml_path:
-            raise ValueError(f"No patch_path or original_file_path found for model '{model_name}'")
+            raise ValueError(
+                f"No patch_path or original_file_path found for model '{model_name}'"
+            )
 
         data = self.yaml_handler.load_file(yml_path)
         if not data:
@@ -529,7 +533,9 @@ class DbtCoreAdapter:
             ref('player', v=1) -> ("player", "1")
             ref("player", version=2) -> ("player", "2")
         """
-        ref_pattern = r"ref\(\s*['\"]([^,'\"]+)['\"](?:\s*,\s*(?:v|version)\s*=\s*([0-9]+))?\s*\)"
+        ref_pattern = (
+            r"ref\(\s*['\"]([^,'\"]+)['\"](?:\s*,\s*(?:v|version)\s*=\s*([0-9]+))?\s*\)"
+        )
         match = re.fullmatch(ref_pattern, ref_value.strip())
         if match:
             return match.group(1), match.group(2)
@@ -552,6 +558,16 @@ class DbtCoreAdapter:
         """Scan dbt yml files and infer entity relationships from relationship tests."""
         model_dirs = self.get_model_dirs()
         model_to_entity = self._get_model_to_entity_map()
+
+        # Only keep relationships where both ends map to entities that are bound to
+        # at least one dbt model (including additional_models). This prevents writing
+        # relationships for unbound entities in large projects.
+        data_model = self._load_data_model()
+        bound_entities = {
+            e.get("id")
+            for e in data_model.get("entities", [])
+            if e.get("id") and (e.get("dbt_model") or e.get("additional_models"))
+        }
         relationships: list[Relationship] = []
         yml_found = False
 
@@ -589,7 +605,9 @@ class DbtCoreAdapter:
                                         )
                                     )
                             else:
-                                versioned_columns.append((None, model.get("columns", [])))
+                                versioned_columns.append(
+                                    (None, model.get("columns", []))
+                                )
 
                             for model_version, columns in versioned_columns:
                                 entity_id = self._resolve_entity_id(
@@ -631,6 +649,14 @@ class DbtCoreAdapter:
                                         target_entity_id = self._resolve_entity_id(
                                             model_to_entity, target_base, target_version
                                         )
+
+                                        # Skip relationships where either side is not bound to a
+                                        # dbt model in the data model
+                                        if (
+                                            entity_id not in bound_entities
+                                            or target_entity_id not in bound_entities
+                                        ):
+                                            continue
 
                                         relationships.append(
                                             {

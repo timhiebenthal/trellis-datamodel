@@ -302,7 +302,20 @@ class TestInferRelationships:
         assert response.status_code == 400
         assert "No schema yml files found" in response.json()["detail"]
 
-    def test_infers_relationships_from_tests(self, test_client, temp_dir):
+    def test_infers_relationships_from_tests(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        # Data model with bound entities
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "users", "dbt_model": "model.project.users"},
+                {"id": "orders", "dbt_model": "model.project.orders"},
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
         # Create a YML file with relationship tests
         models_dir = os.path.join(temp_dir, "models", "3_core")
         os.makedirs(models_dir, exist_ok=True)
@@ -344,10 +357,22 @@ class TestInferRelationships:
         assert rels[0]["source_field"] == "id"
         assert rels[0]["target_field"] == "user_id"
 
-    def test_infers_relationships_from_nested_directories(self, test_client, temp_dir):
+    def test_infers_relationships_from_nested_directories(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
         # Ensure nested model directories are also scanned
         nested_dir = os.path.join(temp_dir, "models", "3_core", "all")
         os.makedirs(nested_dir, exist_ok=True)
+
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "team", "dbt_model": "model.project.team"},
+                {"id": "game", "dbt_model": "model.project.game"},
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
 
         schema = {
             "version": 2,
@@ -426,7 +451,7 @@ class TestInferRelationships:
         ]
 
     def test_infers_relationships_across_multiple_model_paths(
-        self, test_client, temp_dir
+        self, test_client, temp_dir, temp_data_model_path
     ):
         """
         When multiple dbt model paths are configured (including with a models/ prefix),
@@ -441,6 +466,16 @@ class TestInferRelationships:
         original_paths = list(cfg.DBT_MODEL_PATHS)
         try:
             cfg.DBT_MODEL_PATHS = ["3_core", "models/3_entity"]
+
+            data_model = {
+                "version": 0.1,
+                "entities": [
+                    {"id": "product", "dbt_model": "model.project.product"},
+                    {"id": "opportunity", "dbt_model": "model.project.opportunity"},
+                ],
+            }
+            with open(temp_data_model_path, "w") as f:
+                yaml.dump(data_model, f)
 
             schema = {
                 "version": 2,
@@ -490,6 +525,16 @@ class TestInferRelationships:
         # Clean out prior test artifacts to avoid cross-test contamination
         shutil.rmtree(models_dir, ignore_errors=True)
         os.makedirs(models_dir, exist_ok=True)
+
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "customers", "dbt_model": "model.project.customers"},
+                {"id": "orders", "dbt_model": "model.project.orders"},
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
 
         schema = {
             "version": 2,
@@ -545,10 +590,7 @@ class TestInferRelationships:
                     "label": "Customers",
                     "additional_models": ["model.project.customers_alt"],
                 },
-                {
-                    "id": "orders",
-                    "label": "Orders",
-                },
+                {"id": "orders", "label": "Orders", "dbt_model": "model.project.orders"},
             ],
         }
         with open(temp_data_model_path, "w") as f:
