@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Removed backwards-compatibility alias `_get_models_dir()` in favor of unified `get_model_dirs()` method
+- Relationship inference now only includes relationships where both source and target entities have bound dbt models (including `additional_models`), preventing unbound relationships from being written to `data_model.yml` in large-scale projects
 
 ## [0.1.6] - 2025-12-07
 
