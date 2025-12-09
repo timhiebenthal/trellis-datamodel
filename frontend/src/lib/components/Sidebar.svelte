@@ -7,7 +7,7 @@
         nodes,
     } from "$lib/stores";
     import type { DbtModel, TreeNode } from "$lib/types";
-    import { getModelFolder } from "$lib/utils";
+    import { getModelFolder, normalizeTags } from "$lib/utils";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -35,11 +35,11 @@
         Array.from(
             new Set([
                 // Tags from dbt models (manifest.json)
-                ...$dbtModels.flatMap((m) => m.tags || []),
+                ...$dbtModels.flatMap((m) => normalizeTags(m.tags)),
                 // Tags from entity nodes on canvas (user-added tags)
                 ...$nodes
                     .filter((n) => n.type === "entity")
-                    .flatMap((n) => (n.data?.tags as string[]) || []),
+                    .flatMap((n) => normalizeTags(n.data?.tags)),
             ]),
         ).sort(),
     );
@@ -62,7 +62,7 @@
 
             // Tag filter
             if ($tagFilter.length > 0) {
-                const modelTags = m.tags || [];
+                const modelTags = normalizeTags(m.tags);
                 const hasMatch = $tagFilter.some((tag) =>
                     modelTags.includes(tag),
                 );

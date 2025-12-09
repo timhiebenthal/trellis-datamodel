@@ -25,7 +25,7 @@
         inferRelationships,
         syncDbtTests,
     } from "$lib/api";
-    import { getParallelOffset, getModelFolder } from "$lib/utils";
+    import { getParallelOffset, getModelFolder, normalizeTags } from "$lib/utils";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
@@ -121,7 +121,7 @@
                             panelHeight: 200,
                             collapsed: false,
                             folder,
-                            tags: model?.tags ?? [],
+                            tags: normalizeTags(model?.tags),
                         },
                     };
 
@@ -296,7 +296,7 @@
                 const entityNodes = (dataModel.entities || []).map((e: any) => {
                     const metadata = getEntityMetadata(e);
                     // Use tags from entity data if present, otherwise empty array
-                    const entityTags = e.tags || [];
+                    const entityTags = normalizeTags(e.tags);
                     return {
                         id: e.id,
                         type: "entity",
@@ -588,7 +588,7 @@
                             width: n.data?.width as number | undefined,
                             panel_height: n.data?.panelHeight as number | undefined,
                             collapsed: (n.data?.collapsed as boolean) ?? false,
-                            tags: (n.data?.tags as string[]) || [],
+                            tags: normalizeTags(n.data?.tags),
                         })),
                     relationships: currentEdges.map((e) => ({
                         source: e.source,
@@ -664,10 +664,12 @@
 
             if (activeTags.length > 0) {
                 // Combine tags from all bound models (manifest) and entity data (user-added)
-                const allModelTags = allBoundModels.flatMap((m) => m.tags || []);
-                const entityTags = (node.data?.tags as string[]) || [];
+                const allModelTags = allBoundModels.flatMap((m) =>
+                    normalizeTags(m.tags),
+                );
+                const entityTags = normalizeTags(node.data?.tags);
                 const nodeTags = [...new Set([...allModelTags, ...entityTags])];
-                
+
                 visible =
                     visible &&
                     nodeTags.length > 0 &&

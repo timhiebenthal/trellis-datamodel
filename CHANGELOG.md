@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed relationship inference to correctly handle `dbt_model_paths` entries with `models/` prefix (e.g., `models/3_entity`) by normalizing paths to prevent double-prepending
 - Fixed frontend static file serving priority - now correctly prefers configured `FRONTEND_BUILD_DIR` over package static directory, ensuring local builds are served during development
+- Normalized tag handling in the UI so string values (e.g., model/folder names) no longer explode into per-character tag chips; tag filters now only use real tag arrays
 
 ### Changed
 - Removed backwards-compatibility alias `_get_models_dir()` in favor of unified `get_model_dirs()` method
