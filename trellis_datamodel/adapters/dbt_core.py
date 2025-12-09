@@ -320,6 +320,16 @@ class DbtCoreAdapter:
         """Scan dbt yml files and infer entity relationships from relationship tests."""
         model_dirs = self.get_model_dirs()
         model_to_entity = self._get_model_to_entity_map()
+
+        # Only keep relationships where both ends map to entities that are bound to
+        # at least one dbt model (including additional_models). This prevents writing
+        # relationships for unbound entities in large projects.
+        data_model = self._load_data_model()
+        bound_entities = {
+            e.get("id")
+            for e in data_model.get("entities", [])
+            if e.get("id") and (e.get("dbt_model") or e.get("additional_models"))
+        }
         relationships: list[Relationship] = []
         yml_found = False
 
@@ -390,6 +400,14 @@ class DbtCoreAdapter:
                                     target_entity_id = model_to_entity.get(
                                         target_model, target_model
                                     )
+
+                                    # Skip relationships where either side is not bound to a
+                                    # dbt model in the data model
+                                    if (
+                                        entity_id not in bound_entities
+                                        or target_entity_id not in bound_entities
+                                    ):
+                                        continue
 
                                     relationships.append(
                                         {
