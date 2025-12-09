@@ -55,3 +55,30 @@ export function getModelFolder(model: DbtModel): string | null {
     return null;
 }
 
+/**
+ * Normalize any incoming tag shape (string | string[] | undefined) into a
+ * clean, deduplicated array of non-empty strings. Prevents single strings
+ * from being treated as iterables (which would otherwise explode into
+ * characters when spread or flatMapped).
+ */
+export function normalizeTags(raw: unknown): string[] {
+    if (!raw) return [];
+
+    const toStrings = (vals: unknown[]): string[] =>
+        vals
+            .map((v) => String(v).trim())
+            .filter((v) => v.length > 0);
+
+    if (Array.isArray(raw)) {
+        return Array.from(new Set(toStrings(raw)));
+    }
+
+    if (typeof raw === 'string') {
+        // Support comma-separated lists while still accepting single tokens
+        const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+        return Array.from(new Set(parts));
+    }
+
+    return [];
+}
+

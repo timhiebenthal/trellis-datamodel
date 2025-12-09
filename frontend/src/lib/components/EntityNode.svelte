@@ -18,7 +18,11 @@
         getModelSchema,
         updateModelSchema,
     } from "$lib/api";
-    import { getParallelOffset, generateSlug } from "$lib/utils";
+    import {
+        getParallelOffset,
+        generateSlug,
+        normalizeTags,
+    } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
 
@@ -130,14 +134,18 @@
             if (activeModelIndex === 0) {
                 // Load tags from schema.yml (source of truth for bound entities)
                 // schema.tags can be undefined, empty array, or have tags
-                if (schema && Array.isArray(schema.tags)) {
-                    updateNodeData(id, { tags: schema.tags });
-                } else if (modelDetails.tags && modelDetails.tags.length > 0) {
-                    // Fallback to manifest tags if schema.yml doesn't have tags
-                    updateNodeData(id, { tags: modelDetails.tags });
+                const schemaTags = normalizeTags(schema?.tags);
+                if (schemaTags.length > 0) {
+                    updateNodeData(id, { tags: schemaTags });
                 } else {
-                    // Clear tags if schema.yml exists but has no tags
-                    updateNodeData(id, { tags: [] });
+                    const modelTags = normalizeTags(modelDetails.tags);
+                    if (modelTags.length > 0) {
+                        // Fallback to manifest tags if schema.yml doesn't have tags
+                        updateNodeData(id, { tags: modelTags });
+                    } else {
+                        // Clear tags if schema.yml exists but has no tags
+                        updateNodeData(id, { tags: [] });
+                    }
                 }
             }
 
@@ -171,7 +179,7 @@
                     description: col.description,
                 })),
                 data.description,
-                data.tags || [],
+                normalizeTags(data.tags),
                 modelDetails.version ?? undefined,
             );
             hasUnsavedChanges = false;
@@ -541,13 +549,13 @@
     }
 
     // Tag editing functionality
-    let entityTags = $derived((data.tags || []) as string[]);
+    let entityTags = $derived(normalizeTags(data.tags));
     let tagInput = $state("");
     let showTagInput = $state(false);
 
     function getCurrentTags(nodeId: string): string[] {
         const node = $nodes.find((n) => n.id === nodeId);
-        return ((node?.data?.tags as string[]) || []).slice();
+        return normalizeTags(node?.data?.tags);
     }
 
     function addTag(tag: string) {
@@ -627,7 +635,7 @@
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
             if (node && node.type === "entity") {
-                const currentTags = (node.data?.tags || []) as string[];
+                const currentTags = normalizeTags(node.data?.tags);
                 const newTags = currentTags.filter((t) => t !== tag);
                 updateNodeData(nodeId, { tags: newTags });
                 // If this is the current node and it's bound, mark as having unsaved changes
