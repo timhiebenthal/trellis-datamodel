@@ -65,13 +65,46 @@ class DbtCoreAdapter:
             print(f"Warning: Could not load data model: {e}")
             return {}
 
-    def _get_models_dir(self) -> str:
-        """Get the models directory path."""
-        # Respect configured model_paths; default to top-level models dir
-        models_subdir = self.model_paths[0] if self.model_paths else ""
-        return os.path.abspath(
-            os.path.join(self.project_path, "models", models_subdir)
-        ).rstrip(os.sep)
+    def get_model_dirs(self) -> list[str]:
+        """
+        Resolve configured models directories, normalizing common dbt prefixes.
+
+        Users may configure entries like "3_core", "models/3_entity", or absolute
+        paths. We normalize these to real directories so downstream scans work.
+        """
+
+        def _normalize(subdir: str) -> str:
+            # Absolute path - return as-is
+            if os.path.isabs(subdir):
+                return os.path.abspath(subdir).rstrip(os.sep)
+
+            # Remove leading "./"
+            while subdir.startswith("./"):
+                subdir = subdir[2:]
+
+            # Strip an optional leading "models/" so we don't double-prepend
+            prefix = f"models{os.sep}"
+            if subdir.startswith(prefix):
+                subdir = subdir[len(prefix) :]
+
+            return os.path.abspath(
+                os.path.join(self.project_path, "models", subdir)
+            ).rstrip(os.sep)
+
+        if self.model_paths:
+            # Remove duplicates while preserving order
+            seen = set()
+            normalized = []
+            for path in self.model_paths:
+                norm = _normalize(path)
+                if norm not in seen:
+                    seen.add(norm)
+                    normalized.append(norm)
+            return normalized
+
+        return [
+            os.path.abspath(os.path.join(self.project_path, "models")).rstrip(os.sep)
+        ]
 
     def _entity_to_model_name(self, entity: dict[str, Any]) -> str:
         """
@@ -285,83 +318,97 @@ class DbtCoreAdapter:
 
     def infer_relationships(self) -> list[Relationship]:
         """Scan dbt yml files and infer entity relationships from relationship tests."""
-        models_dir = self._get_models_dir()
-
-        if not os.path.exists(models_dir):
-            return []
-
+        model_dirs = self.get_model_dirs()
         model_to_entity = self._get_model_to_entity_map()
         relationships: list[Relationship] = []
+        yml_found = False
 
-        for root, _, files in os.walk(models_dir):
-            for filename in files:
-                if not filename.endswith((".yml", ".yaml")):
-                    continue
+        for models_dir in model_dirs:
+            if not os.path.exists(models_dir):
+                continue
 
-                filepath = os.path.join(root, filename)
-                try:
-                    with open(filepath, "r") as f:
-                        schema_data = yaml.safe_load(f) or {}
+            for root, _, files in os.walk(models_dir):
+                for filename in files:
+                    if not filename.endswith((".yml", ".yaml")):
+                        continue
+                    yml_found = True
 
-                    models_list = schema_data.get("models", [])
-                    for model in models_list:
-                        model_name = model.get("name")
-                        if not model_name:
-                            continue
+                    filepath = os.path.join(root, filename)
+                    try:
+                        with open(filepath, "r") as f:
+                            schema_data = yaml.safe_load(f) or {}
 
-                        entity_id = model_to_entity.get(model_name, model_name)
+                        models_list = schema_data.get("models", [])
+                        for model in models_list:
+                            model_name = model.get("name")
+                            if not model_name:
+                                continue
 
-                        columns = model.get("columns", [])
-                        for column in columns:
-                            test_blocks = []
-                            for key in ("tests", "data_tests"):
-                                value = column.get(key, [])
-                                if isinstance(value, list):
-                                    test_blocks.extend(value)
+                            entity_id = model_to_entity.get(model_name, model_name)
 
-                            for test in test_blocks:
-                                if not isinstance(test, dict) or "relationships" not in test:
-                                    continue
+                            columns = model.get("columns", [])
+                            for column in columns:
+                                test_blocks = []
+                                for key in ("tests", "data_tests"):
+                                    value = column.get(key, [])
+                                    if isinstance(value, list):
+                                        test_blocks.extend(value)
 
-                                rel_test = test["relationships"]
-                                args = rel_test.get("arguments", {}) or {}
+                                for test in test_blocks:
+                                    if (
+                                        not isinstance(test, dict)
+                                        or "relationships" not in test
+                                    ):
+                                        continue
 
-                                # Support both the recommended arguments block and legacy top-level keys
-                                to_ref = rel_test.get("to", "") or args.get("to", "")
-                                target_field = rel_test.get("field", "") or args.get(
-                                    "field", ""
-                                )
+                                    rel_test = test["relationships"]
+                                    args = rel_test.get("arguments", {}) or {}
 
-                                # If either ref target or field is missing, skip and log for debugging
-                                if not to_ref or not target_field:
-                                    continue
+                                    # Support both the recommended arguments block and legacy top-level keys
+                                    to_ref = rel_test.get("to", "") or args.get(
+                                        "to", ""
+                                    )
+                                    target_field = rel_test.get(
+                                        "field", ""
+                                    ) or args.get("field", "")
 
-                                # Parse ref('model_name')
-                                target_model = to_ref
-                                if to_ref.startswith("ref('") and to_ref.endswith("')"):
-                                    target_model = to_ref[5:-2]
-                                elif to_ref.startswith('ref("') and to_ref.endswith(
-                                    '")'
-                                ):
-                                    target_model = to_ref[5:-2]
+                                    # If either ref target or field is missing, skip and log for debugging
+                                    if not to_ref or not target_field:
+                                        continue
 
-                                target_entity_id = model_to_entity.get(
-                                    target_model, target_model
-                                )
+                                    # Parse ref('model_name')
+                                    target_model = to_ref
+                                    if to_ref.startswith("ref('") and to_ref.endswith(
+                                        "')"
+                                    ):
+                                        target_model = to_ref[5:-2]
+                                    elif to_ref.startswith('ref("') and to_ref.endswith(
+                                        '")'
+                                    ):
+                                        target_model = to_ref[5:-2]
 
-                                relationships.append(
-                                    {
-                                        "source": target_entity_id,
-                                        "target": entity_id,
-                                        "label": "",
-                                        "type": "one_to_many",
-                                        "source_field": target_field,
-                                        "target_field": column.get("name"),
-                                    }
-                                )
-                except Exception as e:
-                    print(f"Warning: Could not parse {filepath}: {e}")
-                    continue
+                                    target_entity_id = model_to_entity.get(
+                                        target_model, target_model
+                                    )
+
+                                    relationships.append(
+                                        {
+                                            "source": target_entity_id,
+                                            "target": entity_id,
+                                            "label": "",
+                                            "type": "one_to_many",
+                                            "source_field": target_field,
+                                            "target_field": column.get("name"),
+                                        }
+                                    )
+                    except Exception as e:
+                        print(f"Warning: Could not parse {filepath}: {e}")
+                        continue
+
+        if not yml_found:
+            raise FileNotFoundError(
+                f"No schema yml files found under configured dbt model paths: {model_dirs}"
+            )
 
         # Remove duplicates
         seen: set[tuple] = set()
@@ -419,7 +466,7 @@ class DbtCoreAdapter:
                 }
             )
 
-        models_dir = self._get_models_dir()
+        models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
 
         updated_files: list[Path] = []
@@ -562,7 +609,9 @@ class DbtCoreAdapter:
             field_name = field["name"]
             if field_name in field_to_relationship:
                 rel_info = field_to_relationship[field_name]
-                ref_model = entity_model_name.get(rel_info["target_entity"], rel_info["target_entity"])
+                ref_model = entity_model_name.get(
+                    rel_info["target_entity"], rel_info["target_entity"]
+                )
                 column_dict["data_tests"] = [
                     {
                         "relationships": {
@@ -592,7 +641,7 @@ class DbtCoreAdapter:
             "models": [model_dict],
         }
 
-        models_dir = self._get_models_dir()
+        models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
         output_path = os.path.join(models_dir, f"{entity_id}.yml")
 
@@ -602,4 +651,3 @@ class DbtCoreAdapter:
             yaml.dump(schema_content, f, default_flow_style=False, sort_keys=False)
 
         return Path(output_path)
-

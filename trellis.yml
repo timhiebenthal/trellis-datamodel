@@ -22,3 +22,6 @@ data_model_file: "data_model.yml"
 dbt_model_paths:
   - "3_core"
 
+# Path to frontend build directory (relative to this config file or absolute)
+frontend_build_dir: "./frontend/build"
+

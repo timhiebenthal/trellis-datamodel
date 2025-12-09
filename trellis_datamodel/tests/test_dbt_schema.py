@@ -1,4 +1,5 @@
 """Tests for dbt schema API endpoints."""
+
 import os
 import shutil
 import yaml
@@ -41,7 +42,9 @@ class TestSaveDbtSchema:
 class TestSyncDbtTests:
     """Tests for POST /api/sync-dbt-tests endpoint."""
 
-    def test_syncs_relationship_tests(self, test_client, temp_dir, temp_data_model_path):
+    def test_syncs_relationship_tests(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
         # Create data model with entities and relationships
         data_model = {
             "version": 0.1,
@@ -184,8 +187,8 @@ class TestInferRelationships:
 
     def test_returns_empty_for_no_yml_files(self, test_client, temp_dir):
         response = test_client.get("/api/infer-relationships")
-        assert response.status_code == 200
-        assert response.json()["relationships"] == []
+        assert response.status_code == 400
+        assert "No schema yml files found" in response.json()["detail"]
 
     def test_infers_relationships_from_tests(self, test_client, temp_dir):
         # Create a YML file with relationship tests
@@ -204,7 +207,10 @@ class TestInferRelationships:
                             "tests": [
                                 {
                                     "relationships": {
-                                        "arguments": {"to": "ref('users')", "field": "id"}
+                                        "arguments": {
+                                            "to": "ref('users')",
+                                            "field": "id",
+                                        }
                                     }
                                 }
                             ],
@@ -278,7 +284,12 @@ class TestInferRelationships:
 
         rels = response.json()["relationships"]
         assert len(rels) == 2
-        assert {"source": "team", "target": "game", "source_field": "team_id", "target_field": "home_team_id"} in [
+        assert {
+            "source": "team",
+            "target": "game",
+            "source_field": "team_id",
+            "target_field": "home_team_id",
+        } in [
             {
                 "source": r["source"],
                 "target": r["target"],
@@ -287,7 +298,12 @@ class TestInferRelationships:
             }
             for r in rels
         ]
-        assert {"source": "team", "target": "game", "source_field": "team_id", "target_field": "away_team_id"} in [
+        assert {
+            "source": "team",
+            "target": "game",
+            "source_field": "team_id",
+            "target_field": "away_team_id",
+        } in [
             {
                 "source": r["source"],
                 "target": r["target"],
@@ -296,6 +312,61 @@ class TestInferRelationships:
             }
             for r in rels
         ]
+
+    def test_infers_relationships_across_multiple_model_paths(
+        self, test_client, temp_dir
+    ):
+        """
+        When multiple dbt model paths are configured (including with a models/ prefix),
+        all should be scanned.
+        """
+        from trellis_datamodel import config as cfg
+
+        # Add an extra model path and point to a different directory
+        extra_models_dir = os.path.join(temp_dir, "models", "3_entity")
+        os.makedirs(extra_models_dir, exist_ok=True)
+
+        original_paths = list(cfg.DBT_MODEL_PATHS)
+        try:
+            cfg.DBT_MODEL_PATHS = ["3_core", "models/3_entity"]
+
+            schema = {
+                "version": 2,
+                "models": [
+                    {
+                        "name": "opportunity",
+                        "columns": [
+                            {
+                                "name": "product_id",
+                                "data_tests": [
+                                    {
+                                        "relationships": {
+                                            "arguments": {
+                                                "to": "ref('product')",
+                                                "field": "product_id",
+                                            }
+                                        }
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+
+            with open(os.path.join(extra_models_dir, "opportunity.yml"), "w") as f:
+                yaml.dump(schema, f)
+
+            response = test_client.get("/api/infer-relationships")
+            assert response.status_code == 200
+
+            rels = response.json()["relationships"]
+            assert {"source": "product", "target": "opportunity"} in [
+                {"source": r["source"], "target": r["target"]} for r in rels
+            ]
+        finally:
+            cfg.DBT_MODEL_PATHS = original_paths
+            shutil.rmtree(extra_models_dir, ignore_errors=True)
 
     def test_infers_relationships_with_arguments_block(
         self, test_client, temp_dir, temp_data_model_path
@@ -347,7 +418,9 @@ class TestInferRelationships:
         assert rels[0]["source_field"] == "id"
         assert rels[0]["target_field"] == "customer_id"
 
-    def test_maps_additional_models_to_entity_ids(self, test_client, temp_dir, temp_data_model_path):
+    def test_maps_additional_models_to_entity_ids(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
         """
         Relationship inference should translate additional_models to their entity IDs.
         """
