@@ -351,11 +351,27 @@
                     
                     for (const boundModel of boundModels) {
                         if (boundModel && typeof boundModel === "string") {
-                            // Extract model name from "model.project.name" -> "name"
-                            const modelName = boundModel.includes(".")
-                                ? boundModel.split(".").pop()!
-                                : boundModel;
-                            modelToEntity[modelName] = node.id;
+                            // Extract model name from unique_id, handling versioned models:
+                            // "model.project.name" -> maps "name"
+                            // "model.project.name.v1" -> maps "name" (base name used by backend)
+                            const parts = boundModel.split(".");
+                            if (parts.length >= 3 && parts[0] === "model") {
+                                const lastPart = parts[parts.length - 1];
+                                const isVersioned = /^v\d+$/.test(lastPart);
+                                
+                                if (isVersioned && parts.length >= 4) {
+                                    // Versioned model: map base name (backend returns base_model_name)
+                                    const baseName = parts[parts.length - 2];
+                                    modelToEntity[baseName] = node.id;
+                                } else {
+                                    modelToEntity[lastPart] = node.id;
+                                }
+                            } else {
+                                const modelName = boundModel.includes(".")
+                                    ? boundModel.split(".").pop()!
+                                    : boundModel;
+                                modelToEntity[modelName] = node.id;
+                            }
                         }
                     }
                     // Also map entity ID to itself
