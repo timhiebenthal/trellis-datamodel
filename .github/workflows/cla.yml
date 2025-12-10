@@ -24,5 +24,4 @@ jobs:
           allowlist: "timhiebenthal,dependabot[bot],github-actions[bot]"
           remote-organization-name: "timhiebenthal"
           remote-repository-name: "trellis-datamodel"
-          token: ${{ secrets.GITHUB_TOKEN }}
 
