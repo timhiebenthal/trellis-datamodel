@@ -575,6 +575,69 @@ class TestInferRelationships:
         assert rels[0]["source_field"] == "id"
         assert rels[0]["target_field"] == "customer_id"
 
+    def test_can_include_unbound_entities_when_requested(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        When include_unbound=true is passed, relationships are returned even if
+        the entities have not yet been persisted with dbt_model bindings.
+        """
+        models_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(models_dir, exist_ok=True)
+
+        # Data model without dbt_model bindings (e.g. right after a drag+drop)
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "customers"},
+                {"id": "orders"},
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Relationship test between the two models
+        schema = {
+            "version": 2,
+            "models": [
+                {
+                    "name": "orders",
+                    "columns": [
+                        {
+                            "name": "customer_id",
+                            "tests": [
+                                {
+                                    "relationships": {
+                                        "arguments": {
+                                            "to": "ref('customers')",
+                                            "field": "id",
+                                        }
+                                    }
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        with open(os.path.join(models_dir, "orders.yml"), "w") as f:
+            yaml.dump(schema, f)
+
+        # Default behaviour should still filter unbound entities
+        default_response = test_client.get("/api/infer-relationships")
+        assert default_response.status_code == 200
+        assert default_response.json()["relationships"] == []
+
+        # With the flag enabled we should get the inferred relationship back
+        response = test_client.get("/api/infer-relationships?include_unbound=true")
+        assert response.status_code == 200
+        rels = response.json()["relationships"]
+        assert len(rels) == 1
+        assert rels[0]["source"] == "customers"
+        assert rels[0]["target"] == "orders"
+        assert rels[0]["source_field"] == "id"
+        assert rels[0]["target_field"] == "customer_id"
+
     def test_maps_additional_models_to_entity_ids(
         self, test_client, temp_dir, temp_data_model_path
     ):

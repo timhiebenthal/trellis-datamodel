@@ -322,7 +322,7 @@
 
         // Auto-create relationships from yml relationship tests
         try {
-            const inferred = await inferRelationships();
+            const inferred = await inferRelationships({ includeUnbound: true });
 
                 // Build model name -> entity ID map from current canvas state
                 // Include the model we just bound (since data model hasn't saved yet)

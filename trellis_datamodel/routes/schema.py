@@ -156,7 +156,7 @@ async def update_model_schema(model_name: str, request: ModelSchemaRequest):
 
 
 @router.get("/infer-relationships")
-async def infer_relationships():
+async def infer_relationships(include_unbound: bool = False):
     """Scan schema files and infer entity relationships from relationship tests."""
     try:
         if not DBT_PROJECT_PATH:
@@ -166,7 +166,7 @@ async def infer_relationships():
             )
 
         adapter = get_adapter()
-        relationships = adapter.infer_relationships()
+        relationships = adapter.infer_relationships(include_unbound=include_unbound)
 
         return {"relationships": relationships}
 

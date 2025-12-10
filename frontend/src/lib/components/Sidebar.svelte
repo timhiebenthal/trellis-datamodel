@@ -19,8 +19,26 @@
     let searchTerm = $state("");
     let collapsed = $state(false);
 
+    function inferModelVersion(model: DbtModel): number | null {
+        if (model.version !== undefined && model.version !== null) {
+            return model.version;
+        }
+
+        const uniqueIdMatch = model.unique_id?.match(/\.v(\d+)$/);
+        if (uniqueIdMatch) return Number(uniqueIdMatch[1]);
+
+        const tableMatch = model.table?.match(/__v(\d+)$/);
+        if (tableMatch) return Number(tableMatch[1]);
+
+        const nameMatch = model.name?.match(/(?:\.|_)?v(\d+)$/);
+        if (nameMatch) return Number(nameMatch[1]);
+
+        return null;
+    }
+
     function getModelLabel(model: DbtModel): string {
-        return model.version ? `${model.name}.v${model.version}` : model.name;
+        const version = inferModelVersion(model);
+        return version ? `${model.name}.v${version}` : model.name;
     }
 
     // Extract all unique folders from models
