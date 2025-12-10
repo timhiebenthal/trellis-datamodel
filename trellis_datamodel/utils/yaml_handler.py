@@ -17,8 +17,8 @@ class YamlHandler:
         self.yaml.preserve_quotes = True
         self.yaml.default_flow_style = False
         self.yaml.width = 4096  # Prevent unwanted line wrapping
-        # Enforce clear nested indentation (lists under mappings indented +2)
-        self.yaml.indent(mapping=2, sequence=4, offset=2)
+        # Match the two-space sequence indentation seen in existing dbt yml files
+        self.yaml.indent(mapping=2, sequence=2, offset=0)
         # Disallow indentless sequences so list items are indented under their parent keys
         self.yaml.indentless_sequences = False
 

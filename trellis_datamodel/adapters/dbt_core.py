@@ -4,6 +4,7 @@ dbt-core adapter implementation.
 Handles parsing dbt manifest.json/catalog.json and generating dbt schema YAML files.
 """
 
+import copy
 import json
 import os
 import re
@@ -595,19 +596,30 @@ class DbtCoreAdapter:
                             # Versioned models may declare columns inside versions list
                             version_entries = model.get("versions", [])
                             versioned_columns = []
+                            base_columns = model.get("columns", []) or []
+
                             if isinstance(version_entries, list) and version_entries:
+                                # Carry forward columns when a version uses "include: all"
+                                previous_columns = copy.deepcopy(base_columns)
                                 for ver in version_entries:
-                                    v_cols = ver.get("columns", [])
+                                    raw_columns = ver.get("columns", []) or []
+                                    expanded_columns: list[dict] = []
+                                    for col in raw_columns:
+                                        if isinstance(col, dict) and col.get("include") == "all":
+                                            expanded_columns.extend(copy.deepcopy(previous_columns))
+                                        else:
+                                            expanded_columns.append(col)
+
+                                    # If no columns are explicitly provided, fall back to previous set
+                                    if not expanded_columns and previous_columns:
+                                        expanded_columns = copy.deepcopy(previous_columns)
+
                                     versioned_columns.append(
-                                        (
-                                            ver.get("v") or ver.get("version"),
-                                            v_cols,
-                                        )
+                                        (ver.get("v") or ver.get("version"), expanded_columns)
                                     )
+                                    previous_columns = copy.deepcopy(expanded_columns)
                             else:
-                                versioned_columns.append(
-                                    (None, model.get("columns", []))
-                                )
+                                versioned_columns.append((None, base_columns))
 
                             for model_version, columns in versioned_columns:
                                 entity_id = self._resolve_entity_id(
