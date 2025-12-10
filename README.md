@@ -13,7 +13,7 @@ A local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and
 - Stakeholders can't easily understand model structure without technical context
 
 **How Trellis helps:**
-- Visual data model that stays in sync — reads directly from `manifest.json` / `catalog.json`
+- Visual data model that stays in sync — reads directly from `manifest.json` (required) and `catalog.json` (optional, for field info)
 - Sketch entities and with their fields and auto-generate schema.yml's for dbt
 - Draw relationships on canvas → auto-generates dbt `relationships` tests
 - Two views: **Conceptual** (entity names, descriptions) and **Logical** (columns, types, materializations) to jump between high-level architect and execution-view.
@@ -33,7 +33,101 @@ If this project gains traction, we're exploring support for:
 
 This remains a vision for now — the current focus is on making Trellis work well with dbt-core.
 
-## Prerequisites
+## Installation
+
+Install Trellis Data Model using pip or uv:
+
+```bash
+pip install trellis-datamodel
+```
+
+or with uv:
+
+```bash
+uv pip install trellis-datamodel
+```
+
+**Requirements:** Python 3.11+
+
+## Quick Start
+
+1. **Initialize configuration**
+   
+   Navigate to your dbt project directory (or any directory where you want to store the config):
+   ```bash
+   cd /path/to/your/dbt-project
+   ```
+   
+   Then run:
+   ```bash
+   trellis init
+   ```
+   This creates a `trellis.yml` file in the current directory. If you're in your dbt project directory, the default paths will work. Otherwise, edit the file to configure your dbt project paths.
+
+2. **Generate dbt metadata** (if you haven't already)
+   ```bash
+   dbt docs generate
+   ```
+   This creates `manifest.json` (required) and `catalog.json` (optional, for field info) that Trellis reads to power the ERD modeller.
+
+3. **Start the server**
+   ```bash
+   trellis run
+   ```
+   The server looks for `trellis.yml` in the current directory (or use `--config` to specify a path). It will start on **http://localhost:8089** and automatically open your browser.
+
+## Configuration
+
+Run `trellis init` to create a starter `trellis.yml` file in the current directory. The config file can be placed anywhere—paths can be relative to the config file location or absolute.
+
+**Configuration Options:**
+
+- `framework`: Transformation framework to use. Currently supported: `dbt-core`. Future: `dbt-fusion`, `sqlmesh`, `bruin`, `pydantic`. Defaults to `dbt-core`.
+- `dbt_project_path`: Path to your dbt project directory (relative to `trellis.yml` or absolute). **Required**. Defaults to `"."` (current directory).
+- `dbt_manifest_path`: Path to `manifest.json` (relative to `dbt_project_path` or absolute). Defaults to `target/manifest.json`.
+- `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
+- `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
+- `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
+
+**Example `trellis.yml`:**
+```yaml
+framework: dbt-core
+dbt_project_path: "./dbt_built"
+dbt_manifest_path: "target/manifest.json"
+dbt_catalog_path: "target/catalog.json"
+data_model_file: "data_model.yml"
+dbt_model_paths:
+  - "3_core"
+```
+
+## CLI Options
+
+```bash
+trellis run [OPTIONS]
+
+Options:
+  --port, -p INTEGER    Port to run the server on [default: 8089]
+  --config, -c TEXT     Path to config file (trellis.yml or config.yml)
+  --no-browser          Don't open browser automatically
+  --help                Show help message
+```
+
+## dbt Metadata
+
+Generate dbt artifacts by running `dbt docs generate` in your dbt project:
+
+- **`manifest.json`** (required): Contains model definitions. Without this file, the UI will not show any dbt models.
+- **`catalog.json`** (optional): Contains field/column information including data types. Without this file, models will still appear but won't have detailed field information.
+
+---
+
+## Development / Contributing
+
+### Development Setup
+
+For local development with hot reload, you'll need additional dependencies:
+
+**Prerequisites:**
 - **Node.js 22+ (or 20.19+) & npm**  
   - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
   - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
@@ -42,17 +136,7 @@ This remains a vision for now — the current focus is on making Trellis work we
   - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it's on your `$PATH`.
 - **Make** (optional) for convenience targets defined in the `Makefile`.
 
-## Installation
-
-### Install from PyPI
-
-```bash
-pip install trellis-datamodel
-# or with uv
-uv pip install trellis-datamodel
-```
-
-### Install from Source (Development)
+**Install from Source:**
 
 ```bash
 # Clone the repository
@@ -65,42 +149,19 @@ pip install -e .
 uv pip install -e .
 ```
 
-## Quick Start
-
-1. **Navigate to your dbt project directory**
-   ```bash
-   cd /path/to/your/dbt-project
-   ```
-
-2. **Initialize configuration**
-   ```bash
-   trellis init
-   ```
-   This creates a `trellis.yml` file. Edit it to point to your dbt manifest and catalog locations.
-
-3. **Start the server**
-   ```bash
-   trellis run
-   ```
-
-   The server will start on **http://localhost:8089** and automatically open your browser.
-
-## Development Setup
-
-For local development with hot reload:
-
-### Install Dependencies
-Run these once per machine (or when dependencies change).
+**Install Development Dependencies:**
 
 1. **Backend**
    ```bash
-   uv sync
+   uv sync --extra dev
    ```
 2. **Frontend**
    ```bash
    cd frontend
    npm install
    ```
+
+**Running Development Servers:**
 
 **Terminal 1 – Backend**
 ```bash
@@ -118,68 +179,11 @@ cd frontend && npm run dev
 ```
 Frontend runs at http://localhost:5173 (for development with hot reload).
 
-## Building for Distribution
+### Testing
 
-To build the package with bundled frontend:
+#### Frontend Tests
 
-```bash
-make build-package
-```
-
-This will:
-1. Build the frontend (`npm run build`)
-2. Copy static files to `trellis_datamodel/static/`
-3. Build the Python wheel (`uv build`)
-
-The wheel will be in `dist/` and can be installed with `pip install dist/trellis_datamodel-*.whl`.
-
-## CLI Options
-
-```bash
-trellis run [OPTIONS]
-
-Options:
-  --port, -p INTEGER    Port to run the server on [default: 8089]
-  --config, -c TEXT     Path to config file (trellis.yml or config.yml)
-  --no-browser          Don't open browser automatically
-  --help                Show help message
-```
-
-## dbt Metadata
-- Generate `manifest.json` and `catalog.json` by running `dbt docs generate` in your dbt project.
-- The UI reads these artifacts to power the ERD modeller.
-- Without these artifacts, the UI loads but shows no dbt models.
-
-## Configuration
-
-Run `trellis init` to create a starter `trellis.yml` file in your project.
-
-Options:
-
-- `framework`: Transformation framework to use. Currently supported: `dbt-core`. Future: `dbt-fusion`, `sqlmesh`, `bruin`, `pydantic`. Defaults to `dbt-core`.
-- `dbt_project_path`: Path to your dbt project directory (relative to `config.yml` or absolute). **Required**.
-- `dbt_manifest_path`: Path to `manifest.json` (relative to `dbt_project_path` or absolute). Defaults to `target/manifest.json`.
-- `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
-- `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
-- `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
-
-**Example `trellis.yml`:**
-```yaml
-framework: dbt-core
-dbt_project_path: "./dbt_built"
-dbt_manifest_path: "target/manifest.json"
-dbt_catalog_path: "target/catalog.json"
-data_model_file: "data_model.yml"
-dbt_model_paths:
-  - "3_core"
-```
-
-
-## Testing
-
-### Frontend
 **Testing Libraries:**
-The following testing libraries are defined in `package.json` under `devDependencies` and are automatically installed when you run `npm install`:
 - [Vitest](https://vitest.dev/) (Unit testing)
 - [Playwright](https://playwright.dev/) (End-to-End testing)
 - [Testing Library](https://testing-library.com/) (DOM & Svelte testing utilities)
@@ -204,13 +208,10 @@ The following testing libraries are defined in `package.json` under `devDependen
 
 **Running Tests:**
 
-The test suite has multiple levels to catch different types of issues:
-
 ```bash
 cd frontend
 
 # Quick smoke test (catches 500 errors, runtime crashes, ESM issues)
-# Fastest way to verify the app loads without errors
 npm run test:smoke
 
 # TypeScript/compilation check
@@ -220,18 +221,11 @@ npm run check
 npm run test:unit
 
 # E2E tests (includes smoke test + full test suite)
-# Note: Requires backend running with test data (see Test Data Isolation below)
 npm run test:e2e
 
 # Run all tests (check + smoke + unit + e2e)
 npm run test
 ```
-
-**Test Levels:**
-1. **`npm run check`** - TypeScript compilation errors
-2. **`npm run test:smoke`** - Runtime errors (500s, console errors, ESM issues) - **catches app crashes**
-3. **`npm run test:unit`** - Unit tests with Vitest
-4. **`npm run test:e2e`** - Full E2E tests with Playwright
 
 **Using Makefile:**
 ```bash
@@ -246,40 +240,42 @@ make test-all       # All tests
 **Test Data Isolation:**
 E2E tests use a separate test data file (`frontend/tests/test_data_model.yml`) to avoid polluting your production data model. **Playwright automatically starts the backend** with the correct environment variable, so you don't need to manage it manually.
 
-```bash
-# Just run E2E tests - backend starts automatically with test data
-make test-e2e
-# OR:
-# cd frontend && npm run test:e2e
-```
-
 The test data file is automatically cleaned before and after test runs via Playwright's `globalSetup` and `globalTeardown`. Your production `data_model.yml` remains untouched.
 
-### Backend
+#### Backend Tests
+
 **Testing Libraries:**
-The following testing libraries are defined in `pyproject.toml` under `[project.optional-dependencies]` in the `dev` group:
 - [pytest](https://docs.pytest.org/) (Testing framework)
 - [httpx](https://www.python-httpx.org/) (Async HTTP client for API testing)
-
-**Installation:**
-Unlike `npm`, `uv sync` does not install optional dependencies by default. To include the testing libraries, run:
-```bash
-uv sync --extra dev
-```
 
 **Running Tests:**
 ```bash
 uv run pytest
 ```
 
-## Collaboration
+### Building for Distribution
 
-If you want to collaborate, reach out!
+To build the package with bundled frontend:
 
-## Contributing and CLA
+```bash
+make build-package
+```
+
+This will:
+1. Build the frontend (`npm run build`)
+2. Copy static files to `trellis_datamodel/static/`
+3. Build the Python wheel (`uv build`)
+
+The wheel will be in `dist/` and can be installed with `pip install dist/trellis_datamodel-*.whl`.
+
+### Contributing and CLA
+
 - Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow, testing, and PR guidelines.
 - All contributors must sign the CLA once per GitHub account. The CLA bot on pull requests will guide you; see [`CLA.md`](CLA.md) for details.
 
+If you want to collaborate, reach out!
+
 ## License
+
 - Trellis Datamodel is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 - See [`NOTICE`](NOTICE) for a summary of copyright and licensing information.
