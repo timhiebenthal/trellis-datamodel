@@ -117,9 +117,10 @@ export async function saveDbtSchema(entityId: string, modelName: string, fields:
     return await res.json();
 }
 
-export async function inferRelationships(): Promise<Relationship[]> {
+export async function inferRelationships(options?: { includeUnbound?: boolean }): Promise<Relationship[]> {
     try {
-        const res = await fetch(`${API_BASE}/infer-relationships`);
+        const params = options?.includeUnbound ? '?include_unbound=true' : '';
+        const res = await fetch(`${API_BASE}/infer-relationships${params}`);
         if (!res.ok) {
             // Handle 400 (no schema files) and 404 (endpoint not found) gracefully
             if (res.status === 400 || res.status === 404) return [];

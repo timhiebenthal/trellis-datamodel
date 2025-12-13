@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed relationship auto-inference on drag-and-drop for versioned models (e.g., `customer_booking.v1`): the frontend now correctly maps the base model name instead of the version suffix when building the model-to-entity lookup
+
 ## [0.2.0] - 2025-12-09
 
 ### Added
