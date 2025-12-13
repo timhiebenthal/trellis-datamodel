@@ -5,17 +5,23 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
+  statuses: write
 
 jobs:
   cla:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Debug CLA inputs (no secrets)
         run: |
           echo "event_name=${{ github.event_name }}"
           echo "actor=${{ github.actor }}"
+          echo "workflow_ref=${{ github.workflow_ref }}"
+          echo "ref=${{ github.ref }}"
+          echo "sha=${{ github.sha }}"
           echo "github.token.present=${{ github.token != '' }}"
           if [ -f ".github/cla/signatures.json" ]; then
             echo "signatures.exists=true"
@@ -24,8 +30,9 @@ jobs:
           fi
       - name: CLA Assistant
         uses: contributor-assistant/github-action@v2.4.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          token: ${{ github.token }}
           path-to-signatures: ".github/cla/signatures.json"
           path-to-document: "CLA.md"
           branch: "main"
