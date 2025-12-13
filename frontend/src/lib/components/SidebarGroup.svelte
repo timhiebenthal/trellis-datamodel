@@ -26,7 +26,12 @@
             // Clicked on folder name, set filter
             const folderPath = node.path.replace(/^[^/]+\//, ''); // Remove first segment
             if (folderPath && folderPath !== node.path) {
-                $folderFilter = $folderFilter === folderPath ? null : folderPath;
+                const prev = $folderFilter as unknown;
+                const prevArr = Array.isArray(prev) ? (prev as string[]) : [];
+                const next = prevArr.includes(folderPath)
+                    ? prevArr.filter((f) => f !== folderPath)
+                    : [...prevArr, folderPath];
+                $folderFilter = next;
             }
         }
     }
