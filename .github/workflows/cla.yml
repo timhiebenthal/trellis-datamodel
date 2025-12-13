@@ -12,9 +12,20 @@ jobs:
   cla:
     runs-on: ubuntu-latest
     steps:
+      - name: Debug CLA inputs (no secrets)
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "actor=${{ github.actor }}"
+          echo "github.token.present=${{ github.token != '' }}"
+          if [ -f ".github/cla/signatures.json" ]; then
+            echo "signatures.exists=true"
+          else
+            echo "signatures.exists=false"
+          fi
       - name: CLA Assistant
         uses: contributor-assistant/github-action@v2.4.0
         with:
+          token: ${{ github.token }}
           path-to-signatures: ".github/cla/signatures.json"
           path-to-document: "CLA.md"
           branch: "main"
