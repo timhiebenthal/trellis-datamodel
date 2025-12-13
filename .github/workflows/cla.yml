@@ -35,6 +35,23 @@ jobs:
             echo "signatures.exists=false"
           fi
 
+      - name: Debug signatures.json shape (no secrets)
+        run: |
+          python - <<'PY'
+          import json, os
+          p = ".github/cla/signatures.json"
+          if not os.path.exists(p):
+            print("signatures.shape=missing")
+            raise SystemExit(0)
+          with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+          print("signatures.shape=" + type(data).__name__)
+          if isinstance(data, dict):
+            print("signatures.keys=" + ",".join(sorted(list(data.keys()))[:20]))
+          if isinstance(data, list):
+            print("signatures.len=" + str(len(data)))
+          PY
+
       - name: CLA Assistant
         uses: contributor-assistant/github-action@v2.6.1
         env:
