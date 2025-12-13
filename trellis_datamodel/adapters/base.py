@@ -113,9 +113,15 @@ class TransformationAdapter(Protocol):
         """
         ...
 
-    def infer_relationships(self) -> list[Relationship]:
+    def infer_relationships(self, include_unbound: bool = False) -> list[Relationship]:
         """
         Scan framework schema files and infer entity relationships.
+
+        Args:
+            include_unbound: When True, also include relationships for entities
+                that exist in the data model but are not yet bound to a dbt
+                model. Useful for frontends that want immediate inference right
+                after a bind action, before the data model file is persisted.
 
         Returns:
             List of inferred relationships.
