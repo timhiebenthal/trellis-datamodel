@@ -1,8 +1,11 @@
 name: CLA
 
+
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 permissions:
   actions: write
@@ -13,8 +16,12 @@ permissions:
 jobs:
   cla:
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request_target') ||
+      (github.event_name == 'issue_comment' && (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'))
     steps:
       - uses: actions/checkout@v4
+
       - name: Debug CLA inputs (no secrets)
         run: |
           echo "event_name=${{ github.event_name }}"
@@ -22,14 +29,14 @@ jobs:
           echo "workflow_ref=${{ github.workflow_ref }}"
           echo "ref=${{ github.ref }}"
           echo "sha=${{ github.sha }}"
-          echo "github.token.present=${{ github.token != '' }}"
           if [ -f ".github/cla/signatures.json" ]; then
             echo "signatures.exists=true"
           else
             echo "signatures.exists=false"
           fi
+
       - name: CLA Assistant
-        uses: contributor-assistant/github-action@v2.4.0
+        uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -37,6 +44,4 @@ jobs:
           path-to-document: "CLA.md"
           branch: "main"
           allowlist: "timhiebenthal,dependabot[bot],github-actions[bot]"
-          remote-organization-name: "timhiebenthal"
-          remote-repository-name: "trellis-datamodel"
 
