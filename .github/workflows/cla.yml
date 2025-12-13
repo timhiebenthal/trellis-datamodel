@@ -52,6 +52,20 @@ jobs:
             print("signatures.len=" + str(len(data)))
           PY
 
+      - name: Debug workflow configured action inputs (no secrets)
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          yml = pathlib.Path(".github/workflows/cla.yml").read_text(encoding="utf-8")
+          # very small "parsing" via regex to avoid extra deps
+          def grab(key):
+            m = re.search(rf'^[ \t]*{re.escape(key)}:[ \t]*"?(.*?)"?[ \t]*$', yml, flags=re.M)
+            return m.group(1) if m else None
+          print("configured.branch=" + str(grab("branch")))
+          print("configured.path_to_signatures=" + str(grab("path-to-signatures")))
+          print("configured.path_to_document=" + str(grab("path-to-document")))
+          PY
+
       - name: CLA Assistant
         uses: contributor-assistant/github-action@v2.6.1
         env:
