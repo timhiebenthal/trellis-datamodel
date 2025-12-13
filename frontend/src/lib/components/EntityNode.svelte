@@ -407,6 +407,45 @@
                 );
                 if (edgeExists) continue;
 
+                const genericBetweenPair = $edges.find(
+                    (e) =>
+                        ((e.source === sourceEntityId &&
+                            e.target === targetEntityId) ||
+                            (e.source === targetEntityId &&
+                                e.target === sourceEntityId)) &&
+                        !e.data?.source_field &&
+                        !e.data?.target_field,
+                );
+
+                if (genericBetweenPair) {
+                    // Reuse the existing generic edge instead of creating a duplicate
+                    $edges = $edges.map((e) => {
+                        if (e.id !== genericBetweenPair.id) return e;
+                        return {
+                            ...e,
+                            // Normalize direction to match inferred relationship
+                            source: sourceEntityId,
+                            target: targetEntityId,
+                            data: {
+                                ...(e.data || {}),
+                                // Preserve any user label/type if present; otherwise apply inferred defaults
+                                label:
+                                    ((e.data as any)?.label as string) ||
+                                    rel.label ||
+                                    "",
+                                type:
+                                    ((e.data as any)?.type as string) ||
+                                    rel.type ||
+                                    "one_to_many",
+                                source_field: rel.source_field,
+                                target_field: rel.target_field,
+                            },
+                        };
+                    });
+
+                    continue;
+                }
+
                 const existingBetweenPair = $edges.filter(
                     (e) =>
                         (e.source === sourceEntityId &&
