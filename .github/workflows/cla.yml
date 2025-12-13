@@ -29,6 +29,7 @@ jobs:
           echo "workflow_ref=${{ github.workflow_ref }}"
           echo "ref=${{ github.ref }}"
           echo "sha=${{ github.sha }}"
+          echo "signatures.branch=cla-signatures"
           if [ -f ".github/cla/signatures.json" ]; then
             echo "signatures.exists=true"
           else
@@ -59,6 +60,6 @@ jobs:
         with:
           path-to-signatures: ".github/cla/signatures.json"
           path-to-document: "CLA.md"
-          branch: "main"
+          branch: "cla-signatures"
           allowlist: "timhiebenthal,dependabot[bot],github-actions[bot]"
 
