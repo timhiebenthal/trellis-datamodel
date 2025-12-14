@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-12-14
+
 ### Fixed
 - Fixed relationship auto-inference on drag-and-drop for versioned models (e.g., `customer_booking.v1`): the frontend now correctly maps the base model name instead of the version suffix when building the model-to-entity lookup
 - Fixed duplicate relationship creation when rebinding models: when a model is unbound and then rebound, the system now reuses the existing generic edge (upgrading it with field mappings) instead of creating a second relationship edge between the same entities
