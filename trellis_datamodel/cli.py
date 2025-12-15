@@ -180,7 +180,8 @@ def generate_company_data():
     import importlib.util
 
     # Find the generator script relative to the project root
-    project_root = Path(__file__).parent.parent.parent
+    # cli.py lives in trellis_datamodel/, so repo root is two levels up
+    project_root = Path(__file__).parent.parent
     generator_path = project_root / "dbt_company_dummy" / "generate_data.py"
 
     if not generator_path.exists():
@@ -217,7 +218,7 @@ def generate_company_data():
             )
         )
         typer.echo(
-            "  Install required dependencies with: pip install trellis-datamodel[examples]"
+            "  Install required dependencies with: pip install trellis-datamodel[dbt-example]"
         )
         typer.echo("  Or install directly: pip install pandas faker")
         raise typer.Exit(1)
