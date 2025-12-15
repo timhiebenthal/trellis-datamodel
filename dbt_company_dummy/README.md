@@ -21,9 +21,9 @@ The generator requires the following Python packages:
 
 ### Installing Dependencies
 
-**Option 1: Install with Trellis examples (Recommended)**
+**Option 1: Install with Trellis dbt-example extras (Recommended)**
 ```bash
-pip install trellis-datamodel[examples]
+pip install trellis-datamodel[dbt-example]
 ```
 
 **Option 2: Install dependencies directly**
@@ -31,7 +31,7 @@ pip install trellis-datamodel[examples]
 pip install pandas faker
 ```
 
-If you're using the CLI command (`trellis generate-company-data`), installing with `[examples]` ensures all required dependencies are available.
+If you're using the CLI command (`trellis generate-company-data`), installing with `[dbt-example]` ensures all required dependencies are available.
 
 ## Usage
 

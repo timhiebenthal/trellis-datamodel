@@ -7,7 +7,7 @@ including departments, employees, leads, customers, products, orders, and order 
 
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import List, Dict
 
@@ -24,6 +24,23 @@ except ImportError as e:
 fake = Faker()
 fake.seed_instance(42)  # For reproducible data
 random.seed(42)
+
+
+def datetime_between_days_ago(start_days_ago: int, end_days_ago: int) -> datetime:
+    """Get a faker datetime between (now - start_days_ago) and (now - end_days_ago)."""
+    now = datetime.now()
+    start = now - timedelta(days=start_days_ago)
+    end = now - timedelta(days=end_days_ago)
+    return fake.date_time_between_dates(datetime_start=start, datetime_end=end)
+
+
+def date_between_days_ago(start_days_ago: int, end_days_ago: int) -> date:
+    """Get a faker date between (today - start_days_ago) and (today - end_days_ago)."""
+    today = date.today()
+    start = today - timedelta(days=start_days_ago)
+    end = today - timedelta(days=end_days_ago)
+    return fake.date_between_dates(date_start=start, date_end=end)
+
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent
@@ -51,7 +68,7 @@ def generate_departments(count: int = 8) -> pd.DataFrame:
             {
                 "id": i,
                 "name": dept_name,
-                "created_at": fake.date_time_between(start_date="-2y", end_date="-1y"),
+                "created_at": datetime_between_days_ago(730, 365),  # ~2y to ~1y ago
                 "description": (
                     fake.text(max_nb_chars=100) if random.random() > 0.3 else None
                 ),
@@ -93,9 +110,9 @@ def generate_employees(departments: pd.DataFrame, count: int = 25) -> pd.DataFra
             "department_id": dept_id,
             "team": f"Team {random.choice(['Alpha', 'Beta', 'Gamma', 'Delta'])}",
             "supervisor": supervisor_id,
-            "hire_date": fake.date_between(start_date="-3y", end_date="today"),
+            "hire_date": date_between_days_ago(1095, 0),  # ~3y ago to today
             "role": role,
-            "created_at": fake.date_time_between(start_date="-3y", end_date="-1y"),
+            "created_at": datetime_between_days_ago(1095, 365),  # ~3y to ~1y ago
         }
 
         employees.append(employee)
@@ -122,7 +139,7 @@ def generate_leads(count: int = 12) -> pd.DataFrame:
         status = random.choice(statuses)
         converted_at = None
         if status == "converted":
-            converted_at = fake.date_time_between(start_date="-6m", end_date="today")
+            converted_at = datetime_between_days_ago(180, 0)  # last 6 months
 
         leads.append(
             {
@@ -132,9 +149,7 @@ def generate_leads(count: int = 12) -> pd.DataFrame:
                 "company_name": fake.company(),
                 "status": status,
                 "source": random.choice(sources),
-                "created_at": fake.date_time_between(
-                    start_date="-1y", end_date="today"
-                ),
+                "created_at": datetime_between_days_ago(365, 0),  # last year
                 "converted_at": converted_at,
             }
         )
@@ -174,7 +189,7 @@ def generate_customers(leads: pd.DataFrame, count: int = 18) -> pd.DataFrame:
             name = fake.name()
             email = fake.email()
             company_name = fake.company()
-            created_at = fake.date_time_between(start_date="-1y", end_date="today")
+            created_at = datetime_between_days_ago(365, 0)  # last year
 
         customers.append(
             {
@@ -224,7 +239,7 @@ def generate_products(count: int = 12) -> pd.DataFrame:
                 "description": (
                     fake.text(max_nb_chars=150) if random.random() > 0.2 else None
                 ),
-                "created_at": fake.date_time_between(start_date="-2y", end_date="-6m"),
+                "created_at": datetime_between_days_ago(730, 180),  # ~2y to ~6m ago
                 "active": random.random() > 0.1,  # 90% active
             }
         )
@@ -252,7 +267,7 @@ def generate_orders(
             round(random.uniform(0, 0.3) * amount, 2) if random.random() > 0.6 else 0
         )
 
-        order_date = fake.date_time_between(start_date="-1y", end_date="today")
+        order_date = datetime_between_days_ago(365, 0)  # last year
 
         orders.append(
             {
@@ -302,8 +317,6 @@ def generate_order_items(
         quantity = random.randint(1, 10)
         subtotal = round(unit_price * quantity, 2)
 
-        order = orders[orders["id"] == order_id].iloc[0]
-
         order_items.append(
             {
                 "id": i,
@@ -312,7 +325,9 @@ def generate_order_items(
                 "quantity": quantity,
                 "unit_price": unit_price,
                 "subtotal": subtotal,
-                "created_at": order["created_at"],
+                "created_at": orders.loc[orders["id"] == order_id, "created_at"].iloc[
+                    0
+                ],
             }
         )
 
