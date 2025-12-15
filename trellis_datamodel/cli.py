@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Optional
 
 from trellis_datamodel import __version__
-from trellis_datamodel.config import load_config, find_config_file, print_config
+from trellis_datamodel.config import (
+    load_config,
+    find_config_file,
+    print_config,
+    DBT_COMPANY_DUMMY_PATH,
+)
 
 app = typer.Typer(
     name="trellis",
@@ -168,21 +173,42 @@ dbt_model_paths: []  # Empty = include all models
 
 
 @app.command(name="generate-company-data")
-def generate_company_data():
+def generate_company_data(
+    config: Optional[str] = typer.Option(
+        None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"
+    ),
+):
     """
     Generate mock commercial company data for modeling exercises.
 
     Creates CSV files in dbt_company_dummy/data/ directory with realistic
     commercial company data including departments, employees, leads, customers,
     products, orders, and order items.
+
+    The path to the dbt company dummy project can be configured in trellis.yml
+    via the 'dbt_company_dummy_path' option (defaults to './dbt_company_dummy').
     """
     import sys
     import importlib.util
 
-    # Find the generator script relative to the project root
-    # cli.py lives in trellis_datamodel/, so repo root is two levels up
-    project_root = Path(__file__).parent.parent
-    generator_path = project_root / "dbt_company_dummy" / "generate_data.py"
+    # Load config to get dbt_company_dummy_path
+    config_path = config
+    if not config_path:
+        found_config = find_config_file()
+        if found_config:
+            config_path = found_config
+
+    if config_path:
+        load_config(config_path)
+
+    # Use configured path or fallback to default relative to repo root
+    if DBT_COMPANY_DUMMY_PATH:
+        generator_path = Path(DBT_COMPANY_DUMMY_PATH) / "generate_data.py"
+    else:
+        # Fallback: find relative to repo root
+        # cli.py lives in trellis_datamodel/, so repo root is two levels up
+        project_root = Path(__file__).parent.parent
+        generator_path = project_root / "dbt_company_dummy" / "generate_data.py"
 
     if not generator_path.exists():
         typer.echo(

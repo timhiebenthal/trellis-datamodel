@@ -25,3 +25,8 @@ dbt_model_paths:
 # Path to frontend build directory (relative to this config file or absolute)
 frontend_build_dir: "./frontend/build"
 
+# Path to the dbt company dummy project directory (relative to this config file or absolute)
+# Used by 'trellis generate-company-data' command
+# Defaults to "./dbt_company_dummy" if not specified
+# dbt_company_dummy_path: "./dbt_company_dummy"
+
