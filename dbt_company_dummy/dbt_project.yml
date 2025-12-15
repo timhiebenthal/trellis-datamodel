@@ -1,0 +1,27 @@
+name: 'company_dummy'
+version: '1.0.0'
+config-version: 2
+
+profile: 'company_dummy'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  company_dummy:
+    # Configured by layer
+    1_clean:
+      +materialized: view
+    2_prep:
+      +materialized: view
+    3_core:
+      +materialized: table

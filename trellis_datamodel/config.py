@@ -37,6 +37,7 @@ if _TEST_DIR:
     DBT_PROJECT_PATH: str = _TEST_DIR
     DBT_MODEL_PATHS: list[str] = ["3_core"]
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
+    DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
 else:
     # Production mode: will be set by load_config()
     CONFIG_PATH: str = ""
@@ -49,6 +50,7 @@ else:
     DBT_PROJECT_PATH: str = ""
     DBT_MODEL_PATHS: list[str] = []
     FRONTEND_BUILD_DIR: str = ""
+    DBT_COMPANY_DUMMY_PATH: str = ""
 
 
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
@@ -83,7 +85,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -205,6 +207,21 @@ def load_config(config_path: Optional[str] = None) -> None:
                 os.path.join(os.path.dirname(CONFIG_PATH), "frontend", "build")
             )
 
+        # 9. Resolve dbt company dummy path (defaults to "./dbt_company_dummy")
+        if "dbt_company_dummy_path" in config:
+            p = config["dbt_company_dummy_path"]
+            if not os.path.isabs(p):
+                DBT_COMPANY_DUMMY_PATH = os.path.abspath(
+                    os.path.join(os.path.dirname(CONFIG_PATH), p)
+                )
+            else:
+                DBT_COMPANY_DUMMY_PATH = p
+        else:
+            # Default: dbt_company_dummy next to config file (repo root)
+            DBT_COMPANY_DUMMY_PATH = os.path.abspath(
+                os.path.join(os.path.dirname(CONFIG_PATH), "dbt_company_dummy")
+            )
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
@@ -221,3 +238,5 @@ def print_config() -> None:
     print(f"Looking for canvas layout at: {CANVAS_LAYOUT_PATH}")
     print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
     print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
+    if DBT_COMPANY_DUMMY_PATH:
+        print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")

@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Optional
 
 from trellis_datamodel import __version__
-from trellis_datamodel.config import load_config, find_config_file, print_config
+from trellis_datamodel.config import (
+    load_config,
+    find_config_file,
+    print_config,
+    DBT_COMPANY_DUMMY_PATH,
+)
 
 app = typer.Typer(
     name="trellis",
@@ -52,10 +57,13 @@ def run(
     """
     # Load configuration
     import os
-    
+
     # Allow running without config file if test environment variables are set
-    is_test_mode = bool(os.environ.get("DATAMODEL_DATA_MODEL_PATH") or os.environ.get("DATAMODEL_TEST_DIR"))
-    
+    is_test_mode = bool(
+        os.environ.get("DATAMODEL_DATA_MODEL_PATH")
+        or os.environ.get("DATAMODEL_TEST_DIR")
+    )
+
     config_path = config
     if not config_path:
         found_config = find_config_file()
@@ -162,6 +170,92 @@ dbt_model_paths: []  # Empty = include all models
     typer.echo(typer.style("✓ Created trellis.yml", fg=typer.colors.GREEN))
     typer.echo("  Edit the file to configure your dbt project paths, then run:")
     typer.echo(typer.style("  trellis run", fg=typer.colors.CYAN))
+
+
+@app.command(name="generate-company-data")
+def generate_company_data(
+    config: Optional[str] = typer.Option(
+        None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"
+    ),
+):
+    """
+    Generate mock commercial company data for modeling exercises.
+
+    Creates CSV files in dbt_company_dummy/data/ directory with realistic
+    commercial company data including departments, employees, leads, customers,
+    products, orders, and order items.
+
+    The path to the dbt company dummy project can be configured in trellis.yml
+    via the 'dbt_company_dummy_path' option (defaults to './dbt_company_dummy').
+    """
+    import sys
+    import importlib.util
+
+    # Load config to get dbt_company_dummy_path
+    config_path = config
+    if not config_path:
+        found_config = find_config_file()
+        if found_config:
+            config_path = found_config
+
+    if config_path:
+        load_config(config_path)
+
+    # Use configured path or fallback to default relative to repo root
+    if DBT_COMPANY_DUMMY_PATH:
+        generator_path = Path(DBT_COMPANY_DUMMY_PATH) / "generate_data.py"
+    else:
+        # Fallback: find relative to repo root
+        # cli.py lives in trellis_datamodel/, so repo root is two levels up
+        project_root = Path(__file__).parent.parent
+        generator_path = project_root / "dbt_company_dummy" / "generate_data.py"
+
+    if not generator_path.exists():
+        typer.echo(
+            typer.style(
+                f"Error: Generator script not found at {generator_path}",
+                fg=typer.colors.RED,
+            )
+        )
+        raise typer.Exit(1)
+
+    # Load and run the generator module
+    try:
+        spec = importlib.util.spec_from_file_location("generate_data", generator_path)
+        generator_module = importlib.util.module_from_spec(spec)
+        sys.modules["generate_data"] = generator_module
+        spec.loader.exec_module(generator_module)
+
+        # Call the main function
+        generator_module.main()
+
+        typer.echo()
+        typer.echo(
+            typer.style(
+                "✓ Company dummy data generation completed successfully!",
+                fg=typer.colors.GREEN,
+            )
+        )
+    except ImportError as e:
+        typer.echo(
+            typer.style(
+                f"Error: Missing dependency - {e}",
+                fg=typer.colors.RED,
+            )
+        )
+        typer.echo(
+            "  Install required dependencies with: pip install trellis-datamodel[dbt-example]"
+        )
+        typer.echo("  Or install directly: pip install pandas faker")
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(
+            typer.style(
+                f"Error generating data: {e}",
+                fg=typer.colors.RED,
+            )
+        )
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

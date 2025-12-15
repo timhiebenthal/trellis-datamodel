@@ -1,0 +1,34 @@
+version: 2
+
+sources:
+  - name: company_source
+    schema: main
+    tables:
+      - name: department
+        description: "Company departments"
+        meta:
+          external_location: "data/department.csv"
+      - name: employee
+        description: "Employee records"
+        meta:
+          external_location: "data/employee.csv"
+      - name: lead
+        description: "Sales leads"
+        meta:
+          external_location: "data/lead.csv"
+      - name: customer
+        description: "Customer records"
+        meta:
+          external_location: "data/customer.csv"
+      - name: products
+        description: "Product catalog"
+        meta:
+          external_location: "data/products.csv"
+      - name: order
+        description: "Customer orders"
+        meta:
+          external_location: "data/order.csv"
+      - name: order_item
+        description: "Order line items"
+        meta:
+          external_location: "data/order_item.csv"

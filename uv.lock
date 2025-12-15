@@ -377,6 +377,18 @@ wheels = [
 ]
 
 [[package]]
+name = "faker"
+version = "38.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tzdata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/64/27/022d4dbd4c20567b4c294f79a133cc2f05240ea61e0d515ead18c995c249/faker-38.2.0.tar.gz", hash = "sha256:20672803db9c7cb97f9b56c18c54b915b6f1d8991f63d1d673642dc43f5ce7ab", size = 1941469, upload-time = "2025-11-19T16:37:31.892Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/93/00c94d45f55c336434a15f98d906387e87ce28f9918e4444829a8fda432d/faker-38.2.0-py3-none-any.whl", hash = "sha256:35fe4a0a79dee0dc4103a6083ee9224941e7d3594811a50e3969e547b0d2ee65", size = 1980505, upload-time = "2025-11-19T16:37:30.208Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.121.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1610,7 +1622,7 @@ wheels = [
 
 [[package]]
 name = "trellis-datamodel"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "dbt-core" },
@@ -1624,17 +1636,18 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-]
-examples = [
+dbt-example = [
     { name = "dbt-duckdb" },
     { name = "duckdb" },
+    { name = "faker" },
     { name = "marimo" },
     { name = "nba-api" },
     { name = "pandas" },
     { name = "tqdm" },
+]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
 ]
 
 [package.dev-dependencies]
@@ -1647,22 +1660,23 @@ dev = [
 requires-dist = [
     { name = "dbt-core", specifier = ">=1.10.5,<2.0" },
     { name = "dbt-duckdb", specifier = ">=1.10.0" },
-    { name = "dbt-duckdb", marker = "extra == 'examples'", specifier = "==1.10" },
-    { name = "duckdb", marker = "extra == 'examples'", specifier = ">=1.4.2" },
+    { name = "dbt-duckdb", marker = "extra == 'dbt-example'", specifier = "==1.10" },
+    { name = "duckdb", marker = "extra == 'dbt-example'", specifier = ">=1.4.2" },
+    { name = "faker", marker = "extra == 'dbt-example'", specifier = ">=24.0.0" },
     { name = "fastapi", specifier = ">=0.121.3" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
-    { name = "marimo", marker = "extra == 'examples'", specifier = ">=0.18.0" },
-    { name = "nba-api", marker = "extra == 'examples'", specifier = ">=1.11.3" },
-    { name = "pandas", marker = "extra == 'examples'", specifier = ">=2.3.3" },
+    { name = "marimo", marker = "extra == 'dbt-example'", specifier = ">=0.18.0" },
+    { name = "nba-api", marker = "extra == 'dbt-example'", specifier = ">=1.11.3" },
+    { name = "pandas", marker = "extra == 'dbt-example'", specifier = ">=2.3.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruamel-yaml", specifier = ">=0.18.0" },
-    { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.67.1" },
+    { name = "tqdm", marker = "extra == 'dbt-example'", specifier = ">=4.67.1" },
     { name = "typer", specifier = ">=0.9.0" },
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]
-provides-extras = ["dev", "examples"]
+provides-extras = ["dev", "dbt-example"]
 
 [package.metadata.requires-dev]
 dev = [
