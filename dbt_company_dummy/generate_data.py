@@ -84,24 +84,10 @@ def generate_employees(departments: pd.DataFrame, count: int = 25) -> pd.DataFra
     department_ids = departments["id"].tolist()
     roles = ["Manager", "Senior", "Mid-level", "Junior", "Intern"]
 
-    # Create some managers first for supervisor relationships
-    manager_ids = []
-
+    # First pass: Create all employees without supervisors
     for i in range(1, count + 1):
         dept_id = random.choice(department_ids)
         role = random.choice(roles)
-        is_manager = role == "Manager" and random.random() > 0.7
-
-        # Assign supervisor (must be a manager and in same department)
-        supervisor_id = None
-        if not is_manager and manager_ids:
-            potential_supervisors = [
-                e["id"]
-                for e in employees
-                if e["department_id"] == dept_id and e["id"] in manager_ids
-            ]
-            if potential_supervisors:
-                supervisor_id = random.choice(potential_supervisors)
 
         employee = {
             "id": i,
@@ -109,15 +95,32 @@ def generate_employees(departments: pd.DataFrame, count: int = 25) -> pd.DataFra
             "email": fake.email(),
             "department_id": dept_id,
             "team": f"Team {random.choice(['Alpha', 'Beta', 'Gamma', 'Delta'])}",
-            "supervisor": supervisor_id,
+            "supervisor": None,  # Will be assigned in second pass
             "hire_date": date_between_days_ago(1095, 0),  # ~3y ago to today
             "role": role,
             "created_at": datetime_between_days_ago(1095, 365),  # ~3y to ~1y ago
         }
 
         employees.append(employee)
-        if is_manager:
-            manager_ids.append(i)
+
+    # Second pass: Identify managers and assign supervisors
+    manager_ids = [e["id"] for e in employees if e["role"] == "Manager"]
+
+    # Ensure at least one manager exists
+    if not manager_ids:
+        # Make first employee a manager
+        employees[0]["role"] = "Manager"
+        manager_ids = [1]
+
+    # Assign supervisors to all employees (including managers)
+    for employee in employees:
+        # Skip if employee is their own supervisor
+        available_managers = [mid for mid in manager_ids if mid != employee["id"]]
+        if available_managers:
+            employee["supervisor"] = random.choice(available_managers)
+        else:
+            # Only case: single manager, leave supervisor as None
+            employee["supervisor"] = None
 
     return pd.DataFrame(employees)
 
