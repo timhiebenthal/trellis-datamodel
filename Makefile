@@ -86,6 +86,10 @@ test-check:
 	@echo "Running TypeScript/compilation check..."
 	cd frontend && npm run check
 
+create_mock_dbt_project:
+	@echo "Creating mock project..."
+	uv pip install ".[dbt-example]" && uv run trellis generate-company-data
+
 dbt_refresh:
 	@echo "Refreshing dbt artifacts ..."
 	cd dbt_company_dummy && uv run dbt run && uv run dbt docs generate
