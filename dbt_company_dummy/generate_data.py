@@ -379,6 +379,399 @@ def save_dataframes(dataframes: Dict[str, pd.DataFrame]) -> None:
         print(f"  ✓ Saved {len(df)} records to {file_path.name}")
 
 
+def scaffold_dbt_project():
+    """Scaffold dbt project files if they don't exist."""
+    dbt_project_file = PROJECT_ROOT / "dbt_project.yml"
+    profiles_file = PROJECT_ROOT / "profiles.yml"
+    models_dir = PROJECT_ROOT / "models"
+    clean_dir = models_dir / "1_clean"
+    prep_dir = models_dir / "2_prep"
+    core_dir = models_dir / "3_core" / "all"
+
+    # Create directories
+    clean_dir.mkdir(parents=True, exist_ok=True)
+    prep_dir.mkdir(parents=True, exist_ok=True)
+    core_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create dbt_project.yml if it doesn't exist
+    if not dbt_project_file.exists():
+        dbt_project_content = """name: 'company_dummy'
+version: '1.0.0'
+config-version: 2
+
+profile: 'company_dummy'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  company_dummy:
+    # Configured by layer
+    1_clean:
+      +materialized: view
+    2_prep:
+      +materialized: view
+    3_core:
+      +materialized: table
+"""
+        dbt_project_file.write_text(dbt_project_content)
+        print("  ✓ Created dbt_project.yml")
+
+    # Create profiles.yml if it doesn't exist
+    if not profiles_file.exists():
+        profiles_content = """company_dummy:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'company_dummy.duckdb'
+"""
+        profiles_file.write_text(profiles_content)
+        print("  ✓ Created profiles.yml")
+
+    # Create sources.yml if it doesn't exist
+    sources_file = clean_dir / "sources.yml"
+    if not sources_file.exists():
+        sources_content = """version: 2
+
+sources:
+  - name: company_source
+    schema: main
+    tables:
+      - name: department
+        description: "Company departments"
+        meta:
+          external_location: "data/department.csv"
+      - name: employee
+        description: "Employee records"
+        meta:
+          external_location: "data/employee.csv"
+      - name: lead
+        description: "Sales leads"
+        meta:
+          external_location: "data/lead.csv"
+      - name: customer
+        description: "Customer records"
+        meta:
+          external_location: "data/customer.csv"
+      - name: products
+        description: "Product catalog"
+        meta:
+          external_location: "data/products.csv"
+      - name: order
+        description: "Customer orders"
+        meta:
+          external_location: "data/order.csv"
+      - name: order_item
+        description: "Order line items"
+        meta:
+          external_location: "data/order_item.csv"
+"""
+        sources_file.write_text(sources_content)
+        print("  ✓ Created models/1_clean/sources.yml")
+
+    # Create clean models if they don't exist
+    clean_models = {
+        "clean_customer.sql": """select * 
+from {{ source('company_source', 'customer') }}
+""",
+        "clean_product.sql": """select * 
+from {{ source('company_source', 'products') }}
+""",
+        "clean_lead.sql": """select * 
+from {{ source('company_source', 'lead') }}
+""",
+        "clean_order.sql": """select * 
+from {{ source('company_source', 'order') }}
+""",
+        "clean_order_item.sql": """select * 
+from {{ source('company_source', 'order_item') }}
+""",
+    }
+
+    for filename, content in clean_models.items():
+        file_path = clean_dir / filename
+        if not file_path.exists():
+            file_path.write_text(content)
+            print(f"  ✓ Created models/1_clean/{filename}")
+
+    # Create prep models if they don't exist
+    prep_models = {
+        "prep_customer.sql": """select 
+    id as customer_id,
+    name as customer_name,
+    email,
+    company_name,
+    status,
+    lead_id,
+    created_at
+from {{ ref('clean_customer') }}
+""",
+        "prep_product.sql": """select 
+    id as product_id,
+    name as product_name,
+    category,
+    price,
+    description,
+    created_at,
+    active
+from {{ ref('clean_product') }}
+""",
+        "prep_lead.sql": """select 
+    id as lead_id,
+    name as lead_name,
+    email,
+    company_name,
+    status,
+    source,
+    created_at,
+    converted_at
+from {{ ref('clean_lead') }}
+""",
+        "prep_order.sql": """select 
+    id as order_id,
+    customer_id,
+    employee_id,
+    amount,
+    discount,
+    order_date,
+    status,
+    created_at,
+    updated_at
+from {{ ref('clean_order') }}
+""",
+        "prep_order_item.sql": """select 
+    id as order_item_id,
+    order_id,
+    product_id,
+    quantity,
+    unit_price,
+    subtotal,
+    created_at
+from {{ ref('clean_order_item') }}
+""",
+    }
+
+    for filename, content in prep_models.items():
+        file_path = prep_dir / filename
+        if not file_path.exists():
+            file_path.write_text(content)
+            print(f"  ✓ Created models/2_prep/{filename}")
+
+    # Create base entity models if they don't exist
+    core_models = {
+        "customer.sql": """select 
+    cast(customer_id as text) as customer_id,
+    customer_name,
+    email,
+    company_name,
+    status,
+    cast(lead_id as text) as lead_id,
+    created_at
+from {{ ref('prep_customer') }}
+""",
+        "product.sql": """select 
+    cast(product_id as text) as product_id,
+    product_name,
+    category,
+    price,
+    description,
+    created_at,
+    active
+from {{ ref('prep_product') }}
+""",
+        "lead.sql": """select 
+    cast(lead_id as text) as lead_id,
+    lead_name,
+    email,
+    company_name,
+    status,
+    source,
+    created_at,
+    converted_at
+from {{ ref('prep_lead') }}
+""",
+        "purchase.sql": """select 
+    cast(oi.order_item_id as text) as purchase_id,
+    cast(oi.order_id as text) as order_id,
+    cast(oi.product_id as text) as product_id,
+    cast(o.customer_id as text) as customer_id,
+    oi.quantity,
+    oi.unit_price,
+    oi.subtotal,
+    -- Enriched order info
+    o.order_date,
+    o.status as order_status,
+    o.amount as order_amount,
+    o.discount as order_discount,
+    o.amount - o.discount as order_net_amount,
+    o.created_at as order_created_at,
+    o.updated_at as order_updated_at,
+    -- Purchase-level timestamps
+    oi.created_at as purchase_created_at
+from {{ ref('prep_order_item') }} oi
+inner join {{ ref('prep_order') }} o on oi.order_id = o.order_id
+""",
+    }
+
+    for filename, content in core_models.items():
+        file_path = core_dir / filename
+        if not file_path.exists():
+            file_path.write_text(content)
+            print(f"  ✓ Created models/3_core/all/{filename}")
+
+    # Create .yml documentation files for base entities
+    core_yml_files = {
+        "customer.yml": """version: 2
+models:
+- name: customer
+  description: Customer records
+  columns:
+  - name: customer_id
+    data_type: text
+    description: unique customer ID
+  - name: customer_name
+    data_type: text
+    description: customer name
+  - name: email
+    data_type: text
+  - name: company_name
+    data_type: text
+  - name: status
+    data_type: text
+  - name: lead_id
+    data_type: text
+    description: reference to lead if customer came from a lead
+    data_tests:
+    - relationships:
+        arguments:
+          to: ref('lead')
+          field: lead_id
+  - name: created_at
+    data_type: timestamp
+""",
+        "product.yml": """version: 2
+models:
+- name: product
+  description: Product catalog
+  columns:
+  - name: product_id
+    data_type: text
+    description: unique product ID
+  - name: product_name
+    data_type: text
+    description: product name
+  - name: category
+    data_type: text
+  - name: price
+    data_type: numeric
+  - name: description
+    data_type: text
+  - name: created_at
+    data_type: timestamp
+  - name: active
+    data_type: boolean
+""",
+        "lead.yml": """version: 2
+models:
+- name: lead
+  description: Sales leads
+  columns:
+  - name: lead_id
+    data_type: text
+    description: unique lead ID
+  - name: lead_name
+    data_type: text
+    description: lead contact name
+  - name: email
+    data_type: text
+  - name: company_name
+    data_type: text
+  - name: status
+    data_type: text
+  - name: source
+    data_type: text
+    description: lead source (website, referral, etc.)
+  - name: created_at
+    data_type: timestamp
+  - name: converted_at
+    data_type: timestamp
+    description: timestamp when lead was converted to customer
+""",
+        "purchase.yml": """version: 2
+models:
+- name: purchase
+  description: Purchase records at order-item grain with enriched order information
+  columns:
+  - name: purchase_id
+    data_type: text
+    description: unique purchase ID (order_item_id)
+  - name: order_id
+    data_type: text
+    description: order ID
+  - name: product_id
+    data_type: text
+    description: product ID
+    data_tests:
+    - relationships:
+        arguments:
+          to: ref('product')
+          field: product_id
+  - name: customer_id
+    data_type: text
+    description: customer ID
+    data_tests:
+    - relationships:
+        arguments:
+          to: ref('customer')
+          field: customer_id
+  - name: quantity
+    data_type: numeric
+  - name: unit_price
+    data_type: numeric
+  - name: subtotal
+    data_type: numeric
+  - name: order_date
+    data_type: timestamp
+    description: order date
+  - name: order_status
+    data_type: text
+    description: order status
+  - name: order_amount
+    data_type: numeric
+    description: total order amount
+  - name: order_discount
+    data_type: numeric
+    description: order discount amount
+  - name: order_net_amount
+    data_type: numeric
+    description: net order amount after discount
+  - name: order_created_at
+    data_type: timestamp
+  - name: order_updated_at
+    data_type: timestamp
+  - name: purchase_created_at
+    data_type: timestamp
+    description: purchase (order item) creation timestamp
+""",
+    }
+
+    for filename, content in core_yml_files.items():
+        file_path = core_dir / filename
+        if not file_path.exists():
+            file_path.write_text(content)
+            print(f"  ✓ Created models/3_core/all/{filename}")
+
+
 def main():
     """Main function to generate and save all data."""
     print("🌿 Generating company dummy data...")
@@ -393,6 +786,12 @@ def main():
     print()
     print(f"✓ Successfully generated {len(dataframes)} CSV files in {DATA_DIR}")
     print(f"  Total records: {sum(len(df) for df in dataframes.values())}")
+
+    print()
+    print("Scaffolding dbt project...")
+    scaffold_dbt_project()
+    print()
+    print("✓ dbt project ready! Run 'dbt build' to compile and run models.")
 
 
 if __name__ == "__main__":
