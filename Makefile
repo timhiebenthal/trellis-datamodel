@@ -88,4 +88,4 @@ test-check:
 
 dbt_refresh:
 	@echo "Refreshing dbt artifacts ..."
-	cd dbt_built && uv run dbt run && uv run dbt docs generate
+	cd dbt_company_dummy && uv run dbt run && uv run dbt docs generate
