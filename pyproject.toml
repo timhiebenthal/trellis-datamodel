@@ -48,6 +48,7 @@ dev = [
 examples = [
     "dbt-duckdb==1.10",
     "duckdb>=1.4.2",
+    "faker>=24.0.0",
     "marimo>=0.18.0",
     "nba-api>=1.11.3",
     "pandas>=2.3.3",
