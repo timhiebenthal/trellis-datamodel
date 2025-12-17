@@ -2,7 +2,7 @@
 
 ![Trellis Logo](resources/trellis_with_text.png)
 
-A local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and the physical Implementation (currently with dbt-core).
+A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and the Physical Implementation (currently with dbt-core).
 
 ## Motivation
 
@@ -11,12 +11,15 @@ A local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and
 - Data transformations are done isolated from the conceptual data model.
 - No single view connecting business concepts to logical schema
 - Stakeholders can't easily understand model structure without technical context
+- Holistic Data Warehouse Automation Tools exists but do not integrate well with dbt and the Modern Data Stack
 
 **How Trellis helps:**
 - Visual data model that stays in sync — reads directly from `manifest.json` / `catalog.json`
 - Sketch entities and with their fields and auto-generate schema.yml's for dbt
 - Draw relationships on canvas → auto-generates dbt `relationships` tests
 - Two views: **Conceptual** (entity names, descriptions) and **Logical** (columns, types, materializations) to jump between high-level architect and execution-view.
+- Organize entities based on subdirectories and tags from your pyhsical implementation.
+- Write description or tags back to your dbt-project
 
 **Two Ways of getting started** 
 - Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  
