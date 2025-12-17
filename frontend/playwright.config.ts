@@ -15,14 +15,14 @@ export default defineConfig({
     testDir: './tests',
     globalSetup: './tests/global-setup.ts',
     globalTeardown: './tests/global-teardown.ts',
-    /* Run tests in files in parallel - disabled locally to prevent WSL2 memory issues */
-    fullyParallel: !!process.env.CI,
+    /* Run tests in files in parallel - disabled to prevent collisions on shared backend data model */
+    fullyParallel: false,
     /* Fail the build on CI if you accidentally left test.only in the source code. */
     forbidOnly: !!process.env.CI,
     /* Retry on CI only */
     retries: process.env.CI ? 2 : 0,
-    /* Limit workers locally to prevent WSL2 crashes */
-    workers: process.env.CI ? 4 : 1,
+    /* Limit workers to 1 to prevent collisions on shared backend data model */
+    workers: 1,
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
     reporter: 'html',
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

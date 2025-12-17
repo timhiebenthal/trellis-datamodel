@@ -114,6 +114,9 @@ test.describe('Canvas Interactions', () => {
             expect(isExpanded).toBeTruthy();
         }
 
+        // Wait for save to finish before reload to ensure state is persisted on backend
+        await expect(page.getByText('Saving...')).not.toBeVisible({ timeout: 5000 });
+
         // 8. Reload page and verify state persisted (should be expanded)
         await page.reload();
         await page.waitForLoadState('networkidle');
