@@ -455,11 +455,15 @@
                                     Set <code>dbt_project_path</code> in config.
                                 {:else if !$configStatus.manifest_exists}
                                     Manifest not found.<br />
-                                    <span
-                                        class="text-[10px] mt-1 block opacity-75"
-                                        >Check <code>dbt_project_path</code
-                                        >.</span
-                                    >
+                                    <span class="text-[10px] mt-1 block opacity-75">
+                                        {#if $configStatus.catalog_exists === false}
+                                            Run <code>dbt docs generate</code> to create manifest.json and catalog.json.
+                                        {:else}
+                                            Run <code>dbt compile</code> to create manifest.json.
+                                        {/if}
+                                        <br />
+                                        Check the <strong>Config Info</strong> button for configuration details.
+                                    </span>
                                 {/if}
                             </div>
                         {/if}
