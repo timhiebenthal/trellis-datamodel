@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 import yaml
 import os
 
-from trellis_datamodel.config import DBT_PROJECT_PATH, DATA_MODEL_PATH
+from trellis_datamodel import config as cfg
 from trellis_datamodel.models.schemas import DbtSchemaRequest, ModelSchemaRequest
 from trellis_datamodel.adapters import get_adapter
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api", tags=["schema"])
 async def save_dbt_schema(request: DbtSchemaRequest):
     """Generate and save a schema YAML file for the drafted fields."""
     try:
-        if not DBT_PROJECT_PATH:
+        if not cfg.DBT_PROJECT_PATH:
             raise HTTPException(
                 status_code=400,
                 detail="dbt_project_path is not configured. Please set it in config.yml",
@@ -46,16 +46,16 @@ async def save_dbt_schema(request: DbtSchemaRequest):
 async def sync_dbt_tests():
     """Sync relationship tests from data model to schema files."""
     try:
-        if not DBT_PROJECT_PATH:
+        if not cfg.DBT_PROJECT_PATH:
             raise HTTPException(
                 status_code=400,
                 detail="dbt_project_path is not configured. Please set it in config.yml",
             )
 
-        if not DATA_MODEL_PATH or not os.path.exists(DATA_MODEL_PATH):
+        if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
             raise HTTPException(status_code=404, detail="Data model file not found")
 
-        with open(DATA_MODEL_PATH, "r") as f:
+        with open(cfg.DATA_MODEL_PATH, "r") as f:
             data_model = yaml.safe_load(f) or {}
 
         entities = data_model.get("entities", [])
@@ -83,7 +83,7 @@ async def sync_dbt_tests():
 async def get_model_schema(model_name: str, version: int | None = None):
     """Get the schema for a specific model from its YAML file."""
     try:
-        if not DBT_PROJECT_PATH:
+        if not cfg.DBT_PROJECT_PATH:
             raise HTTPException(
                 status_code=400,
                 detail="dbt_project_path is not configured. Please set it in config.yml",
@@ -119,7 +119,7 @@ async def get_model_schema(model_name: str, version: int | None = None):
 async def update_model_schema(model_name: str, request: ModelSchemaRequest):
     """Update the schema for a specific model in its YAML file."""
     try:
-        if not DBT_PROJECT_PATH:
+        if not cfg.DBT_PROJECT_PATH:
             raise HTTPException(
                 status_code=400,
                 detail="dbt_project_path is not configured. Please set it in config.yml",
@@ -159,7 +159,7 @@ async def update_model_schema(model_name: str, request: ModelSchemaRequest):
 async def infer_relationships(include_unbound: bool = False):
     """Scan schema files and infer entity relationships from relationship tests."""
     try:
-        if not DBT_PROJECT_PATH:
+        if not cfg.DBT_PROJECT_PATH:
             raise HTTPException(
                 status_code=400,
                 detail="dbt_project_path is not configured. Please set it in config.yml",
