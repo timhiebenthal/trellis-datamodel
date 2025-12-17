@@ -17,6 +17,7 @@
         groupByFolder,
     } from "$lib/stores";
     import {
+        getApiBase,
         getManifest,
         getDataModel,
         saveDataModel,
@@ -35,6 +36,7 @@
     import Icon from "@iconify/svelte";
     import logoHref from "$lib/assets/trellis_squared.svg?url";
 
+    const API_BASE = getApiBase();
     let loading = $state(true);
     let saving = $state(false);
     let syncing = $state(false);
@@ -263,6 +265,8 @@
         applyExpandCollapseState(allExpanded);
         // Persist to localStorage
         localStorage.setItem(STORAGE_KEY, String(allExpanded));
+        // Save immediately so reloads reflect latest state
+        saveNow();
     }
     let sidebarWidth = $state(280);
     let resizingSidebar = $state(false);
@@ -586,12 +590,151 @@
                 redo();
             }
         }
+        const handleBeforeUnload = () => {
+            flushPendingSaveSync();
+        };
+
         window.addEventListener("keydown", handleKeydown);
-        return () => window.removeEventListener("keydown", handleKeydown);
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => {
+            window.removeEventListener("keydown", handleKeydown);
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+        };
     });
 
     // Auto-save logic
-    let timeout: ReturnType<typeof setTimeout>;
+    const SAVE_DEBOUNCE_MS = 400;
+    let pendingSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    function buildDataModelFromState(
+        currentNodes: Node[],
+        currentEdges: Edge[],
+    ) {
+        return {
+            version: 0.1,
+            entities: currentNodes
+                .filter((n) => n.type === "entity")
+                .map((n) => ({
+                    id: n.id,
+                    label: ((n.data.label as string) || "").trim() || "Entity",
+                    description: n.data.description as string | undefined,
+                    dbt_model: n.data.dbt_model as string | undefined,
+                    additional_models: n.data?.additional_models as string[] | undefined,
+                    drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                    position: n.position,
+                    width: n.data?.width as number | undefined,
+                    panel_height: n.data?.panelHeight as number | undefined,
+                    collapsed: (n.data?.collapsed as boolean) ?? false,
+                    tags: normalizeTags(n.data?.tags),
+                })),
+            relationships: currentEdges.map((e) => ({
+                source: e.source,
+                target: e.target,
+                label: (e.data?.label as string) || "",
+                type:
+                    (e.data?.type as
+                        | "one_to_many"
+                        | "many_to_one"
+                        | "one_to_one"
+                        | "many_to_many") || "one_to_many",
+                source_field: e.data?.source_field as string | undefined,
+                target_field: e.data?.target_field as string | undefined,
+                label_dx: e.data?.label_dx as number | undefined,
+                label_dy: e.data?.label_dy as number | undefined,
+            })),
+        };
+    }
+
+    async function persistDataModel(
+        nodesSnapshot: Node[],
+        edgesSnapshot: Edge[],
+        stateString: string,
+    ) {
+        try {
+            const dataModel = buildDataModelFromState(nodesSnapshot, edgesSnapshot);
+            await saveDataModel(dataModel);
+            lastSavedState = stateString;
+        } catch (e) {
+            console.error("Save failed", e);
+        } finally {
+            saving = false;
+            pendingSaveTimeout = null;
+        }
+    }
+
+    function saveNow() {
+        if (loading) return;
+
+        if (pendingSaveTimeout) {
+            clearTimeout(pendingSaveTimeout);
+            pendingSaveTimeout = null;
+        }
+
+        const currentNodes = $nodes;
+        const currentEdges = $edges;
+        const state = JSON.stringify({
+            nodes: currentNodes,
+            edges: currentEdges,
+        });
+
+        saving = true;
+        void persistDataModel(
+            structuredClone(currentNodes),
+            structuredClone(currentEdges),
+            state,
+        );
+    }
+
+    function flushPendingSaveSync() {
+        if (loading) return;
+        const nodesSnapshot = $nodes;
+        const edgesSnapshot = $edges;
+        const state = JSON.stringify({
+            nodes: nodesSnapshot,
+            edges: edgesSnapshot,
+        });
+        if (state === lastSavedState) return;
+
+        const payload = JSON.stringify(
+            buildDataModelFromState(nodesSnapshot, edgesSnapshot),
+        );
+        const url = `${API_BASE}/data-model`;
+
+        try {
+            if (
+                typeof navigator !== "undefined" &&
+                typeof navigator.sendBeacon === "function"
+            ) {
+                const blob = new Blob([payload], { type: "application/json" });
+                const sent = navigator.sendBeacon(url, blob);
+                if (sent) {
+                    lastSavedState = state;
+                    saving = false;
+                    return;
+                }
+            }
+        } catch (err) {
+            console.error("Beacon save failed", err);
+        }
+
+        // Fallback best-effort save using keepalive fetch
+        try {
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: payload,
+                keepalive: true,
+            })
+                .then(() => {
+                    lastSavedState = state;
+                    saving = false;
+                })
+                .catch((err) => console.error("Fallback save failed", err));
+        } catch (err) {
+            console.error("Immediate save failed", err);
+        }
+        pendingSaveTimeout = null;
+    }
 
     $effect(() => {
         if (loading) return;
@@ -614,48 +757,16 @@
         // Push to undo history
         pushHistory();
 
-        clearTimeout(timeout);
-        saving = true;
-        timeout = setTimeout(async () => {
-            try {
-                // Convert back to data model format
-                const dataModel = {
-                    version: 0.1,
-                    entities: currentNodes
-                        .filter((n) => n.type === "entity") // Only save entity nodes, not group nodes
-                        .map((n) => ({
-                            id: n.id,
-                            label: ((n.data.label as string) || "").trim() || "Entity",
-                            description: n.data.description as string | undefined,
-                            dbt_model: n.data.dbt_model as string | undefined,
-                            additional_models: n.data?.additional_models as string[] | undefined,
-                            drafted_fields: n.data?.drafted_fields as any[] | undefined,
-                            position: n.position,
-                            width: n.data?.width as number | undefined,
-                            panel_height: n.data?.panelHeight as number | undefined,
-                            collapsed: (n.data?.collapsed as boolean) ?? false,
-                            tags: normalizeTags(n.data?.tags),
-                        })),
-                    relationships: currentEdges.map((e) => ({
-                        source: e.source,
-                        target: e.target,
-                        label: (e.data?.label as string) || "",
-                        type: (e.data?.type as 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many') || "one_to_many",
-                        source_field: e.data?.source_field as string | undefined,
-                        target_field: e.data?.target_field as string | undefined,
-                        label_dx: e.data?.label_dx as number | undefined,
-                        label_dy: e.data?.label_dy as number | undefined,
-                    })),
-                };
+        if (pendingSaveTimeout) {
+            clearTimeout(pendingSaveTimeout);
+        }
 
-                await saveDataModel(dataModel);
-                lastSavedState = state;
-            } catch (e) {
-                console.error("Save failed", e);
-            } finally {
-                saving = false;
-            }
-        }, 1000); // 1s debounce
+        saving = true;
+        const nodesSnapshot = structuredClone(currentNodes);
+        const edgesSnapshot = structuredClone(currentEdges);
+        pendingSaveTimeout = setTimeout(() => {
+            void persistDataModel(nodesSnapshot, edgesSnapshot, state);
+        }, SAVE_DEBOUNCE_MS);
     });
 
     // Apply filters to node visibility
