@@ -29,7 +29,7 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 
 trellis is currently designed and tested specifically for **dbt-core**, but the vision is to be tool-agnostic. As the saying goes: *"tools evolve, concepts don't"* — data modeling concepts persist regardless of the transformation framework you use.
 
-If this project gains traction, we're exploring support for:
+If this project gains traction, we might explore support for:
 - **dbt-fusion** through adapter support
 - **Pydantic models** as a simple output format
 - Other frameworks like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) through adapter patterns, where compatibility allows
