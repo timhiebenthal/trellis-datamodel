@@ -9,7 +9,7 @@ When you start a new project, the first step is to initialize Trellis in your pr
 2. Run `trellis init`.
 3. This creates a `trellis.yml` configuration file.
 
-![Initializing Trellis](resources/clips/1%20-%20init.mp4)
+https://github.com/timhiebenthal/trellis-datamodel/raw/feat/tutorial_clips/resources/clips/1_init.mp4
 
 ## 2. Connecting to dbt
 Trellis needs to know where your dbt project and its artifacts (`manifest.json` and `catalog.json`) are located.
@@ -19,7 +19,7 @@ Trellis needs to know where your dbt project and its artifacts (`manifest.json` 
 3. Trellis uses `manifest.json` to understand your project structure and `catalog.json` to get column types.
 4. Run `dbt docs generate` in your dbt project to ensure these files are up-to-date.
 
-![dbt Setup](resources/clips/4%20-%20dbt%20setup.mp4)
+https://github.com/timhiebenthal/trellis-datamodel/raw/feat/tutorial_clips/resources/clips/4_dbt_setup.mp4
 
 ## 3. Creating your first Model
 Trellis allows you to sketch out your data model before writing any SQL.
@@ -35,7 +35,7 @@ Trellis allows you to sketch out your data model before writing any SQL.
     - If no dbt model exists yet, use **Drafted Fields** to define the structure you need.
 6. When you save your changes, Trellis creates a `data_model.yml` and `canvas_layout.yml` to track your visual state.
 
-![First Model](resources/clips/2%20-%20first%20commit.mp4)
+https://github.com/timhiebenthal/trellis-datamodel/raw/feat/tutorial_clips/resources/clips/2_first_commit.mp4
 
 ## 4. Using the Example Project
 If you want to explore Trellis without your own dbt project, you can generate an example commercial company model.
@@ -52,7 +52,7 @@ If you already have a dbt project with relationship tests, Trellis can automatic
 3. It automatically draws edges between entities based on these tests.
 4. You can manually adjust relationship labels and their positions (`label_dx`, `label_dy`) to keep the canvas clear.
 
-![Read dbt Relationships](resources/clips/5%20-%20read%20dbt%20relationships.mp4)
+https://github.com/timhiebenthal/trellis-datamodel/raw/feat/tutorial_clips/resources/clips/5_read_dbt_relationships.mp4
 
 ## 6. Organizing with Folders
 Large data models can become messy. Trellis helps you stay organized by grouping entities.
@@ -61,7 +61,7 @@ Large data models can become messy. Trellis helps you stay organized by grouping
 2. You can filter and group models based on their file paths or dbt tags.
 3. Drag and drop entities to arrange them logically.
 
-![Organize Folders](resources/clips/6%20-%20organize%20folders.mp4)
+https://github.com/timhiebenthal/trellis-datamodel/raw/feat/tutorial_clips/resources/clips/6_organize_folders.mp4
 
 ## 7. Pushing Changes back to dbt
 Once you've designed your model visually, you can push those changes back into your dbt project.
@@ -74,6 +74,6 @@ Once you've designed your model visually, you can push those changes back into y
     - dbt tags
     - `relationships` tests (based on the edges you drew on the canvas)
 
-![Push to dbt](resources/clips/3%20-%20push%20to%20dbt.mp4)
+https://github.com/timhiebenthal/trellis-datamodel/raw/feat/tutorial_clips/resources/clips/3_push_to_dbt.mp4
 
 By following these steps, you can keep your conceptual design and physical dbt implementation perfectly in sync.
