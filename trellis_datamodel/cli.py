@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import Optional
 
 from trellis_datamodel import __version__
+from trellis_datamodel import config as cfg
 from trellis_datamodel.config import (
     load_config,
     find_config_file,
     print_config,
-    DBT_COMPANY_DUMMY_PATH,
 )
 
 app = typer.Typer(
@@ -202,8 +202,8 @@ def generate_company_data(
         load_config(config_path)
 
     # Use configured path or fallback to default relative to repo root
-    if DBT_COMPANY_DUMMY_PATH:
-        generator_path = Path(DBT_COMPANY_DUMMY_PATH) / "generate_data.py"
+    if cfg.DBT_COMPANY_DUMMY_PATH:
+        generator_path = Path(cfg.DBT_COMPANY_DUMMY_PATH) / "generate_data.py"
     else:
         # Fallback: find relative to repo root
         # cli.py lives in trellis_datamodel/, so repo root is two levels up
