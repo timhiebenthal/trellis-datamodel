@@ -34,3 +34,8 @@
 .svelte-flow__node:active {
     cursor: move !important;
 }
+
+/* Fix for invisible I-beam cursor */
+input, textarea, [contenteditable] {
+    cursor: default !important;
+}
