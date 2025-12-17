@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-12-17
+
+### Fixed
+- Fixed configuration variable access to use live values from config module instead of stale copies: CLI commands and API routes now correctly access configuration paths after `load_config()` is called, ensuring `trellis generate-company-data` and other commands work correctly when the package is installed (not just when running from source)
+
 ## [0.3.0] - 2025-12-17
 
 ### Added
