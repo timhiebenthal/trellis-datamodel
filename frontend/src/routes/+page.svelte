@@ -112,7 +112,7 @@
                         position: { x: 200 + addedNodes * 60, y: 200 },
                         zIndex: 10,
                         data: {
-                            label: model?.name ?? id,
+                            label: (model?.name ?? id).trim(),
                             description: model?.description ?? "",
                             dbt_model: model?.unique_id ?? null,
                             additional_models: [],
@@ -349,7 +349,7 @@
                         position: e.position || { x: 0, y: 0 },
                         zIndex: 10, // Entities should be above groups (zIndex 1)
                         data: {
-                            label: e.label,
+                            label: (e.label || "").trim(),
                             description: e.description,
                             dbt_model: e.dbt_model,
                             additional_models: e.additional_models,
@@ -625,7 +625,7 @@
                         .filter((n) => n.type === "entity") // Only save entity nodes, not group nodes
                         .map((n) => ({
                             id: n.id,
-                            label: n.data.label as string,
+                            label: ((n.data.label as string) || "").trim() || "Entity",
                             description: n.data.description as string | undefined,
                             dbt_model: n.data.dbt_model as string | undefined,
                             additional_models: n.data?.additional_models as string[] | undefined,
