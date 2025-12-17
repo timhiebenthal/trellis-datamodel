@@ -1,11 +1,11 @@
 version: 2
 models:
-- name: purchase
-  description: Purchase records at order-item grain with enriched order information
+- name: sale
+  description: Sale records at order-item grain with enriched order information
   columns:
-  - name: purchase_id
+  - name: sale_id
     data_type: text
-    description: unique purchase ID (order_item_id)
+    description: unique sale ID (order_item_id)
   - name: order_id
     data_type: text
     description: order ID
@@ -50,6 +50,6 @@ models:
     data_type: timestamp
   - name: order_updated_at
     data_type: timestamp
-  - name: purchase_created_at
+  - name: sale_created_at
     data_type: timestamp
-    description: purchase (order item) creation timestamp
+    description: sale (order item) creation timestamp
