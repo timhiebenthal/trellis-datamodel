@@ -17,6 +17,7 @@
         groupByFolder,
     } from "$lib/stores";
     import {
+        getApiBase,
         getManifest,
         getDataModel,
         saveDataModel,
@@ -35,6 +36,7 @@
     import Icon from "@iconify/svelte";
     import logoHref from "$lib/assets/trellis_squared.svg?url";
 
+    const API_BASE = getApiBase();
     let loading = $state(true);
     let saving = $state(false);
     let syncing = $state(false);
@@ -112,7 +114,7 @@
                         position: { x: 200 + addedNodes * 60, y: 200 },
                         zIndex: 10,
                         data: {
-                            label: model?.name ?? id,
+                            label: (model?.name ?? id).trim(),
                             description: model?.description ?? "",
                             dbt_model: model?.unique_id ?? null,
                             additional_models: [],
@@ -218,6 +220,54 @@
         $nodes = layoutedNodes;
         // fitView prop on Canvas will automatically adjust the view
     }
+
+    // Expand/Collapse all entities toggle
+    const STORAGE_KEY = "trellis_all_expanded";
+    let allExpanded = $state(true);
+    let stateApplied = $state(false);
+
+    // Restore state from localStorage on mount
+    onMount(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved !== null) {
+            allExpanded = saved === "true";
+        }
+    });
+
+    // Watch for nodes changes and apply persisted state once when nodes are first loaded
+    $effect(() => {
+        const currentNodes = $nodes;
+        const entityNodes = currentNodes.filter((n) => n.type === "entity");
+        if (entityNodes.length > 0 && !stateApplied) {
+            // Apply the persisted state to all entity nodes
+            applyExpandCollapseState(allExpanded);
+            stateApplied = true;
+        }
+    });
+
+    function applyExpandCollapseState(expanded: boolean) {
+        const entityNodes = $nodes.filter((n) => n.type === "entity");
+        if (entityNodes.length === 0) return;
+
+        $nodes = $nodes.map((node) => {
+            if (node.type === "entity") {
+                return {
+                    ...node,
+                    data: { ...node.data, collapsed: !expanded },
+                };
+            }
+            return node;
+        });
+    }
+
+    function toggleAllEntities() {
+        allExpanded = !allExpanded;
+        applyExpandCollapseState(allExpanded);
+        // Persist to localStorage
+        localStorage.setItem(STORAGE_KEY, String(allExpanded));
+        // Save immediately so reloads reflect latest state
+        saveNow();
+    }
     let sidebarWidth = $state(280);
     let resizingSidebar = $state(false);
     let resizeStartX = 0;
@@ -303,7 +353,7 @@
                         position: e.position || { x: 0, y: 0 },
                         zIndex: 10, // Entities should be above groups (zIndex 1)
                         data: {
-                            label: e.label,
+                            label: (e.label || "").trim(),
                             description: e.description,
                             dbt_model: e.dbt_model,
                             additional_models: e.additional_models,
@@ -540,12 +590,151 @@
                 redo();
             }
         }
+        const handleBeforeUnload = () => {
+            flushPendingSaveSync();
+        };
+
         window.addEventListener("keydown", handleKeydown);
-        return () => window.removeEventListener("keydown", handleKeydown);
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => {
+            window.removeEventListener("keydown", handleKeydown);
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+        };
     });
 
     // Auto-save logic
-    let timeout: ReturnType<typeof setTimeout>;
+    const SAVE_DEBOUNCE_MS = 400;
+    let pendingSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    function buildDataModelFromState(
+        currentNodes: Node[],
+        currentEdges: Edge[],
+    ) {
+        return {
+            version: 0.1,
+            entities: currentNodes
+                .filter((n) => n.type === "entity")
+                .map((n) => ({
+                    id: n.id,
+                    label: ((n.data.label as string) || "").trim() || "Entity",
+                    description: n.data.description as string | undefined,
+                    dbt_model: n.data.dbt_model as string | undefined,
+                    additional_models: n.data?.additional_models as string[] | undefined,
+                    drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                    position: n.position,
+                    width: n.data?.width as number | undefined,
+                    panel_height: n.data?.panelHeight as number | undefined,
+                    collapsed: (n.data?.collapsed as boolean) ?? false,
+                    tags: normalizeTags(n.data?.tags),
+                })),
+            relationships: currentEdges.map((e) => ({
+                source: e.source,
+                target: e.target,
+                label: (e.data?.label as string) || "",
+                type:
+                    (e.data?.type as
+                        | "one_to_many"
+                        | "many_to_one"
+                        | "one_to_one"
+                        | "many_to_many") || "one_to_many",
+                source_field: e.data?.source_field as string | undefined,
+                target_field: e.data?.target_field as string | undefined,
+                label_dx: e.data?.label_dx as number | undefined,
+                label_dy: e.data?.label_dy as number | undefined,
+            })),
+        };
+    }
+
+    async function persistDataModel(
+        nodesSnapshot: Node[],
+        edgesSnapshot: Edge[],
+        stateString: string,
+    ) {
+        try {
+            const dataModel = buildDataModelFromState(nodesSnapshot, edgesSnapshot);
+            await saveDataModel(dataModel);
+            lastSavedState = stateString;
+        } catch (e) {
+            console.error("Save failed", e);
+        } finally {
+            saving = false;
+            pendingSaveTimeout = null;
+        }
+    }
+
+    function saveNow() {
+        if (loading) return;
+
+        if (pendingSaveTimeout) {
+            clearTimeout(pendingSaveTimeout);
+            pendingSaveTimeout = null;
+        }
+
+        const currentNodes = $nodes;
+        const currentEdges = $edges;
+        const state = JSON.stringify({
+            nodes: currentNodes,
+            edges: currentEdges,
+        });
+
+        saving = true;
+        void persistDataModel(
+            structuredClone(currentNodes),
+            structuredClone(currentEdges),
+            state,
+        );
+    }
+
+    function flushPendingSaveSync() {
+        if (loading) return;
+        const nodesSnapshot = $nodes;
+        const edgesSnapshot = $edges;
+        const state = JSON.stringify({
+            nodes: nodesSnapshot,
+            edges: edgesSnapshot,
+        });
+        if (state === lastSavedState) return;
+
+        const payload = JSON.stringify(
+            buildDataModelFromState(nodesSnapshot, edgesSnapshot),
+        );
+        const url = `${API_BASE}/data-model`;
+
+        try {
+            if (
+                typeof navigator !== "undefined" &&
+                typeof navigator.sendBeacon === "function"
+            ) {
+                const blob = new Blob([payload], { type: "application/json" });
+                const sent = navigator.sendBeacon(url, blob);
+                if (sent) {
+                    lastSavedState = state;
+                    saving = false;
+                    return;
+                }
+            }
+        } catch (err) {
+            console.error("Beacon save failed", err);
+        }
+
+        // Fallback best-effort save using keepalive fetch
+        try {
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: payload,
+                keepalive: true,
+            })
+                .then(() => {
+                    lastSavedState = state;
+                    saving = false;
+                })
+                .catch((err) => console.error("Fallback save failed", err));
+        } catch (err) {
+            console.error("Immediate save failed", err);
+        }
+        pendingSaveTimeout = null;
+    }
 
     $effect(() => {
         if (loading) return;
@@ -568,48 +757,16 @@
         // Push to undo history
         pushHistory();
 
-        clearTimeout(timeout);
-        saving = true;
-        timeout = setTimeout(async () => {
-            try {
-                // Convert back to data model format
-                const dataModel = {
-                    version: 0.1,
-                    entities: currentNodes
-                        .filter((n) => n.type === "entity") // Only save entity nodes, not group nodes
-                        .map((n) => ({
-                            id: n.id,
-                            label: n.data.label as string,
-                            description: n.data.description as string | undefined,
-                            dbt_model: n.data.dbt_model as string | undefined,
-                            additional_models: n.data?.additional_models as string[] | undefined,
-                            drafted_fields: n.data?.drafted_fields as any[] | undefined,
-                            position: n.position,
-                            width: n.data?.width as number | undefined,
-                            panel_height: n.data?.panelHeight as number | undefined,
-                            collapsed: (n.data?.collapsed as boolean) ?? false,
-                            tags: normalizeTags(n.data?.tags),
-                        })),
-                    relationships: currentEdges.map((e) => ({
-                        source: e.source,
-                        target: e.target,
-                        label: (e.data?.label as string) || "",
-                        type: (e.data?.type as 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many') || "one_to_many",
-                        source_field: e.data?.source_field as string | undefined,
-                        target_field: e.data?.target_field as string | undefined,
-                        label_dx: e.data?.label_dx as number | undefined,
-                        label_dy: e.data?.label_dy as number | undefined,
-                    })),
-                };
+        if (pendingSaveTimeout) {
+            clearTimeout(pendingSaveTimeout);
+        }
 
-                await saveDataModel(dataModel);
-                lastSavedState = state;
-            } catch (e) {
-                console.error("Save failed", e);
-            } finally {
-                saving = false;
-            }
-        }, 1000); // 1s debounce
+        saving = true;
+        const nodesSnapshot = structuredClone(currentNodes);
+        const edgesSnapshot = structuredClone(currentEdges);
+        pendingSaveTimeout = setTimeout(() => {
+            void persistDataModel(nodesSnapshot, edgesSnapshot, state);
+        }, SAVE_DEBOUNCE_MS);
     });
 
     // Apply filters to node visibility
@@ -804,6 +961,27 @@
             >
                 <Icon icon="lucide:info" class="w-4 h-4" />
                 Config info
+            </button>
+
+            <button
+                onclick={toggleAllEntities}
+                disabled={loading}
+                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                title={allExpanded ? "Collapse all entities" : "Expand all entities"}
+                aria-label={allExpanded ? "Collapse all entities" : "Expand all entities"}
+            >
+                {#if allExpanded}
+                    <!-- Collapse icon: chevrons pointing inward -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path d="m7.4 21.308l-.708-.708L12 15.292l5.308 5.308l-.708.708l-4.6-4.6zm4.6-12.6L6.692 3.4l.708-.708l4.6 4.6l4.6-4.6l.708.708z"/>
+                    </svg>
+                {:else}
+                    <!-- Expand icon: chevrons pointing outward -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path d="M12 21.308L6.692 16l.714-.713L12 19.842l4.594-4.555l.714.713zm-4.588-12.6L6.692 8L12 2.692L17.308 8l-.72.708L12 4.158z"/>
+                    </svg>
+                {/if}
+                {allExpanded ? "Collapse All" : "Expand All"}
             </button>
 
             <button

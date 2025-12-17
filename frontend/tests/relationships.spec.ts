@@ -99,7 +99,7 @@ test.describe('Relationship (Edge) Interactions', () => {
         expect(initialBbox).not.toBeNull();
 
         // Drag entity to new position
-        await entity.hover();
+        await entity.hover({ force: true });
         await page.mouse.down();
         await page.mouse.move(
             initialBbox!.x + 100,

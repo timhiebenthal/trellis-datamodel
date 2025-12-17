@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added global expand/collapse toggle button in the top bar to expand or collapse all entity nodes at once, with state persisted in browser localStorage across page reloads
 - Extended company dummy data generator with procurement domain entities (suppliers, purchase orders, supplier invoices, inventory)
 - Added customer invoices and employee/department entities to company dummy data generator
 - Company dummy data now showcases two distinct business domains (Sales and Procurement)

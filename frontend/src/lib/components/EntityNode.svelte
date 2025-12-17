@@ -242,14 +242,15 @@
     }
 
     function updateLabel(e: Event) {
-        const label = (e.target as HTMLInputElement).value;
+        const label = (e.target as HTMLInputElement).value.trim();
         // Just update the label without changing ID (for real-time typing)
+        // Labels can contain spaces - only the ID (generated on blur) converts spaces to underscores
         updateNodeData(id, { label });
     }
 
     function updateIdFromLabel(e: Event) {
         // Called on blur - update the ID based on final label
-        const label = (e.target as HTMLInputElement).value;
+        const label = (e.target as HTMLInputElement).value.trim();
         const newId = generateSlug(label, $nodes.map((n) => n.id), id);
 
         // If ID changes, update the node and all relationships
@@ -570,6 +571,10 @@
     }
 
     function handleHeaderKeydown(event: KeyboardEvent) {
+        // Only handle keyboard events if the target is not an input field
+        if ((event.target as HTMLElement).tagName === "INPUT") {
+            return;
+        }
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             toggleCollapse(event);
@@ -903,10 +908,13 @@
                 {/if}
             </span>
             <input
+                type="text"
                 value={data.label}
                 oninput={updateLabel}
                 onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+                onkeyup={(e) => e.stopPropagation()}
                 class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm text-gray-800"
                 placeholder="Entity Name"
             />

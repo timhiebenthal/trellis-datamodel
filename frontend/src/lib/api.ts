@@ -15,7 +15,7 @@ import type {
  * To override, set PUBLIC_API_URL in your .env file:
  *   PUBLIC_API_URL=http://your-backend-url/api
  */
-function getApiBase(): string {
+export function getApiBase(): string {
     // Prefer Vite/SvelteKit public env var (build-time)
     // Falls back to legacy PUBLIC_API_URL, then relative /api
     const maybe =
