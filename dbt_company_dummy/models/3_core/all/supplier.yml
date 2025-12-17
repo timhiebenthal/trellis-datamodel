@@ -1,0 +1,26 @@
+version: 2
+models:
+- name: supplier
+  description: Supplier records
+  columns:
+  - name: supplier_id
+    data_type: text
+    description: unique supplier ID
+  - name: supplier_name
+    data_type: text
+    description: supplier company name
+  - name: contact_name
+    data_type: text
+  - name: email
+    data_type: text
+  - name: phone
+    data_type: text
+  - name: category
+    data_type: text
+    description: supplier category
+  - name: status
+    data_type: text
+  - name: payment_terms
+    data_type: text
+  - name: created_at
+    data_type: timestamp

@@ -1,5 +1,5 @@
 select 
-    cast(oi.order_item_id as text) as purchase_id,
+    cast(oi.order_item_id as text) as sale_id,
     cast(oi.order_id as text) as order_id,
     cast(oi.product_id as text) as product_id,
     cast(o.customer_id as text) as customer_id,
@@ -14,7 +14,7 @@ select
     o.amount - o.discount as order_net_amount,
     o.created_at as order_created_at,
     o.updated_at as order_updated_at,
-    -- Purchase-level timestamps
-    oi.created_at as purchase_created_at
+    -- Sale-level timestamps
+    oi.created_at as sale_created_at
 from {{ ref('prep_order_item') }} oi
 inner join {{ ref('prep_order') }} o on oi.order_id = o.order_id

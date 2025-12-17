@@ -1,0 +1,60 @@
+version: 2
+models:
+- name: procurement
+  description: Procurement records at purchase-order-item grain with enriched purchase order information
+  columns:
+  - name: procurement_id
+    data_type: text
+    description: unique procurement ID (purchase_order_item_id)
+  - name: purchase_order_id
+    data_type: text
+    description: purchase order ID
+  - name: product_id
+    data_type: text
+    description: product ID
+    data_tests:
+    - relationships:
+        arguments:
+          to: ref('product')
+          field: product_id
+  - name: supplier_id
+    data_type: text
+    description: supplier ID
+    data_tests:
+    - relationships:
+        arguments:
+          to: ref('supplier')
+          field: supplier_id
+  - name: quantity
+    data_type: numeric
+  - name: unit_price
+    data_type: numeric
+  - name: subtotal
+    data_type: numeric
+  - name: po_number
+    data_type: text
+    description: purchase order number
+  - name: po_date
+    data_type: timestamp
+    description: purchase order date
+  - name: expected_delivery_date
+    data_type: timestamp
+  - name: po_status
+    data_type: text
+    description: purchase order status
+  - name: po_amount
+    data_type: numeric
+    description: total purchase order amount
+  - name: po_discount
+    data_type: numeric
+    description: purchase order discount amount
+  - name: po_net_amount
+    data_type: numeric
+    description: net purchase order amount after discount
+  - name: po_created_at
+    data_type: timestamp
+  - name: po_updated_at
+    data_type: timestamp
+  - name: procurement_created_at
+    data_type: timestamp
+    description: procurement (purchase order item) creation timestamp
