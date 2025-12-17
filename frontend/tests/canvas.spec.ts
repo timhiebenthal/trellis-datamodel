@@ -58,4 +58,78 @@ test.describe('Canvas Interactions', () => {
         // Verify gone
         await expect(entity).not.toBeVisible();
     });
+
+    test('expand/collapse all entities toggle', async ({ page }) => {
+        // 1. Create multiple entities
+        const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+        await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
+        
+        // Create first entity
+        await addEntityBtn.click();
+        await page.waitForTimeout(500);
+        
+        // Create second entity
+        await addEntityBtn.click();
+        await page.waitForTimeout(500);
+
+        // Wait for entities to be visible
+        const entities = page.locator('.svelte-flow__node-entity');
+        await expect(entities).toHaveCount(2, { timeout: 5000 });
+
+        // 2. Verify entities are expanded by default (we can see the content area)
+        // Check that at least one entity has visible content (not collapsed)
+        const firstEntity = entities.first();
+        // Check for the collapse tooltip or chevron-down icon (expanded state)
+        const collapsedIndicator = firstEntity.locator('[title*="collapse"], [title*="Collapse"]');
+        await expect(collapsedIndicator.first()).toBeVisible({ timeout: 2000 });
+
+        // 3. Click collapse all button (now in the top bar)
+        const collapseAllBtn = page.getByRole('button', { name: 'Collapse All' });
+        await expect(collapseAllBtn).toBeVisible({ timeout: 5000 });
+        await collapseAllBtn.click();
+        await page.waitForTimeout(500);
+
+        // 4. Verify all entities are collapsed
+        // Check that entities show "Click to expand" tooltip (collapsed state)
+        for (let i = 0; i < 2; i++) {
+            const entity = entities.nth(i);
+            const expandIndicator = entity.locator('[title*="expand"], [title*="Expand"]');
+            const isCollapsed = await expandIndicator.isVisible({ timeout: 1000 }).catch(() => false);
+            expect(isCollapsed).toBeTruthy();
+        }
+
+        // 5. Verify button text changed to "Expand All"
+        const expandAllBtn = page.getByRole('button', { name: 'Expand All' });
+        await expect(expandAllBtn).toBeVisible({ timeout: 2000 });
+
+        // 6. Click expand all button
+        await expandAllBtn.click();
+        await page.waitForTimeout(500);
+
+        // 7. Verify all entities are expanded again
+        for (let i = 0; i < 2; i++) {
+            const entity = entities.nth(i);
+            const collapseIndicator = entity.locator('[title*="collapse"], [title*="Collapse"]');
+            const isExpanded = await collapseIndicator.isVisible({ timeout: 1000 }).catch(() => false);
+            expect(isExpanded).toBeTruthy();
+        }
+
+        // 8. Reload page and verify state persisted (should be expanded)
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(1000); // Wait for state to be applied
+
+        const entitiesAfterReload = page.locator('.svelte-flow__node-entity');
+        await expect(entitiesAfterReload).toHaveCount(2, { timeout: 5000 });
+
+        // Verify entities are expanded (last state was expanded)
+        const firstEntityAfterReload = entitiesAfterReload.first();
+        const collapseIndicatorAfterReload = firstEntityAfterReload.locator('[title*="collapse"], [title*="Collapse"]');
+        const isExpandedAfterReload = await collapseIndicatorAfterReload.isVisible({ timeout: 2000 }).catch(() => false);
+        expect(isExpandedAfterReload).toBeTruthy();
+
+        // Verify button shows "Collapse All" (since state was expanded)
+        const collapseAllBtnAfterReload = page.getByRole('button', { name: 'Collapse All' });
+        await expect(collapseAllBtnAfterReload).toBeVisible({ timeout: 5000 });
+    });
 });

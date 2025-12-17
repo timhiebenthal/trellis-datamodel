@@ -218,6 +218,52 @@
         $nodes = layoutedNodes;
         // fitView prop on Canvas will automatically adjust the view
     }
+
+    // Expand/Collapse all entities toggle
+    const STORAGE_KEY = "trellis_all_expanded";
+    let allExpanded = $state(true);
+    let stateApplied = $state(false);
+
+    // Restore state from localStorage on mount
+    onMount(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved !== null) {
+            allExpanded = saved === "true";
+        }
+    });
+
+    // Watch for nodes changes and apply persisted state once when nodes are first loaded
+    $effect(() => {
+        const currentNodes = $nodes;
+        const entityNodes = currentNodes.filter((n) => n.type === "entity");
+        if (entityNodes.length > 0 && !stateApplied) {
+            // Apply the persisted state to all entity nodes
+            applyExpandCollapseState(allExpanded);
+            stateApplied = true;
+        }
+    });
+
+    function applyExpandCollapseState(expanded: boolean) {
+        const entityNodes = $nodes.filter((n) => n.type === "entity");
+        if (entityNodes.length === 0) return;
+
+        $nodes = $nodes.map((node) => {
+            if (node.type === "entity") {
+                return {
+                    ...node,
+                    data: { ...node.data, collapsed: !expanded },
+                };
+            }
+            return node;
+        });
+    }
+
+    function toggleAllEntities() {
+        allExpanded = !allExpanded;
+        applyExpandCollapseState(allExpanded);
+        // Persist to localStorage
+        localStorage.setItem(STORAGE_KEY, String(allExpanded));
+    }
     let sidebarWidth = $state(280);
     let resizingSidebar = $state(false);
     let resizeStartX = 0;
@@ -804,6 +850,27 @@
             >
                 <Icon icon="lucide:info" class="w-4 h-4" />
                 Config info
+            </button>
+
+            <button
+                onclick={toggleAllEntities}
+                disabled={loading}
+                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                title={allExpanded ? "Collapse all entities" : "Expand all entities"}
+                aria-label={allExpanded ? "Collapse all entities" : "Expand all entities"}
+            >
+                {#if allExpanded}
+                    <!-- Collapse icon: chevrons pointing inward -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path d="m7.4 21.308l-.708-.708L12 15.292l5.308 5.308l-.708.708l-4.6-4.6zm4.6-12.6L6.692 3.4l.708-.708l4.6 4.6l4.6-4.6l.708.708z"/>
+                    </svg>
+                {:else}
+                    <!-- Expand icon: chevrons pointing outward -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path d="M12 21.308L6.692 16l.714-.713L12 19.842l4.594-4.555l.714.713zm-4.588-12.6L6.692 8L12 2.692L17.308 8l-.72.708L12 4.158z"/>
+                    </svg>
+                {/if}
+                {allExpanded ? "Collapse All" : "Expand All"}
             </button>
 
             <button

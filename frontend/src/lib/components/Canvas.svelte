@@ -14,7 +14,6 @@
         type Connection,
         type Edge,
     } from "@xyflow/svelte";
-
     import { nodes, edges, viewMode } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import EntityNode from "./EntityNode.svelte";
