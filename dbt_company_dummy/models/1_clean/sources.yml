@@ -32,3 +32,27 @@ sources:
         description: "Order line items"
         meta:
           external_location: "data/order_item.csv"
+      - name: customer_invoice
+        description: "Customer invoices"
+        meta:
+          external_location: "data/customer_invoice.csv"
+      - name: supplier
+        description: "Supplier records"
+        meta:
+          external_location: "data/supplier.csv"
+      - name: purchase_order
+        description: "Purchase orders to suppliers"
+        meta:
+          external_location: "data/purchase_order.csv"
+      - name: purchase_order_item
+        description: "Purchase order line items"
+        meta:
+          external_location: "data/purchase_order_item.csv"
+      - name: supplier_invoice
+        description: "Supplier invoices"
+        meta:
+          external_location: "data/supplier_invoice.csv"
+      - name: inventory
+        description: "Product inventory levels"
+        meta:
+          external_location: "data/inventory.csv"

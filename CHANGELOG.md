@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Extended company dummy data generator with procurement domain entities (suppliers, purchase orders, supplier invoices, inventory)
+- Added customer invoices and employee/department entities to company dummy data generator
+- Company dummy data now showcases two distinct business domains (Sales and Procurement)
+
 ### Changed
+- Renamed `purchase` to `sale` and `receipt` to `supplier_invoice` in company dummy data for clarity
 - Enhanced Sidebar error messages to provide clearer instructions for dbt project configuration: now suggests running `dbt docs generate` or `dbt compile` based on catalog existence, and directs users to the "Config Info" button for detailed configuration information
+
 ### Fixed
 - Fixed cursor visibility issue on WSL/Windows: replaced `grab`/`grabbing` cursors with `default`/`move` cursors, and `text` (I-beam) cursor with `default` cursor to prevent invisible white cursors on light backgrounds
 

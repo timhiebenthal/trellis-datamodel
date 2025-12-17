@@ -1,0 +1,15 @@
+version: 2
+models:
+- name: department
+  description: Company departments
+  columns:
+  - name: department_id
+    data_type: text
+    description: unique department ID
+  - name: department_name
+    data_type: text
+    description: department name
+  - name: description
+    data_type: text
+  - name: created_at
+    data_type: timestamp
