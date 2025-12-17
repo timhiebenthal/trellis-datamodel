@@ -201,22 +201,52 @@ def generate_company_data(
     if config_path:
         load_config(config_path)
 
-    # Use configured path or fallback to default relative to repo root
+    # Use configured path or fallback to default relative to current working directory
+    import os
+
     if cfg.DBT_COMPANY_DUMMY_PATH:
         generator_path = Path(cfg.DBT_COMPANY_DUMMY_PATH) / "generate_data.py"
     else:
-        # Fallback: find relative to repo root
-        # cli.py lives in trellis_datamodel/, so repo root is two levels up
-        project_root = Path(__file__).parent.parent
-        generator_path = project_root / "dbt_company_dummy" / "generate_data.py"
+        # Fallback: check current working directory first (for installed packages)
+        # This is the most common case when running from repo root
+        cwd_dummy_path = Path(os.getcwd()) / "dbt_company_dummy" / "generate_data.py"
+        if cwd_dummy_path.exists():
+            generator_path = cwd_dummy_path
+        else:
+            # Try repo root (for development when running from source)
+            project_root = Path(__file__).parent.parent
+            repo_dummy_path = project_root / "dbt_company_dummy" / "generate_data.py"
+            if repo_dummy_path.exists():
+                generator_path = repo_dummy_path
+            else:
+                # Last resort: use current working directory even if it doesn't exist yet
+                # (will show helpful error message)
+                generator_path = cwd_dummy_path
 
     if not generator_path.exists():
+        import os
+
         typer.echo(
             typer.style(
                 f"Error: Generator script not found at {generator_path}",
                 fg=typer.colors.RED,
             )
         )
+        typer.echo()
+        typer.echo("The generator script should be located at:")
+        if cfg.DBT_COMPANY_DUMMY_PATH:
+            typer.echo(f"  {cfg.DBT_COMPANY_DUMMY_PATH}/generate_data.py")
+            typer.echo()
+            typer.echo("This path is configured in your trellis.yml file.")
+        else:
+            typer.echo(f"  {os.getcwd()}/dbt_company_dummy/generate_data.py")
+            typer.echo()
+            typer.echo(
+                "Make sure you're running this command from the repository root,"
+            )
+            typer.echo(
+                "or configure 'dbt_company_dummy_path' in your trellis.yml file."
+            )
         raise typer.Exit(1)
 
     # Load and run the generator module

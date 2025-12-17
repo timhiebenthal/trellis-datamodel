@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-12-17
+
+### Fixed
+- Fixed `trellis generate-company-data` fallback path resolution: when run from an installed package without a configured `dbt_company_dummy_path`, the command now prefers `./dbt_company_dummy` in the current working directory instead of looking relative to the installed package.
+
 ## [0.3.1] - 2025-12-17
 
 ### Fixed
