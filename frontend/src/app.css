@@ -15,3 +15,27 @@
     display: none !important;
     pointer-events: none !important;
 }
+
+/* 
+  Fix for "white cursor on white background" issue on some OS/Theme combinations (e.g. WSL/Windows Dark Mode).
+  The standard 'grab' and 'grabbing' cursors can render as white-only without borders, making them invisible.
+  We override them with 'default' (arrow) and 'move' (cross/arrow) which are more robust.
+*/
+.svelte-flow__pane,
+.svelte-flow__node,
+.cursor-grab {
+    cursor: default !important;
+}
+
+.svelte-flow__pane.dragging,
+.svelte-flow__node.dragging,
+.cursor-grabbing,
+.svelte-flow__pane:active,
+.svelte-flow__node:active {
+    cursor: move !important;
+}
+
+/* Fix for invisible I-beam cursor */
+input, textarea, [contenteditable] {
+    cursor: default !important;
+}
