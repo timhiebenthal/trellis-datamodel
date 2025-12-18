@@ -9,11 +9,19 @@ import os
 import sys
 import subprocess
 import tempfile
+import re
 import pytest
 from typer.testing import CliRunner
 from pathlib import Path
 
 runner = CliRunner()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences (Typer/Rich help output in CI)."""
+    return _ANSI_RE.sub("", text)
 
 
 class TestCLIVersion:
@@ -321,9 +329,10 @@ class TestCLIHelp:
         # Disable rich/ANSI output so assertions work in CI ("dumb" terminals).
         result = runner.invoke(app, ["--help"], color=False)
         assert result.exit_code == 0
-        assert "run" in result.output
-        assert "init" in result.output
-        assert "generate-company-data" in result.output
+        out = _strip_ansi(result.output)
+        assert "run" in out
+        assert "init" in out
+        assert "generate-company-data" in out
 
     def test_subcommand_help(self):
         """Test subcommand --help works."""
@@ -332,8 +341,9 @@ class TestCLIHelp:
         # Disable rich/ANSI output so "--port" isn't split by escape codes.
         result = runner.invoke(app, ["run", "--help"], color=False)
         assert result.exit_code == 0
-        assert "--port" in result.output
-        assert "--config" in result.output
+        out = _strip_ansi(result.output)
+        assert "--port" in out
+        assert "--config" in out
 
 
 class TestCLIInstalledPackage:
