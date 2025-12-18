@@ -318,7 +318,8 @@ class TestCLIHelp:
         """Test --help shows available commands."""
         from trellis_datamodel.cli import app
 
-        result = runner.invoke(app, ["--help"])
+        # Disable rich/ANSI output so assertions work in CI ("dumb" terminals).
+        result = runner.invoke(app, ["--help"], color=False)
         assert result.exit_code == 0
         assert "run" in result.output
         assert "init" in result.output
@@ -328,7 +329,8 @@ class TestCLIHelp:
         """Test subcommand --help works."""
         from trellis_datamodel.cli import app
 
-        result = runner.invoke(app, ["run", "--help"])
+        # Disable rich/ANSI output so "--port" isn't split by escape codes.
+        result = runner.invoke(app, ["run", "--help"], color=False)
         assert result.exit_code == 0
         assert "--port" in result.output
         assert "--config" in result.output
