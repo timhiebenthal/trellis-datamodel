@@ -1,0 +1,334 @@
+"""Tests for CLI commands.
+
+These tests verify CLI commands work correctly when the package is installed
+(not just when running from source). This catches issues like path resolution
+bugs that only manifest in installed packages.
+"""
+
+import os
+import sys
+import subprocess
+import tempfile
+import shutil
+from typer.testing import CliRunner
+from pathlib import Path
+
+runner = CliRunner()
+
+
+class TestCLIVersion:
+    """Test version command."""
+
+    def test_version_flag(self):
+        """Test --version flag shows version."""
+        from trellis_datamodel.cli import app
+
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+        # Should output a version string like "0.3.3"
+        assert result.output.strip()
+        # Version should be a valid semver-ish string
+        parts = result.output.strip().split(".")
+        assert len(parts) >= 2
+
+
+class TestCLIInit:
+    """Test init command."""
+
+    def test_init_creates_config(self):
+        """Test trellis init creates trellis.yml."""
+        from trellis_datamodel.cli import app
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Change to temp directory for the test
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                result = runner.invoke(app, ["init"])
+                assert result.exit_code == 0
+                assert "Created trellis.yml" in result.output
+
+                # Verify file was created
+                config_path = Path(tmpdir) / "trellis.yml"
+                assert config_path.exists()
+
+                # Verify content
+                content = config_path.read_text()
+                assert "framework: dbt-core" in content
+                assert "dbt_project_path" in content
+            finally:
+                os.chdir(original_cwd)
+
+    def test_init_fails_if_exists(self):
+        """Test trellis init fails if trellis.yml already exists."""
+        from trellis_datamodel.cli import app
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                # Create existing config
+                Path(tmpdir, "trellis.yml").write_text("existing: true")
+
+                result = runner.invoke(app, ["init"])
+                assert result.exit_code == 1
+                assert "already exists" in result.output
+            finally:
+                os.chdir(original_cwd)
+
+
+class TestCLIGenerateCompanyData:
+    """Test generate-company-data command.
+
+    These tests specifically verify the path resolution logic works correctly
+    in various scenarios that have caused bugs in the past.
+
+    IMPORTANT: These tests must clear DATAMODEL_TEST_DIR and reload the config
+    module to simulate production behavior (not test mode).
+    """
+
+    def _create_mock_generator(self, path: Path):
+        """Create a minimal mock generate_data.py script."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            '''"""Mock generator for testing."""
+def main():
+    print("Mock data generation complete")
+'''
+        )
+
+    def _get_fresh_app(self):
+        """Get fresh CLI app without test mode enabled."""
+        # Clear test environment to simulate production
+        old_test_dir = os.environ.pop("DATAMODEL_TEST_DIR", None)
+
+        # Force reload of config and cli modules
+        modules_to_remove = [
+            k for k in list(sys.modules.keys()) if "trellis_datamodel" in k
+        ]
+        for mod in modules_to_remove:
+            del sys.modules[mod]
+
+        # Import fresh
+        from trellis_datamodel.cli import app
+
+        return app, old_test_dir
+
+    def _restore_test_env(self, old_test_dir):
+        """Restore test environment after test."""
+        if old_test_dir:
+            os.environ["DATAMODEL_TEST_DIR"] = old_test_dir
+        # Reload modules to restore test mode
+        modules_to_remove = [
+            k for k in list(sys.modules.keys()) if "trellis_datamodel" in k
+        ]
+        for mod in modules_to_remove:
+            del sys.modules[mod]
+
+    def test_generate_without_config_finds_cwd_script(self):
+        """Test generate-company-data finds script in cwd when no config exists.
+
+        Scenario: User clones repo and runs command without any config file.
+        Expected: Should find ./dbt_company_dummy/generate_data.py
+        """
+        app, old_test_dir = self._get_fresh_app()
+        original_cwd = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                os.chdir(tmpdir)
+
+                # Create mock generator in cwd
+                generator_path = Path(tmpdir) / "dbt_company_dummy" / "generate_data.py"
+                self._create_mock_generator(generator_path)
+
+                result = runner.invoke(app, ["generate-company-data"])
+                assert result.exit_code == 0, f"Command failed: {result.output}"
+                assert "Mock data generation complete" in result.output
+        finally:
+            os.chdir(original_cwd)
+            self._restore_test_env(old_test_dir)
+
+    def test_generate_with_config_but_no_dummy_path_configured(self):
+        """Test generate-company-data works when config exists but dbt_company_dummy_path is not set.
+
+        Scenario: User runs 'trellis init' then 'trellis generate-company-data'.
+        The config file exists but doesn't have dbt_company_dummy_path configured.
+        Expected: Should fall back to ./dbt_company_dummy/generate_data.py in cwd.
+
+        This is the exact bug that was fixed in v0.3.3 - the config loader was
+        setting a default path that didn't exist instead of letting CLI use fallback logic.
+        """
+        app, old_test_dir = self._get_fresh_app()
+        original_cwd = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                os.chdir(tmpdir)
+
+                # Create config file WITHOUT dbt_company_dummy_path
+                config_path = Path(tmpdir) / "trellis.yml"
+                config_path.write_text(
+                    """\
+framework: dbt-core
+dbt_project_path: "."
+dbt_manifest_path: "target/manifest.json"
+data_model_file: "data_model.yml"
+"""
+                )
+
+                # Create mock generator in cwd
+                generator_path = Path(tmpdir) / "dbt_company_dummy" / "generate_data.py"
+                self._create_mock_generator(generator_path)
+
+                result = runner.invoke(app, ["generate-company-data"])
+                assert result.exit_code == 0, f"Command failed: {result.output}"
+                assert "Mock data generation complete" in result.output
+        finally:
+            os.chdir(original_cwd)
+            self._restore_test_env(old_test_dir)
+
+    def test_generate_with_explicit_dummy_path_configured(self):
+        """Test generate-company-data uses explicit dbt_company_dummy_path from config."""
+        app, old_test_dir = self._get_fresh_app()
+        original_cwd = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                os.chdir(tmpdir)
+
+                # Create custom directory for dummy data
+                custom_dummy_dir = Path(tmpdir) / "my_custom_dummy"
+                generator_path = custom_dummy_dir / "generate_data.py"
+                self._create_mock_generator(generator_path)
+
+                # Create config with explicit dbt_company_dummy_path
+                config_path = Path(tmpdir) / "trellis.yml"
+                config_path.write_text(
+                    f"""\
+framework: dbt-core
+dbt_project_path: "."
+dbt_company_dummy_path: "{custom_dummy_dir}"
+"""
+                )
+
+                result = runner.invoke(app, ["generate-company-data"])
+                assert result.exit_code == 0, f"Command failed: {result.output}"
+                assert "Mock data generation complete" in result.output
+        finally:
+            os.chdir(original_cwd)
+            self._restore_test_env(old_test_dir)
+
+    def test_generate_with_relative_dummy_path_configured(self):
+        """Test generate-company-data resolves relative dbt_company_dummy_path."""
+        app, old_test_dir = self._get_fresh_app()
+        original_cwd = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                os.chdir(tmpdir)
+
+                # Create custom directory for dummy data
+                custom_dummy_dir = Path(tmpdir) / "subdir" / "dummy_data"
+                generator_path = custom_dummy_dir / "generate_data.py"
+                self._create_mock_generator(generator_path)
+
+                # Create config with relative dbt_company_dummy_path
+                config_path = Path(tmpdir) / "trellis.yml"
+                config_path.write_text(
+                    """\
+framework: dbt-core
+dbt_project_path: "."
+dbt_company_dummy_path: "subdir/dummy_data"
+"""
+                )
+
+                result = runner.invoke(app, ["generate-company-data"])
+                assert result.exit_code == 0, f"Command failed: {result.output}"
+                assert "Mock data generation complete" in result.output
+        finally:
+            os.chdir(original_cwd)
+            self._restore_test_env(old_test_dir)
+
+    def test_generate_fails_gracefully_when_script_missing(self):
+        """Test generate-company-data shows helpful error when script not found."""
+        app, old_test_dir = self._get_fresh_app()
+        original_cwd = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                os.chdir(tmpdir)
+
+                # Create a config file to prevent fallback to repo root
+                config_path = Path(tmpdir) / "trellis.yml"
+                config_path.write_text(
+                    """\
+framework: dbt-core
+dbt_project_path: "."
+dbt_company_dummy_path: "nonexistent_dummy"
+"""
+                )
+
+                # No generator script exists at configured path
+                result = runner.invoke(app, ["generate-company-data"])
+                assert result.exit_code == 1
+                assert "Generator script not found" in result.output
+                assert "nonexistent_dummy" in result.output
+        finally:
+            os.chdir(original_cwd)
+            self._restore_test_env(old_test_dir)
+
+
+class TestCLIRun:
+    """Test run/serve commands."""
+
+    def test_run_fails_without_config(self):
+        """Test trellis run fails gracefully without config file."""
+        original_cwd = os.getcwd()
+        # Clear test environment variable to simulate production
+        old_test_dir = os.environ.pop("DATAMODEL_TEST_DIR", None)
+
+        # Force reload of config and cli modules
+        modules_to_remove = [
+            k for k in list(sys.modules.keys()) if "trellis_datamodel" in k
+        ]
+        for mod in modules_to_remove:
+            del sys.modules[mod]
+
+        from trellis_datamodel.cli import app
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                os.chdir(tmpdir)
+                result = runner.invoke(app, ["run"])
+                assert result.exit_code == 1
+                assert "No config file found" in result.output
+                assert "trellis init" in result.output
+        finally:
+            os.chdir(original_cwd)
+            if old_test_dir:
+                os.environ["DATAMODEL_TEST_DIR"] = old_test_dir
+            # Reload modules to restore test mode
+            modules_to_remove = [
+                k for k in list(sys.modules.keys()) if "trellis_datamodel" in k
+            ]
+            for mod in modules_to_remove:
+                del sys.modules[mod]
+
+
+class TestCLIHelp:
+    """Test help output."""
+
+    def test_help_shows_commands(self):
+        """Test --help shows available commands."""
+        from trellis_datamodel.cli import app
+
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        assert "run" in result.output
+        assert "init" in result.output
+        assert "generate-company-data" in result.output
+
+    def test_subcommand_help(self):
+        """Test subcommand --help works."""
+        from trellis_datamodel.cli import app
+
+        result = runner.invoke(app, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "--port" in result.output
+        assert "--config" in result.output
