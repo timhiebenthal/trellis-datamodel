@@ -10,6 +10,7 @@ import sys
 import subprocess
 import tempfile
 import shutil
+import pytest
 from typer.testing import CliRunner
 from pathlib import Path
 
@@ -332,3 +333,190 @@ class TestCLIHelp:
         assert result.exit_code == 0
         assert "--port" in result.output
         assert "--config" in result.output
+
+
+class TestCLIInstalledPackage:
+    """Test CLI commands when package is installed (not from source).
+
+    These tests simulate real-world usage by:
+    1. Building the package as a wheel
+    2. Creating an isolated virtual environment
+    3. Installing the wheel in that venv
+    4. Running CLI commands from a completely different directory
+    5. Verifying path resolution works correctly
+
+    This catches bugs that only manifest when:
+    - __file__ points to site-packages, not source repo
+    - No access to source repo's dbt_company_dummy directory
+    - Package is installed via pip/uv, not editable mode
+    """
+
+    def _build_package(self, repo_root: Path) -> Path:
+        """Build the package and return path to wheel."""
+        # Try different build methods
+        build_commands = [
+            ["uv", "build"],  # Preferred: uv build
+            ["python", "-m", "build", "--wheel"],  # Fallback: python -m build
+            ["python", "-m", "pip", "install", "build", "&&", "python", "-m", "build", "--wheel"],  # Install build first
+        ]
+
+        dist_dir = repo_root / "dist"
+        dist_dir.mkdir(exist_ok=True)
+
+        # Check if wheel already exists (from previous test run or manual build)
+        wheels = list(dist_dir.glob("*.whl"))
+        if wheels:
+            return wheels[0]
+
+        # Try to build
+        for cmd in build_commands:
+            try:
+                # Handle shell commands
+                if "&&" in cmd:
+                    result = subprocess.run(
+                        " ".join(cmd),
+                        shell=True,
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                    )
+                else:
+                    result = subprocess.run(
+                        cmd,
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                if result.returncode == 0:
+                    wheels = list(dist_dir.glob("*.whl"))
+                    if wheels:
+                        return wheels[0]
+            except FileNotFoundError:
+                continue
+
+        pytest.skip("Could not build package - no build tool available (uv or python -m build)")
+
+    def _create_isolated_venv(self, venv_dir: Path):
+        """Create an isolated virtual environment."""
+        subprocess.run(
+            [sys.executable, "-m", "venv", str(venv_dir)],
+            check=True,
+            capture_output=True,
+        )
+
+    def _install_package_in_venv(self, venv_dir: Path, wheel_path: Path):
+        """Install the wheel in the virtual environment."""
+        pip = venv_dir / "bin" / "pip"
+        if not pip.exists():
+            pip = venv_dir / "Scripts" / "pip.exe"  # Windows
+
+        subprocess.run(
+            [str(pip), "install", str(wheel_path)],
+            check=True,
+            capture_output=True,
+        )
+
+    def _get_venv_trellis_command(self, venv_dir: Path) -> Path:
+        """Get path to trellis command in venv."""
+        trellis = venv_dir / "bin" / "trellis"
+        if not trellis.exists():
+            trellis = venv_dir / "Scripts" / "trellis.exe"  # Windows
+        return trellis
+
+    def test_generate_company_data_with_installed_package(self):
+        """Test generate-company-data works when package is installed (not editable).
+
+        This simulates the exact scenario from the bug report:
+        - Package installed via pip (not editable)
+        - User runs 'trellis init' in their project
+        - User runs 'trellis generate-company-data'
+        - No dbt_company_dummy_path configured in trellis.yml
+        - dbt_company_dummy exists in user's project directory
+
+        This test ensures the fix works in real-world installations.
+        """
+        repo_root = Path(__file__).parent.parent.parent
+        original_cwd = os.getcwd()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            # 1. Build the package (skip if build tools unavailable)
+            try:
+                wheel_path = self._build_package(repo_root)
+            except Exception as e:
+                pytest.skip(f"Could not build package: {e}")
+
+            # 2. Create isolated venv
+            venv_dir = tmp_path / "venv"
+            try:
+                self._create_isolated_venv(venv_dir)
+            except Exception as e:
+                pytest.skip(f"Could not create venv: {e}")
+
+            # 3. Install package in venv
+            try:
+                self._install_package_in_venv(venv_dir, wheel_path)
+            except Exception as e:
+                pytest.skip(f"Could not install package: {e}")
+
+            # 4. Create a completely separate "user project" directory
+            #    (simulating a different repo/system where user installed the package)
+            user_project_dir = tmp_path / "my_project"
+            user_project_dir.mkdir()
+
+            # 5. Create mock generator in user's project (simulating cloned dbt_company_dummy)
+            generator_path = user_project_dir / "dbt_company_dummy" / "generate_data.py"
+            generator_path.parent.mkdir(parents=True, exist_ok=True)
+            generator_path.write_text(
+                '''"""Mock generator for testing."""
+def main():
+    print("Mock data generation complete")
+'''
+            )
+
+            # 6. Create trellis.yml WITHOUT dbt_company_dummy_path (the bug scenario)
+            config_path = user_project_dir / "trellis.yml"
+            config_path.write_text(
+                """\
+framework: dbt-core
+dbt_project_path: "."
+dbt_manifest_path: "target/manifest.json"
+data_model_file: "data_model.yml"
+"""
+            )
+
+            # 7. Run trellis command from user's project directory
+            #    This simulates real-world usage where __file__ points to site-packages
+            trellis_cmd = self._get_venv_trellis_command(venv_dir)
+            if not trellis_cmd.exists():
+                pytest.skip(f"trellis command not found at {trellis_cmd}")
+
+            os.chdir(user_project_dir)
+
+            # Clear any test environment variables that might interfere
+            test_env = {k: v for k, v in os.environ.items() if not k.startswith("DATAMODEL_")}
+            test_env["PYTHONUNBUFFERED"] = "1"
+
+            try:
+                result = subprocess.run(
+                    [str(trellis_cmd), "generate-company-data"],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(user_project_dir),
+                    env=test_env,  # Use clean environment without test vars
+                )
+
+                assert result.returncode == 0, (
+                    f"Command failed with exit code {result.returncode}\n"
+                    f"STDOUT: {result.stdout}\n"
+                    f"STDERR: {result.stderr}"
+                )
+                assert "Mock data generation complete" in result.stdout, (
+                    f"Expected 'Mock data generation complete' in output\n"
+                    f"STDOUT: {result.stdout}\n"
+                    f"STDERR: {result.stderr}"
+                )
+            finally:
+                os.chdir(original_cwd)
