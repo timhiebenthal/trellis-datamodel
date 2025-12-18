@@ -1622,7 +1622,7 @@ wheels = [
 
 [[package]]
 name = "trellis-datamodel"
-version = "0.3.0"
+version = "0.3.3"
 source = { editable = "." }
 dependencies = [
     { name = "dbt-core" },

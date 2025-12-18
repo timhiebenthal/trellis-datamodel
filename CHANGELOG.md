@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-12-18
+
+### Fixed
+- Fixed `trellis generate-company-data` failing when config file exists but `dbt_company_dummy_path` is not configured: the config loader no longer sets a default path, allowing the CLI's smart fallback logic to properly check if `./dbt_company_dummy/generate_data.py` exists in the current working directory
+
+### Added
+- Added comprehensive CLI tests (`test_cli.py`) to catch path resolution bugs that only manifest in installed packages. Tests cover `trellis init`, `trellis run`, `trellis generate-company-data`, and help output
+
 ## [0.3.2] - 2025-12-17
 
 ### Fixed

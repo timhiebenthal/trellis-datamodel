@@ -207,7 +207,8 @@ def load_config(config_path: Optional[str] = None) -> None:
                 os.path.join(os.path.dirname(CONFIG_PATH), "frontend", "build")
             )
 
-        # 9. Resolve dbt company dummy path (defaults to "./dbt_company_dummy")
+        # 9. Resolve dbt company dummy path (only if explicitly configured)
+        # If not configured, leave empty so CLI can use smart fallback logic
         if "dbt_company_dummy_path" in config:
             p = config["dbt_company_dummy_path"]
             if not os.path.isabs(p):
@@ -216,11 +217,7 @@ def load_config(config_path: Optional[str] = None) -> None:
                 )
             else:
                 DBT_COMPANY_DUMMY_PATH = p
-        else:
-            # Default: dbt_company_dummy next to config file (repo root)
-            DBT_COMPANY_DUMMY_PATH = os.path.abspath(
-                os.path.join(os.path.dirname(CONFIG_PATH), "dbt_company_dummy")
-            )
+        # Note: No default set here - CLI handles fallback to cwd/dbt_company_dummy
 
     except Exception as e:
         print(f"Error loading config: {e}")
