@@ -25,6 +25,10 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 - Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  
 - Brownfield: document your existing data model by loading existing dbt models and utilize relationship tests to infer links
 
+## Tutorial
+
+Check out our [Full Tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) with video clips showing the core features in action.
+
 ## Vision
 
 trellis is currently designed and tested specifically for **dbt-core**, but the vision is to be tool-agnostic. As the saying goes: *"tools evolve, concepts don't"* — data modeling concepts persist regardless of the transformation framework you use.
