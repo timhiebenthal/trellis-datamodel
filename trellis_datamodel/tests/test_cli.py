@@ -9,7 +9,6 @@ import os
 import sys
 import subprocess
 import tempfile
-import shutil
 import pytest
 from typer.testing import CliRunner
 from pathlib import Path
@@ -357,7 +356,6 @@ class TestCLIInstalledPackage:
         build_commands = [
             ["uv", "build"],  # Preferred: uv build
             ["python", "-m", "build", "--wheel"],  # Fallback: python -m build
-            ["python", "-m", "pip", "install", "build", "&&", "python", "-m", "build", "--wheel"],  # Install build first
         ]
 
         dist_dir = repo_root / "dist"
@@ -371,22 +369,12 @@ class TestCLIInstalledPackage:
         # Try to build
         for cmd in build_commands:
             try:
-                # Handle shell commands
-                if "&&" in cmd:
-                    result = subprocess.run(
-                        " ".join(cmd),
-                        shell=True,
-                        cwd=repo_root,
-                        capture_output=True,
-                        text=True,
-                    )
-                else:
-                    result = subprocess.run(
-                        cmd,
-                        cwd=repo_root,
-                        capture_output=True,
-                        text=True,
-                    )
+                result = subprocess.run(
+                    cmd,
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
+                )
 
                 if result.returncode == 0:
                     wheels = list(dist_dir.glob("*.whl"))
@@ -395,7 +383,9 @@ class TestCLIInstalledPackage:
             except FileNotFoundError:
                 continue
 
-        pytest.skip("Could not build package - no build tool available (uv or python -m build)")
+        pytest.skip(
+            "Could not build package - no build tool available (uv or python -m build)"
+        )
 
     def _create_isolated_venv(self, venv_dir: Path):
         """Create an isolated virtual environment."""
@@ -496,7 +486,9 @@ data_model_file: "data_model.yml"
             os.chdir(user_project_dir)
 
             # Clear any test environment variables that might interfere
-            test_env = {k: v for k, v in os.environ.items() if not k.startswith("DATAMODEL_")}
+            test_env = {
+                k: v for k, v in os.environ.items() if not k.startswith("DATAMODEL_")
+            }
             test_env["PYTHONUNBUFFERED"] = "1"
 
             try:
