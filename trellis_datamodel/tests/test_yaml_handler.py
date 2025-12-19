@@ -226,3 +226,52 @@ class TestYamlHandlerRelationshipTests:
         assert len(col["data_tests"]) == 2
         rel_test = next(t for t in col["data_tests"] if "relationships" in t)
         assert rel_test["relationships"]["arguments"]["to"] == "ref('new_model')"
+
+
+class TestYamlIndentation:
+    """Test YAML indentation formatting (regression test for issue #19)."""
+
+    def test_models_list_indentation(self, temp_dir):
+        """Test that models list items are properly indented under the models key."""
+        handler = YamlHandler()
+        file_path = os.path.join(temp_dir, "test_indentation.yml")
+
+        # Create data with a plain Python list (simulates real usage in dbt_core.py)
+        data = {"version": 2, "models": [{"name": "test_model", "description": "Test"}]}
+        handler.save_file(file_path, data)
+
+        # Read the raw file text
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        # Assert proper indentation: models list items should be indented 2 spaces
+        # Expected format:
+        # models:
+        #   - name: test_model
+        assert (
+            "models:\n  - name:" in content
+        ), f"Expected proper indentation, got:\n{content}"
+
+    def test_ensure_model_normalizes_plain_list(self, temp_dir):
+        """Test that ensure_model normalizes plain Python lists to CommentedSeq."""
+        handler = YamlHandler()
+        file_path = os.path.join(temp_dir, "test_normalize.yml")
+
+        # Start with a plain Python list
+        data = {"version": 2, "models": []}
+
+        # Call ensure_model which should normalize the list
+        handler.ensure_model(data, "new_model")
+
+        # Verify it's now a CommentedSeq
+        assert isinstance(data["models"], CommentedSeq)
+
+        # Save and verify indentation
+        handler.save_file(file_path, data)
+
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        assert (
+            "models:\n  - name:" in content
+        ), f"Expected proper indentation after normalization, got:\n{content}"
