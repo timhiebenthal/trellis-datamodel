@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/timhiebenthal/trellis-datamodel"
+Homepage = "https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a"
 Repository = "https://github.com/timhiebenthal/trellis-datamodel"
 Issues = "https://github.com/timhiebenthal/trellis-datamodel/issues"
 
