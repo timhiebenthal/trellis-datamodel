@@ -275,3 +275,182 @@ class TestYamlIndentation:
         assert (
             "models:\n  - name:" in content
         ), f"Expected proper indentation after normalization, got:\n{content}"
+
+
+class TestTagHandling:
+    """Test tag handling improvements (issue #20)."""
+
+    def test_update_model_tags_skips_empty_tags(self):
+        """Test that empty tags arrays are not written to YAML (Point 1)."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test"})
+
+        # Update with empty tags - should not create tags key
+        handler.update_model_tags(model, [])
+
+        assert "tags" not in model
+        assert "config" not in model
+
+    def test_update_model_tags_removes_existing_empty_tags(self):
+        """Test that existing tags are removed when updated to empty (Point 1)."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test", "tags": ["old_tag"]})
+
+        # Update with empty tags - should remove existing tags
+        handler.update_model_tags(model, [])
+
+        assert "tags" not in model
+
+    def test_update_model_tags_removes_config_tags_when_empty(self):
+        """Test that config.tags are removed when updated to empty (Point 1)."""
+        handler = YamlHandler()
+        model = CommentedMap(
+            {
+                "name": "test",
+                "config": CommentedMap({"tags": ["old_tag"], "materialized": "table"}),
+            }
+        )
+
+        # Update with empty tags - should remove config.tags but keep config
+        handler.update_model_tags(model, [])
+
+        assert "tags" not in model["config"]
+        assert model["config"]["materialized"] == "table"
+
+    def test_update_version_tags_skips_empty_tags(self):
+        """Test that empty tags arrays are not written for versions (Point 1)."""
+        handler = YamlHandler()
+        version = CommentedMap({"v": 2})
+
+        # Update with empty tags - should not create config
+        handler.update_version_tags(version, [])
+
+        assert "config" not in version
+
+    def test_update_version_tags_removes_existing_empty_tags(self):
+        """Test that existing version tags are removed when updated to empty (Point 1)."""
+        handler = YamlHandler()
+        version = CommentedMap({"v": 2, "config": CommentedMap({"tags": ["old_tag"]})})
+
+        # Update with empty tags - should remove config.tags
+        handler.update_version_tags(version, [])
+
+        assert "tags" not in version["config"]
+
+    def test_config_placement_after_description(self, temp_dir):
+        """Test that config block is placed after description (Point 2)."""
+        handler = YamlHandler()
+        file_path = os.path.join(temp_dir, "test_config_placement.yml")
+
+        # Create model with name and description, then add tags
+        model = CommentedMap()
+        model["name"] = "test_model"
+        model["description"] = "A test model"
+
+        handler.update_model_tags(model, ["core"])
+
+        # Save and check order
+        data = {"version": 2, "models": [model]}
+        handler.save_file(file_path, data)
+
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        # Config should appear after description
+        desc_pos = content.find("description:")
+        config_pos = content.find("config:")
+
+        assert desc_pos > 0, "Description should be present"
+        assert config_pos > 0, "Config should be present"
+        assert config_pos > desc_pos, "Config should appear after description"
+
+    def test_config_placement_before_columns(self, temp_dir):
+        """Test that config block is placed before columns (Point 2)."""
+        handler = YamlHandler()
+        file_path = os.path.join(temp_dir, "test_config_before_columns.yml")
+
+        # Create model with name, description, and columns
+        model = CommentedMap()
+        model["name"] = "test_model"
+        model["description"] = "A test model"
+        model["columns"] = CommentedSeq([CommentedMap({"name": "id"})])
+
+        # Add tags - should insert config before columns
+        handler.update_model_tags(model, ["core"])
+
+        # Save and check order
+        data = {"version": 2, "models": [model]}
+        handler.save_file(file_path, data)
+
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        # Config should appear before columns
+        config_pos = content.find("config:")
+        columns_pos = content.find("columns:")
+
+        assert config_pos > 0, "Config should be present"
+        assert columns_pos > 0, "Columns should be present"
+        assert config_pos < columns_pos, "Config should appear before columns"
+
+    def test_config_placement_after_name_when_no_description(self, temp_dir):
+        """Test that config is placed after name when description is missing (Point 2)."""
+        handler = YamlHandler()
+        file_path = os.path.join(temp_dir, "test_config_after_name.yml")
+
+        # Create model with only name
+        model = CommentedMap()
+        model["name"] = "test_model"
+
+        handler.update_model_tags(model, ["core"])
+
+        # Save and check order
+        data = {"version": 2, "models": [model]}
+        handler.save_file(file_path, data)
+
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        # Config should appear after name
+        name_pos = content.find("name:")
+        config_pos = content.find("config:")
+
+        assert name_pos > 0, "Name should be present"
+        assert config_pos > 0, "Config should be present"
+        assert config_pos > name_pos, "Config should appear after name"
+
+    def test_version_config_placement(self, temp_dir):
+        """Test that config block in versions is placed correctly (Point 2)."""
+        handler = YamlHandler()
+        file_path = os.path.join(temp_dir, "test_version_config.yml")
+
+        # Create version with description
+        version = CommentedMap()
+        version["v"] = 2
+        version["description"] = "Version 2"
+
+        handler.update_version_tags(version, ["core"])
+
+        # Save and check order
+        model = CommentedMap()
+        model["name"] = "test_model"
+        model["versions"] = CommentedSeq([version])
+        data = {"version": 2, "models": [model]}
+        handler.save_file(file_path, data)
+
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        # In the version block, config should appear after description
+        lines = content.split("\n")
+        v_line = next(i for i, line in enumerate(lines) if "v:" in line)
+        desc_line = next(
+            i for i, line in enumerate(lines) if i > v_line and "description:" in line
+        )
+        config_line = next(
+            i for i, line in enumerate(lines) if i > v_line and "config:" in line
+        )
+
+        assert (
+            config_line > desc_line
+        ), "Config should appear after description in version block"

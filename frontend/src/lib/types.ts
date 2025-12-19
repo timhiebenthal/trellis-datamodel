@@ -47,6 +47,9 @@ export interface EntityData {
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
+    // Internal tracking for tag sources (not persisted to YAML)
+    _schemaTags?: string[]; // Tags explicitly defined in schema.yml
+    _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
 }
 
 /**

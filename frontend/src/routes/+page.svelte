@@ -363,6 +363,9 @@
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags: entityTags,
+                            // Initialize _schemaTags with tags from data model (explicit tags)
+                            _schemaTags: entityTags,
+                            _manifestTags: [],
                         },
                         parentId: undefined, // Will be set if grouping is enabled
                     };
@@ -625,7 +628,8 @@
                     width: n.data?.width as number | undefined,
                     panel_height: n.data?.panelHeight as number | undefined,
                     collapsed: (n.data?.collapsed as boolean) ?? false,
-                    tags: normalizeTags(n.data?.tags),
+                    // Only save schema tags (explicit), not manifest tags (inherited)
+                    tags: normalizeTags(n.data?._schemaTags || n.data?.tags),
                 })),
             relationships: currentEdges.map((e) => ({
                 source: e.source,
