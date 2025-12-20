@@ -617,20 +617,32 @@
             version: 0.1,
             entities: currentNodes
                 .filter((n) => n.type === "entity")
-                .map((n) => ({
-                    id: n.id,
-                    label: ((n.data.label as string) || "").trim() || "Entity",
-                    description: n.data.description as string | undefined,
-                    dbt_model: n.data.dbt_model as string | undefined,
-                    additional_models: n.data?.additional_models as string[] | undefined,
-                    drafted_fields: n.data?.drafted_fields as any[] | undefined,
-                    position: n.position,
-                    width: n.data?.width as number | undefined,
-                    panel_height: n.data?.panelHeight as number | undefined,
-                    collapsed: (n.data?.collapsed as boolean) ?? false,
-                    // Only save schema tags (explicit), not manifest tags (inherited)
-                    tags: normalizeTags(n.data?._schemaTags || n.data?.tags),
-                })),
+                .map((n) => {
+                    const displayTags = normalizeTags(n.data?.tags);
+                    const schemaTags = normalizeTags(n.data?._schemaTags);
+                    const manifestTags = normalizeTags(n.data?._manifestTags);
+                    const mergedTags = [
+                        ...new Set([...displayTags, ...schemaTags, ...manifestTags]),
+                    ];
+                    const tagsToPersist =
+                        mergedTags.length > 0 ? mergedTags : undefined;
+
+                    return {
+                        id: n.id,
+                        label: ((n.data.label as string) || "").trim() || "Entity",
+                        description: n.data.description as string | undefined,
+                        dbt_model: n.data.dbt_model as string | undefined,
+                        additional_models: n.data?.additional_models as string[] | undefined,
+                        drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                        position: n.position,
+                        width: n.data?.width as number | undefined,
+                        panel_height: n.data?.panelHeight as number | undefined,
+                        collapsed: (n.data?.collapsed as boolean) ?? false,
+                        // Persist display tags (schema + manifest) to data_model.yml,
+                        // while dbt schema saves still use _schemaTags.
+                        tags: tagsToPersist,
+                    };
+                }),
             relationships: currentEdges.map((e) => ({
                 source: e.source,
                 target: e.target,
