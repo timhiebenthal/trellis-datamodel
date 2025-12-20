@@ -347,6 +347,7 @@
                     const metadata = getEntityMetadata(e);
                     // Use tags from entity data if present, otherwise empty array
                     const entityTags = normalizeTags(e.tags);
+                    const hasDbtBinding = Boolean(e.dbt_model);
                     return {
                         id: e.id,
                         type: "entity",
@@ -363,9 +364,11 @@
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags: entityTags,
-                            // Initialize _schemaTags with tags from data model (explicit tags)
-                            _schemaTags: entityTags,
-                            _manifestTags: [],
+                            // Treat saved tags as manifest/display tags by default for bound models,
+                            // so they don't get written back to schema.yml. Schema tags will be loaded
+                            // explicitly via loadSchema().
+                            _schemaTags: hasDbtBinding ? [] : entityTags,
+                            _manifestTags: hasDbtBinding ? entityTags : [],
                         },
                         parentId: undefined, // Will be set if grouping is enabled
                     };
@@ -619,13 +622,8 @@
                 .filter((n) => n.type === "entity")
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const schemaTags = normalizeTags(n.data?._schemaTags);
-                    const manifestTags = normalizeTags(n.data?._manifestTags);
-                    const mergedTags = [
-                        ...new Set([...displayTags, ...schemaTags, ...manifestTags]),
-                    ];
                     const tagsToPersist =
-                        mergedTags.length > 0 ? mergedTags : undefined;
+                        displayTags.length > 0 ? displayTags : undefined;
 
                     return {
                         id: n.id,
@@ -638,8 +636,7 @@
                         width: n.data?.width as number | undefined,
                         panel_height: n.data?.panelHeight as number | undefined,
                         collapsed: (n.data?.collapsed as boolean) ?? false,
-                        // Persist display tags (schema + manifest) to data_model.yml,
-                        // while dbt schema saves still use _schemaTags.
+                        // Persist display tags only; schema writes rely on _schemaTags.
                         tags: tagsToPersist,
                     };
                 }),
