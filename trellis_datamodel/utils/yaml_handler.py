@@ -340,22 +340,37 @@ class YamlHandler:
             target_field: Target field name
         """
         existing_tests = CommentedSeq()
+        existing_relationship: Optional[CommentedMap] = None
 
-        # Collect non-relationship tests from both tests and data_tests keys
+        # Collect non-relationship tests and capture existing relationship test (to preserve tags)
         for key in ("data_tests", "tests"):
-            if key in column:
-                for test in column.get(key, []):
-                    if isinstance(test, dict) and "relationships" in test:
-                        continue
-                    existing_tests.append(test)
+            if key not in column:
+                continue
+            for test in column.get(key, []):
+                if isinstance(test, dict) and "relationships" in test:
+                    # Keep the first relationships test we find so we can preserve its metadata (e.g., tags)
+                    if existing_relationship is None:
+                        existing_relationship = test
+                    continue
+                existing_tests.append(test)
 
-        # Build new relationships test using recommended arguments block
+        # Build (or update) relationships test using the recommended arguments block
         rel_test = CommentedMap()
-        rel_test["relationships"] = CommentedMap()
-        rel_test["relationships"]["arguments"] = CommentedMap()
-        rel_test["relationships"]["arguments"]["to"] = f"ref('{target_model}')"
-        rel_test["relationships"]["arguments"]["field"] = target_field
+        rel_body = CommentedMap()
 
+        # Preserve existing tags (or any other metadata except arguments) on the relationships block
+        if existing_relationship and isinstance(existing_relationship.get("relationships"), dict):
+            for key, value in existing_relationship["relationships"].items():
+                if key == "arguments":
+                    continue  # arguments will be rebuilt with the new ref/field
+                rel_body[key] = value
+
+        # Always set arguments with the latest reference targets
+        rel_body["arguments"] = CommentedMap()
+        rel_body["arguments"]["to"] = f"ref('{target_model}')"
+        rel_body["arguments"]["field"] = target_field
+
+        rel_test["relationships"] = rel_body
         existing_tests.append(rel_test)
 
         column["data_tests"] = existing_tests
