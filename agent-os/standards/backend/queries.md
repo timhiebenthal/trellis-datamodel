@@ -1,9 +1,27 @@
-## Database query best practices
+## Query and data access best practices
 
-- **Prevent SQL Injection**: Always use parameterized queries or ORM methods; never interpolate user input into SQL strings
-- **Avoid N+1 Queries**: Use eager loading or joins to fetch related data in a single query instead of multiple queries
+This project primarily works with dbt artifacts (manifest.json, catalog.json) and YAML files rather than direct database queries.
+
+### dbt Artifact Reading
+- **Manifest Parsing**: Read dbt `manifest.json` to understand model structure, dependencies, and metadata
+- **Catalog Parsing**: Read dbt `catalog.json` to get column information and types
+- **File Path Handling**: Use proper path resolution relative to `dbt_project_path` configuration
+- **Error Handling**: Handle missing or malformed JSON files gracefully with clear error messages
+
+### YAML File Operations
+- **Preserve Formatting**: Use `ruamel.yaml` (not `pyyaml`) to preserve YAML formatting, comments, and structure when editing
+- **Safe Updates**: Read, modify, and write YAML files atomically to avoid corruption
+- **Schema Validation**: Validate YAML structure against expected schema before processing
+- **Backup Strategy**: Consider backing up YAML files before major modifications
+
+### DuckDB Queries (if needed)
+- **Prevent SQL Injection**: Always use parameterized queries; never interpolate user input into SQL strings
 - **Select Only Needed Data**: Request only the columns you need rather than using SELECT * for better performance
-- **Index Strategic Columns**: Index columns used in WHERE, JOIN, and ORDER BY clauses for query optimization
-- **Use Transactions for Related Changes**: Wrap related database operations in transactions to maintain data consistency
+- **DuckDB-Specific**: Leverage DuckDB's columnar storage and analytical functions when appropriate
+- **Connection Management**: Use connection pooling or context managers for database connections
 - **Set Query Timeouts**: Implement timeouts to prevent runaway queries from impacting system performance
-- **Cache Expensive Queries**: Cache results of complex or frequently-run queries when appropriate
+
+### Performance Considerations
+- **Caching**: Cache parsed manifest/catalog data when appropriate (they don't change frequently)
+- **Lazy Loading**: Load dbt artifacts only when needed, not at application startup
+- **Incremental Updates**: Consider incremental updates to data model rather than full reloads
