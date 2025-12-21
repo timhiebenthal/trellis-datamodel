@@ -29,5 +29,5 @@ jobs:
           path-to-signatures: ".github/cla/signatures.json"
           path-to-document: "CLA.md"
           branch: "cla-signatures"
-          allowlist: "timhiebenthal,dependabot[bot],github-actions[bot]"
+          allowlist: "timhiebenthal,tim.hiebenthal@a11.global,tim.hiebenthal@project-a.com,dependabot[bot],github-actions[bot]"
 
