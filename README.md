@@ -27,7 +27,7 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 
 ## Tutorial & Guide
 
-Check out our [Full Tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) with video clips showing the core features in action.Also [General Information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a) is available.
+Check out our [Full Tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) with video clips showing the core features in action.  Also [General Information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a) is available.
 
 ## Vision
 
