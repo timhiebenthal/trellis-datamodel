@@ -19,8 +19,8 @@ This project uses a Python backend with a SvelteKit frontend, designed for Analy
 ### Database & Storage
 - **Database:** DuckDB as local default (via dbt-duckdb adapter)
 - **Data Modeling:** dbt-core for transformations and schema management
-- **Storage:** Store data in dedicated `/data` directory (ask if it should be git-tracked)
-- **YAML Handling:** ruamel.yaml for preserving formatting when editing dbt schema files
+- **Storage:** Data model stored in `data_model.yml`, canvas layout in `canvas_layout.yml`
+- **YAML Handling:** Use standard `yaml` library (pyyaml) for data model files; use `ruamel.yaml` when editing dbt schema.yml files to preserve formatting
 
 ### Testing & Quality
 - **Backend Testing:** pytest with httpx for API testing

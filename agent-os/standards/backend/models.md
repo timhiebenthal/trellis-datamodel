@@ -15,7 +15,7 @@ This project bridges conceptual/logical data modeling with physical dbt implemen
   - Entity-to-dbt-model bindings (dbt_model, additional_models)
   - Drafted fields (fields defined before SQL exists)
   - Relationships between entities (source, target, type, fields)
-- **Handling**: Use standard `yaml` library for reading/writing
+- **Handling**: Use standard `yaml` library (pyyaml) for reading/writing
 - **Location**: Configurable via `data_model_file` in `trellis.yml`, defaults to `data_model.yml` in dbt project root
 - **Separation**: Does NOT contain visual/layout properties (those go in canvas_layout.yml)
 
@@ -24,7 +24,7 @@ This project bridges conceptual/logical data modeling with physical dbt implemen
 - **Content**:
   - Entity positions, widths, panel heights, collapsed states
   - Relationship label offsets (label_dx, label_dy)
-- **Handling**: Use standard `yaml` library for reading/writing
+- **Handling**: Use standard `yaml` library (pyyaml) for reading/writing
 - **Location**: Automatically placed next to `data_model.yml` (e.g., `canvas_layout.yml`)
 - **Merging**: Backend merges layout data into model data when serving to frontend
 

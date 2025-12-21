@@ -9,7 +9,8 @@ This project primarily works with dbt artifacts (manifest.json, catalog.json) an
 - **Error Handling**: Handle missing or malformed JSON files gracefully with clear error messages
 
 ### YAML File Operations
-- **Preserve Formatting**: Use `ruamel.yaml` (not `pyyaml`) to preserve YAML formatting, comments, and structure when editing
+- **Data Model Files**: Use standard `yaml` library (pyyaml) for `data_model.yml` and `canvas_layout.yml`
+- **dbt Schema Files**: Use `ruamel.yaml` (not `pyyaml`) to preserve YAML formatting, comments, and structure when editing dbt `schema.yml` files
 - **Safe Updates**: Read, modify, and write YAML files atomically to avoid corruption
 - **Schema Validation**: Validate YAML structure against expected schema before processing
 - **Backup Strategy**: Consider backing up YAML files before major modifications
