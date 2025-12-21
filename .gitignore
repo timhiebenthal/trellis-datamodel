@@ -38,3 +38,6 @@ frontend/tests/test_data_model.yml
 
 # Cursor MCP configuration (may contain secrets)
 .cursor/mcp.json
+
+# Agent OS specs folder
+agent-os/specs/
