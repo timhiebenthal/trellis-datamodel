@@ -1,7 +1,4 @@
-nba-data/__marimo__/session/data.py.json
-nba-data/data/*
 backend/backend.log
-nba-data/__marimo__/session/pull_data.py.json
 dbt_company_dummy/data/*
 dbt_built/logs/dbt.log
 dbt_built/.user.yml
