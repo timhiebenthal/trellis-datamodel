@@ -139,7 +139,7 @@
                 // Combine for display: schema tags (explicit) + manifest tags (may include inherited)
                 // But track them separately so we only save schema tags
                 const displayTags = [...new Set([...schemaTags, ...manifestTags])];
-                
+
                 updateNodeData(id, { 
                     tags: displayTags,
                     _schemaTags: schemaTags,

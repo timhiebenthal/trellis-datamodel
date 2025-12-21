@@ -622,8 +622,18 @@
                 .filter((n) => n.type === "entity")
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const tagsToPersist =
-                        displayTags.length > 0 ? displayTags : undefined;
+                    const schemaTags = normalizeTags((n.data as any)?._schemaTags);
+                    const isBound = Boolean(n.data?.dbt_model);
+
+                    // For bound models, persist only explicit schema tags (user-defined).
+                    // Inherited/manifest tags live in _manifestTags and should not be written back.
+                    const tagsToPersist = isBound
+                        ? schemaTags.length > 0
+                            ? schemaTags
+                            : undefined
+                        : displayTags.length > 0
+                            ? displayTags
+                            : undefined;
 
                     return {
                         id: n.id,
