@@ -1,8 +1,0 @@
-I need your help with the following problem:
-
-The relationships are kinda broken
-If I refresh the page, rename an entity or simple drag an relation between two entities
-sometimes 2 or 3 new relations pop up
-
-can you investigate the issue, identify the problem and propose a solution.
-also, feel free to suggest better, more robust ways of handling relationship-building between entities
