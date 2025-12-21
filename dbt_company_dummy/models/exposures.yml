@@ -1,0 +1,19 @@
+exposures:
+
+  - name: sales_dashboard
+    label: Sales Dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.tool/dashboards/1
+    description: >
+      Sales dashboard showing sales by product, customer, and date.
+
+    depends_on:
+      - ref('sale')
+      - ref('lead')
+      - ref('product')
+      - ref('customer')
+
+    owner:
+      name: Jon Doe
+      email: jon.doe@example.com
