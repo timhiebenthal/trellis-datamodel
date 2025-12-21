@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2025-12-21
+
+### Fixed
+- Fixed `schema.yml` write-back so empty tag arrays are not written (and existing empty tags are removed), preventing noisy `tags: []` / `config: { tags: [] }` output.
+- Fixed tag propagation for dbt models so inherited/manifest tags are displayed but not persisted back into `schema.yml`.
+- Fixed relationship test updates to preserve existing relationship-test metadata (e.g. tags) when rebuilding the `relationships` test block.
+
+### Added
+- Added internal tag source tracking in the UI to distinguish schema tags (explicit) from manifest tags (inherited) so saves are deterministic.
+- Added regression tests covering tag handling and config placement in YAML write-back.
+
 ## [0.3.3] - 2025-12-18
 
 ### Fixed

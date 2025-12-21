@@ -347,6 +347,7 @@
                     const metadata = getEntityMetadata(e);
                     // Use tags from entity data if present, otherwise empty array
                     const entityTags = normalizeTags(e.tags);
+                    const hasDbtBinding = Boolean(e.dbt_model);
                     return {
                         id: e.id,
                         type: "entity",
@@ -363,6 +364,11 @@
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags: entityTags,
+                            // Treat saved tags as manifest/display tags by default for bound models,
+                            // so they don't get written back to schema.yml. Schema tags will be loaded
+                            // explicitly via loadSchema().
+                            _schemaTags: hasDbtBinding ? [] : entityTags,
+                            _manifestTags: hasDbtBinding ? entityTags : [],
                         },
                         parentId: undefined, // Will be set if grouping is enabled
                     };
@@ -614,19 +620,36 @@
             version: 0.1,
             entities: currentNodes
                 .filter((n) => n.type === "entity")
-                .map((n) => ({
-                    id: n.id,
-                    label: ((n.data.label as string) || "").trim() || "Entity",
-                    description: n.data.description as string | undefined,
-                    dbt_model: n.data.dbt_model as string | undefined,
-                    additional_models: n.data?.additional_models as string[] | undefined,
-                    drafted_fields: n.data?.drafted_fields as any[] | undefined,
-                    position: n.position,
-                    width: n.data?.width as number | undefined,
-                    panel_height: n.data?.panelHeight as number | undefined,
-                    collapsed: (n.data?.collapsed as boolean) ?? false,
-                    tags: normalizeTags(n.data?.tags),
-                })),
+                .map((n) => {
+                    const displayTags = normalizeTags(n.data?.tags);
+                    const schemaTags = normalizeTags((n.data as any)?._schemaTags);
+                    const isBound = Boolean(n.data?.dbt_model);
+
+                    // For bound models, persist only explicit schema tags (user-defined).
+                    // Inherited/manifest tags live in _manifestTags and should not be written back.
+                    const tagsToPersist = isBound
+                        ? schemaTags.length > 0
+                            ? schemaTags
+                            : undefined
+                        : displayTags.length > 0
+                            ? displayTags
+                            : undefined;
+
+                    return {
+                        id: n.id,
+                        label: ((n.data.label as string) || "").trim() || "Entity",
+                        description: n.data.description as string | undefined,
+                        dbt_model: n.data.dbt_model as string | undefined,
+                        additional_models: n.data?.additional_models as string[] | undefined,
+                        drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                        position: n.position,
+                        width: n.data?.width as number | undefined,
+                        panel_height: n.data?.panelHeight as number | undefined,
+                        collapsed: (n.data?.collapsed as boolean) ?? false,
+                        // Persist display tags only; schema writes rely on _schemaTags.
+                        tags: tagsToPersist,
+                    };
+                }),
             relationships: currentEdges.map((e) => ({
                 source: e.source,
                 target: e.target,

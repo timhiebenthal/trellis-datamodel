@@ -171,14 +171,57 @@ class YamlHandler:
                 combined.append(tag)
         return combined
 
+    def _find_config_insert_position(self, model: CommentedMap) -> Optional[int]:
+        """
+        Find the best position to insert a config block in a model.
+        Places it after description but before columns/versions.
+
+        Returns:
+            Index position for insertion, or None to append at end
+        """
+        keys = list(model.keys())
+
+        # Preferred order: name, description, config, columns/versions/...
+        # Insert after description if it exists
+        if "description" in keys:
+            return keys.index("description") + 1
+
+        # Otherwise insert after name if it exists
+        if "name" in keys:
+            return keys.index("name") + 1
+
+        # If we have columns or versions, insert before them
+        for key in ["columns", "versions", "latest_version"]:
+            if key in keys:
+                return keys.index(key)
+
+        # Default: append at end (return None)
+        return None
+
     def update_version_tags(self, version: CommentedMap, tags: List[str]) -> None:
         """
         Replace the tags list for a model version using config.tags (dbt convention).
+        Skips writing empty tags arrays.
         """
         config = version.get("config")
+
+        # If tags is empty, remove existing tags and don't create new ones
+        if not tags:
+            if config is not None and "tags" in config:
+                del config["tags"]
+            return
+
+        # Create config block if needed, placing it after description but before columns
         if config is None:
-            version["config"] = CommentedMap()
+            config = CommentedMap()
+            # Find the best insertion position
+            insert_pos = self._find_config_insert_position(version)
+            if insert_pos is not None:
+                version.insert(insert_pos, "config", config)
+            else:
+                version["config"] = config
             config = version["config"]
+
         config["tags"] = tags
 
     def update_model_tags(self, model: CommentedMap, tags: List[str]) -> None:
@@ -186,10 +229,19 @@ class YamlHandler:
 
         Priority: 1) existing config.tags, 2) existing top-level tags, 3) config.tags (default)
         Ensures tags are only in one location to avoid confusion.
+        Skips writing empty tags arrays.
         """
         config = model.get("config")
         has_config_tags = config is not None and "tags" in config
         has_top_level_tags = "tags" in model
+
+        # If tags is empty, remove existing tags and don't create new ones
+        if not tags:
+            if has_config_tags:
+                del config["tags"]
+            if has_top_level_tags:
+                del model["tags"]
+            return
 
         if has_config_tags:
             # Update in config block (original location)
@@ -203,7 +255,13 @@ class YamlHandler:
         else:
             # Default: use config.tags (dbt convention)
             if config is None:
-                model["config"] = CommentedMap()
+                config = CommentedMap()
+                # Find the best insertion position
+                insert_pos = self._find_config_insert_position(model)
+                if insert_pos is not None:
+                    model.insert(insert_pos, "config", config)
+                else:
+                    model["config"] = config
                 config = model["config"]
             config["tags"] = tags
 
@@ -282,22 +340,39 @@ class YamlHandler:
             target_field: Target field name
         """
         existing_tests = CommentedSeq()
+        existing_relationship: Optional[CommentedMap] = None
 
-        # Collect non-relationship tests from both tests and data_tests keys
+        # Collect non-relationship tests and capture existing relationship test (to preserve tags)
         for key in ("data_tests", "tests"):
-            if key in column:
-                for test in column.get(key, []):
-                    if isinstance(test, dict) and "relationships" in test:
-                        continue
-                    existing_tests.append(test)
+            if key not in column:
+                continue
+            for test in column.get(key, []):
+                if isinstance(test, dict) and "relationships" in test:
+                    # Keep the first relationships test we find so we can preserve its metadata (e.g., tags)
+                    if existing_relationship is None:
+                        existing_relationship = test
+                    continue
+                existing_tests.append(test)
 
-        # Build new relationships test using recommended arguments block
+        # Build (or update) relationships test using the recommended arguments block
         rel_test = CommentedMap()
-        rel_test["relationships"] = CommentedMap()
-        rel_test["relationships"]["arguments"] = CommentedMap()
-        rel_test["relationships"]["arguments"]["to"] = f"ref('{target_model}')"
-        rel_test["relationships"]["arguments"]["field"] = target_field
+        rel_body = CommentedMap()
 
+        # Preserve existing tags (or any other metadata except arguments) on the relationships block
+        if existing_relationship and isinstance(
+            existing_relationship.get("relationships"), dict
+        ):
+            for key, value in existing_relationship["relationships"].items():
+                if key == "arguments":
+                    continue  # arguments will be rebuilt with the new ref/field
+                rel_body[key] = value
+
+        # Always set arguments with the latest reference targets
+        rel_body["arguments"] = CommentedMap()
+        rel_body["arguments"]["to"] = f"ref('{target_model}')"
+        rel_body["arguments"]["field"] = target_field
+
+        rel_test["relationships"] = rel_body
         existing_tests.append(rel_test)
 
         column["data_tests"] = existing_tests

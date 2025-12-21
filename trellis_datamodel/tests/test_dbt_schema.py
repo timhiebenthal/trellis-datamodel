@@ -653,7 +653,11 @@ class TestInferRelationships:
                     "label": "Customers",
                     "additional_models": ["model.project.customers_alt"],
                 },
-                {"id": "orders", "label": "Orders", "dbt_model": "model.project.orders"},
+                {
+                    "id": "orders",
+                    "label": "Orders",
+                    "dbt_model": "model.project.orders",
+                },
             ],
         }
         with open(temp_data_model_path, "w") as f:
@@ -847,9 +851,7 @@ class TestModelSchemaVersionHandling:
         self._write_versioned_manifest(temp_dir)
         self._write_versioned_schema(temp_dir)
 
-        response = test_client.get(
-            "/api/models/player/schema", params={"version": 2}
-        )
+        response = test_client.get("/api/models/player/schema", params={"version": 2})
         assert response.status_code == 200
 
         schema = response.json()

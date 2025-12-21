@@ -132,21 +132,19 @@
 
             // Only sync tags from dbt schema for the primary model
             if (activeModelIndex === 0) {
-                // Load tags from schema.yml (source of truth for bound entities)
-                // schema.tags can be undefined, empty array, or have tags
+                // Track tag sources separately to prevent inherited tag propagation
                 const schemaTags = normalizeTags(schema?.tags);
-                if (schemaTags.length > 0) {
-                    updateNodeData(id, { tags: schemaTags });
-                } else {
-                    const modelTags = normalizeTags(modelDetails.tags);
-                    if (modelTags.length > 0) {
-                        // Fallback to manifest tags if schema.yml doesn't have tags
-                        updateNodeData(id, { tags: modelTags });
-                    } else {
-                        // Clear tags if schema.yml exists but has no tags
-                        updateNodeData(id, { tags: [] });
-                    }
-                }
+                const manifestTags = normalizeTags(modelDetails.tags);
+                
+                // Combine for display: schema tags (explicit) + manifest tags (may include inherited)
+                // But track them separately so we only save schema tags
+                const displayTags = [...new Set([...schemaTags, ...manifestTags])];
+
+                updateNodeData(id, { 
+                    tags: displayTags,
+                    _schemaTags: schemaTags,
+                    _manifestTags: manifestTags
+                });
             }
 
             hasUnsavedChanges = false;
@@ -171,6 +169,10 @@
         schemaError = null;
 
         try {
+            // Only save schema tags (explicit), not manifest tags (which may be inherited)
+            // User-added tags are added to _schemaTags when addTag is called
+            const tagsToSave = normalizeTags(data._schemaTags);
+            
             await updateModelSchema(
                 modelDetails.name,
                 editableColumns.map((col) => ({
@@ -179,7 +181,7 @@
                     description: col.description,
                 })),
                 data.description,
-                normalizeTags(data.tags),
+                tagsToSave,
                 modelDetails.version ?? undefined,
             );
             hasUnsavedChanges = false;
@@ -625,7 +627,12 @@
         const currentTags = getCurrentTags(id);
         if (currentTags.includes(trimmed)) return;
 
-        updateNodeData(id, { tags: [...currentTags, trimmed] });
+        // When user adds a tag, add it to both display tags and schema tags
+        const currentSchemaTags = normalizeTags(data._schemaTags);
+        updateNodeData(id, { 
+            tags: [...currentTags, trimmed],
+            _schemaTags: [...currentSchemaTags, trimmed]
+        });
         if (isBound) {
             hasUnsavedChanges = true;
         }
@@ -634,7 +641,14 @@
 
     function removeTag(tag: string) {
         const newTags = entityTags.filter((t) => t !== tag);
-        updateNodeData(id, { tags: newTags });
+        // Also remove from schema tags if present
+        const currentSchemaTags = normalizeTags(data._schemaTags);
+        const newSchemaTags = currentSchemaTags.filter((t) => t !== tag);
+        
+        updateNodeData(id, { 
+            tags: newTags,
+            _schemaTags: newSchemaTags
+        });
         if (isBound) {
             hasUnsavedChanges = true;
         }
@@ -678,9 +692,14 @@
         
         const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
         allSelectedIds.forEach((nodeId) => {
+            const node = $nodes.find((n) => n.id === nodeId);
             const currentTags = getCurrentTags(nodeId);
             if (!currentTags.includes(trimmed)) {
-                updateNodeData(nodeId, { tags: [...currentTags, trimmed] });
+                const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
+                updateNodeData(nodeId, { 
+                    tags: [...currentTags, trimmed],
+                    _schemaTags: [...currentSchemaTags, trimmed]
+                });
                 // If this is the current node and it's bound, mark as having unsaved changes
                 if (nodeId === id && isBound) {
                     hasUnsavedChanges = true;
@@ -697,7 +716,12 @@
             if (node && node.type === "entity") {
                 const currentTags = normalizeTags(node.data?.tags);
                 const newTags = currentTags.filter((t) => t !== tag);
-                updateNodeData(nodeId, { tags: newTags });
+                const currentSchemaTags = normalizeTags(node.data?._schemaTags);
+                const newSchemaTags = currentSchemaTags.filter((t) => t !== tag);
+                updateNodeData(nodeId, { 
+                    tags: newTags,
+                    _schemaTags: newSchemaTags
+                });
                 // If this is the current node and it's bound, mark as having unsaved changes
                 if (nodeId === id && isBound) {
                     hasUnsavedChanges = true;
