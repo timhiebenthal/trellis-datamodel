@@ -40,4 +40,4 @@ frontend/tests/test_data_model.yml
 .cursor/mcp.json
 
 # Agent OS specs folder
-agent-os/specs/
+# agent-os/specs/
