@@ -358,13 +358,14 @@ class YamlHandler:
         rel_test = CommentedMap()
         rel_body = CommentedMap()
 
-        # Preserve existing tags (or any other metadata except arguments) on the relationships block
+        # Preserve existing tags (or any other metadata except arguments, to, and field) on the relationships block
+        # Skip "to" and "field" as they are old-style syntax that should be replaced by the new "arguments" block
         if existing_relationship and isinstance(
             existing_relationship.get("relationships"), dict
         ):
             for key, value in existing_relationship["relationships"].items():
-                if key == "arguments":
-                    continue  # arguments will be rebuilt with the new ref/field
+                if key in ("arguments", "to", "field"):
+                    continue  # arguments/to/field will be rebuilt with the new ref/field syntax
                 rel_body[key] = value
 
         # Always set arguments with the latest reference targets
