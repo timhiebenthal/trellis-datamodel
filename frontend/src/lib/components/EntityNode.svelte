@@ -110,32 +110,6 @@
                     : (modelDetails?.version as number | null),
         });
     });
-    
-    // #region agent log
-    $effect(() => {
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'H5',
-                location: 'EntityNode.svelte:active-model-set',
-                message: 'Active model state updated on node',
-                data: {
-                    nodeId: id,
-                    dbt_model: data.dbt_model || null,
-                    additional_models: (data.additional_models as string[] | undefined) || null,
-                    activeModelId: activeModelId || null,
-                    activeModelIndex,
-                    allBoundModelsCount: allBoundModels.length,
-                    modelDetailsName: modelDetails?.name || null,
-                },
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-    });
-    // #endregion
 
     async function loadSchema() {
         if (!modelDetails) return;

@@ -225,72 +225,6 @@
   const firstModelRelationship = $derived(edgeModels[0] || null);
   const firstNormalizedRelationship = $derived(normalizedEdgeModels[0] || null);
 
-  // #region agent log
-  $effect(() => {
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H4',
-        location: 'CustomEdge.svelte:node-bindings',
-        message: 'Node binding state for edge',
-        data: {
-          edgeId: id,
-          sourceNode: {
-            id: source,
-            dbt_model: sourceNodeData?.dbt_model || null,
-            additional_models: (sourceNodeData?.additional_models as string[] | undefined) || null,
-            activeModelId: sourceNodeData?._activeModelId || null,
-            activeModelName: sourceNodeData?._activeModelName || null,
-          },
-          targetNode: {
-            id: target,
-            dbt_model: targetNodeData?.dbt_model || null,
-            additional_models: (targetNodeData?.additional_models as string[] | undefined) || null,
-            activeModelId: targetNodeData?._activeModelId || null,
-            activeModelName: targetNodeData?._activeModelName || null,
-          },
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  });
-  // #endregion
-
-  // #region agent log
-  $effect(() => {
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'CustomEdge.svelte:active-models',
-        message: 'Active models and edge models for relationship matching',
-        data: {
-          edgeId: id,
-          sourceNodeId: source,
-          targetNodeId: target,
-          sourceActiveModel: sourceActiveModel ? { name: sourceActiveModel.name, version: normalizeVersion(sourceActiveModel.version) } : null,
-          targetActiveModel: targetActiveModel ? { name: targetActiveModel.name, version: normalizeVersion(targetActiveModel.version) } : null,
-          edgeModels: normalizedEdgeModels.map((m: any) => ({
-            src: m.source_model_name,
-            srcVer: normalizeVersion(m.source_model_version),
-            tgt: m.target_model_name,
-            tgtVer: normalizeVersion(m.target_model_version),
-            srcField: m.source_field,
-            tgtField: m.target_field,
-          })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  });
-  // #endregion
-
   // Use active model relationship fields if available, otherwise fall back to first model or edge defaults
   let sourceField = $derived(
     activeModelRelationship?.source_field || 
@@ -304,42 +238,6 @@
     (data?.target_field as string) || 
     ''
   );
-  
-  // #region agent log
-  $effect(() => {
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H2',
-        location: 'CustomEdge.svelte:relationship-selection',
-        message: 'Relationship selection for active models',
-        data: {
-          edgeId: id,
-          matchedModel: activeModelRelationship ? {
-            src: activeModelRelationship.source_model_name,
-            srcVer: normalizeVersion(activeModelRelationship.source_model_version),
-            tgt: activeModelRelationship.target_model_name,
-            tgtVer: normalizeVersion(activeModelRelationship.target_model_version),
-            srcField: activeModelRelationship.source_field,
-            tgtField: activeModelRelationship.target_field,
-          } : null,
-          fallbackModel: !activeModelRelationship && firstNormalizedRelationship ? {
-            src: firstNormalizedRelationship.source_model_name,
-            srcVer: normalizeVersion(firstNormalizedRelationship.source_model_version),
-            tgt: firstNormalizedRelationship.target_model_name,
-            tgtVer: normalizeVersion(firstNormalizedRelationship.target_model_version),
-            srcField: firstNormalizedRelationship.source_field,
-            tgtField: firstNormalizedRelationship.target_field,
-          } : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  });
-  // #endregion
   
   // Display text for collapsed state - show label or placeholder
   const displayLabel = $derived(label?.trim() || 'relates to');
@@ -400,31 +298,6 @@
   const relationText = $derived(
     `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
   );
-  
-  // #region agent log
-  $effect(() => {
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H3',
-        location: 'CustomEdge.svelte:field-display',
-        message: 'Resolved fields for edge display',
-        data: {
-          edgeId: id,
-          sourceLabel: sourceName,
-          targetLabel: targetName,
-          sourceField,
-          targetField,
-          viewMode: $viewMode,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  });
-  // #endregion
 
   function updateEdge(partial: Record<string, unknown>) {
     edges.update((list) =>
