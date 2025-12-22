@@ -13,6 +13,7 @@
     calculateConnectionInfo,
     getSideRotation,
     buildOrthogonalPath,
+    buildSelfLoopPath,
     calculateMarkerPosition,
     type Side
   } from '$lib/edge-utils';
@@ -75,9 +76,20 @@
     return calculateConnectionInfo(sourceNode, targetNode, $nodes);
   });
 
+  const isSelfEdge = $derived(source === target);
+
   // Build the edge path
   const edgePath = $derived.by(() => {
     const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
+    if (isSelfEdge) {
+      return buildSelfLoopPath(
+        sourcePoint,
+        targetPoint,
+        sourceSide,
+        baseOffset,
+        60 // stable loop radius; label offset handled separately
+      );
+    }
     return buildOrthogonalPath(
       sourcePoint,
       targetPoint,
@@ -93,6 +105,16 @@
   // Label position at the middle of the edge
   const edgeLabelPos = $derived.by(() => {
     const { sourceSide, sourcePoint, targetPoint } = connectionInfo;
+    
+    // Special handling for self-loops: position label outside the loop curve
+    if (isSelfEdge) {
+      const midY = (sourcePoint.y + targetPoint.y) / 2 + baseOffset;
+      // Position label to the right of the node edge, offset by loop radius + padding
+      const loopRadius = 60;
+      const labelOffset = loopRadius + 20; // Extra padding for readability
+      const midX = sourcePoint.x + labelOffset + storedOffsetX + dragOffsetX;
+      return { x: midX, y: midY + storedOffsetY + dragOffsetY };
+    }
     
     let sX = sourcePoint.x;
     let sY = sourcePoint.y;

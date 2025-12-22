@@ -23,6 +23,39 @@ export interface ConnectionInfo {
 }
 
 /**
+ * Build a self-loop path that exits and re-enters the same node
+ */
+export function buildSelfLoopPath(
+  sourcePoint: Point,
+  targetPoint: Point,
+  side: Side = 'right',
+  baseOffset: number = 0,
+  loopRadius: number = 60
+): string {
+  let sX = sourcePoint.x;
+  let sY = sourcePoint.y;
+  let tX = targetPoint.x;
+  let tY = targetPoint.y;
+
+  // Apply parallel edge offset perpendicular to exit direction
+  if (side === 'left' || side === 'right') {
+    sY += baseOffset;
+    tY += baseOffset;
+  } else {
+    sX += baseOffset;
+    tX += baseOffset;
+  }
+
+  const horizontalOffset =
+    side === 'left' || side === 'right'
+      ? loopRadius * (side === 'left' ? -1 : 1)
+      : 0;
+
+  // Use a cubic curve to create a smooth loop on the side of the node
+  return `M ${sX} ${sY} C ${sX + horizontalOffset} ${sY}, ${tX + horizontalOffset} ${tY}, ${tX} ${tY}`;
+}
+
+/**
  * Get node dimensions from node data
  * Prefers SvelteFlow's measured dimensions if available
  */
@@ -96,6 +129,31 @@ export function calculateConnectionInfo(
   targetNode: any,
   nodes: any[]
 ): ConnectionInfo {
+  // Self-relationships: exit and re-enter on the right side with a loop
+  const isSameNode =
+    (sourceNode && targetNode && sourceNode === targetNode) ||
+    (sourceNode?.id && targetNode?.id && sourceNode.id === targetNode.id);
+
+  if (isSameNode) {
+    const center = getNodeCenter(sourceNode, nodes);
+    const dim = getNodeDimensions(sourceNode);
+    const halfHeight = dim.height / 2;
+
+    // Keep markers away from corners while staying within the node's height
+    const verticalOffset = Math.min(
+      Math.max(dim.height * 0.25, 16),
+      Math.max(halfHeight - 12, 16)
+    );
+
+    const edgeX = center.x + dim.width / 2;
+    return {
+      sourceSide: 'right',
+      targetSide: 'right',
+      sourcePoint: { x: edgeX, y: center.y - verticalOffset },
+      targetPoint: { x: edgeX, y: center.y + verticalOffset }
+    };
+  }
+
   const sourceCenter = getNodeCenter(sourceNode, nodes);
   const targetCenter = getNodeCenter(targetNode, nodes);
   const sourceDim = getNodeDimensions(sourceNode);
