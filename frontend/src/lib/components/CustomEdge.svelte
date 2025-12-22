@@ -143,61 +143,70 @@
   // Get models array from edge data
   const edgeModels = $derived((data?.models as any[]) || []);
   const modelCount = $derived((data?.modelCount as number) || edgeModels.length || 0);
-  
+
   // Get active models for source and target nodes (prefer ephemeral active model data)
   const sourceNodeData = $derived(sourceNode?.data as any);
   const targetNodeData = $derived(targetNode?.data as any);
   
-  const sourceActiveModel = $derived(() => {
-    // Preferred: ephemeral active model info from node
-    if (sourceNodeData?._activeModelName) {
+  const resolveActiveModel = (nodeData: any) => {
+    // Prefer explicit active model id if present
+    if (nodeData?._activeModelId) {
+      const byId = $dbtModels.find((m) => m.unique_id === nodeData._activeModelId);
+      if (byId) return byId;
+    }
+    // Next: ephemeral active model name/version
+    if (nodeData?._activeModelName) {
       return {
-        name: sourceNodeData._activeModelName as string,
-        version: sourceNodeData._activeModelVersion as number | null | undefined,
+        name: nodeData._activeModelName as string,
+        version: nodeData._activeModelVersion as number | null | undefined,
       };
     }
-    // Fallback: primary bound model
-    if (sourceNodeData?.dbt_model) {
-      return $dbtModels.find((m) => m.unique_id === sourceNodeData.dbt_model) || null;
+    // Next: primary bound model
+    if (nodeData?.dbt_model) {
+      const byPrimary = $dbtModels.find((m) => m.unique_id === nodeData.dbt_model);
+      if (byPrimary) return byPrimary;
     }
-    // Fallback: first additional model
-    const firstAdditional =
-      (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
+    // Next: first additional model
+    const firstAdditional = (nodeData?.additional_models as string[] | undefined)?.[0] || null;
     if (firstAdditional) {
-      return $dbtModels.find((m) => m.unique_id === firstAdditional) || null;
+      const byAdditional = $dbtModels.find((m) => m.unique_id === firstAdditional);
+      if (byAdditional) return byAdditional;
     }
     return null;
-  });
+  };
   
-  const targetActiveModel = $derived(() => {
-    if (targetNodeData?._activeModelName) {
-      return {
-        name: targetNodeData._activeModelName as string,
-        version: targetNodeData._activeModelVersion as number | null | undefined,
-      };
-    }
-    if (targetNodeData?.dbt_model) {
-      return $dbtModels.find((m) => m.unique_id === targetNodeData.dbt_model) || null;
-    }
-    const firstAdditional =
-      (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
-    if (firstAdditional) {
-      return $dbtModels.find((m) => m.unique_id === firstAdditional) || null;
-    }
-    return null;
-  });
+  const sourceActiveModel = $derived(resolveActiveModel(sourceNodeData));
+  const targetActiveModel = $derived(resolveActiveModel(targetNodeData));
+  
+  // Normalize model info for matching/display: if model names are missing, fall back to resolved active models
+  const normalizedEdgeModels = $derived.by(() =>
+    edgeModels.map((m: any) => ({
+      source_model_name: m.source_model_name || sourceActiveModel?.name || null,
+      source_model_version:
+        m.source_model_version === undefined
+          ? (sourceActiveModel ? sourceActiveModel.version ?? null : null)
+          : m.source_model_version ?? null,
+      target_model_name: m.target_model_name || targetActiveModel?.name || null,
+      target_model_version:
+        m.target_model_version === undefined
+          ? (targetActiveModel ? targetActiveModel.version ?? null : null)
+          : m.target_model_version ?? null,
+      source_field: m.source_field,
+      target_field: m.target_field,
+    }))
+  );
   
   const normalizeVersion = (v: number | null | undefined) =>
     v === undefined ? null : v;
 
   // Find matching model relationship based on active models
   const activeModelRelationship = $derived.by(() => {
-    if (!sourceActiveModel || !targetActiveModel || edgeModels.length === 0) {
+    if (!sourceActiveModel || !targetActiveModel || normalizedEdgeModels.length === 0) {
       return null;
     }
     
     // Match by model name and version
-    return edgeModels.find((m: any) => {
+    return normalizedEdgeModels.find((m: any) => {
       const srcVer = normalizeVersion(m.source_model_version as number | null | undefined);
       const tgtVer = normalizeVersion(m.target_model_version as number | null | undefined);
       const activeSrcVer = normalizeVersion(sourceActiveModel.version as number | null | undefined);
@@ -214,20 +223,123 @@
   });
   
   const firstModelRelationship = $derived(edgeModels[0] || null);
+  const firstNormalizedRelationship = $derived(normalizedEdgeModels[0] || null);
+
+  // #region agent log
+  $effect(() => {
+    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H4',
+        location: 'CustomEdge.svelte:node-bindings',
+        message: 'Node binding state for edge',
+        data: {
+          edgeId: id,
+          sourceNode: {
+            id: source,
+            dbt_model: sourceNodeData?.dbt_model || null,
+            additional_models: (sourceNodeData?.additional_models as string[] | undefined) || null,
+            activeModelId: sourceNodeData?._activeModelId || null,
+            activeModelName: sourceNodeData?._activeModelName || null,
+          },
+          targetNode: {
+            id: target,
+            dbt_model: targetNodeData?.dbt_model || null,
+            additional_models: (targetNodeData?.additional_models as string[] | undefined) || null,
+            activeModelId: targetNodeData?._activeModelId || null,
+            activeModelName: targetNodeData?._activeModelName || null,
+          },
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  });
+  // #endregion
+
+  // #region agent log
+  $effect(() => {
+    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'CustomEdge.svelte:active-models',
+        message: 'Active models and edge models for relationship matching',
+        data: {
+          edgeId: id,
+          sourceNodeId: source,
+          targetNodeId: target,
+          sourceActiveModel: sourceActiveModel ? { name: sourceActiveModel.name, version: normalizeVersion(sourceActiveModel.version) } : null,
+          targetActiveModel: targetActiveModel ? { name: targetActiveModel.name, version: normalizeVersion(targetActiveModel.version) } : null,
+          edgeModels: normalizedEdgeModels.map((m: any) => ({
+            src: m.source_model_name,
+            srcVer: normalizeVersion(m.source_model_version),
+            tgt: m.target_model_name,
+            tgtVer: normalizeVersion(m.target_model_version),
+            srcField: m.source_field,
+            tgtField: m.target_field,
+          })),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  });
+  // #endregion
 
   // Use active model relationship fields if available, otherwise fall back to first model or edge defaults
   let sourceField = $derived(
     activeModelRelationship?.source_field || 
-    firstModelRelationship?.source_field ||
+    firstNormalizedRelationship?.source_field ||
     (data?.source_field as string) || 
     ''
   );
   let targetField = $derived(
     activeModelRelationship?.target_field || 
-    firstModelRelationship?.target_field ||
+    firstNormalizedRelationship?.target_field ||
     (data?.target_field as string) || 
     ''
   );
+  
+  // #region agent log
+  $effect(() => {
+    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H2',
+        location: 'CustomEdge.svelte:relationship-selection',
+        message: 'Relationship selection for active models',
+        data: {
+          edgeId: id,
+          matchedModel: activeModelRelationship ? {
+            src: activeModelRelationship.source_model_name,
+            srcVer: normalizeVersion(activeModelRelationship.source_model_version),
+            tgt: activeModelRelationship.target_model_name,
+            tgtVer: normalizeVersion(activeModelRelationship.target_model_version),
+            srcField: activeModelRelationship.source_field,
+            tgtField: activeModelRelationship.target_field,
+          } : null,
+          fallbackModel: !activeModelRelationship && firstNormalizedRelationship ? {
+            src: firstNormalizedRelationship.source_model_name,
+            srcVer: normalizeVersion(firstNormalizedRelationship.source_model_version),
+            tgt: firstNormalizedRelationship.target_model_name,
+            tgtVer: normalizeVersion(firstNormalizedRelationship.target_model_version),
+            srcField: firstNormalizedRelationship.source_field,
+            tgtField: firstNormalizedRelationship.target_field,
+          } : null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  });
+  // #endregion
   
   // Display text for collapsed state - show label or placeholder
   const displayLabel = $derived(label?.trim() || 'relates to');
@@ -269,13 +381,50 @@
   );
 
   // sourceNode and targetNode defined above for label names
-  const sourceName = $derived((sourceNode?.data?.label as string) || 'Source');
-  const targetName = $derived((targetNode?.data?.label as string) || 'Target');
+  const entityLabelSource = $derived((sourceNode?.data?.label as string) || 'Source');
+  const entityLabelTarget = $derived((targetNode?.data?.label as string) || 'Target');
+
+  // Prefer active model names for display; fall back to relationship model names, then entity labels
+  const sourceName = $derived(
+    sourceActiveModel?.name ||
+    activeModelRelationship?.source_model_name ||
+    entityLabelSource
+  );
+  const targetName = $derived(
+    targetActiveModel?.name ||
+    activeModelRelationship?.target_model_name ||
+    entityLabelTarget
+  );
   const actionText = $derived(label?.trim() || 'relates to');
   
   const relationText = $derived(
     `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
   );
+  
+  // #region agent log
+  $effect(() => {
+    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H3',
+        location: 'CustomEdge.svelte:field-display',
+        message: 'Resolved fields for edge display',
+        data: {
+          edgeId: id,
+          sourceLabel: sourceName,
+          targetLabel: targetName,
+          sourceField,
+          targetField,
+          viewMode: $viewMode,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  });
+  // #endregion
 
   function updateEdge(partial: Record<string, unknown>) {
     edges.update((list) =>
