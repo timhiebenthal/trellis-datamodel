@@ -13,6 +13,7 @@
     calculateConnectionInfo,
     getSideRotation,
     buildOrthogonalPath,
+    buildSelfLoopPath,
     calculateMarkerPosition,
     type Side
   } from '$lib/edge-utils';
@@ -75,9 +76,20 @@
     return calculateConnectionInfo(sourceNode, targetNode, $nodes);
   });
 
+  const isSelfEdge = $derived(source === target);
+
   // Build the edge path
   const edgePath = $derived.by(() => {
     const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
+    if (isSelfEdge) {
+      return buildSelfLoopPath(
+        sourcePoint,
+        targetPoint,
+        sourceSide,
+        baseOffset,
+        60 // stable loop radius; label offset handled separately
+      );
+    }
     return buildOrthogonalPath(
       sourcePoint,
       targetPoint,
