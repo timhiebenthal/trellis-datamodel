@@ -106,6 +106,16 @@
   const edgeLabelPos = $derived.by(() => {
     const { sourceSide, sourcePoint, targetPoint } = connectionInfo;
     
+    // Special handling for self-loops: position label outside the loop curve
+    if (isSelfEdge) {
+      const midY = (sourcePoint.y + targetPoint.y) / 2 + baseOffset;
+      // Position label to the right of the node edge, offset by loop radius + padding
+      const loopRadius = 60;
+      const labelOffset = loopRadius + 20; // Extra padding for readability
+      const midX = sourcePoint.x + labelOffset + storedOffsetX + dragOffsetX;
+      return { x: midX, y: midY + storedOffsetY + dragOffsetY };
+    }
+    
     let sX = sourcePoint.x;
     let sY = sourcePoint.y;
     let tX = targetPoint.x;
