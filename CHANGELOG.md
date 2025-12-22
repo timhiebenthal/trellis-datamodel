@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed self-relationship rendering: self-relationships (self-joins) now render as smooth curved loops on the right side of nodes instead of going through the box
+- Fixed duplicate relationship tests when converting old syntax (`to:` and `field:` at top level) to new `arguments:` syntax: old-style keys are now properly skipped during conversion, preventing duplicate relationship tests in dbt schema files
+
 ## [0.3.4] - 2025-12-21
 
 ### Fixed
