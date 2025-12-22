@@ -99,6 +99,18 @@
         }
     });
 
+    // Expose active model info on node data (ephemeral; not persisted)
+    $effect(() => {
+        updateNodeData(id, {
+            _activeModelId: activeModelId || null,
+            _activeModelName: modelDetails?.name || null,
+            _activeModelVersion:
+                modelDetails?.version === undefined
+                    ? null
+                    : (modelDetails?.version as number | null),
+        });
+    });
+
     async function loadSchema() {
         if (!modelDetails) return;
 
@@ -784,19 +796,43 @@
             return;
         }
 
-        // Get active model information for source and target nodes
+        // Get active model information for source and target nodes (prefer ephemeral active model data)
         const sourceNodeData = $nodes.find(n => n.id === sourceNodeId)?.data as any;
         const targetNodeData = $nodes.find(n => n.id === targetNodeId)?.data as any;
         
-        const sourceActiveModelId = sourceNodeData?.dbt_model || 
-            (sourceNodeData?.additional_models as string[])?.[0] || null;
-        const targetActiveModelId = targetNodeData?.dbt_model || 
-            (targetNodeData?.additional_models as string[])?.[0] || null;
+        const sourceActiveModel = (() => {
+            if (sourceNodeData?._activeModelName) {
+                return {
+                    name: sourceNodeData._activeModelName as string,
+                    version: sourceNodeData._activeModelVersion as number | null | undefined,
+                };
+            }
+            if (sourceNodeData?.dbt_model) {
+                return $dbtModels.find(m => m.unique_id === sourceNodeData.dbt_model) || null;
+            }
+            const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
+            if (firstAdditional) {
+                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+            }
+            return null;
+        })();
         
-        const sourceActiveModel = sourceActiveModelId ? 
-            $dbtModels.find(m => m.unique_id === sourceActiveModelId) : null;
-        const targetActiveModel = targetActiveModelId ? 
-            $dbtModels.find(m => m.unique_id === targetActiveModelId) : null;
+        const targetActiveModel = (() => {
+            if (targetNodeData?._activeModelName) {
+                return {
+                    name: targetNodeData._activeModelName as string,
+                    version: targetNodeData._activeModelVersion as number | null | undefined,
+                };
+            }
+            if (targetNodeData?.dbt_model) {
+                return $dbtModels.find(m => m.unique_id === targetNodeData.dbt_model) || null;
+            }
+            const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
+            if (firstAdditional) {
+                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+            }
+            return null;
+        })();
         
         // Create relationship object (may not have model info if models aren't bound)
         const relationship = {
