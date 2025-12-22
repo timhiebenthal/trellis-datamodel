@@ -111,6 +111,32 @@
         });
     });
 
+    // Preserve edge selection when switching models (defensive measure)
+    let previousModelIndex = $state(activeModelIndex);
+    let lastKnownSelectedEdges = $state<Set<string>>(new Set());
+    
+    // Continuously track selected edges
+    $effect(() => {
+        const selectedIds = new Set($edges.filter(e => e.selected).map(e => e.id));
+        if (selectedIds.size > 0) {
+            lastKnownSelectedEdges = selectedIds;
+        }
+    });
+    
+    // Restore selection when model index changes
+    $effect(() => {
+        if (previousModelIndex !== activeModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
+            // Model switch occurred - restore previously selected edges after a microtask
+            queueMicrotask(() => {
+                $edges = $edges.map(edge => ({
+                    ...edge,
+                    selected: lastKnownSelectedEdges.has(edge.id)
+                }));
+            });
+        }
+        previousModelIndex = activeModelIndex;
+    });
+
     async function loadSchema() {
         if (!modelDetails) return;
 
@@ -980,7 +1006,10 @@
                                     class="group relative flex items-center"
                                 >
                                     <button
-                                        onclick={() => activeModelIndex = index}
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            activeModelIndex = index;
+                                        }}
                                         class="px-2 py-1 text-[10px] rounded border transition-colors whitespace-nowrap flex items-center gap-1"
                                         class:bg-primary-500={isActive}
                                         class:text-white={isActive}
