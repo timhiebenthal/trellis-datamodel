@@ -40,8 +40,8 @@ models:
     data_type: timestamp
   - name: valid_from
     data_type: date
-    description: DEMO: Start date of validity period for this employee record
+    description: "DEMO: Start date of validity period for this employee record"
   - name: valid_to
     data_type: date
-    description: DEMO: End date of validity period for this employee record
+    description: "DEMO: End date of validity period for this employee record"
 
