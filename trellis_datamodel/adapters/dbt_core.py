@@ -670,16 +670,32 @@ class DbtCoreAdapter:
                                         if not to_ref or not target_field:
                                             continue
 
-                                        target_base, target_version = self._parse_ref(
+                                        target_base, target_version_str = self._parse_ref(
                                             to_ref
                                         )
+                                        
+                                        # Convert version string to int if present
+                                        target_version_int = None
+                                        if target_version_str:
+                                            try:
+                                                target_version_int = int(target_version_str)
+                                            except ValueError:
+                                                pass
+                                        
+                                        # Convert model_version to int if present
+                                        source_version_int = None
+                                        if model_version is not None:
+                                            try:
+                                                source_version_int = int(model_version)
+                                            except (ValueError, TypeError):
+                                                pass
                                         
                                         # When include_unbound, use raw model name
                                         if include_unbound:
                                             target_entity_id = target_base
                                         else:
                                             target_entity_id = self._resolve_entity_id(
-                                                model_to_entity, target_base, target_version
+                                                model_to_entity, target_base, target_version_str
                                             )
 
                                             # Skip relationships where either side is not bound
@@ -697,6 +713,10 @@ class DbtCoreAdapter:
                                                 "type": "one_to_many",
                                                 "source_field": target_field,
                                                 "target_field": column.get("name"),
+                                                "source_model_name": target_base,
+                                                "source_model_version": target_version_int,
+                                                "target_model_name": base_model_name,
+                                                "target_model_version": source_version_int,
                                             }
                                         )
                     except Exception as e:

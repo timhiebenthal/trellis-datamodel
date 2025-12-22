@@ -22,6 +22,7 @@
         getParallelOffset,
         generateSlug,
         normalizeTags,
+        mergeRelationshipIntoEdges,
     } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
@@ -398,91 +399,15 @@
                 );
                 if (!sourceExists || !targetExists) continue;
 
-                // Check if edge with same field mapping already exists
-                const edgeExists = $edges.some(
-                    (e) =>
-                        ((e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                            (e.source === targetEntityId &&
-                                e.target === sourceEntityId)) &&
-                        e.data?.source_field === rel.source_field &&
-                        e.data?.target_field === rel.target_field,
-                );
-                if (edgeExists) continue;
-
-                const genericBetweenPair = $edges.find(
-                    (e) =>
-                        ((e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                            (e.source === targetEntityId &&
-                                e.target === sourceEntityId)) &&
-                        !e.data?.source_field &&
-                        !e.data?.target_field,
-                );
-
-                if (genericBetweenPair) {
-                    // Reuse the existing generic edge instead of creating a duplicate
-                    $edges = $edges.map((e) => {
-                        if (e.id !== genericBetweenPair.id) return e;
-                        return {
-                            ...e,
-                            // Normalize direction to match inferred relationship
-                            source: sourceEntityId,
-                            target: targetEntityId,
-                            data: {
-                                ...(e.data || {}),
-                                // Preserve any user label/type if present; otherwise apply inferred defaults
-                                label:
-                                    ((e.data as any)?.label as string) ||
-                                    rel.label ||
-                                    "",
-                                type:
-                                    ((e.data as any)?.type as string) ||
-                                    rel.type ||
-                                    "one_to_many",
-                                source_field: rel.source_field,
-                                target_field: rel.target_field,
-                            },
-                        };
-                    });
-
-                    continue;
-                }
-
-                const existingBetweenPair = $edges.filter(
-                    (e) =>
-                        (e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                        (e.source === targetEntityId &&
-                            e.target === sourceEntityId),
-                ).length;
-
-                // Generate unique edge ID (allow multiple edges between same entities)
-                const baseId = `e${sourceEntityId}-${targetEntityId}`;
-                let edgeId = baseId;
-                let counter = 1;
-                while ($edges.some((e) => e.id === edgeId)) {
-                    edgeId = `${baseId}-${counter}`;
-                    counter++;
-                }
-
-                // Create new edge
-                const newEdge = {
-                    id: edgeId,
+                // Remap the relationship to use entity IDs
+                const remappedRel = {
+                    ...rel,
                     source: sourceEntityId,
                     target: targetEntityId,
-                    type: "custom",
-                    data: {
-                        label: rel.label || "",
-                        type: rel.type || "one_to_many",
-                        source_field: rel.source_field,
-                        target_field: rel.target_field,
-                        parallelOffset: getParallelOffset(existingBetweenPair),
-                        label_dx: 0,
-                        label_dy: 0,
-                    },
                 };
-                $edges = [...$edges, newEdge];
+
+                // Merge relationship into edges (will aggregate by entity pair)
+                $edges = mergeRelationshipIntoEdges($edges, remappedRel);
             }
         } catch (e) {
             console.warn("Could not infer relationships:", e);
@@ -859,20 +784,36 @@
             return;
         }
 
-        // Create new edge with field mapping (always create new edge to support multiple relationships)
-        const newEdge = {
-            id: `e${sourceNodeId}-${targetNodeId}-${Date.now()}`,
+        // Get active model information for source and target nodes
+        const sourceNodeData = $nodes.find(n => n.id === sourceNodeId)?.data as any;
+        const targetNodeData = $nodes.find(n => n.id === targetNodeId)?.data as any;
+        
+        const sourceActiveModelId = sourceNodeData?.dbt_model || 
+            (sourceNodeData?.additional_models as string[])?.[0] || null;
+        const targetActiveModelId = targetNodeData?.dbt_model || 
+            (targetNodeData?.additional_models as string[])?.[0] || null;
+        
+        const sourceActiveModel = sourceActiveModelId ? 
+            $dbtModels.find(m => m.unique_id === sourceActiveModelId) : null;
+        const targetActiveModel = targetActiveModelId ? 
+            $dbtModels.find(m => m.unique_id === targetActiveModelId) : null;
+        
+        // Create relationship object (may not have model info if models aren't bound)
+        const relationship = {
             source: sourceNodeId,
             target: targetNodeId,
-            type: "custom",
-            data: {
-                label: "",
-                type: "one_to_many",
-                source_field: $draggingField.fieldName,
-                target_field: targetFieldName,
-            },
+            label: "",
+            type: "one_to_many" as const,
+            source_field: $draggingField.fieldName,
+            target_field: targetFieldName,
+            source_model_name: sourceActiveModel?.name,
+            source_model_version: sourceActiveModel?.version ?? null,
+            target_model_name: targetActiveModel?.name,
+            target_model_version: targetActiveModel?.version ?? null,
         };
-        $edges = [...$edges, newEdge];
+        
+        // Merge relationship into edges (will aggregate by entity pair)
+        $edges = mergeRelationshipIntoEdges($edges, relationship);
 
         $draggingField = null;
     }

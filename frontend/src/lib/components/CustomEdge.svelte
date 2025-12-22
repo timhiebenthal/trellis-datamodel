@@ -5,7 +5,7 @@
     type EdgeProps,
     useSvelteFlow
   } from '@xyflow/svelte';
-  import { edges, nodes, viewMode } from '$lib/stores';
+  import { edges, nodes, viewMode, dbtModels } from '$lib/stores';
   import {
     getNodeDimensions,
     getNodeAbsolutePosition,
@@ -139,8 +139,64 @@
   // Use raw data.label for input value, default to empty
   let label = $derived((data?.label as string) || '');
   let type = $derived((data?.type as string) || 'one_to_many');
-  let sourceField = $derived((data?.source_field as string) || '');
-  let targetField = $derived((data?.target_field as string) || '');
+  
+  // Get models array from edge data
+  const edgeModels = $derived((data?.models as any[]) || []);
+  const modelCount = $derived((data?.modelCount as number) || edgeModels.length || 0);
+  
+  // Get active models for source and target nodes
+  const sourceNodeData = $derived(sourceNode?.data as any);
+  const targetNodeData = $derived(targetNode?.data as any);
+  
+  // Get active model unique_ids (primary model or first additional model)
+  const sourceActiveModelId = $derived(
+    sourceNodeData?.dbt_model || 
+    (sourceNodeData?.additional_models as string[])?.[0] || 
+    null
+  );
+  const targetActiveModelId = $derived(
+    targetNodeData?.dbt_model || 
+    (targetNodeData?.additional_models as string[])?.[0] || 
+    null
+  );
+  
+  // Get model details from dbtModels
+  const sourceActiveModel = $derived(
+    sourceActiveModelId ? $dbtModels.find(m => m.unique_id === sourceActiveModelId) : null
+  );
+  const targetActiveModel = $derived(
+    targetActiveModelId ? $dbtModels.find(m => m.unique_id === targetActiveModelId) : null
+  );
+  
+  // Find matching model relationship based on active models
+  const activeModelRelationship = $derived.by(() => {
+    if (!sourceActiveModel || !targetActiveModel || edgeModels.length === 0) {
+      return null;
+    }
+    
+    // Match by model name and version
+    return edgeModels.find((m: any) => {
+      const sourceMatch = 
+        m.source_model_name === sourceActiveModel.name &&
+        (m.source_model_version === null || m.source_model_version === sourceActiveModel.version);
+      const targetMatch = 
+        m.target_model_name === targetActiveModel.name &&
+        (m.target_model_version === null || m.target_model_version === targetActiveModel.version);
+      return sourceMatch && targetMatch;
+    });
+  });
+  
+  // Use active model relationship fields if available, otherwise fall back to default
+  let sourceField = $derived(
+    activeModelRelationship?.source_field || 
+    (data?.source_field as string) || 
+    ''
+  );
+  let targetField = $derived(
+    activeModelRelationship?.target_field || 
+    (data?.target_field as string) || 
+    ''
+  );
   
   // Display text for collapsed state - show label or placeholder
   const displayLabel = $derived(label?.trim() || 'relates to');
@@ -397,13 +453,21 @@
       <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">
         {relationText}
       </div>
-      <!-- Field mappings - only show in Logical view when fields are set -->
-      {#if $viewMode === "logical" && (sourceField || targetField)}
-      <div class="text-[9px] text-slate-500 text-center border-t border-slate-200 pt-1 mt-0.5">
-        <span class="font-mono"><span class="text-slate-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
-        <span class="text-slate-400 mx-1">→</span>
-        <span class="font-mono"><span class="text-slate-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
-      </div>
+      <!-- Field mappings - show in Logical view -->
+      {#if $viewMode === "logical"}
+        {#if activeModelRelationship && (sourceField || targetField)}
+          <!-- Show field details for active model -->
+          <div class="text-[9px] text-slate-500 text-center border-t border-slate-200 pt-1 mt-0.5">
+            <span class="font-mono"><span class="text-slate-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
+            <span class="text-slate-400 mx-1">→</span>
+            <span class="font-mono"><span class="text-slate-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
+          </div>
+        {:else if modelCount > 1}
+          <!-- Show summary badge when multiple models exist but none active -->
+          <div class="text-[9px] text-slate-400 text-center border-t border-slate-200 pt-1 mt-0.5">
+            {modelCount} model{modelCount !== 1 ? 's' : ''}
+          </div>
+        {/if}
       {/if}
     </div>
   </EdgeLabel>

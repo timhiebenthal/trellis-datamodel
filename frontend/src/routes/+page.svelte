@@ -26,7 +26,7 @@
         inferRelationships,
         syncDbtTests,
     } from "$lib/api";
-    import { getParallelOffset, getModelFolder, normalizeTags } from "$lib/utils";
+    import { getParallelOffset, getModelFolder, normalizeTags, aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
@@ -93,7 +93,7 @@
             if (inferred.length > 0) {
                 let addedCount = 0;
                 let addedNodes = 0;
-                const newEdges = [...$edges];
+                let newEdges = [...$edges];
                 const existingEntityIds = new Set(
                     $nodes.filter((n) => n.type === "entity").map((n) => n.id),
                 );
@@ -136,59 +136,22 @@
                     maybeAddEntity(r.source);
                     maybeAddEntity(r.target);
 
-                    const exists = newEdges.some(
-                        (e) =>
-                            e.source === r.source &&
-                            e.target === r.target &&
-                            e.data?.source_field === r.source_field &&
-                            e.data?.target_field === r.target_field,
-                    );
-
-                    if (!exists) {
-                        const parallelEdges = newEdges.filter(
-                            (e) =>
-                                (e.source === r.source &&
-                                    e.target === r.target) ||
-                                (e.source === r.target &&
-                                    e.target === r.source),
-                        );
-                        const currentCount = parallelEdges.length;
-
-                        const baseId = `e${r.source}-${r.target}`;
-                        const edgeId = `${baseId}-${Date.now()}-${currentCount}`;
-
-                        newEdges.push({
-                            id: edgeId,
-                            source: r.source,
-                            target: r.target,
-                            type: "custom",
-                            data: {
-                                label: r.label || "",
-                                type: r.type || "one_to_many",
-                                source_field: r.source_field,
-                                target_field: r.target_field,
-                                label_dx: r.label_dx || 0,
-                                label_dy: r.label_dy || 0,
-                                parallelOffset: getParallelOffset(currentCount),
-                            },
-                        });
+                    // Merge relationship into edges (will aggregate by entity pair)
+                    const beforeCount = newEdges.length;
+                    newEdges = mergeRelationshipIntoEdges(newEdges, r);
+                    if (newEdges.length > beforeCount) {
                         addedCount++;
                     }
                 });
 
-                if (addedCount > 0) {
+                if (addedCount > 0 || addedNodes > 0) {
                     $edges = newEdges;
-                    syncMessage = `✓ Added ${addedCount} new${addedNodes ? `, ${addedNodes} nodes` : ""}`;
-                    setTimeout(() => {
-                        syncMessage = null;
-                    }, 3000);
-                } else if (addedNodes > 0) {
-                    syncMessage = `✓ Added ${addedNodes} nodes`;
+                    syncMessage = `✓ Added ${addedCount} relationship${addedCount !== 1 ? 's' : ''}${addedNodes ? `, ${addedNodes} node${addedNodes !== 1 ? 's' : ''}` : ""}`;
                     setTimeout(() => {
                         syncMessage = null;
                     }, 3000);
                 } else {
-                    syncMessage = "No new found";
+                    syncMessage = "✓ No new relationships found";
                     setTimeout(() => {
                         syncMessage = null;
                     }, 3000);
@@ -505,54 +468,8 @@
 
                 $nodes = [...groupNodes, ...entityNodes] as Node[];
 
-                const edgeCounts = new Map<string, number>();
-                $edges = relationships.map((r: any) => {
-                    const pairKey =
-                        r.source < r.target
-                            ? `${r.source}-${r.target}`
-                            : `${r.target}-${r.source}`;
-                    const currentCount = edgeCounts.get(pairKey) ?? 0;
-                    edgeCounts.set(pairKey, currentCount + 1);
-
-                    const baseId = `e${r.source}-${r.target}`;
-                    let edgeId = `${baseId}-${currentCount}`;
-                    if (currentCount === 0) edgeId = baseId;
-
-                    return {
-                        id: edgeId,
-                        source: r.source,
-                        target: r.target,
-                        type: "custom",
-                        data: {
-                            label: r.label || "",
-                            type: r.type || "one_to_many",
-                            source_field: r.source_field,
-                            target_field: r.target_field,
-                            label_dx: r.label_dx || 0,
-                            label_dy: r.label_dy || 0,
-                            parallelOffset: getParallelOffset(currentCount),
-                        },
-                    };
-                }) as Edge[];
-
-                // Deduplicate edges on load to clean up any existing bad state
-                const uniqueEdges = new Map<string, Edge>();
-                $edges.forEach((edge) => {
-                    // Create a unique key based on content, ignoring ID
-                    // Key: source|target|source_field|target_field
-                    // We sort source/target to handle bidirectional duplicates if any (though usually direction matters)
-                    // But for now let's stick to exact direction match unless it's a generic relationship
-                    const key = `${edge.source}|${edge.target}|${edge.data?.source_field || ""}|${edge.data?.target_field || ""}`;
-
-                    if (!uniqueEdges.has(key)) {
-                        uniqueEdges.set(key, edge);
-                    } else {
-                        console.warn(
-                            `Removed duplicate edge on load: ${edge.id} (duplicate of ${uniqueEdges.get(key)?.id})`,
-                        );
-                    }
-                });
-                $edges = Array.from(uniqueEdges.values());
+                // Aggregate relationships by entity pair (deduplicate)
+                $edges = aggregateRelationshipsIntoEdges(relationships);
 
                 // Auto-apply layout if all entity nodes are at default position (no saved layout)
                 const layoutCheckNodes = $nodes.filter((n) => n.type === "entity");
