@@ -22,6 +22,7 @@
         getParallelOffset,
         generateSlug,
         normalizeTags,
+        mergeRelationshipIntoEdges,
     } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
@@ -96,6 +97,44 @@
             editableColumns = [];
             hasUnsavedChanges = false;
         }
+    });
+
+    // Expose active model info on node data (ephemeral; not persisted)
+    $effect(() => {
+        updateNodeData(id, {
+            _activeModelId: activeModelId || null,
+            _activeModelName: modelDetails?.name || null,
+            _activeModelVersion:
+                modelDetails?.version === undefined
+                    ? null
+                    : (modelDetails?.version as number | null),
+        });
+    });
+
+    // Preserve edge selection when switching models (defensive measure)
+    let previousModelIndex = $state(activeModelIndex);
+    let lastKnownSelectedEdges = $state<Set<string>>(new Set());
+    
+    // Continuously track selected edges
+    $effect(() => {
+        const selectedIds = new Set($edges.filter(e => e.selected).map(e => e.id));
+        if (selectedIds.size > 0) {
+            lastKnownSelectedEdges = selectedIds;
+        }
+    });
+    
+    // Restore selection when model index changes
+    $effect(() => {
+        if (previousModelIndex !== activeModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
+            // Model switch occurred - restore previously selected edges after a microtask
+            queueMicrotask(() => {
+                $edges = $edges.map(edge => ({
+                    ...edge,
+                    selected: lastKnownSelectedEdges.has(edge.id)
+                }));
+            });
+        }
+        previousModelIndex = activeModelIndex;
     });
 
     async function loadSchema() {
@@ -398,91 +437,15 @@
                 );
                 if (!sourceExists || !targetExists) continue;
 
-                // Check if edge with same field mapping already exists
-                const edgeExists = $edges.some(
-                    (e) =>
-                        ((e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                            (e.source === targetEntityId &&
-                                e.target === sourceEntityId)) &&
-                        e.data?.source_field === rel.source_field &&
-                        e.data?.target_field === rel.target_field,
-                );
-                if (edgeExists) continue;
-
-                const genericBetweenPair = $edges.find(
-                    (e) =>
-                        ((e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                            (e.source === targetEntityId &&
-                                e.target === sourceEntityId)) &&
-                        !e.data?.source_field &&
-                        !e.data?.target_field,
-                );
-
-                if (genericBetweenPair) {
-                    // Reuse the existing generic edge instead of creating a duplicate
-                    $edges = $edges.map((e) => {
-                        if (e.id !== genericBetweenPair.id) return e;
-                        return {
-                            ...e,
-                            // Normalize direction to match inferred relationship
-                            source: sourceEntityId,
-                            target: targetEntityId,
-                            data: {
-                                ...(e.data || {}),
-                                // Preserve any user label/type if present; otherwise apply inferred defaults
-                                label:
-                                    ((e.data as any)?.label as string) ||
-                                    rel.label ||
-                                    "",
-                                type:
-                                    ((e.data as any)?.type as string) ||
-                                    rel.type ||
-                                    "one_to_many",
-                                source_field: rel.source_field,
-                                target_field: rel.target_field,
-                            },
-                        };
-                    });
-
-                    continue;
-                }
-
-                const existingBetweenPair = $edges.filter(
-                    (e) =>
-                        (e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                        (e.source === targetEntityId &&
-                            e.target === sourceEntityId),
-                ).length;
-
-                // Generate unique edge ID (allow multiple edges between same entities)
-                const baseId = `e${sourceEntityId}-${targetEntityId}`;
-                let edgeId = baseId;
-                let counter = 1;
-                while ($edges.some((e) => e.id === edgeId)) {
-                    edgeId = `${baseId}-${counter}`;
-                    counter++;
-                }
-
-                // Create new edge
-                const newEdge = {
-                    id: edgeId,
+                // Remap the relationship to use entity IDs
+                const remappedRel = {
+                    ...rel,
                     source: sourceEntityId,
                     target: targetEntityId,
-                    type: "custom",
-                    data: {
-                        label: rel.label || "",
-                        type: rel.type || "one_to_many",
-                        source_field: rel.source_field,
-                        target_field: rel.target_field,
-                        parallelOffset: getParallelOffset(existingBetweenPair),
-                        label_dx: 0,
-                        label_dy: 0,
-                    },
                 };
-                $edges = [...$edges, newEdge];
+
+                // Merge relationship into edges (will aggregate by entity pair)
+                $edges = mergeRelationshipIntoEdges($edges, remappedRel);
             }
         } catch (e) {
             console.warn("Could not infer relationships:", e);
@@ -859,20 +822,60 @@
             return;
         }
 
-        // Create new edge with field mapping (always create new edge to support multiple relationships)
-        const newEdge = {
-            id: `e${sourceNodeId}-${targetNodeId}-${Date.now()}`,
+        // Get active model information for source and target nodes (prefer ephemeral active model data)
+        const sourceNodeData = $nodes.find(n => n.id === sourceNodeId)?.data as any;
+        const targetNodeData = $nodes.find(n => n.id === targetNodeId)?.data as any;
+        
+        const sourceActiveModel = (() => {
+            if (sourceNodeData?._activeModelName) {
+                return {
+                    name: sourceNodeData._activeModelName as string,
+                    version: sourceNodeData._activeModelVersion as number | null | undefined,
+                };
+            }
+            if (sourceNodeData?.dbt_model) {
+                return $dbtModels.find(m => m.unique_id === sourceNodeData.dbt_model) || null;
+            }
+            const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
+            if (firstAdditional) {
+                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+            }
+            return null;
+        })();
+        
+        const targetActiveModel = (() => {
+            if (targetNodeData?._activeModelName) {
+                return {
+                    name: targetNodeData._activeModelName as string,
+                    version: targetNodeData._activeModelVersion as number | null | undefined,
+                };
+            }
+            if (targetNodeData?.dbt_model) {
+                return $dbtModels.find(m => m.unique_id === targetNodeData.dbt_model) || null;
+            }
+            const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
+            if (firstAdditional) {
+                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+            }
+            return null;
+        })();
+        
+        // Create relationship object (may not have model info if models aren't bound)
+        const relationship = {
             source: sourceNodeId,
             target: targetNodeId,
-            type: "custom",
-            data: {
-                label: "",
-                type: "one_to_many",
-                source_field: $draggingField.fieldName,
-                target_field: targetFieldName,
-            },
+            label: "",
+            type: "one_to_many" as const,
+            source_field: $draggingField.fieldName,
+            target_field: targetFieldName,
+            source_model_name: sourceActiveModel?.name,
+            source_model_version: sourceActiveModel?.version ?? null,
+            target_model_name: targetActiveModel?.name,
+            target_model_version: targetActiveModel?.version ?? null,
         };
-        $edges = [...$edges, newEdge];
+        
+        // Merge relationship into edges (will aggregate by entity pair)
+        $edges = mergeRelationshipIntoEdges($edges, relationship);
 
         $draggingField = null;
     }
@@ -1003,7 +1006,10 @@
                                     class="group relative flex items-center"
                                 >
                                     <button
-                                        onclick={() => activeModelIndex = index}
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            activeModelIndex = index;
+                                        }}
                                         class="px-2 py-1 text-[10px] rounded border transition-colors whitespace-nowrap flex items-center gap-1"
                                         class:bg-primary-500={isActive}
                                         class:text-white={isActive}

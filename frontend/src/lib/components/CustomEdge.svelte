@@ -5,7 +5,7 @@
     type EdgeProps,
     useSvelteFlow
   } from '@xyflow/svelte';
-  import { edges, nodes, viewMode } from '$lib/stores';
+  import { edges, nodes, viewMode, dbtModels } from '$lib/stores';
   import {
     getNodeDimensions,
     getNodeAbsolutePosition,
@@ -139,8 +139,105 @@
   // Use raw data.label for input value, default to empty
   let label = $derived((data?.label as string) || '');
   let type = $derived((data?.type as string) || 'one_to_many');
-  let sourceField = $derived((data?.source_field as string) || '');
-  let targetField = $derived((data?.target_field as string) || '');
+  
+  // Get models array from edge data
+  const edgeModels = $derived((data?.models as any[]) || []);
+  const modelCount = $derived((data?.modelCount as number) || edgeModels.length || 0);
+
+  // Get active models for source and target nodes (prefer ephemeral active model data)
+  const sourceNodeData = $derived(sourceNode?.data as any);
+  const targetNodeData = $derived(targetNode?.data as any);
+  
+  const resolveActiveModel = (nodeData: any) => {
+    // Prefer explicit active model id if present
+    if (nodeData?._activeModelId) {
+      const byId = $dbtModels.find((m) => m.unique_id === nodeData._activeModelId);
+      if (byId) return byId;
+    }
+    // Next: ephemeral active model name/version
+    if (nodeData?._activeModelName) {
+      return {
+        name: nodeData._activeModelName as string,
+        version: nodeData._activeModelVersion as number | null | undefined,
+      };
+    }
+    // Next: primary bound model
+    if (nodeData?.dbt_model) {
+      const byPrimary = $dbtModels.find((m) => m.unique_id === nodeData.dbt_model);
+      if (byPrimary) return byPrimary;
+    }
+    // Next: first additional model
+    const firstAdditional = (nodeData?.additional_models as string[] | undefined)?.[0] || null;
+    if (firstAdditional) {
+      const byAdditional = $dbtModels.find((m) => m.unique_id === firstAdditional);
+      if (byAdditional) return byAdditional;
+    }
+    return null;
+  };
+  
+  const sourceActiveModel = $derived(resolveActiveModel(sourceNodeData));
+  const targetActiveModel = $derived(resolveActiveModel(targetNodeData));
+  
+  // Normalize model info for matching/display: if model names are missing, fall back to resolved active models
+  const normalizedEdgeModels = $derived.by(() =>
+    edgeModels.map((m: any) => ({
+      source_model_name: m.source_model_name || sourceActiveModel?.name || null,
+      source_model_version:
+        m.source_model_version === undefined
+          ? (sourceActiveModel ? sourceActiveModel.version ?? null : null)
+          : m.source_model_version ?? null,
+      target_model_name: m.target_model_name || targetActiveModel?.name || null,
+      target_model_version:
+        m.target_model_version === undefined
+          ? (targetActiveModel ? targetActiveModel.version ?? null : null)
+          : m.target_model_version ?? null,
+      source_field: m.source_field,
+      target_field: m.target_field,
+    }))
+  );
+  
+  const normalizeVersion = (v: number | null | undefined) =>
+    v === undefined ? null : v;
+
+  // Find matching model relationship based on active models
+  const activeModelRelationship = $derived.by(() => {
+    if (!sourceActiveModel || !targetActiveModel || normalizedEdgeModels.length === 0) {
+      return null;
+    }
+    
+    // Match by model name and version
+    return normalizedEdgeModels.find((m: any) => {
+      const srcVer = normalizeVersion(m.source_model_version as number | null | undefined);
+      const tgtVer = normalizeVersion(m.target_model_version as number | null | undefined);
+      const activeSrcVer = normalizeVersion(sourceActiveModel.version as number | null | undefined);
+      const activeTgtVer = normalizeVersion(targetActiveModel.version as number | null | undefined);
+
+      const sourceMatch = 
+        m.source_model_name === sourceActiveModel.name &&
+        (srcVer === null || srcVer === activeSrcVer);
+      const targetMatch = 
+        m.target_model_name === targetActiveModel.name &&
+        (tgtVer === null || tgtVer === activeTgtVer);
+      return sourceMatch && targetMatch;
+    });
+  });
+  
+  const firstModelRelationship = $derived(edgeModels[0] || null);
+  const firstNormalizedRelationship = $derived(normalizedEdgeModels[0] || null);
+
+  // Use active model relationship fields if available, otherwise fall back to first model or edge defaults
+  let sourceField = $derived(
+    activeModelRelationship?.source_field || 
+    firstNormalizedRelationship?.source_field ||
+    (data?.source_field as string) || 
+    ''
+  );
+  let targetField = $derived(
+    activeModelRelationship?.target_field || 
+    firstNormalizedRelationship?.target_field ||
+    (data?.target_field as string) || 
+    ''
+  );
   
   // Display text for collapsed state - show label or placeholder
   const displayLabel = $derived(label?.trim() || 'relates to');
@@ -182,8 +279,20 @@
   );
 
   // sourceNode and targetNode defined above for label names
-  const sourceName = $derived((sourceNode?.data?.label as string) || 'Source');
-  const targetName = $derived((targetNode?.data?.label as string) || 'Target');
+  const entityLabelSource = $derived((sourceNode?.data?.label as string) || 'Source');
+  const entityLabelTarget = $derived((targetNode?.data?.label as string) || 'Target');
+
+  // Prefer active model names for display; fall back to relationship model names, then entity labels
+  const sourceName = $derived(
+    sourceActiveModel?.name ||
+    activeModelRelationship?.source_model_name ||
+    entityLabelSource
+  );
+  const targetName = $derived(
+    targetActiveModel?.name ||
+    activeModelRelationship?.target_model_name ||
+    entityLabelTarget
+  );
   const actionText = $derived(label?.trim() || 'relates to');
   
   const relationText = $derived(
@@ -397,13 +506,21 @@
       <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">
         {relationText}
       </div>
-      <!-- Field mappings - only show in Logical view when fields are set -->
-      {#if $viewMode === "logical" && (sourceField || targetField)}
-      <div class="text-[9px] text-slate-500 text-center border-t border-slate-200 pt-1 mt-0.5">
-        <span class="font-mono"><span class="text-slate-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
-        <span class="text-slate-400 mx-1">→</span>
-        <span class="font-mono"><span class="text-slate-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
-      </div>
+      <!-- Field mappings - show in Logical view -->
+      {#if $viewMode === "logical"}
+        {#if sourceField || targetField}
+          <!-- Show field details (active model if matched, else fallback) -->
+          <div class="text-[9px] text-slate-500 text-center border-t border-slate-200 pt-1 mt-0.5">
+            <span class="font-mono"><span class="text-slate-400">{sourceName.toLowerCase()}.</span>{sourceField || '?'}</span>
+            <span class="text-slate-400 mx-1">→</span>
+            <span class="font-mono"><span class="text-slate-400">{targetName.toLowerCase()}.</span>{targetField || '?'}</span>
+          </div>
+        {:else if modelCount > 1}
+          <!-- Show summary badge when multiple models exist but no fields resolved -->
+          <div class="text-[9px] text-slate-400 text-center border-t border-slate-200 pt-1 mt-0.5">
+            {modelCount} model{modelCount !== 1 ? 's' : ''}
+          </div>
+        {/if}
       {/if}
     </div>
   </EdgeLabel>

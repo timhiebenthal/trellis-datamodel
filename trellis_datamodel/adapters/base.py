@@ -50,7 +50,7 @@ class ModelSchema(TypedDict, total=False):
     file_path: str
 
 
-class Relationship(TypedDict):
+class Relationship(TypedDict, total=False):
     """Relationship inferred from framework metadata."""
 
     source: str
@@ -59,6 +59,10 @@ class Relationship(TypedDict):
     type: str  # e.g., "one_to_many"
     source_field: str
     target_field: str
+    source_model_name: str  # name of the source model (e.g., "employee")
+    source_model_version: Optional[int]  # version of the source model if versioned
+    target_model_name: str  # name of the target model (e.g., "employee_history")
+    target_model_version: Optional[int]  # version of the target model if versioned
 
 
 class TransformationAdapter(Protocol):
