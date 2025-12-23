@@ -297,7 +297,7 @@
   const actionText = $derived(label?.trim() || 'relates to');
   
   const relationText = $derived(
-    `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
+    `${descriptors.source} '${sourceName}' ${actionText} ${descriptors.target} '${targetName}'`
   );
 
   function updateEdge(partial: Record<string, unknown>) {
