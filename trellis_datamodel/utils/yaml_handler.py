@@ -325,6 +325,40 @@ class YamlHandler:
         if description:
             column["description"] = description
 
+    def remove_relationship_test(
+        self,
+        column: CommentedMap,
+    ) -> None:
+        """
+        Remove any relationship test from a column, keeping other tests.
+
+        Args:
+            column: Column entry
+        """
+        existing_tests = CommentedSeq()
+
+        # Collect non-relationship tests only
+        for key in ("data_tests", "tests"):
+            if key not in column:
+                continue
+            for test in column.get(key, []):
+                if isinstance(test, dict) and "relationships" in test:
+                    # Skip relationship tests - we're removing them
+                    continue
+                existing_tests.append(test)
+
+        # Update column with non-relationship tests only
+        if len(existing_tests) > 0:
+            column["data_tests"] = existing_tests
+        else:
+            # Remove data_tests key if no tests remain
+            if "data_tests" in column:
+                del column["data_tests"]
+        
+        # Drop tests key if present to avoid confusion
+        if "tests" in column:
+            del column["tests"]
+
     def add_relationship_test(
         self,
         column: CommentedMap,

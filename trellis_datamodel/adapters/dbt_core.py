@@ -859,7 +859,20 @@ class DbtCoreAdapter:
                 )
 
             # Sync Relationships (FKs)
+            # First, remove all relationship tests from columns that shouldn't have them
+            # This ensures we clean up tests when relationships are moved or deleted
             fk_list = fk_by_entity.get(entity_id, [])
+            fk_fields = {fk_info["fk_field"] for fk_info in fk_list}
+            
+            # Remove relationship tests from columns that are not in the current FK list
+            if "columns" in model_entry:
+                for col in model_entry.get("columns", []):
+                    col_name = col.get("name")
+                    if col_name and col_name not in fk_fields:
+                        # This column should not have a relationship test
+                        self.yaml_handler.remove_relationship_test(col)
+            
+            # Now add/update relationship tests for current FKs
             for fk_info in fk_list:
                 fk_field = fk_info["fk_field"]
                 ref_entity = fk_info["ref_entity"]
