@@ -354,20 +354,21 @@
     const currentEdge = $edges.find(e => e.id === id);
     if (!currentEdge) return;
     
-    // Swap source and target
-    const newSource = target;
-    const newTarget = source;
+    // Don't swap source/target - keep the arrow direction the same
+    const newSource = source;
+    const newTarget = target;
     
-    // Generate new edge ID based on swapped source/target
-    const newEdgeId = `e${newSource}-${newTarget}`;
+    // Edge ID stays the same since we're not changing direction
+    const newEdgeId = id;
     
-    // Swap source_field and target_field
-    const newSourceField = targetField;
-    const newTargetField = sourceField;
+    // Don't swap fields - they stay with their entities
+    const newSourceField = sourceField;
+    const newTargetField = targetField;
     
-    // Update relationship type based on current type
-    // one_to_many ↔ many_to_one (swaps cardinality)
-    // one_to_one and many_to_many remain the same (just swaps direction)
+    // Only swap the relationship type
+    // This moves the FK from one side to the other while keeping the visual direction
+    // For example: "cool_stuff → department" with type "many_to_one" (FK on cool_stuff)
+    // becomes: "cool_stuff → department" with type "one_to_many" (FK on department)
     let newType = type;
     if (type === 'one_to_many') {
       newType = 'many_to_one';
@@ -375,16 +376,9 @@
       newType = 'one_to_many';
     }
     
-    // Swap models array entries if they exist (for edges with multiple model relationships)
+    // Models array doesn't need to be swapped since we're not changing direction
+    // We're only changing the type, which affects FK location but not the arrow direction
     const currentModels = (currentEdge.data?.models as any[]) || [];
-    const swappedModels = currentModels.map((m: any) => ({
-      source_model_name: m.target_model_name,
-      source_model_version: m.target_model_version,
-      target_model_name: m.source_model_name,
-      target_model_version: m.source_model_version,
-      source_field: m.target_field,
-      target_field: m.source_field,
-    }));
     
     // Update edge with swapped values
     edges.update((list) =>
@@ -400,7 +394,7 @@
                 source_field: newSourceField,
                 target_field: newTargetField,
                 type: newType,
-                models: swappedModels.length > 0 ? swappedModels : edge.data?.models,
+                models: currentModels.length > 0 ? currentModels : edge.data?.models,
               }
             }
           : edge
@@ -581,9 +575,9 @@
         <button 
             class="text-slate-600 hover:text-[#26A69A] hover:bg-white rounded px-1.5 py-0.5 cursor-pointer bg-slate-100 border border-slate-300 flex items-center justify-center"
             onclick={swapDirection}
-            title="Swap relationship direction"
+            title="Swap which table has the foreign key (moves FK to opposite side)"
             type="button"
-            aria-label="Swap relationship direction"
+            aria-label="Swap foreign key location"
         >
             <Icon icon="lucide:arrow-left-right" class="w-3 h-3" />
         </button>
