@@ -23,6 +23,7 @@
         generateSlug,
         normalizeTags,
         mergeRelationshipIntoEdges,
+        detectFieldSemantics,
     } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
@@ -767,7 +768,7 @@
         }
     }
 
-    function onFieldDrop(targetFieldName: string, e: DragEvent) {
+    async function onFieldDrop(targetFieldName: string, e: DragEvent) {
         e.preventDefault();
         e.stopPropagation(); // Prevent bubble to canvas
         if (!$draggingField || $draggingField.nodeId === id) return;
@@ -860,18 +861,105 @@
             return null;
         })();
         
-        // Create relationship object (may not have model info if models aren't bound)
+        /**
+         * Relationship Direction Rules:
+         * 
+         * Relationships must always be named from the "1" side to the "*" side (parent → child).
+         * - one_to_many: source = 1 (parent), target = * (child)
+         * - many_to_one: source = * (child), target = 1 (parent)
+         * - one_to_one: source = FK holder, target = referenced table
+         * 
+         * Auto-Detection from dbt:
+         * When both entities have bound dbt models, we detect FK/PK semantics to determine parent/child:
+         * - If source field is FK and target field is PK → flip direction (FK points to PK, so PK is parent)
+         * - If source field is PK and target field is FK → keep direction (PK is parent, FK is child)
+         * - Otherwise → use drag direction as fallback
+         * 
+         * Manual Override:
+         * Users can manually swap direction using the swap button in the relationship editor.
+         */
+        
+        // Detect FK/PK semantics if both models are bound
+        let finalSource = sourceNodeId;
+        let finalTarget = targetNodeId;
+        let finalSourceField = $draggingField.fieldName;
+        let finalTargetField = targetFieldName;
+        let relationshipType: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many' = 'one_to_many';
+        
+        if (sourceActiveModel && targetActiveModel) {
+            try {
+                // Fetch schemas for both models to detect FK/PK semantics
+                const sourceSchema = await getModelSchema(
+                    sourceActiveModel.name,
+                    sourceActiveModel.version ?? undefined
+                );
+                const targetSchema = await getModelSchema(
+                    targetActiveModel.name,
+                    targetActiveModel.version ?? undefined
+                );
+                
+                if (sourceSchema && targetSchema) {
+                    // Build map of model schemas for FK/PK detection
+                    const modelSchemas = new Map<string, any>();
+                    modelSchemas.set(sourceActiveModel.name, sourceSchema);
+                    modelSchemas.set(targetActiveModel.name, targetSchema);
+                    
+                    // Detect semantics for both fields
+                    const sourceSemantics = detectFieldSemantics(
+                        sourceActiveModel.name,
+                        finalSourceField,
+                        targetActiveModel.name,
+                        modelSchemas
+                    );
+                    const targetSemantics = detectFieldSemantics(
+                        targetActiveModel.name,
+                        finalTargetField,
+                        sourceActiveModel.name,
+                        modelSchemas
+                    );
+                    
+                    // Determine if direction needs to be flipped to maintain 1 → * rule
+                    // Rule: Relationships always go from parent (PK holder) to child (FK holder)
+                    if (sourceSemantics === 'fk' && targetSemantics === 'pk') {
+                        // Flip direction: FK → PK becomes PK → FK (parent → child)
+                        // The FK field is on the child side, PK field is on the parent side
+                        finalSource = targetNodeId;
+                        finalTarget = sourceNodeId;
+                        finalSourceField = targetFieldName;
+                        finalTargetField = $draggingField.fieldName;
+                        relationshipType = 'one_to_many'; // PK → FK = one_to_many (parent → child)
+                    } else if (sourceSemantics === 'pk' && targetSemantics === 'fk') {
+                        // Keep direction: PK → FK is already correct (parent → child)
+                        relationshipType = 'one_to_many';
+                    } else {
+                        // Unknown semantics or both PKs/FKs: use drag direction as fallback
+                        // This handles edge cases like:
+                        // - Both fields are PKs (likely many-to-many or one-to-one)
+                        // - Both fields are FKs (unusual case)
+                        // - No FK/PK information available
+                        relationshipType = 'one_to_many';
+                    }
+                }
+            } catch (error) {
+                // Fall back to drag direction on error (e.g., schema fetch fails, network error)
+                // This ensures relationship creation doesn't fail even if FK/PK detection fails
+                console.warn('Error detecting FK/PK semantics, using drag direction:', error);
+            }
+        }
+        // If models aren't bound (greenfield), use drag direction - user can manually swap if needed
+        
+        // Create relationship object
         const relationship = {
-            source: sourceNodeId,
-            target: targetNodeId,
+            source: finalSource,
+            target: finalTarget,
             label: "",
-            type: "one_to_many" as const,
-            source_field: $draggingField.fieldName,
-            target_field: targetFieldName,
-            source_model_name: sourceActiveModel?.name,
-            source_model_version: sourceActiveModel?.version ?? null,
-            target_model_name: targetActiveModel?.name,
-            target_model_version: targetActiveModel?.version ?? null,
+            type: relationshipType,
+            source_field: finalSourceField,
+            target_field: finalTargetField,
+            source_model_name: finalSource === sourceNodeId ? sourceActiveModel?.name : targetActiveModel?.name,
+            source_model_version: finalSource === sourceNodeId ? (sourceActiveModel?.version ?? null) : (targetActiveModel?.version ?? null),
+            target_model_name: finalTarget === targetNodeId ? targetActiveModel?.name : sourceActiveModel?.name,
+            target_model_version: finalTarget === targetNodeId ? (targetActiveModel?.version ?? null) : (sourceActiveModel?.version ?? null),
         };
         
         // Merge relationship into edges (will aggregate by entity pair)

@@ -6,6 +6,7 @@
     useSvelteFlow
   } from '@xyflow/svelte';
   import { edges, nodes, viewMode, dbtModels } from '$lib/stores';
+  import Icon from '@iconify/svelte';
   import {
     getNodeDimensions,
     getNodeAbsolutePosition,
@@ -296,7 +297,7 @@
   const actionText = $derived(label?.trim() || 'relates to');
   
   const relationText = $derived(
-    `${descriptors.source} ${sourceName} ${actionText} ${descriptors.target} ${targetName}`
+    `${descriptors.source} '${sourceName}' ${actionText} ${descriptors.target} '${targetName}'`
   );
 
   function updateEdge(partial: Record<string, unknown>) {
@@ -330,6 +331,75 @@
     const nextType = typeOrder[nextIndex];
     
     updateEdge({ type: nextType });
+  }
+
+  /**
+   * Swap relationship direction.
+   * 
+   * Swaps source ↔ target and source_field ↔ target_field to reverse the relationship direction.
+   * Updates relationship type accordingly:
+   * - one_to_many ↔ many_to_one (swaps cardinality)
+   * - one_to_one → remains one_to_one (just swaps direction)
+   * - many_to_many → remains many_to_many (just swaps direction)
+   * 
+   * Also updates all models array entries if multiple models exist, ensuring consistency
+   * across all model relationships for this edge.
+   */
+  function swapDirection(e: MouseEvent) {
+    // Explicitly stop propagation at all levels
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    
+    // Get current edge data
+    const currentEdge = $edges.find(e => e.id === id);
+    if (!currentEdge) return;
+    
+    // Don't swap source/target - keep the arrow direction the same
+    const newSource = source;
+    const newTarget = target;
+    
+    // Edge ID stays the same since we're not changing direction
+    const newEdgeId = id;
+    
+    // Don't swap fields - they stay with their entities
+    const newSourceField = sourceField;
+    const newTargetField = targetField;
+    
+    // Only swap the relationship type
+    // This moves the FK from one side to the other while keeping the visual direction
+    // For example: "cool_stuff → department" with type "many_to_one" (FK on cool_stuff)
+    // becomes: "cool_stuff → department" with type "one_to_many" (FK on department)
+    let newType = type;
+    if (type === 'one_to_many') {
+      newType = 'many_to_one';
+    } else if (type === 'many_to_one') {
+      newType = 'one_to_many';
+    }
+    
+    // Models array doesn't need to be swapped since we're not changing direction
+    // We're only changing the type, which affects FK location but not the arrow direction
+    const currentModels = (currentEdge.data?.models as any[]) || [];
+    
+    // Update edge with swapped values
+    edges.update((list) =>
+      list.map((edge) =>
+        edge.id === id
+          ? {
+              ...edge,
+              id: newEdgeId,
+              source: newSource,
+              target: newTarget,
+              data: {
+                ...(edge.data || {}),
+                source_field: newSourceField,
+                target_field: newTargetField,
+                type: newType,
+                models: currentModels.length > 0 ? currentModels : edge.data?.models,
+              }
+            }
+          : edge
+      )
+    );
   }
 
   function selectThisEdge(e: Event) {
@@ -501,6 +571,15 @@
             type="button"
         >
             {cardinalityText}
+        </button>
+        <button 
+            class="text-slate-600 hover:text-[#26A69A] hover:bg-white rounded px-1.5 py-0.5 cursor-pointer bg-slate-100 border border-slate-300 flex items-center justify-center"
+            onclick={swapDirection}
+            title="Swap which table has the foreign key (moves FK to opposite side)"
+            type="button"
+            aria-label="Swap foreign key location"
+        >
+            <Icon icon="lucide:arrow-left-right" class="w-3 h-3" />
         </button>
       </div>
       <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">

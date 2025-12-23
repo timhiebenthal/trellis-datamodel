@@ -757,8 +757,13 @@ class DbtCoreAdapter:
             eid: self._entity_to_model_name(ent) for eid, ent in entity_map.items()
         }
 
-        # Group relationships by target entity (the one with the FK)
+        # Group relationships by entity (the one with the FK)
+        # FK is always on the "many" side of the relationship
         fk_by_entity: dict[str, list[dict]] = {}
+        
+        # Track all fields that appear in ANY relationship in the data model
+        # This helps us identify which relationship tests are managed by us vs manually added
+        all_relationship_fields_by_entity: dict[str, set[str]] = {}
 
         for rel in relationships:
             source_id = rel.get("source")
@@ -770,11 +775,33 @@ class DbtCoreAdapter:
             if not source_field or not target_field:
                 continue
 
-            fk_on_target = rel_type == "one_to_many"
-            fk_entity = target_id if fk_on_target else source_id
-            fk_field = target_field if fk_on_target else source_field
-            ref_entity = source_id if fk_on_target else target_id
-            ref_field = source_field if fk_on_target else target_field
+            # Determine which side has the "many" cardinality (where FK should be)
+            # Relationship types ending in "_to_many" or starting with "many_to_" have FK on target/source respectively
+            # For one_to_one, FK is typically on source (FK holder → referenced table per spec)
+            if rel_type in ("one_to_many", "one_to_zero_or_many", "zero_or_one_to_many", "zero_or_many_to_many"):
+                # FK on target (target is the "many" side)
+                fk_entity = target_id
+                fk_field = target_field
+                ref_entity = source_id
+                ref_field = source_field
+            elif rel_type in ("many_to_one", "many_to_many", "zero_or_many_to_one"):
+                # FK on source (source is the "many" side)
+                fk_entity = source_id
+                fk_field = source_field
+                ref_entity = target_id
+                ref_field = target_field
+            elif rel_type == "one_to_one":
+                # For one_to_one, FK is on source (FK holder → referenced table per spec)
+                fk_entity = source_id
+                fk_field = source_field
+                ref_entity = target_id
+                ref_field = target_field
+            else:
+                # Fallback: assume FK on target (default behavior)
+                fk_entity = target_id
+                fk_field = target_field
+                ref_entity = source_id
+                ref_field = source_field
 
             fk_by_entity.setdefault(fk_entity, []).append(
                 {
@@ -783,6 +810,10 @@ class DbtCoreAdapter:
                     "ref_field": ref_field,
                 }
             )
+            
+            # Track which fields are involved in relationships
+            all_relationship_fields_by_entity.setdefault(source_id, set()).add(source_field)
+            all_relationship_fields_by_entity.setdefault(target_id, set()).add(target_field)
 
         models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
@@ -836,7 +867,27 @@ class DbtCoreAdapter:
                 )
 
             # Sync Relationships (FKs)
+            # Build a map of which fields should have which relationship tests
             fk_list = fk_by_entity.get(entity_id, [])
+            fk_fields = {fk_info["fk_field"] for fk_info in fk_list}
+            
+            # Get all fields that appear in relationships for this entity
+            relationship_fields = all_relationship_fields_by_entity.get(entity_id, set())
+            
+            # Clean up: Remove relationship tests from fields that:
+            # 1. Are in a relationship in the data model (relationship_fields)
+            # 2. But are NOT currently FKs (not in fk_fields)
+            # This removes tests when relationships are moved or type changes
+            # But preserves manually added tests (not in relationship_fields)
+            if "columns" in model_entry:
+                for col in model_entry.get("columns", []):
+                    col_name = col.get("name")
+                    if col_name and col_name in relationship_fields and col_name not in fk_fields:
+                        # This field was in a relationship but is no longer an FK
+                        # Remove its relationship test
+                        self.yaml_handler.remove_relationship_test(col)
+            
+            # Now add/update relationship tests for current FKs
             for fk_info in fk_list:
                 fk_field = fk_info["fk_field"]
                 ref_entity = fk_info["ref_entity"]
