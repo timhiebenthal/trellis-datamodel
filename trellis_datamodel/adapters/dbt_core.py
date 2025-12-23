@@ -760,6 +760,10 @@ class DbtCoreAdapter:
         # Group relationships by entity (the one with the FK)
         # FK is always on the "many" side of the relationship
         fk_by_entity: dict[str, list[dict]] = {}
+        
+        # Track all fields that appear in ANY relationship in the data model
+        # This helps us identify which relationship tests are managed by us vs manually added
+        all_relationship_fields_by_entity: dict[str, set[str]] = {}
 
         for rel in relationships:
             source_id = rel.get("source")
@@ -806,6 +810,10 @@ class DbtCoreAdapter:
                     "ref_field": ref_field,
                 }
             )
+            
+            # Track which fields are involved in relationships
+            all_relationship_fields_by_entity.setdefault(source_id, set()).add(source_field)
+            all_relationship_fields_by_entity.setdefault(target_id, set()).add(target_field)
 
         models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
@@ -859,17 +867,24 @@ class DbtCoreAdapter:
                 )
 
             # Sync Relationships (FKs)
-            # First, remove all relationship tests from columns that shouldn't have them
-            # This ensures we clean up tests when relationships are moved or deleted
+            # Build a map of which fields should have which relationship tests
             fk_list = fk_by_entity.get(entity_id, [])
             fk_fields = {fk_info["fk_field"] for fk_info in fk_list}
             
-            # Remove relationship tests from columns that are not in the current FK list
+            # Get all fields that appear in relationships for this entity
+            relationship_fields = all_relationship_fields_by_entity.get(entity_id, set())
+            
+            # Clean up: Remove relationship tests from fields that:
+            # 1. Are in a relationship in the data model (relationship_fields)
+            # 2. But are NOT currently FKs (not in fk_fields)
+            # This removes tests when relationships are moved or type changes
+            # But preserves manually added tests (not in relationship_fields)
             if "columns" in model_entry:
                 for col in model_entry.get("columns", []):
                     col_name = col.get("name")
-                    if col_name and col_name not in fk_fields:
-                        # This column should not have a relationship test
+                    if col_name and col_name in relationship_fields and col_name not in fk_fields:
+                        # This field was in a relationship but is no longer an FK
+                        # Remove its relationship test
                         self.yaml_handler.remove_relationship_test(col)
             
             # Now add/update relationship tests for current FKs
