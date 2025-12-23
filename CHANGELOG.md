@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2025-12-23
+
 ### Added
 - Added relationship deduplication for entities with multiple dbt models: when an entity has multiple dbt models (e.g., `employee` and `employee_history`), relationships are now aggregated into a single edge per entity pair instead of showing parallel edges. The relationship detail box dynamically shows field-level details based on the currently selected dbt model for each entity.
 
@@ -18,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed stale relationship test cleanup: when relationship types change (e.g., from `one_to_many` to `many_to_one`), relationship tests are now properly removed from the old FK location and added to the new FK location in dbt schema files
 
 ### Changed
-- Improved relationship text display: entity names in relationship labels are now shown in quotes (e.g., `one 'cool stuff' relates to many 'department'`) for better readability
+- Improved relationship text display: entity names in relationship labels are now shown in quotes (e.g., `one 'department' relates to many 'employee'`) for better readability
 
 ## [0.3.4] - 2025-12-21
 
