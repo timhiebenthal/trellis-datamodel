@@ -42,6 +42,8 @@
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
     let lastSavedState = "";
+    let lastSyncedState = "";
+    let needsSync = $derived(lastSavedState !== "" && lastSavedState !== lastSyncedState);
     let showConfigInfoModal = $state(false);
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
@@ -53,6 +55,8 @@
         try {
             const result = await syncDbtTests();
             syncMessage = `✓ ${result.message}`;
+            // Mark current state as synced
+            lastSyncedState = lastSavedState;
             setTimeout(() => {
                 syncMessage = null;
             }, 3000);
@@ -488,6 +492,8 @@
                     nodes: $nodes,
                     edges: $edges,
                 });
+                // Initialize as synced since we just loaded from disk
+                lastSyncedState = lastSavedState;
                 initHistory();
             } catch (e) {
                 console.error("Initialization error:", e);
@@ -567,21 +573,49 @@
                         tags: tagsToPersist,
                     };
                 }),
-            relationships: currentEdges.map((e) => ({
-                source: e.source,
-                target: e.target,
-                label: (e.data?.label as string) || "",
-                type:
-                    (e.data?.type as
-                        | "one_to_many"
-                        | "many_to_one"
-                        | "one_to_one"
-                        | "many_to_many") || "one_to_many",
-                source_field: e.data?.source_field as string | undefined,
-                target_field: e.data?.target_field as string | undefined,
-                label_dx: e.data?.label_dx as number | undefined,
-                label_dy: e.data?.label_dy as number | undefined,
-            })),
+            relationships: currentEdges.flatMap((e) => {
+                // If edge has multiple model relationships, expand them
+                const models = (e.data?.models as any[]) || [];
+                if (models.length > 0) {
+                    // Create one relationship per model
+                    return models.map((m) => ({
+                        source: e.source,
+                        target: e.target,
+                        label: (e.data?.label as string) || "",
+                        type:
+                            (e.data?.type as
+                                | "one_to_many"
+                                | "many_to_one"
+                                | "one_to_one"
+                                | "many_to_many") || "one_to_many",
+                        source_field: m.source_field as string | undefined,
+                        target_field: m.target_field as string | undefined,
+                        source_model_name: m.source_model_name as string | undefined,
+                        source_model_version: m.source_model_version as number | null | undefined,
+                        target_model_name: m.target_model_name as string | undefined,
+                        target_model_version: m.target_model_version as number | null | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
+                    }));
+                } else {
+                    // Fallback: single relationship from edge-level data
+                    return [{
+                        source: e.source,
+                        target: e.target,
+                        label: (e.data?.label as string) || "",
+                        type:
+                            (e.data?.type as
+                                | "one_to_many"
+                                | "many_to_one"
+                                | "one_to_one"
+                                | "many_to_many") || "one_to_many",
+                        source_field: e.data?.source_field as string | undefined,
+                        target_field: e.data?.target_field as string | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
+                    }];
+                }
+            }),
         };
     }
 
@@ -947,8 +981,15 @@
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
-                title="Sync entity & field-definitions and relationship-tests to dbt schema.yml files"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm relative"
+                class:bg-primary-600={!needsSync}
+                class:hover:bg-primary-700={!needsSync}
+                class:bg-amber-600={needsSync}
+                class:hover:bg-amber-700={needsSync}
+                class:animate-pulse={needsSync}
+                title={needsSync 
+                    ? "⚠️ Changes in data model need to be pushed to dbt schema files" 
+                    : "Sync entity & field-definitions and relationship-tests to dbt schema.yml files"}
             >
                 {#if syncing}
                     <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
@@ -956,6 +997,12 @@
                     <Icon icon="lucide:upload" class="w-4 h-4" />
                 {/if}
                 Push to dbt
+                {#if needsSync && !syncing}
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                {/if}
             </button>
         </div>
     </header>
