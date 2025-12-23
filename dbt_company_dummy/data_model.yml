@@ -11,14 +11,6 @@ entities:
   label: department
   description: Company departments
   dbt_model: model.company_dummy.department
-- id: cool_stuff
-  label: cool stuff
-  description: ''
-  drafted_fields:
-  - name: id
-    datatype: text
-  - name: department_id
-    datatype: text
 relationships:
 - source: new_entity
   target: new_entity
@@ -30,9 +22,4 @@ relationships:
   type: one_to_many
   source_field: department_id
   target_field: department_id
-- source: department
-  target: cool_stuff
-  label: ''
-  type: many_to_one
-  source_field: department_id
-  target_field: department_id
+
