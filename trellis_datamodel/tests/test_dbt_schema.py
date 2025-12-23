@@ -244,6 +244,78 @@ class TestSyncDbtTests:
             }
         ]
 
+    def test_syncs_many_to_one_relationship(self, test_client, temp_dir, temp_data_model_path):
+        """
+        Ensure many_to_one relationships write FK test to source entity (the "many" side).
+        """
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "customer_entity",
+                    "label": "Customers",
+                    "dbt_model": "model.project.customers",
+                    "position": {"x": 0, "y": 0},
+                },
+                {
+                    "id": "order_entity",
+                    "label": "Orders",
+                    "dbt_model": "model.project.orders",
+                    "drafted_fields": [{"name": "customer_id", "datatype": "int"}],
+                    "position": {"x": 100, "y": 0},
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "order_entity",  # Source is "many" side, so FK should be here
+                    "target": "customer_entity",  # Target is "one" side (PK)
+                    "type": "many_to_one",
+                    "source_field": "customer_id",  # FK field
+                    "target_field": "id",  # PK field
+                }
+            ],
+        }
+
+        # Persist data model
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # orders.yml should contain a relationship test (FK is on source/orders)
+        orders_yml = os.path.join(temp_dir, "models", "3_core", "orders.yml")
+        assert os.path.exists(orders_yml)
+        with open(orders_yml, "r") as f:
+            schema = yaml.safe_load(f)
+
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert rel_tests == [
+            {
+                "relationships": {
+                    "arguments": {"to": "ref('customers')", "field": "id"},
+                }
+            }
+        ]
+
+        # customers.yml should NOT have a relationship test (PK is on target/customers)
+        customers_yml = os.path.join(temp_dir, "models", "3_core", "customers.yml")
+        if os.path.exists(customers_yml):
+            with open(customers_yml, "r") as f:
+                customer_schema = yaml.safe_load(f)
+            # If customers.yml exists, it shouldn't have relationship tests for this relationship
+            if "models" in customer_schema and len(customer_schema["models"]) > 0:
+                if "columns" in customer_schema["models"][0]:
+                    for col in customer_schema["models"][0]["columns"]:
+                        if col.get("name") == "id":
+                            # PK field shouldn't have relationship test pointing back
+                            tests = col.get("data_tests", [])
+                            for test in tests:
+                                if "relationships" in test:
+                                    rel = test["relationships"]
+                                    ref = rel.get("arguments", {}).get("to", "") or rel.get("to", "")
+                                    assert "ref('orders')" not in ref
+
 
 class TestGetModelSchema:
     """Tests for GET /api/models/{model_name}/schema endpoint."""
