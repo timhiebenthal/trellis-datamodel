@@ -17,6 +17,7 @@
         inferRelationships,
         getModelSchema,
         updateModelSchema,
+        getLineage,
     } from "$lib/api";
     import {
         getParallelOffset,
@@ -27,8 +28,9 @@
         formatModelNameForLabel,
         extractModelNameFromUniqueId,
     } from "$lib/utils";
-    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
-    import Icon from "@iconify/svelte";
+import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
+import LineageModal from "./LineageModal.svelte";
+import Icon from "@iconify/svelte";
 
     let { data: rawData, id, selected }: NodeProps = $props();
     // Cast data to EntityData for proper typing - use $derived to maintain reactivity
@@ -36,6 +38,8 @@
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
+    let showLineageModal = $state(false);
+    let lineageModelId = $state<string | null>(null);
 
     // Batch editing support
     let selectedEntityNodes = $derived(
@@ -635,6 +639,23 @@
         showDeleteModal = false;
     }
 
+    function handleDoubleClick(event: MouseEvent) {
+        // Only trigger lineage modal for entities bound to dbt models
+        if (!boundModelName) {
+            return;
+        }
+        // Prevent double-click from triggering collapse/expand toggle
+        event.stopPropagation();
+        // Open lineage modal with primary bound model
+        lineageModelId = boundModelName;
+        showLineageModal = true;
+    }
+
+    function closeLineageModal() {
+        showLineageModal = false;
+        lineageModelId = null;
+    }
+
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
     let tagInput = $state("");
@@ -1045,6 +1066,7 @@
     ondragover={onDragOver}
     ondragenter={onDragEnter}
     ondragleave={onDragLeave}
+    ondblclick={handleDoubleClick}
     role="presentation"
 >
     <!-- Handles on all 4 sides for flexible edge routing -->
@@ -1804,6 +1826,12 @@
     entityLabel={data.label || "Entity"}
     onConfirm={deleteEntity}
     onCancel={cancelDelete}
+/>
+
+<LineageModal
+    open={showLineageModal}
+    modelId={lineageModelId}
+    onClose={closeLineageModal}
 />
 
 <style>

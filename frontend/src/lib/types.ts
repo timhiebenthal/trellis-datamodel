@@ -158,3 +158,29 @@ export interface ModelSchema {
     file_path: string;
 }
 
+export interface LineageNode {
+    id: string;
+    label: string;
+    level: number;
+    isSource: boolean;
+}
+
+export interface LineageEdge {
+    source: string;
+    target: string;
+    level: number;
+}
+
+export interface LineageMetadata {
+    root_model_id: string;
+    level_counts: Record<number, number>;
+    total_nodes: number;
+    total_edges: number;
+}
+
+export interface LineageResponse {
+    nodes: LineageNode[];
+    edges: LineageEdge[];
+    metadata: LineageMetadata;
+}
+
