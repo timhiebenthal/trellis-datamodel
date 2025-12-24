@@ -22,6 +22,8 @@
         getParallelOffset,
         generateSlug,
         normalizeTags,
+        mergeRelationshipIntoEdges,
+        detectFieldSemantics,
     } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
@@ -96,6 +98,44 @@
             editableColumns = [];
             hasUnsavedChanges = false;
         }
+    });
+
+    // Expose active model info on node data (ephemeral; not persisted)
+    $effect(() => {
+        updateNodeData(id, {
+            _activeModelId: activeModelId || null,
+            _activeModelName: modelDetails?.name || null,
+            _activeModelVersion:
+                modelDetails?.version === undefined
+                    ? null
+                    : (modelDetails?.version as number | null),
+        });
+    });
+
+    // Preserve edge selection when switching models (defensive measure)
+    let previousModelIndex = $state(activeModelIndex);
+    let lastKnownSelectedEdges = $state<Set<string>>(new Set());
+    
+    // Continuously track selected edges
+    $effect(() => {
+        const selectedIds = new Set($edges.filter(e => e.selected).map(e => e.id));
+        if (selectedIds.size > 0) {
+            lastKnownSelectedEdges = selectedIds;
+        }
+    });
+    
+    // Restore selection when model index changes
+    $effect(() => {
+        if (previousModelIndex !== activeModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
+            // Model switch occurred - restore previously selected edges after a microtask
+            queueMicrotask(() => {
+                $edges = $edges.map(edge => ({
+                    ...edge,
+                    selected: lastKnownSelectedEdges.has(edge.id)
+                }));
+            });
+        }
+        previousModelIndex = activeModelIndex;
     });
 
     async function loadSchema() {
@@ -398,91 +438,15 @@
                 );
                 if (!sourceExists || !targetExists) continue;
 
-                // Check if edge with same field mapping already exists
-                const edgeExists = $edges.some(
-                    (e) =>
-                        ((e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                            (e.source === targetEntityId &&
-                                e.target === sourceEntityId)) &&
-                        e.data?.source_field === rel.source_field &&
-                        e.data?.target_field === rel.target_field,
-                );
-                if (edgeExists) continue;
-
-                const genericBetweenPair = $edges.find(
-                    (e) =>
-                        ((e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                            (e.source === targetEntityId &&
-                                e.target === sourceEntityId)) &&
-                        !e.data?.source_field &&
-                        !e.data?.target_field,
-                );
-
-                if (genericBetweenPair) {
-                    // Reuse the existing generic edge instead of creating a duplicate
-                    $edges = $edges.map((e) => {
-                        if (e.id !== genericBetweenPair.id) return e;
-                        return {
-                            ...e,
-                            // Normalize direction to match inferred relationship
-                            source: sourceEntityId,
-                            target: targetEntityId,
-                            data: {
-                                ...(e.data || {}),
-                                // Preserve any user label/type if present; otherwise apply inferred defaults
-                                label:
-                                    ((e.data as any)?.label as string) ||
-                                    rel.label ||
-                                    "",
-                                type:
-                                    ((e.data as any)?.type as string) ||
-                                    rel.type ||
-                                    "one_to_many",
-                                source_field: rel.source_field,
-                                target_field: rel.target_field,
-                            },
-                        };
-                    });
-
-                    continue;
-                }
-
-                const existingBetweenPair = $edges.filter(
-                    (e) =>
-                        (e.source === sourceEntityId &&
-                            e.target === targetEntityId) ||
-                        (e.source === targetEntityId &&
-                            e.target === sourceEntityId),
-                ).length;
-
-                // Generate unique edge ID (allow multiple edges between same entities)
-                const baseId = `e${sourceEntityId}-${targetEntityId}`;
-                let edgeId = baseId;
-                let counter = 1;
-                while ($edges.some((e) => e.id === edgeId)) {
-                    edgeId = `${baseId}-${counter}`;
-                    counter++;
-                }
-
-                // Create new edge
-                const newEdge = {
-                    id: edgeId,
+                // Remap the relationship to use entity IDs
+                const remappedRel = {
+                    ...rel,
                     source: sourceEntityId,
                     target: targetEntityId,
-                    type: "custom",
-                    data: {
-                        label: rel.label || "",
-                        type: rel.type || "one_to_many",
-                        source_field: rel.source_field,
-                        target_field: rel.target_field,
-                        parallelOffset: getParallelOffset(existingBetweenPair),
-                        label_dx: 0,
-                        label_dy: 0,
-                    },
                 };
-                $edges = [...$edges, newEdge];
+
+                // Merge relationship into edges (will aggregate by entity pair)
+                $edges = mergeRelationshipIntoEdges($edges, remappedRel);
             }
         } catch (e) {
             console.warn("Could not infer relationships:", e);
@@ -804,7 +768,7 @@
         }
     }
 
-    function onFieldDrop(targetFieldName: string, e: DragEvent) {
+    async function onFieldDrop(targetFieldName: string, e: DragEvent) {
         e.preventDefault();
         e.stopPropagation(); // Prevent bubble to canvas
         if (!$draggingField || $draggingField.nodeId === id) return;
@@ -859,20 +823,147 @@
             return;
         }
 
-        // Create new edge with field mapping (always create new edge to support multiple relationships)
-        const newEdge = {
-            id: `e${sourceNodeId}-${targetNodeId}-${Date.now()}`,
-            source: sourceNodeId,
-            target: targetNodeId,
-            type: "custom",
-            data: {
-                label: "",
-                type: "one_to_many",
-                source_field: $draggingField.fieldName,
-                target_field: targetFieldName,
-            },
+        // Get active model information for source and target nodes (prefer ephemeral active model data)
+        const sourceNodeData = $nodes.find(n => n.id === sourceNodeId)?.data as any;
+        const targetNodeData = $nodes.find(n => n.id === targetNodeId)?.data as any;
+        
+        const sourceActiveModel = (() => {
+            if (sourceNodeData?._activeModelName) {
+                return {
+                    name: sourceNodeData._activeModelName as string,
+                    version: sourceNodeData._activeModelVersion as number | null | undefined,
+                };
+            }
+            if (sourceNodeData?.dbt_model) {
+                return $dbtModels.find(m => m.unique_id === sourceNodeData.dbt_model) || null;
+            }
+            const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
+            if (firstAdditional) {
+                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+            }
+            return null;
+        })();
+        
+        const targetActiveModel = (() => {
+            if (targetNodeData?._activeModelName) {
+                return {
+                    name: targetNodeData._activeModelName as string,
+                    version: targetNodeData._activeModelVersion as number | null | undefined,
+                };
+            }
+            if (targetNodeData?.dbt_model) {
+                return $dbtModels.find(m => m.unique_id === targetNodeData.dbt_model) || null;
+            }
+            const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
+            if (firstAdditional) {
+                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+            }
+            return null;
+        })();
+        
+        /**
+         * Relationship Direction Rules:
+         * 
+         * Relationships must always be named from the "1" side to the "*" side (parent → child).
+         * - one_to_many: source = 1 (parent), target = * (child)
+         * - many_to_one: source = * (child), target = 1 (parent)
+         * - one_to_one: source = FK holder, target = referenced table
+         * 
+         * Auto-Detection from dbt:
+         * When both entities have bound dbt models, we detect FK/PK semantics to determine parent/child:
+         * - If source field is FK and target field is PK → flip direction (FK points to PK, so PK is parent)
+         * - If source field is PK and target field is FK → keep direction (PK is parent, FK is child)
+         * - Otherwise → use drag direction as fallback
+         * 
+         * Manual Override:
+         * Users can manually swap direction using the swap button in the relationship editor.
+         */
+        
+        // Detect FK/PK semantics if both models are bound
+        let finalSource = sourceNodeId;
+        let finalTarget = targetNodeId;
+        let finalSourceField = $draggingField.fieldName;
+        let finalTargetField = targetFieldName;
+        let relationshipType: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many' = 'one_to_many';
+        
+        if (sourceActiveModel && targetActiveModel) {
+            try {
+                // Fetch schemas for both models to detect FK/PK semantics
+                const sourceSchema = await getModelSchema(
+                    sourceActiveModel.name,
+                    sourceActiveModel.version ?? undefined
+                );
+                const targetSchema = await getModelSchema(
+                    targetActiveModel.name,
+                    targetActiveModel.version ?? undefined
+                );
+                
+                if (sourceSchema && targetSchema) {
+                    // Build map of model schemas for FK/PK detection
+                    const modelSchemas = new Map<string, any>();
+                    modelSchemas.set(sourceActiveModel.name, sourceSchema);
+                    modelSchemas.set(targetActiveModel.name, targetSchema);
+                    
+                    // Detect semantics for both fields
+                    const sourceSemantics = detectFieldSemantics(
+                        sourceActiveModel.name,
+                        finalSourceField,
+                        targetActiveModel.name,
+                        modelSchemas
+                    );
+                    const targetSemantics = detectFieldSemantics(
+                        targetActiveModel.name,
+                        finalTargetField,
+                        sourceActiveModel.name,
+                        modelSchemas
+                    );
+                    
+                    // Determine if direction needs to be flipped to maintain 1 → * rule
+                    // Rule: Relationships always go from parent (PK holder) to child (FK holder)
+                    if (sourceSemantics === 'fk' && targetSemantics === 'pk') {
+                        // Flip direction: FK → PK becomes PK → FK (parent → child)
+                        // The FK field is on the child side, PK field is on the parent side
+                        finalSource = targetNodeId;
+                        finalTarget = sourceNodeId;
+                        finalSourceField = targetFieldName;
+                        finalTargetField = $draggingField.fieldName;
+                        relationshipType = 'one_to_many'; // PK → FK = one_to_many (parent → child)
+                    } else if (sourceSemantics === 'pk' && targetSemantics === 'fk') {
+                        // Keep direction: PK → FK is already correct (parent → child)
+                        relationshipType = 'one_to_many';
+                    } else {
+                        // Unknown semantics or both PKs/FKs: use drag direction as fallback
+                        // This handles edge cases like:
+                        // - Both fields are PKs (likely many-to-many or one-to-one)
+                        // - Both fields are FKs (unusual case)
+                        // - No FK/PK information available
+                        relationshipType = 'one_to_many';
+                    }
+                }
+            } catch (error) {
+                // Fall back to drag direction on error (e.g., schema fetch fails, network error)
+                // This ensures relationship creation doesn't fail even if FK/PK detection fails
+                console.warn('Error detecting FK/PK semantics, using drag direction:', error);
+            }
+        }
+        // If models aren't bound (greenfield), use drag direction - user can manually swap if needed
+        
+        // Create relationship object
+        const relationship = {
+            source: finalSource,
+            target: finalTarget,
+            label: "",
+            type: relationshipType,
+            source_field: finalSourceField,
+            target_field: finalTargetField,
+            source_model_name: finalSource === sourceNodeId ? sourceActiveModel?.name : targetActiveModel?.name,
+            source_model_version: finalSource === sourceNodeId ? (sourceActiveModel?.version ?? null) : (targetActiveModel?.version ?? null),
+            target_model_name: finalTarget === targetNodeId ? targetActiveModel?.name : sourceActiveModel?.name,
+            target_model_version: finalTarget === targetNodeId ? (targetActiveModel?.version ?? null) : (sourceActiveModel?.version ?? null),
         };
-        $edges = [...$edges, newEdge];
+        
+        // Merge relationship into edges (will aggregate by entity pair)
+        $edges = mergeRelationshipIntoEdges($edges, relationship);
 
         $draggingField = null;
     }
@@ -1003,7 +1094,10 @@
                                     class="group relative flex items-center"
                                 >
                                     <button
-                                        onclick={() => activeModelIndex = index}
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            activeModelIndex = index;
+                                        }}
                                         class="px-2 py-1 text-[10px] rounded border transition-colors whitespace-nowrap flex items-center gap-1"
                                         class:bg-primary-500={isActive}
                                         class:text-white={isActive}

@@ -325,6 +325,40 @@ class YamlHandler:
         if description:
             column["description"] = description
 
+    def remove_relationship_test(
+        self,
+        column: CommentedMap,
+    ) -> None:
+        """
+        Remove any relationship test from a column, keeping other tests.
+
+        Args:
+            column: Column entry
+        """
+        existing_tests = CommentedSeq()
+
+        # Collect non-relationship tests only
+        for key in ("data_tests", "tests"):
+            if key not in column:
+                continue
+            for test in column.get(key, []):
+                if isinstance(test, dict) and "relationships" in test:
+                    # Skip relationship tests - we're removing them
+                    continue
+                existing_tests.append(test)
+
+        # Update column with non-relationship tests only
+        if len(existing_tests) > 0:
+            column["data_tests"] = existing_tests
+        else:
+            # Remove data_tests key if no tests remain
+            if "data_tests" in column:
+                del column["data_tests"]
+        
+        # Drop tests key if present to avoid confusion
+        if "tests" in column:
+            del column["tests"]
+
     def add_relationship_test(
         self,
         column: CommentedMap,
@@ -358,13 +392,14 @@ class YamlHandler:
         rel_test = CommentedMap()
         rel_body = CommentedMap()
 
-        # Preserve existing tags (or any other metadata except arguments) on the relationships block
+        # Preserve existing tags (or any other metadata except arguments, to, and field) on the relationships block
+        # Skip "to" and "field" as they are old-style syntax that should be replaced by the new "arguments" block
         if existing_relationship and isinstance(
             existing_relationship.get("relationships"), dict
         ):
             for key, value in existing_relationship["relationships"].items():
-                if key == "arguments":
-                    continue  # arguments will be rebuilt with the new ref/field
+                if key in ("arguments", "to", "field"):
+                    continue  # arguments/to/field will be rebuilt with the new ref/field syntax
                 rel_body[key] = value
 
         # Always set arguments with the latest reference targets

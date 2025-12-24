@@ -26,7 +26,7 @@
         inferRelationships,
         syncDbtTests,
     } from "$lib/api";
-    import { getParallelOffset, getModelFolder, normalizeTags } from "$lib/utils";
+    import { getParallelOffset, getModelFolder, normalizeTags, aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
@@ -42,6 +42,8 @@
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
     let lastSavedState = "";
+    let lastSyncedState = "";
+    let needsSync = $derived(lastSavedState !== "" && lastSavedState !== lastSyncedState);
     let showConfigInfoModal = $state(false);
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
@@ -53,6 +55,8 @@
         try {
             const result = await syncDbtTests();
             syncMessage = `✓ ${result.message}`;
+            // Mark current state as synced
+            lastSyncedState = lastSavedState;
             setTimeout(() => {
                 syncMessage = null;
             }, 3000);
@@ -93,7 +97,7 @@
             if (inferred.length > 0) {
                 let addedCount = 0;
                 let addedNodes = 0;
-                const newEdges = [...$edges];
+                let newEdges = [...$edges];
                 const existingEntityIds = new Set(
                     $nodes.filter((n) => n.type === "entity").map((n) => n.id),
                 );
@@ -136,59 +140,22 @@
                     maybeAddEntity(r.source);
                     maybeAddEntity(r.target);
 
-                    const exists = newEdges.some(
-                        (e) =>
-                            e.source === r.source &&
-                            e.target === r.target &&
-                            e.data?.source_field === r.source_field &&
-                            e.data?.target_field === r.target_field,
-                    );
-
-                    if (!exists) {
-                        const parallelEdges = newEdges.filter(
-                            (e) =>
-                                (e.source === r.source &&
-                                    e.target === r.target) ||
-                                (e.source === r.target &&
-                                    e.target === r.source),
-                        );
-                        const currentCount = parallelEdges.length;
-
-                        const baseId = `e${r.source}-${r.target}`;
-                        const edgeId = `${baseId}-${Date.now()}-${currentCount}`;
-
-                        newEdges.push({
-                            id: edgeId,
-                            source: r.source,
-                            target: r.target,
-                            type: "custom",
-                            data: {
-                                label: r.label || "",
-                                type: r.type || "one_to_many",
-                                source_field: r.source_field,
-                                target_field: r.target_field,
-                                label_dx: r.label_dx || 0,
-                                label_dy: r.label_dy || 0,
-                                parallelOffset: getParallelOffset(currentCount),
-                            },
-                        });
+                    // Merge relationship into edges (will aggregate by entity pair)
+                    const beforeCount = newEdges.length;
+                    newEdges = mergeRelationshipIntoEdges(newEdges, r);
+                    if (newEdges.length > beforeCount) {
                         addedCount++;
                     }
                 });
 
-                if (addedCount > 0) {
+                if (addedCount > 0 || addedNodes > 0) {
                     $edges = newEdges;
-                    syncMessage = `✓ Added ${addedCount} new${addedNodes ? `, ${addedNodes} nodes` : ""}`;
-                    setTimeout(() => {
-                        syncMessage = null;
-                    }, 3000);
-                } else if (addedNodes > 0) {
-                    syncMessage = `✓ Added ${addedNodes} nodes`;
+                    syncMessage = `✓ Added ${addedCount} relationship${addedCount !== 1 ? 's' : ''}${addedNodes ? `, ${addedNodes} node${addedNodes !== 1 ? 's' : ''}` : ""}`;
                     setTimeout(() => {
                         syncMessage = null;
                     }, 3000);
                 } else {
-                    syncMessage = "No new found";
+                    syncMessage = "✓ No new relationships found";
                     setTimeout(() => {
                         syncMessage = null;
                     }, 3000);
@@ -505,54 +472,8 @@
 
                 $nodes = [...groupNodes, ...entityNodes] as Node[];
 
-                const edgeCounts = new Map<string, number>();
-                $edges = relationships.map((r: any) => {
-                    const pairKey =
-                        r.source < r.target
-                            ? `${r.source}-${r.target}`
-                            : `${r.target}-${r.source}`;
-                    const currentCount = edgeCounts.get(pairKey) ?? 0;
-                    edgeCounts.set(pairKey, currentCount + 1);
-
-                    const baseId = `e${r.source}-${r.target}`;
-                    let edgeId = `${baseId}-${currentCount}`;
-                    if (currentCount === 0) edgeId = baseId;
-
-                    return {
-                        id: edgeId,
-                        source: r.source,
-                        target: r.target,
-                        type: "custom",
-                        data: {
-                            label: r.label || "",
-                            type: r.type || "one_to_many",
-                            source_field: r.source_field,
-                            target_field: r.target_field,
-                            label_dx: r.label_dx || 0,
-                            label_dy: r.label_dy || 0,
-                            parallelOffset: getParallelOffset(currentCount),
-                        },
-                    };
-                }) as Edge[];
-
-                // Deduplicate edges on load to clean up any existing bad state
-                const uniqueEdges = new Map<string, Edge>();
-                $edges.forEach((edge) => {
-                    // Create a unique key based on content, ignoring ID
-                    // Key: source|target|source_field|target_field
-                    // We sort source/target to handle bidirectional duplicates if any (though usually direction matters)
-                    // But for now let's stick to exact direction match unless it's a generic relationship
-                    const key = `${edge.source}|${edge.target}|${edge.data?.source_field || ""}|${edge.data?.target_field || ""}`;
-
-                    if (!uniqueEdges.has(key)) {
-                        uniqueEdges.set(key, edge);
-                    } else {
-                        console.warn(
-                            `Removed duplicate edge on load: ${edge.id} (duplicate of ${uniqueEdges.get(key)?.id})`,
-                        );
-                    }
-                });
-                $edges = Array.from(uniqueEdges.values());
+                // Aggregate relationships by entity pair (deduplicate)
+                $edges = aggregateRelationshipsIntoEdges(relationships);
 
                 // Auto-apply layout if all entity nodes are at default position (no saved layout)
                 const layoutCheckNodes = $nodes.filter((n) => n.type === "entity");
@@ -571,6 +492,8 @@
                     nodes: $nodes,
                     edges: $edges,
                 });
+                // Initialize as synced since we just loaded from disk
+                lastSyncedState = lastSavedState;
                 initHistory();
             } catch (e) {
                 console.error("Initialization error:", e);
@@ -650,21 +573,49 @@
                         tags: tagsToPersist,
                     };
                 }),
-            relationships: currentEdges.map((e) => ({
-                source: e.source,
-                target: e.target,
-                label: (e.data?.label as string) || "",
-                type:
-                    (e.data?.type as
-                        | "one_to_many"
-                        | "many_to_one"
-                        | "one_to_one"
-                        | "many_to_many") || "one_to_many",
-                source_field: e.data?.source_field as string | undefined,
-                target_field: e.data?.target_field as string | undefined,
-                label_dx: e.data?.label_dx as number | undefined,
-                label_dy: e.data?.label_dy as number | undefined,
-            })),
+            relationships: currentEdges.flatMap((e) => {
+                // If edge has multiple model relationships, expand them
+                const models = (e.data?.models as any[]) || [];
+                if (models.length > 0) {
+                    // Create one relationship per model
+                    return models.map((m) => ({
+                        source: e.source,
+                        target: e.target,
+                        label: (e.data?.label as string) || "",
+                        type:
+                            (e.data?.type as
+                                | "one_to_many"
+                                | "many_to_one"
+                                | "one_to_one"
+                                | "many_to_many") || "one_to_many",
+                        source_field: m.source_field as string | undefined,
+                        target_field: m.target_field as string | undefined,
+                        source_model_name: m.source_model_name as string | undefined,
+                        source_model_version: m.source_model_version as number | null | undefined,
+                        target_model_name: m.target_model_name as string | undefined,
+                        target_model_version: m.target_model_version as number | null | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
+                    }));
+                } else {
+                    // Fallback: single relationship from edge-level data
+                    return [{
+                        source: e.source,
+                        target: e.target,
+                        label: (e.data?.label as string) || "",
+                        type:
+                            (e.data?.type as
+                                | "one_to_many"
+                                | "many_to_one"
+                                | "one_to_one"
+                                | "many_to_many") || "one_to_many",
+                        source_field: e.data?.source_field as string | undefined,
+                        target_field: e.data?.target_field as string | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
+                    }];
+                }
+            }),
         };
     }
 
@@ -1030,8 +981,15 @@
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
-                title="Sync entity & field-definitions and relationship-tests to dbt schema.yml files"
+                class="px-4 py-2 text-sm rounded-lg font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm relative"
+                class:bg-primary-600={!needsSync}
+                class:hover:bg-primary-700={!needsSync}
+                class:bg-amber-600={needsSync}
+                class:hover:bg-amber-700={needsSync}
+                class:animate-pulse={needsSync}
+                title={needsSync 
+                    ? "⚠️ Changes in data model need to be pushed to dbt schema files" 
+                    : "Sync entity & field-definitions and relationship-tests to dbt schema.yml files"}
             >
                 {#if syncing}
                     <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
@@ -1039,6 +997,12 @@
                     <Icon icon="lucide:upload" class="w-4 h-4" />
                 {/if}
                 Push to dbt
+                {#if needsSync && !syncing}
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                {/if}
             </button>
         </div>
     </header>

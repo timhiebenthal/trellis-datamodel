@@ -82,6 +82,10 @@ export interface Relationship {
     target_field?: string;
     label_dx?: number;
     label_dy?: number;
+    source_model_name?: string; // name of the source model (e.g., "employee")
+    source_model_version?: number | null; // version of the source model if versioned
+    target_model_name?: string; // name of the target model (e.g., "employee_history")
+    target_model_version?: number | null; // version of the target model if versioned
 }
 
 /**
