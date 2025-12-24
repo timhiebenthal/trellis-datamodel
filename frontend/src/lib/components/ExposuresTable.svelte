@@ -70,41 +70,7 @@
     });
 </script>
 
-<div class="h-full w-full overflow-auto bg-gray-50 relative">
-    <!-- Floating Back to Canvas Button -->
-    <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
-        <div
-            class="flex bg-white rounded-lg p-1 border border-gray-200/60 shadow-lg"
-        >
-            <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-primary-50={$viewMode === "conceptual"}
-                class:text-primary-600={$viewMode === "conceptual"}
-                class:shadow-sm={$viewMode === "conceptual"}
-                class:text-gray-500={$viewMode !== "conceptual"}
-                class:hover:text-gray-900={$viewMode !== "conceptual"}
-                onclick={() => ($viewMode = "conceptual")}
-                title="Conceptual View"
-            >
-                <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
-                Conceptual
-            </button>
-            <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-primary-50={$viewMode === "logical"}
-                class:text-primary-600={$viewMode === "logical"}
-                class:shadow-sm={$viewMode === "logical"}
-                class:text-gray-500={$viewMode !== "logical"}
-                class:hover:text-gray-900={$viewMode !== "logical"}
-                onclick={() => ($viewMode = "logical")}
-                title="Logical View"
-            >
-                <Icon icon="lucide:database" class="w-3.5 h-3.5" />
-                Logical
-            </button>
-        </div>
-    </div>
-
+<div class="h-full w-full overflow-auto bg-gray-50">
     {#if loading}
         <div class="flex items-center justify-center h-full">
             <div class="text-center">
