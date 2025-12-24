@@ -352,7 +352,8 @@
         {#if $viewMode === "conceptual" || $viewMode === "logical"}
             <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
                 <div
-                    class="flex bg-white rounded-full p-1 border border-black shadow-lg"
+                    class="flex bg-white rounded-full p-1 border-[3px] border-primary-600 shadow-lg"
+                    style="box-shadow: 0 0 8px rgba(13, 148, 136, 0.4), 0 0 16px rgba(13, 148, 136, 0.25);"
                 >
                     <button
                         class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
