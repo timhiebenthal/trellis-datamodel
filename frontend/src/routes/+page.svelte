@@ -30,6 +30,7 @@
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
+    import ExposuresTable from "$lib/components/ExposuresTable.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, DbtModel } from "$lib/types";
@@ -886,7 +887,7 @@
                 class:hover:text-gray-900={$viewMode !== "conceptual"}
                 onclick={() => ($viewMode = "conceptual")}
             >
-                <Icon icon="octicon:workflow-16" class="w-4 h-4" />
+                <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
                 Conceptual
             </button>
             <button
@@ -898,8 +899,20 @@
                 class:hover:text-gray-900={$viewMode !== "logical"}
                 onclick={() => ($viewMode = "logical")}
             >
-                <Icon icon="lucide:database" class="w-4 h-4" />
+                <Icon icon="lucide:database" class="w-3.5 h-3.5" />
                 Logical
+            </button>
+            <button
+                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                class:bg-white={$viewMode === "exposures"}
+                class:text-primary-600={$viewMode === "exposures"}
+                class:shadow-sm={$viewMode === "exposures"}
+                class:text-gray-500={$viewMode !== "exposures"}
+                class:hover:text-gray-900={$viewMode !== "exposures"}
+                onclick={() => ($viewMode = "exposures")}
+            >
+                <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
+                Exposures
             </button>
         </div>
 
@@ -1014,7 +1027,11 @@
             class:active={resizingSidebar}
             onpointerdown={startSidebarResize}
         ></div>
-        <Canvas />
+        {#if $viewMode === 'exposures'}
+            <ExposuresTable />
+        {:else}
+            <Canvas />
+        {/if}
     </main>
 
     <ConfigInfoModal
