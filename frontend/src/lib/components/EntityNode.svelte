@@ -640,6 +640,12 @@ import Icon from "@iconify/svelte";
     }
 
     function handleDoubleClick(event: MouseEvent) {
+        // Don't trigger if double-clicking on an input field or other interactive element
+        const target = event.target as HTMLElement;
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "BUTTON" || target.closest("input, textarea, button")) {
+            return;
+        }
+        
         // Only trigger lineage modal for entities bound to dbt models
         if (!boundModelName) {
             return;
@@ -1111,6 +1117,7 @@ import Icon from "@iconify/svelte";
                 oninput={updateLabel}
                 onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}
+                ondblclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => e.stopPropagation()}
                 onkeyup={(e) => e.stopPropagation()}
                 class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm text-gray-800"

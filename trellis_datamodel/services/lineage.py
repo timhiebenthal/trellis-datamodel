@@ -1,7 +1,8 @@
 """
-Lineage extraction service using dbt-colibri.
+Lineage extraction service.
 
 Extracts table-level upstream lineage from dbt manifest.json and catalog.json files.
+Uses native manifest parsing (primary) with optional dbt-colibri support.
 """
 
 import json
@@ -10,10 +11,10 @@ from typing import Any, Optional
 from collections import deque
 
 try:
-    from dbt_colibri import extract_lineage
+    from dbt_colibri import extract_lineage as colibri_extract_lineage
+    COLIBRI_AVAILABLE = True
 except ImportError:
-    # Fallback if dbt-colibri is not available
-    extract_lineage = None
+    COLIBRI_AVAILABLE = False
 
 
 class LineageError(Exception):
@@ -44,28 +45,16 @@ def extract_upstream_lineage(
         LineageError: If lineage extraction fails
         FileNotFoundError: If manifest.json is missing
     """
-    if extract_lineage is None:
-        raise LineageError(
-            "dbt-colibri is not installed. Please install it with: pip install dbt-colibri"
-        )
-
     # Validate manifest exists
     if not os.path.exists(manifest_path):
         raise FileNotFoundError(f"Manifest not found at {manifest_path}")
-
-    # Check catalog exists (warn but don't fail)
-    if catalog_path and not os.path.exists(catalog_path):
-        raise LineageError(
-            f"Catalog not found at {catalog_path}. "
-            "Please run 'dbt docs generate' to create catalog.json"
-        )
 
     try:
         # Load manifest
         with open(manifest_path, "r") as f:
             manifest = json.load(f)
 
-        # Load catalog if available
+        # Load catalog if available (optional)
         catalog = None
         if catalog_path and os.path.exists(catalog_path):
             with open(catalog_path, "r") as f:
@@ -74,26 +63,158 @@ def extract_upstream_lineage(
         # Verify model exists in manifest
         nodes = manifest.get("nodes", {})
         if model_unique_id not in nodes:
-            raise LineageError(f"Model '{model_unique_id}' not found in manifest")
+            # Check if it's a versioned model issue
+            model_name = model_unique_id.split(".")[-1] if "." in model_unique_id else model_unique_id
+            matching_models = [
+                uid for uid in nodes.keys()
+                if uid.endswith(f".{model_name}") or uid.endswith(f".{model_name}.v")
+            ]
+            if matching_models:
+                raise LineageError(
+                    f"Model '{model_unique_id}' not found in manifest. "
+                    f"Found similar models: {', '.join(matching_models[:3])}"
+                )
+            raise LineageError(
+                f"Model '{model_unique_id}' not found in manifest. "
+                f"Available models: {len([n for n in nodes.values() if n.get('resource_type') == 'model'])} model(s)"
+            )
 
-        # Extract lineage using dbt-colibri
-        # Note: dbt-colibri API may vary - this is a placeholder implementation
-        # We'll need to adjust based on actual dbt-colibri API
-        lineage_data = extract_lineage(
-            manifest=manifest,
-            catalog=catalog,
-            model_unique_id=model_unique_id,
-            upstream=True,  # Get upstream lineage
-            table_level=True,  # Table-level (not column-level)
-        )
+        # Extract lineage using native manifest parsing
+        # This works without dbt-colibri by traversing depends_on relationships
+        lineage_data = _extract_lineage_from_manifest(manifest, model_unique_id)
 
-        # Transform dbt-colibri output to our format
+        # Transform to our format
         return _transform_lineage_data(lineage_data, model_unique_id)
 
     except FileNotFoundError:
         raise
     except Exception as e:
         raise LineageError(f"Failed to extract lineage: {str(e)}") from e
+
+
+def _extract_lineage_from_manifest(
+    manifest: dict[str, Any],
+    root_model_id: str,
+) -> dict[str, Any]:
+    """
+    Extract upstream lineage directly from manifest.json.
+    
+    Traverses depends_on relationships to build upstream lineage graph.
+    
+    Args:
+        manifest: Parsed manifest.json dictionary
+        root_model_id: Starting model unique_id
+        
+    Returns:
+        Dictionary with nodes (list of unique_ids) and edges (list of {source, target})
+    """
+    nodes = manifest.get("nodes", {})
+    sources = manifest.get("sources", {})
+    
+    # Track all nodes in lineage
+    lineage_node_ids: set[str] = {root_model_id}
+    lineage_edges: list[dict[str, str]] = []
+    
+    def _is_intermediate_model_only_sources(model_id: str) -> bool:
+        """Check if a model only depends on sources (no other models)."""
+        model_node = nodes.get(model_id)
+        if not model_node:
+            return False
+            
+        depends_on = model_node.get("depends_on")
+        if not depends_on:
+            return False
+            
+        if isinstance(depends_on, dict):
+            upstream_nodes = depends_on.get("nodes", [])
+        elif isinstance(depends_on, list):
+            upstream_nodes = depends_on
+        else:
+            upstream_nodes = []
+        
+        # Check if all dependencies are sources
+        for upstream_id in upstream_nodes:
+            if upstream_id.startswith("model."):
+                return False  # Has at least one model dependency
+        return len(upstream_nodes) > 0  # Has dependencies and they're all sources
+    
+    # BFS to find all upstream dependencies
+    queue = deque([root_model_id])
+    visited = {root_model_id}
+    
+    while queue:
+        current_id = queue.popleft()
+        current_node = nodes.get(current_id)
+        
+        if not current_node:
+            continue
+            
+        # Get upstream dependencies
+        depends_on = current_node.get("depends_on")
+        if not depends_on:
+            continue
+            
+        # Handle both dict and list formats
+        if isinstance(depends_on, dict):
+            upstream_nodes = depends_on.get("nodes", [])
+        elif isinstance(depends_on, list):
+            upstream_nodes = depends_on
+        else:
+            upstream_nodes = []
+        
+        for upstream_id in upstream_nodes:
+            # Check if this is an intermediate model that only connects to sources
+            if upstream_id.startswith("model.") and _is_intermediate_model_only_sources(upstream_id):
+                # Skip this intermediate model, connect its sources directly to current
+                upstream_node = nodes.get(upstream_id)
+                if upstream_node:
+                    upstream_depends_on = upstream_node.get("depends_on")
+                    if upstream_depends_on:
+                        if isinstance(upstream_depends_on, dict):
+                            source_deps = upstream_depends_on.get("nodes", [])
+                        elif isinstance(upstream_depends_on, list):
+                            source_deps = upstream_depends_on
+                        else:
+                            source_deps = []
+                        
+                        # Connect sources directly to current (skipping intermediate model)
+                        for source_id in source_deps:
+                            if source_id.startswith("source."):
+                                lineage_edges.append({
+                                    "source": source_id,
+                                    "target": current_id,
+                                })
+                                lineage_node_ids.add(source_id)
+            else:
+                # Normal dependency - add edge
+                lineage_edges.append({
+                    "source": upstream_id,
+                    "target": current_id,
+                })
+                
+                # Add upstream node to lineage
+                lineage_node_ids.add(upstream_id)
+                
+                # Continue BFS if not visited
+                if upstream_id not in visited:
+                    visited.add(upstream_id)
+                    # Only continue BFS for models (not sources)
+                    if upstream_id.startswith("model."):
+                        queue.append(upstream_id)
+    
+    # Identify source tables
+    source_ids = set()
+    for node_id in lineage_node_ids:
+        if node_id.startswith("source."):
+            source_ids.add(node_id)
+        elif node_id in sources:
+            source_ids.add(node_id)
+    
+    return {
+        "nodes": list(lineage_node_ids),
+        "edges": lineage_edges,
+        "sources": list(source_ids),
+    }
 
 
 def _transform_lineage_data(
@@ -118,11 +239,11 @@ def _transform_lineage_data(
     node_map: dict[str, dict[str, Any]] = {}
 
     # Extract nodes and edges from lineage_data
-    # Assuming lineage_data has structure like:
+    # Structure:
     # {
-    #   "nodes": [...],
-    #   "edges": [...],
-    #   "sources": [...]
+    #   "nodes": [list of unique_ids],
+    #   "edges": [list of {source, target}],
+    #   "sources": [list of source unique_ids]
     # }
 
     lineage_nodes = lineage_data.get("nodes", [])

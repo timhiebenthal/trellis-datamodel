@@ -25,8 +25,8 @@
     let lineageNodes = $state<Node[]>([]);
     let lineageEdges = $state<Edge[]>([]);
 
-    // Progressive display state
-    let expandedLevels = $state<Set<number>>(new Set([1])); // Start with level 1 visible
+    // Progressive display state - show all levels initially, but can collapse later
+    let expandedLevels = $state<Set<number>>(new Set());
     let placeholderNodes = $state<Map<string, { parentId: string; level: number }>>(new Map());
 
     // Fetch lineage when modal opens
@@ -39,7 +39,7 @@
             lineageNodes = [];
             lineageEdges = [];
             error = null;
-            expandedLevels = new Set([1]);
+            expandedLevels = new Set();
             placeholderNodes = new Map();
         }
     });
@@ -78,25 +78,15 @@
         // Get max level
         const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level), 0);
 
-        // Process nodes
+        // Process nodes - show all nodes initially (no progressive filtering for now)
+        // Sources should always be visible
         for (const node of lineageData.nodes) {
-            const level = node.level;
-
-            // Always show root (level 0) and level 1
-            if (level === 0 || level === 1) {
+            // Always show sources, root, and direct dependencies
+            if (node.isSource || node.level === 0 || node.level === 1) {
                 visibleNodes.push(createFlowNode(node));
-            } else if (expandedLevels.has(level)) {
-                // Show if level is expanded
+            } else if (expandedLevels.size === 0 || expandedLevels.has(node.level)) {
+                // Show if no filtering or if level is expanded
                 visibleNodes.push(createFlowNode(node));
-            } else {
-                // Check if this node has children that should be shown
-                const hasVisibleChildren = lineageData.edges.some(
-                    (e) => e.source === node.id && expandedLevels.has(e.level + 1)
-                );
-                if (hasVisibleChildren) {
-                    // This node should be visible because its children are visible
-                    visibleNodes.push(createFlowNode(node));
-                }
             }
         }
 
@@ -217,7 +207,7 @@
         aria-modal="true"
         aria-labelledby="lineage-modal-title"
     >
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] border border-gray-200 flex flex-col">
+        <div class="bg-white rounded-xl shadow-2xl w-[99.5vw] h-[98vh] border border-gray-200 flex flex-col">
             <!-- Header -->
             <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
                 <div class="flex items-center gap-2">
@@ -230,11 +220,12 @@
                     {/if}
                 </div>
                 <button
-                    class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                    class="p-2 rounded-md hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
                     onclick={onClose}
                     aria-label="Close"
+                    title="Close (Esc)"
                 >
-                    <Icon icon="lucide:x" class="w-5 h-5" />
+                    <Icon icon="lucide:x" class="w-6 h-6 font-bold" />
                 </button>
             </div>
 
@@ -288,15 +279,6 @@
                 {/if}
             </div>
 
-            <!-- Footer -->
-            <div class="px-5 py-3 border-t border-gray-200 flex justify-end flex-shrink-0">
-                <button
-                    class="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200"
-                    onclick={onClose}
-                >
-                    Close
-                </button>
-            </div>
         </div>
     </div>
 {/if}
