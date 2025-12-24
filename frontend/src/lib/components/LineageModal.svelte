@@ -13,6 +13,7 @@
     import type { LineageResponse, LineageNode, LineageEdge } from "$lib/types";
     import Icon from "@iconify/svelte";
     import LineageSourceNode from "./LineageSourceNode.svelte";
+    import LineageModelNode from "./LineageModelNode.svelte";
 
     const { open = false, modelId = null, onClose } = $props<{
         open: boolean;
@@ -28,7 +29,7 @@
 
     const nodeTypes = {
         source: LineageSourceNode,
-        default: undefined, // Use default node type for regular models
+        default: LineageModelNode, // Use custom node type for regular models
     };
 
     // Progressive display state - show all levels initially, but can collapse later
@@ -158,10 +159,46 @@
     }
 
     function createFlowNode(node: LineageNode): Node {
+        if (!lineageData) {
+            return {
+                id: node.id,
+                type: node.isSource ? "source" : "default",
+                position: { x: 0, y: 0 },
+                data: {
+                    label: node.label,
+                    level: node.level,
+                    isSource: node.isSource,
+                },
+            };
+        }
+
+        // Calculate positions: sources at top, target at bottom
+        const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level), 0);
+        const BOTTOM_Y = 700; // Target entity position (bottom)
+        const TOP_Y = 100; // Sources position (top)
+        const LEVEL_SPACING = 200; // Vertical spacing between levels
+        
+        // Y position: sources at top, target at bottom
+        let yPosition: number;
+        if (node.isSource) {
+            // Sources always at the very top
+            yPosition = TOP_Y;
+        } else if (node.level === 0) {
+            // Target entity at the bottom
+            yPosition = BOTTOM_Y;
+        } else {
+            // Intermediate models: position from bottom, going up as level increases
+            // Level 1 should be above target, level 2 above level 1, etc.
+            yPosition = BOTTOM_Y - (node.level * LEVEL_SPACING);
+        }
+        
+        // X position: spread horizontally by level
+        const xPosition = node.level * 300;
+        
         return {
             id: node.id,
             type: node.isSource ? "source" : "default",
-            position: { x: node.level * 200, y: Math.random() * 300 }, // Basic layout - will be improved
+            position: { x: xPosition, y: yPosition },
             data: {
                 label: node.label,
                 level: node.level,
