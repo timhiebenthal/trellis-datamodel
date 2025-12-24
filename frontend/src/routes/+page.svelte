@@ -874,47 +874,20 @@
             {/if}
         </div>
 
-        <!-- View Switcher -->
-        <div
-            class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60"
+        <!-- Exposures Tab -->
+        <button
+            class="px-4 py-1.5 text-sm rounded-lg transition-all duration-200 font-medium flex items-center gap-2 border border-gray-200/60"
+            class:bg-white={$viewMode === "exposures"}
+            class:text-primary-600={$viewMode === "exposures"}
+            class:shadow-sm={$viewMode === "exposures"}
+            class:text-gray-500={$viewMode !== "exposures"}
+            class:hover:text-gray-900={$viewMode !== "exposures"}
+            class:bg-gray-100={$viewMode !== "exposures"}
+            onclick={() => ($viewMode = "exposures")}
         >
-            <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-white={$viewMode === "conceptual"}
-                class:text-primary-600={$viewMode === "conceptual"}
-                class:shadow-sm={$viewMode === "conceptual"}
-                class:text-gray-500={$viewMode !== "conceptual"}
-                class:hover:text-gray-900={$viewMode !== "conceptual"}
-                onclick={() => ($viewMode = "conceptual")}
-            >
-                <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
-                Conceptual
-            </button>
-            <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-white={$viewMode === "logical"}
-                class:text-primary-600={$viewMode === "logical"}
-                class:shadow-sm={$viewMode === "logical"}
-                class:text-gray-500={$viewMode !== "logical"}
-                class:hover:text-gray-900={$viewMode !== "logical"}
-                onclick={() => ($viewMode = "logical")}
-            >
-                <Icon icon="lucide:database" class="w-3.5 h-3.5" />
-                Logical
-            </button>
-            <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-white={$viewMode === "exposures"}
-                class:text-primary-600={$viewMode === "exposures"}
-                class:shadow-sm={$viewMode === "exposures"}
-                class:text-gray-500={$viewMode !== "exposures"}
-                class:hover:text-gray-900={$viewMode !== "exposures"}
-                onclick={() => ($viewMode = "exposures")}
-            >
-                <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
-                Exposures
-            </button>
-        </div>
+            <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
+            Exposures
+        </button>
 
         <!-- Actions -->
         <div class="flex items-center gap-3">
