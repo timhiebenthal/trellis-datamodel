@@ -156,7 +156,7 @@
                     type: "placeholder",
                     position: {
                         x: parentNode.position.x,
-                        y: parentNode.position.y + 100,
+                        y: parentNode.position.y + 60,
                     },
                     data: {
                         label: "...",
@@ -193,11 +193,11 @@
 
         // Calculate positions: sources at top, target at bottom
         const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level), 0);
-        const BOTTOM_Y = 700; // Target entity position (bottom)
-        const TOP_Y = 100; // Sources position (top)
-        const LEVEL_SPACING = 200; // Vertical spacing between levels
-        const COLUMN_OFFSET = 280; // Base offset per level (keeps columns apart)
-        const H_SPACING = 220; // Horizontal spacing between siblings at the same level
+        const BOTTOM_Y = 500; // Target entity position (bottom)
+        const TOP_Y = 80; // Sources position (top)
+        const LEVEL_SPACING = 120; // Vertical spacing between levels
+        const COLUMN_OFFSET = 180; // Base offset per level (keeps columns apart)
+        const H_SPACING = 150; // Horizontal spacing between siblings at the same level
         
         // Y position: sources at top, target at bottom
         let yPosition: number;
