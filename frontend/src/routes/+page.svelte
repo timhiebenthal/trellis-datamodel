@@ -888,7 +888,7 @@
                 onclick={() => ($viewMode = "conceptual")}
                 title="Canvas View"
             >
-                <Icon icon="lucide:layout-grid" class="w-3.5 h-3.5" />
+                <Icon icon="lucide:layout-dashboard" class="w-3.5 h-3.5" />
                 Canvas
             </button>
             <button
@@ -967,7 +967,7 @@
                 class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Automatically arrange entities and relationships for optimal readability"
             >
-                <Icon icon="lucide:layout-grid" class="w-4 h-4" />
+                <Icon icon="lucide:wand-2" class="w-4 h-4" />
                 Auto Layout
             </button>
 
