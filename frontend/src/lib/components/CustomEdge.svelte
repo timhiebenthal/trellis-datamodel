@@ -5,7 +5,7 @@
     type EdgeProps,
     useSvelteFlow
   } from '@xyflow/svelte';
-  import { edges, nodes, viewMode, dbtModels, lineageModal } from '$lib/stores';
+  import { edges, nodes, viewMode, dbtModels } from '$lib/stores';
   import Icon from '@iconify/svelte';
   import {
     getNodeDimensions,
@@ -82,9 +82,6 @@
   // Build the edge path
   const edgePath = $derived.by(() => {
     const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomEdge.svelte:83',message:'edgePath calculation',data:{id,sourceNode:sourceNode?.id,targetNode:targetNode?.id,sourcePos:sourceNode?.position,targetPos:targetNode?.position,sourcePoint,targetPoint,hasSourceNode:!!sourceNode,hasTargetNode:!!targetNode},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion agent log
     let path: string;
     if (isSelfEdge) {
       path = buildSelfLoopPath(
@@ -105,9 +102,6 @@
         storedOffsetY + dragOffsetY
       );
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomEdge.svelte:103',message:'edgePath result',data:{id,path,sourcePoint,targetPoint},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion agent log
     return path;
   });
 
@@ -480,25 +474,13 @@
 
   // Style overrides for selection - Use #26A69A (Teal)
   const edgeStyle = $derived.by(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomEdge.svelte:473',message:'edgeStyle derivation',data:{id,selected,styleValue:style,hasStyle:!!style},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion agent log
-    
     if (selected) {
-      const result = `stroke: #26A69A; stroke-width: 2; ${style || ''}`;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomEdge.svelte:478',message:'edgeStyle selected path',data:{id,result},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion agent log
-      return result;
+      return `stroke: #26A69A; stroke-width: 2; ${style || ''}`;
     }
     
     // Ensure default stroke styling when not selected
     const defaultStyle = 'stroke: #64748b; stroke-width: 2';
-    const result = style ? `${defaultStyle}; ${style}` : defaultStyle;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomEdge.svelte:485',message:'edgeStyle unselected path',data:{id,styleValue:style,result},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion agent log
-    return result;
+    return style ? `${defaultStyle}; ${style}` : defaultStyle;
   });
   
   // Crow's foot marker positions and rotations based on connection sides
@@ -519,20 +501,9 @@
     return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(targetSide)})`;
   });
 
-  // #region agent log
-  // Track BaseEdge rendering and lineageModal state
-  $effect(() => {
-    const currentStyle = edgeStyle;
-    const modalState = $lineageModal;
-    const currentPath = edgePath;
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomEdge.svelte:525',message:'BaseEdge render',data:{id,edgeStyle:currentStyle,edgePath:currentPath,selected,hasPath:!!currentPath,modalOpen:modalState.open},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'C'})}).catch(()=>{});
-  });
-  // #endregion agent log
 </script>
 
-{#key `${edgePath}-${$lineageModal.open}`}
-  <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
-{/key}
+<BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
 
 <!-- Crow's foot notation markers - on VERTICAL segments near entities -->
 <!-- Crow's foot points AT the entity box, zero circle toward the middle of the edge -->
