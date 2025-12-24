@@ -244,6 +244,260 @@ class TestSyncDbtTests:
             }
         ]
 
+    def test_syncs_many_to_one_relationship(self, test_client, temp_dir, temp_data_model_path):
+        """
+        Ensure many_to_one relationships write FK test to source entity (the "many" side).
+        """
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "customer_entity",
+                    "label": "Customers",
+                    "dbt_model": "model.project.customers",
+                    "position": {"x": 0, "y": 0},
+                },
+                {
+                    "id": "order_entity",
+                    "label": "Orders",
+                    "dbt_model": "model.project.orders",
+                    "drafted_fields": [{"name": "customer_id", "datatype": "int"}],
+                    "position": {"x": 100, "y": 0},
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "order_entity",  # Source is "many" side, so FK should be here
+                    "target": "customer_entity",  # Target is "one" side (PK)
+                    "type": "many_to_one",
+                    "source_field": "customer_id",  # FK field
+                    "target_field": "id",  # PK field
+                }
+            ],
+        }
+
+        # Persist data model
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # orders.yml should contain a relationship test (FK is on source/orders)
+        orders_yml = os.path.join(temp_dir, "models", "3_core", "orders.yml")
+        assert os.path.exists(orders_yml)
+        with open(orders_yml, "r") as f:
+            schema = yaml.safe_load(f)
+
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert rel_tests == [
+            {
+                "relationships": {
+                    "arguments": {"to": "ref('customers')", "field": "id"},
+                }
+            }
+        ]
+
+        # customers.yml should NOT have a relationship test (PK is on target/customers)
+        customers_yml = os.path.join(temp_dir, "models", "3_core", "customers.yml")
+        if os.path.exists(customers_yml):
+            with open(customers_yml, "r") as f:
+                customer_schema = yaml.safe_load(f)
+            # If customers.yml exists, it shouldn't have relationship tests for this relationship
+            if "models" in customer_schema and len(customer_schema["models"]) > 0:
+                if "columns" in customer_schema["models"][0]:
+                    for col in customer_schema["models"][0]["columns"]:
+                        if col.get("name") == "id":
+                            # PK field shouldn't have relationship test pointing back
+                            tests = col.get("data_tests", [])
+                            for test in tests:
+                                if "relationships" in test:
+                                    rel = test["relationships"]
+                                    ref = rel.get("arguments", {}).get("to", "") or rel.get("to", "")
+                                    assert "ref('orders')" not in ref
+
+    def test_removes_stale_relationship_tests_when_type_changes(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        When relationship type changes (e.g., one_to_many -> many_to_one),
+        stale relationship tests should be removed from old FK location and
+        added to new FK location.
+        """
+        # Start with one_to_many relationship (FK on target/orders)
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "customers",
+                    "label": "Customers",
+                    "dbt_model": "model.project.customers",
+                    "position": {"x": 0, "y": 0},
+                },
+                {
+                    "id": "orders",
+                    "label": "Orders",
+                    "dbt_model": "model.project.orders",
+                    "drafted_fields": [{"name": "customer_id", "datatype": "int"}],
+                    "position": {"x": 100, "y": 0},
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "customers",
+                    "target": "orders",
+                    "type": "one_to_many",  # FK on target (orders)
+                    "source_field": "id",
+                    "target_field": "customer_id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # First sync: FK should be on orders
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        orders_yml = os.path.join(temp_dir, "models", "3_core", "orders.yml")
+        assert os.path.exists(orders_yml)
+        with open(orders_yml, "r") as f:
+            schema = yaml.safe_load(f)
+        
+        # Verify FK test is on orders.customer_id
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert len(rel_tests) == 1
+        assert "relationships" in rel_tests[0]
+        assert rel_tests[0]["relationships"]["arguments"]["to"] == "ref('customers')"
+
+        # Now change relationship type to many_to_one (FK should move to source/customers)
+        data_model["relationships"][0]["type"] = "many_to_one"
+        # Swap fields: FK now on source (customers), PK on target (orders)
+        data_model["relationships"][0]["source_field"] = "customer_id"
+        data_model["relationships"][0]["target_field"] = "id"
+        # Swap source/target to reflect new direction
+        data_model["relationships"][0]["source"] = "orders"
+        data_model["relationships"][0]["target"] = "customers"
+
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Second sync: FK should move to orders, old FK on customers should be removed
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # Verify orders.yml still has the test (FK is still on orders, just different semantics)
+        with open(orders_yml, "r") as f:
+            schema = yaml.safe_load(f)
+        
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert len(rel_tests) == 1
+        assert "relationships" in rel_tests[0]
+        assert rel_tests[0]["relationships"]["arguments"]["to"] == "ref('customers')"
+
+        # Verify customers.yml does NOT have a relationship test
+        # (even if it exists, it shouldn't have a test pointing back to orders)
+        customers_yml = os.path.join(temp_dir, "models", "3_core", "customers.yml")
+        if os.path.exists(customers_yml):
+            with open(customers_yml, "r") as f:
+                customer_schema = yaml.safe_load(f)
+            if "models" in customer_schema and len(customer_schema["models"]) > 0:
+                if "columns" in customer_schema["models"][0]:
+                    for col in customer_schema["models"][0]["columns"]:
+                        if col.get("name") == "id":
+                            tests = col.get("data_tests", [])
+                            for test in tests:
+                                if "relationships" in test:
+                                    rel = test["relationships"]
+                                    ref = rel.get("arguments", {}).get("to", "") or rel.get("to", "")
+                                    assert "ref('orders')" not in ref
+
+    def test_removes_stale_tests_when_swapping_one_to_many_to_many_to_one(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        Test the specific bug scenario: swapping one_to_many to many_to_one
+        should move FK from target to source and remove stale test from target.
+        """
+        # Create initial state: one_to_many with FK on target
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "department",
+                    "label": "Department",
+                    "dbt_model": "model.project.department",
+                    "drafted_fields": [{"name": "department_id", "datatype": "text"}],
+                },
+                {
+                    "id": "cool_stuff",
+                    "label": "Cool Stuff",
+                    "dbt_model": "model.project.cool_stuff",
+                    "drafted_fields": [{"name": "department_id", "datatype": "text"}],
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "department",
+                    "target": "cool_stuff",
+                    "type": "one_to_many",  # FK on target (cool_stuff)
+                    "source_field": "department_id",
+                    "target_field": "department_id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Initial sync: FK should be on cool_stuff
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        cool_stuff_yml = os.path.join(temp_dir, "models", "3_core", "cool_stuff.yml")
+        assert os.path.exists(cool_stuff_yml)
+        with open(cool_stuff_yml, "r") as f:
+            schema = yaml.safe_load(f)
+        
+        # Verify FK test exists on cool_stuff.department_id
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert len(rel_tests) == 1
+        assert "relationships" in rel_tests[0]
+
+        # Now swap to many_to_one (FK should move to department)
+        data_model["relationships"][0]["type"] = "many_to_one"
+        # Note: source/target stay the same, only type changes (as per fixed swap logic)
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Second sync: FK should move to department, stale test removed from cool_stuff
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # Verify cool_stuff.yml no longer has the relationship test
+        with open(cool_stuff_yml, "r") as f:
+            schema = yaml.safe_load(f)
+        
+        # cool_stuff.department_id should NOT have relationship test anymore
+        if "columns" in schema["models"][0]:
+            for col in schema["models"][0]["columns"]:
+                if col.get("name") == "department_id":
+                    tests = col.get("data_tests", [])
+                    # Should have no relationship tests (or no tests at all)
+                    for test in tests:
+                        assert "relationships" not in test
+
+        # Verify department.yml now has the relationship test
+        department_yml = os.path.join(temp_dir, "models", "3_core", "department.yml")
+        assert os.path.exists(department_yml)
+        with open(department_yml, "r") as f:
+            dept_schema = yaml.safe_load(f)
+        
+        # department.department_id should have relationship test pointing to cool_stuff
+        rel_tests = dept_schema["models"][0]["columns"][0]["data_tests"]
+        assert len(rel_tests) == 1
+        assert "relationships" in rel_tests[0]
+        assert rel_tests[0]["relationships"]["arguments"]["to"] == "ref('cool_stuff')"
+
 
 class TestGetModelSchema:
     """Tests for GET /api/models/{model_name}/schema endpoint."""

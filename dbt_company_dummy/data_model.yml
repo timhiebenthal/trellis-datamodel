@@ -1,0 +1,25 @@
+version: 0.1
+entities:
+- id: new_entity
+  label: New Entity
+  description: Employee records
+  dbt_model: model.company_dummy.employee
+  drafted_fields:
+  - name: ''
+    datatype: text
+- id: department
+  label: department
+  description: Company departments
+  dbt_model: model.company_dummy.department
+relationships:
+- source: new_entity
+  target: new_entity
+  label: ''
+  type: one_to_many
+- source: department
+  target: new_entity
+  label: ''
+  type: one_to_many
+  source_field: department_id
+  target_field: department_id
+

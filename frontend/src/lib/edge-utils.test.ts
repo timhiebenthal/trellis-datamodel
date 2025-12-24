@@ -6,6 +6,7 @@ import {
   calculateConnectionInfo,
   getSideRotation,
   buildOrthogonalPath,
+  buildSelfLoopPath,
   calculateMarkerPosition,
   type Side
 } from './edge-utils';
@@ -112,14 +113,15 @@ describe('getNodeCenter', () => {
 });
 
 describe('calculateConnectionInfo', () => {
-  const createNode = (x: number, y: number, width = 320, height = 200) => ({
+  const createNode = (id: string, x: number, y: number, width = 320, height = 200) => ({
+    id,
     position: { x, y },
     measured: { width, height }
   });
 
   it('chooses right/left sides when target is to the right', () => {
-    const source = createNode(0, 0);
-    const target = createNode(500, 0);
+    const source = createNode('a', 0, 0);
+    const target = createNode('b', 500, 0);
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     expect(info.sourceSide).toBe('right');
@@ -127,8 +129,8 @@ describe('calculateConnectionInfo', () => {
   });
 
   it('chooses left/right sides when target is to the left', () => {
-    const source = createNode(500, 0);
-    const target = createNode(0, 0);
+    const source = createNode('a', 500, 0);
+    const target = createNode('b', 0, 0);
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     expect(info.sourceSide).toBe('left');
@@ -136,8 +138,8 @@ describe('calculateConnectionInfo', () => {
   });
 
   it('chooses bottom/top sides when target is below', () => {
-    const source = createNode(0, 0);
-    const target = createNode(0, 500);
+    const source = createNode('a', 0, 0);
+    const target = createNode('b', 0, 500);
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     expect(info.sourceSide).toBe('bottom');
@@ -145,8 +147,8 @@ describe('calculateConnectionInfo', () => {
   });
 
   it('chooses top/bottom sides when target is above', () => {
-    const source = createNode(0, 500);
-    const target = createNode(0, 0);
+    const source = createNode('a', 0, 500);
+    const target = createNode('b', 0, 0);
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     expect(info.sourceSide).toBe('top');
@@ -154,8 +156,8 @@ describe('calculateConnectionInfo', () => {
   });
 
   it('prefers horizontal when dx > dy', () => {
-    const source = createNode(0, 0);
-    const target = createNode(300, 100); // dx=300, dy=100
+    const source = createNode('a', 0, 0);
+    const target = createNode('b', 300, 100); // dx=300, dy=100
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     expect(info.sourceSide).toBe('right');
@@ -163,8 +165,8 @@ describe('calculateConnectionInfo', () => {
   });
 
   it('prefers vertical when dy > dx', () => {
-    const source = createNode(0, 0);
-    const target = createNode(100, 300); // dx=100, dy=300
+    const source = createNode('a', 0, 0);
+    const target = createNode('b', 100, 300); // dx=100, dy=300
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     expect(info.sourceSide).toBe('bottom');
@@ -172,14 +174,27 @@ describe('calculateConnectionInfo', () => {
   });
 
   it('calculates correct connection points on node borders', () => {
-    const source = createNode(0, 0, 100, 100); // center at (50, 50)
-    const target = createNode(200, 0, 100, 100); // center at (250, 50)
+    const source = createNode('a', 0, 0, 100, 100); // center at (50, 50)
+    const target = createNode('b', 200, 0, 100, 100); // center at (250, 50)
     const info = calculateConnectionInfo(source, target, [source, target]);
     
     // Source right edge: x = 0 + 100 = 100, y = 50
     expect(info.sourcePoint).toEqual({ x: 100, y: 50 });
     // Target left edge: x = 200, y = 50
     expect(info.targetPoint).toEqual({ x: 200, y: 50 });
+  });
+
+  it('routes self-relationships out and back on the right side', () => {
+    const node = createNode('self', 100, 100, 120, 80); // center at (160, 140)
+    const info = calculateConnectionInfo(node, node, [node]);
+
+    expect(info.sourceSide).toBe('right');
+    expect(info.targetSide).toBe('right');
+
+    // Points should be separated vertically and aligned to the right edge
+    expect(info.sourcePoint.x).toBeCloseTo(160 + 60); // center x + half width
+    expect(info.targetPoint.x).toBeCloseTo(160 + 60);
+    expect(info.targetPoint.y).toBeGreaterThan(info.sourcePoint.y);
   });
 });
 
@@ -284,6 +299,34 @@ describe('buildOrthogonalPath', () => {
     );
     // midY should be (100+200)/2 + 30 = 180
     expect(path).toContain('180');
+  });
+});
+
+describe('buildSelfLoopPath', () => {
+  it('creates a curved loop to the right of the node', () => {
+    const path = buildSelfLoopPath(
+      { x: 100, y: 50 },
+      { x: 100, y: 90 },
+      'right',
+      0,
+      40
+    );
+
+    expect(path).toBe('M 100 50 C 140 50, 140 90, 100 90');
+  });
+
+  it('applies baseOffset perpendicular to the loop direction', () => {
+    const path = buildSelfLoopPath(
+      { x: 100, y: 50 },
+      { x: 100, y: 90 },
+      'right',
+      20, // baseOffset shifts Y for right-side loops
+      40
+    );
+
+    // Y values should be offset by 20
+    expect(path).toContain('70');
+    expect(path).toContain('110');
   });
 });
 

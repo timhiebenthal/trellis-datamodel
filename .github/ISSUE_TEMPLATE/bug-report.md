@@ -8,10 +8,10 @@ assignees: ''
 ---
 
 ## Problem
-Please describe the issue you're experiencing
+<!-- Please describe the issue you're experiencing -->
 
 ## Expected behavior
- If sensible, describe what behavior you would have expected instead
+<!--  If sensible, describe what behavior you would have expected instead -->
 
 
 ## Environment

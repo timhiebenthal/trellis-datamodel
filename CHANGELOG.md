@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added auto-naming for entities when binding dbt models: when a user binds a dbt model to an unnamed entity (ID starts with `new_entity` and label is `"New Entity"`), the entity ID and label are automatically derived from the dbt model name. Model names are formatted with title-case and spaces (e.g., `entity_booking` → `"Entity Booking"`), and the entity ID is generated as a slugified version. This reduces manual naming steps and improves developer experience.
+
+## [0.3.5] - 2025-12-23
+
+### Added
+- Added relationship deduplication for entities with multiple dbt models: when an entity has multiple dbt models (e.g., `employee` and `employee_history`), relationships are now aggregated into a single edge per entity pair instead of showing parallel edges. The relationship detail box dynamically shows field-level details based on the currently selected dbt model for each entity.
+
+### Fixed
+- Fixed self-relationship rendering: self-relationships (self-joins) now render as smooth curved loops on the right side of nodes instead of going through the box
+- Fixed duplicate relationship tests when converting old syntax (`to:` and `field:` at top level) to new `arguments:` syntax: old-style keys are now properly skipped during conversion, preventing duplicate relationship tests in dbt schema files
+- Fixed relationship detail box to show correct model names when switching between multiple dbt models bound to the same entity (e.g., switching from `employee` to `employee_history` now correctly updates the field labels in relationship details)
+- Fixed relationship direction swap functionality: the swap button now only changes the relationship type (e.g., `one_to_many` ↔ `many_to_one`) without swapping source/target entities, correctly moving the foreign key between entities and propagating changes to dbt schema files
+- Fixed stale relationship test cleanup: when relationship types change (e.g., from `one_to_many` to `many_to_one`), relationship tests are now properly removed from the old FK location and added to the new FK location in dbt schema files
+
+### Changed
+- Improved relationship text display: entity names in relationship labels are now shown in quotes (e.g., `one 'department' relates to many 'employee'`) for better readability
+
 ## [0.3.4] - 2025-12-21
 
 ### Fixed
