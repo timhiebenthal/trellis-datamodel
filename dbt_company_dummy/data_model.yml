@@ -1,7 +1,7 @@
 version: 0.1
 entities:
-- id: new_entity
-  label: New Entity
+- id: employee
+  label: employee
   description: Employee records
   dbt_model: model.company_dummy.employee
   drafted_fields:
@@ -11,15 +11,79 @@ entities:
   label: department
   description: Company departments
   dbt_model: model.company_dummy.department
+- id: lead
+  label: lead
+  description: Sales leads
+  dbt_model: model.company_dummy.lead
+- id: sale
+  label: sale
+  description: Sale records at order-item grain with enriched order information
+  dbt_model: model.company_dummy.sale
+- id: product
+  label: product
+  description: Product catalog
+  dbt_model: model.company_dummy.product
+- id: customer
+  label: customer
+  description: Customer records
+  dbt_model: model.company_dummy.customer
+- id: supplier
+  label: supplier
+  description: Supplier records
+  dbt_model: model.company_dummy.supplier
+- id: inventory
+  label: inventory
+  description: Product inventory levels
+  dbt_model: model.company_dummy.inventory
+- id: procurement
+  label: procurement
+  description: Procurement records at purchase-order-item grain with enriched purchase
+    order information
+  dbt_model: model.company_dummy.procurement
 relationships:
-- source: new_entity
-  target: new_entity
+- source: employee
+  target: employee
   label: ''
   type: one_to_many
 - source: department
-  target: new_entity
+  target: employee
   label: ''
   type: one_to_many
   source_field: department_id
   target_field: department_id
-
+- source: lead
+  target: customer
+  label: ''
+  type: one_to_many
+  source_field: lead_id
+  target_field: lead_id
+- source: customer
+  target: sale
+  label: ''
+  type: one_to_many
+  source_field: customer_id
+  target_field: customer_id
+- source: product
+  target: sale
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: inventory
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: supplier
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: supplier_id
+  target_field: supplier_id

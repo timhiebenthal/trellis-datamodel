@@ -15,5 +15,25 @@ exposures:
       - ref('customer')
 
     owner:
-      name: Jon Doe
-      email: jon.doe@example.com
+      name: Jeff Cash
+      email: jeff.cash@example.com
+
+
+  - name: operations_dashboard
+    label: Operations Dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.tool/dashboards/2
+    description: >
+      Operations dashboard showing operations by product, supplier, procurement, and inventory.
+
+    depends_on:
+      - ref('product')
+      - ref('supplier')
+      - ref('supplier_invoice')
+      - ref('inventory')
+      - ref('procurement')
+
+    owner:
+      name: Clara Stock
+      email: clara.stock@example.com
