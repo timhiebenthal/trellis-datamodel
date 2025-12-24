@@ -227,6 +227,7 @@
                 label: node.label,
                 level: node.level,
                 isSource: node.isSource,
+                sourceName: node.sourceName,
             },
         };
     }

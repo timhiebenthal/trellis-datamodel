@@ -163,6 +163,7 @@ export interface LineageNode {
     label: string;
     level: number;
     isSource: boolean;
+    sourceName?: string; // Source-name for source nodes (e.g., "company_source" from "source.project.company_source.table")
 }
 
 export interface LineageEdge {

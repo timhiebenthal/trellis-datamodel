@@ -359,13 +359,25 @@ def _get_node_info(
     # Determine if this is a source table
     is_source = node_id in source_set or node_id.startswith("source.")
 
+    # Extract source-name for source nodes
+    # Source IDs follow format: source.project.source_name.table_name
+    source_name = None
+    if is_source and len(parts) >= 3:
+        source_name = parts[2]  # Third part is the source-name
+
     # Get level (distance from root)
     level = levels.get(node_id, 0)
 
-    return {
+    result = {
         "id": node_id,
         "label": label,
         "level": level,
         "isSource": is_source,
     }
+    
+    # Add source-name if this is a source node
+    if source_name is not None:
+        result["sourceName"] = source_name
+
+    return result
 
