@@ -37,6 +37,54 @@ export function generateSlug(label: string, existingIds: string[], currentId?: s
 }
 
 /**
+ * Format a dbt model name for use as an entity label.
+ * Replaces underscores with spaces and title-cases each word.
+ * 
+ * @param modelName - The model name (e.g., "entity_booking")
+ * @returns Formatted label (e.g., "Entity Booking")
+ * 
+ * @example
+ * formatModelNameForLabel("user_id") // "User Id"
+ * formatModelNameForLabel("API_key") // "Api Key"
+ * formatModelNameForLabel("entity_booking") // "Entity Booking"
+ */
+export function formatModelNameForLabel(modelName: string): string {
+    return modelName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+/**
+ * Extract model name from a dbt model's unique_id.
+ * Handles both regular and versioned models.
+ * 
+ * @param uniqueId - The dbt model unique_id (e.g., "model.project.entity_booking" or "model.project.entity_booking.v1")
+ * @returns The extracted model name (e.g., "entity_booking")
+ * 
+ * @example
+ * extractModelNameFromUniqueId("model.project.entity_booking") // "entity_booking"
+ * extractModelNameFromUniqueId("model.project.entity_booking.v1") // "entity_booking"
+ */
+export function extractModelNameFromUniqueId(uniqueId: string): string {
+    const parts = uniqueId.split(".");
+    if (parts.length >= 3 && parts[0] === "model") {
+        const lastPart = parts[parts.length - 1];
+        const isVersioned = /^v\d+$/.test(lastPart);
+        
+        if (isVersioned && parts.length >= 4) {
+            // Versioned model: return base name (second-to-last part)
+            return parts[parts.length - 2];
+        } else {
+            // Regular model: return last part
+            return lastPart;
+        }
+    }
+    // Fallback: if format doesn't match, try to extract from end
+    return uniqueId.includes(".") ? uniqueId.split(".").pop()! : uniqueId;
+}
+
+/**
  * Extract folder path from a dbt model's file_path.
  * Skips "models/" prefix and the first directory level (e.g., "3_core").
  * Returns null if no subfolder exists.

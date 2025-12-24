@@ -24,6 +24,8 @@
         normalizeTags,
         mergeRelationshipIntoEdges,
         detectFieldSemantics,
+        formatModelNameForLabel,
+        extractModelNameFromUniqueId,
     } from "$lib/utils";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import Icon from "@iconify/svelte";
@@ -360,7 +362,66 @@
             if (!hasDescription && (model.description || "").trim().length > 0) {
                 updates.description = model.description;
             }
-            updateNodeData(id, updates);
+            
+            // Auto-naming: Check if entity is unnamed and binding primary model
+            const isUnnamed = id.startsWith('new_entity') && data.label === 'New Entity';
+            let finalId = id; // Track the final ID to use for updateNodeData
+            
+            if (isUnnamed) {
+                try {
+                    // Extract model name from unique_id
+                    const modelName = extractModelNameFromUniqueId(model.unique_id);
+                    // Format label (title-case with spaces)
+                    const formattedLabel = formatModelNameForLabel(modelName);
+                    // Generate new ID using generateSlug
+                    const newId = generateSlug(formattedLabel, $nodes.map(n => n.id), id);
+                    
+                    // If ID changes, update edges and node
+                    if (newId !== id) {
+                        // Update all edges that reference this node
+                        $edges = $edges.map((edge) => {
+                            let updatedEdge = { ...edge };
+                            if (edge.source === id) {
+                                updatedEdge.source = newId;
+                            }
+                            if (edge.target === id) {
+                                updatedEdge.target = newId;
+                            }
+                            // Do NOT update edge ID (see comment at line 310-313)
+                            return updatedEdge;
+                        });
+                        
+                        // Update the node itself with new ID - include ALL updates (dbt_model, description, label)
+                        $nodes = $nodes.map((node) => {
+                            if (node.id === id) {
+                                const updatedData = { 
+                                    ...node.data, 
+                                    label: formattedLabel,
+                                    ...updates // Include dbt_model and description from updates
+                                };
+                                return {
+                                    ...node,
+                                    id: newId,
+                                    data: updatedData,
+                                };
+                            }
+                            return node;
+                        });
+                        
+                        // Use new ID for updateNodeData call
+                        finalId = newId;
+                        updates.label = formattedLabel;
+                    } else {
+                        // ID didn't change, just update label
+                        updates.label = formattedLabel;
+                    }
+                } catch (e) {
+                    // If model name extraction fails, silently skip auto-naming (graceful degradation)
+                    console.warn("Failed to auto-name entity from model:", e);
+                }
+            }
+            
+            updateNodeData(finalId, updates);
         }
 
         // Auto-create relationships from yml relationship tests
