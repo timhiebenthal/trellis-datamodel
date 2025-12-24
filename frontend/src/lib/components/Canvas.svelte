@@ -352,10 +352,10 @@
         {#if $viewMode === "conceptual" || $viewMode === "logical"}
             <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
                 <div
-                    class="flex bg-white rounded-lg p-1 border border-gray-200/60 shadow-lg"
+                    class="flex bg-white rounded-full p-1 border border-black shadow-lg"
                 >
                     <button
-                        class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                        class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
                         class:bg-primary-50={$viewMode === "conceptual"}
                         class:text-primary-600={$viewMode === "conceptual"}
                         class:shadow-sm={$viewMode === "conceptual"}
@@ -368,7 +368,7 @@
                         Conceptual
                     </button>
                     <button
-                        class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                        class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
                         class:bg-primary-50={$viewMode === "logical"}
                         class:text-primary-600={$viewMode === "logical"}
                         class:shadow-sm={$viewMode === "logical"}
