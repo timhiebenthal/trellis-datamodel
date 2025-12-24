@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added a new "Exposures" view mode that provides a cross-table visualization of entity usage across downstream dbt exposures.
+- Added "Exposures" tab to the main navigation for switching between Conceptual, Logical, and Exposures views.
+- Added support for fetching and displaying exposure metadata (labels, types, owners, descriptions) from the backend API.
+- Added automated empty state handling for projects without `exposures.yml` with helpful guidance for users.
+
 ## [0.3.5] - 2025-12-23
 
 ### Added
