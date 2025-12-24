@@ -82,18 +82,34 @@
         const visibleEdges: Edge[] = [];
         const newPlaceholderNodes = new Map<string, { parentId: string; level: number }>();
 
-        // Get max level
-        const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level), 0);
+        // Bucket nodes by level to spread siblings horizontally
+        const levelBuckets = new Map<number, LineageNode[]>();
+        for (const node of lineageData.nodes) {
+            const bucket = levelBuckets.get(node.level) ?? [];
+            bucket.push(node);
+            levelBuckets.set(node.level, bucket);
+        }
+
+        // Precompute each node's sibling index and total at its level
+        const levelPositions = new Map<string, { index: number; count: number }>();
+        for (const [, nodes] of levelBuckets) {
+            const count = nodes.length;
+            nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+        }
 
         // Process nodes - show all nodes initially (no progressive filtering for now)
         // Sources should always be visible
         for (const node of lineageData.nodes) {
+            const pos = levelPositions.get(node.id);
+            const indexInLevel = pos?.index ?? 0;
+            const countAtLevel = pos?.count ?? 1;
+
             // Always show sources, root, and direct dependencies
             if (node.isSource || node.level === 0 || node.level === 1) {
-                visibleNodes.push(createFlowNode(node));
+                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
             } else if (expandedLevels.size === 0 || expandedLevels.has(node.level)) {
                 // Show if no filtering or if level is expanded
-                visibleNodes.push(createFlowNode(node));
+                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
             }
         }
 
@@ -158,7 +174,11 @@
         placeholderNodes = newPlaceholderNodes;
     }
 
-    function createFlowNode(node: LineageNode): Node {
+    function createFlowNode(
+        node: LineageNode,
+        indexInLevel: number,
+        countAtLevel: number,
+    ): Node {
         if (!lineageData) {
             return {
                 id: node.id,
@@ -177,6 +197,8 @@
         const BOTTOM_Y = 700; // Target entity position (bottom)
         const TOP_Y = 100; // Sources position (top)
         const LEVEL_SPACING = 200; // Vertical spacing between levels
+        const COLUMN_OFFSET = 280; // Base offset per level (keeps columns apart)
+        const H_SPACING = 220; // Horizontal spacing between siblings at the same level
         
         // Y position: sources at top, target at bottom
         let yPosition: number;
@@ -192,8 +214,11 @@
             yPosition = BOTTOM_Y - (node.level * LEVEL_SPACING);
         }
         
-        // X position: spread horizontally by level
-        const xPosition = node.level * 300;
+        // X position: center siblings for this level and spread them horizontally
+        // Example: for 3 siblings, indexes 0,1,2 become offsets -1,0,1.
+        const siblingCenterOffset = (countAtLevel - 1) / 2;
+        const siblingOffset = (indexInLevel - siblingCenterOffset) * H_SPACING;
+        const xPosition = node.level * COLUMN_OFFSET + siblingOffset;
         
         return {
             id: node.id,

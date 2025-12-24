@@ -173,26 +173,26 @@ export function calculateConnectionInfo(
     if (dx > 0) {
       sourceSide = 'right';
       targetSide = 'left';
-      sourcePoint = { x: sourceCenter.x + sourceDim.width / 2, y: sourceCenter.y };
-      targetPoint = { x: targetCenter.x - targetDim.width / 2, y: targetCenter.y };
+      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
+      targetPoint = { x: targetCenter.x, y: targetCenter.y };
     } else {
       sourceSide = 'left';
       targetSide = 'right';
-      sourcePoint = { x: sourceCenter.x - sourceDim.width / 2, y: sourceCenter.y };
-      targetPoint = { x: targetCenter.x + targetDim.width / 2, y: targetCenter.y };
+      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
+      targetPoint = { x: targetCenter.x, y: targetCenter.y };
     }
   } else {
     // Vertical arrangement - use top/bottom sides
     if (dy > 0) {
       sourceSide = 'bottom';
       targetSide = 'top';
-      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y + sourceDim.height / 2 };
-      targetPoint = { x: targetCenter.x, y: targetCenter.y - targetDim.height / 2 };
+      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
+      targetPoint = { x: targetCenter.x, y: targetCenter.y };
     } else {
       sourceSide = 'top';
       targetSide = 'bottom';
-      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y - sourceDim.height / 2 };
-      targetPoint = { x: targetCenter.x, y: targetCenter.y + targetDim.height / 2 };
+      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
+      targetPoint = { x: targetCenter.x, y: targetCenter.y };
     }
   }
   
