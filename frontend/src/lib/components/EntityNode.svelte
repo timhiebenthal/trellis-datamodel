@@ -73,14 +73,17 @@
     });
 
     // Reset to primary model when switching to logical view
-    let previousViewMode = $state<'conceptual' | 'logical'>('conceptual');
+    let previousViewMode = $state<'conceptual' | 'logical' | 'exposures'>('conceptual');
     $effect(() => {
         const currentViewMode = $viewMode;
-        // Only reset when switching FROM conceptual TO logical
+        // Only reset when switching FROM conceptual TO logical (ignore exposures mode)
         if (previousViewMode === "conceptual" && currentViewMode === "logical" && allBoundModels.length > 0) {
             activeModelIndex = 0;
         }
-        previousViewMode = currentViewMode;
+        // Only track conceptual/logical modes for this logic
+        if (currentViewMode === "conceptual" || currentViewMode === "logical") {
+            previousViewMode = currentViewMode;
+        }
     });
 
     // Schema editing state for bound models
@@ -113,7 +116,7 @@
     });
 
     // Preserve edge selection when switching models (defensive measure)
-    let previousModelIndex = $state(activeModelIndex);
+    let previousModelIndex = $state(0);
     let lastKnownSelectedEdges = $state<Set<string>>(new Set());
     
     // Continuously track selected edges

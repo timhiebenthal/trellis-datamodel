@@ -22,12 +22,15 @@
     let entities = $derived(
         $nodes
             .filter((n) => n.type !== 'group')
-            .map((n) => ({
-                id: n.id,
-                label: ((n.data as EntityData)?.label || '').trim() || 'Entity',
-                folder: (n.data as EntityData)?.folder,
-                tags: normalizeTags((n.data as EntityData)?.tags),
-            }))
+            .map((n) => {
+                const data = n.data as unknown as EntityData;
+                return {
+                    id: n.id,
+                    label: (data?.label || '').trim() || 'Entity',
+                    folder: data?.folder,
+                    tags: normalizeTags(data?.tags),
+                };
+            })
             .filter((entity) => {
                 // Filter by folder
                 if ($folderFilter.length > 0) {
@@ -198,8 +201,9 @@
 
                     <!-- Exposure Type Filter -->
                     <div class="flex items-center gap-2">
-                        <label class="text-xs text-gray-600">Type:</label>
+                        <label for="exposure-type-filter" class="text-xs text-gray-600">Type:</label>
                         <select
+                            id="exposure-type-filter"
                             class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             onchange={(e) => {
                                 const value = (e.target as HTMLSelectElement).value;
@@ -213,7 +217,7 @@
                         >
                             <option value="">Select type...</option>
                             {#each availableTypes as type}
-                                {#if !$exposureTypeFilter.includes(type)}
+                                {#if type && !$exposureTypeFilter.includes(type)}
                                     <option value={type}>{type}</option>
                                 {/if}
                             {/each}
@@ -235,8 +239,9 @@
 
                     <!-- Exposure Owner Filter -->
                     <div class="flex items-center gap-2">
-                        <label class="text-xs text-gray-600">Owner:</label>
+                        <label for="exposure-owner-filter" class="text-xs text-gray-600">Owner:</label>
                         <select
+                            id="exposure-owner-filter"
                             class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                             onchange={(e) => {
                                 const value = (e.target as HTMLSelectElement).value;
@@ -250,7 +255,7 @@
                         >
                             <option value="">Select owner...</option>
                             {#each availableOwners as owner}
-                                {#if !$exposureOwnerFilter.includes(owner)}
+                                {#if owner && !$exposureOwnerFilter.includes(owner)}
                                     <option value={owner}>{owner}</option>
                                 {/if}
                             {/each}
