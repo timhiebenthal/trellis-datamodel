@@ -12,6 +12,7 @@
     import { getLineage } from "$lib/api";
     import type { LineageResponse, LineageNode, LineageEdge } from "$lib/types";
     import Icon from "@iconify/svelte";
+    import LineageSourceNode from "./LineageSourceNode.svelte";
 
     const { open = false, modelId = null, onClose } = $props<{
         open: boolean;
@@ -24,6 +25,11 @@
     let lineageData = $state<LineageResponse | null>(null);
     let lineageNodes = $state<Node[]>([]);
     let lineageEdges = $state<Edge[]>([]);
+
+    const nodeTypes = {
+        source: LineageSourceNode,
+        default: undefined, // Use default node type for regular models
+    };
 
     // Progressive display state - show all levels initially, but can collapse later
     let expandedLevels = $state<Set<number>>(new Set());
@@ -263,6 +269,7 @@
                     <SvelteFlow
                         nodes={lineageNodes}
                         edges={lineageEdges}
+                        nodeTypes={nodeTypes}
                         fitView
                         panOnDrag={true}
                         selectionOnDrag={false}
