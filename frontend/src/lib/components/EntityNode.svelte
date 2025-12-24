@@ -29,7 +29,7 @@
         extractModelNameFromUniqueId,
     } from "$lib/utils";
 import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
-import LineageModal from "./LineageModal.svelte";
+    import { openLineageModal } from "$lib/stores";
 import Icon from "@iconify/svelte";
 
     let { data: rawData, id, selected }: NodeProps = $props();
@@ -38,8 +38,7 @@ import Icon from "@iconify/svelte";
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
-    let showLineageModal = $state(false);
-    let lineageModelId = $state<string | null>(null);
+    // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
 
     // Batch editing support
     let selectedEntityNodes = $derived(
@@ -653,13 +652,7 @@ import Icon from "@iconify/svelte";
         // Prevent double-click from triggering collapse/expand toggle
         event.stopPropagation();
         // Open lineage modal with primary bound model
-        lineageModelId = boundModelName;
-        showLineageModal = true;
-    }
-
-    function closeLineageModal() {
-        showLineageModal = false;
-        lineageModelId = null;
+        openLineageModal(boundModelName);
     }
 
     // Tag editing functionality
@@ -1833,12 +1826,6 @@ import Icon from "@iconify/svelte";
     entityLabel={data.label || "Entity"}
     onConfirm={deleteEntity}
     onCancel={cancelDelete}
-/>
-
-<LineageModal
-    open={showLineageModal}
-    modelId={lineageModelId}
-    onClose={closeLineageModal}
 />
 
 <style>

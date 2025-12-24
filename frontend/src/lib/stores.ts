@@ -16,6 +16,20 @@ export const groupByFolder = writable<boolean>(true);
 // Drag-and-drop state for field linking
 export const draggingField = writable<FieldDragState | null>(null);
 
+// Global modals (rendered outside SvelteFlow to avoid viewport transform affecting position:fixed)
+export const lineageModal = writable<{ open: boolean; modelId: string | null }>({
+    open: false,
+    modelId: null,
+});
+
+export function openLineageModal(modelId: string) {
+    lineageModal.set({ open: true, modelId });
+}
+
+export function closeLineageModal() {
+    lineageModal.set({ open: false, modelId: null });
+}
+
 // Undo/Redo history management
 interface HistoryState {
     nodes: Node[];

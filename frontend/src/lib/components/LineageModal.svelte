@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import {
         SvelteFlow,
         Controls,
@@ -275,7 +274,9 @@
         aria-modal="true"
         aria-labelledby="lineage-modal-title"
     >
-        <div class="bg-white rounded-xl shadow-2xl w-[99.5vw] h-[98vh] border border-gray-200 flex flex-col">
+        <div
+            class="bg-white rounded-xl shadow-2xl w-[94vw] h-[92vh] max-w-[1600px] max-h-[920px] border border-gray-200 flex flex-col"
+        >
             <!-- Header -->
             <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
                 <div class="flex items-center gap-2">
