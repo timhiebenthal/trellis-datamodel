@@ -166,6 +166,19 @@ export function calculateConnectionInfo(
   let targetSide: Side;
   let sourcePoint: Point;
   let targetPoint: Point;
+
+  const getBorderPoint = (center: Point, dim: NodeDimensions, side: Side): Point => {
+    switch (side) {
+      case 'left':
+        return { x: center.x - dim.width / 2, y: center.y };
+      case 'right':
+        return { x: center.x + dim.width / 2, y: center.y };
+      case 'top':
+        return { x: center.x, y: center.y - dim.height / 2 };
+      case 'bottom':
+        return { x: center.x, y: center.y + dim.height / 2 };
+    }
+  };
   
   // Choose sides based on relative positions - pick closest pair
   if (Math.abs(dx) > Math.abs(dy)) {
@@ -173,26 +186,26 @@ export function calculateConnectionInfo(
     if (dx > 0) {
       sourceSide = 'right';
       targetSide = 'left';
-      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
-      targetPoint = { x: targetCenter.x, y: targetCenter.y };
+      sourcePoint = getBorderPoint(sourceCenter, sourceDim, sourceSide);
+      targetPoint = getBorderPoint(targetCenter, targetDim, targetSide);
     } else {
       sourceSide = 'left';
       targetSide = 'right';
-      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
-      targetPoint = { x: targetCenter.x, y: targetCenter.y };
+      sourcePoint = getBorderPoint(sourceCenter, sourceDim, sourceSide);
+      targetPoint = getBorderPoint(targetCenter, targetDim, targetSide);
     }
   } else {
     // Vertical arrangement - use top/bottom sides
     if (dy > 0) {
       sourceSide = 'bottom';
       targetSide = 'top';
-      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
-      targetPoint = { x: targetCenter.x, y: targetCenter.y };
+      sourcePoint = getBorderPoint(sourceCenter, sourceDim, sourceSide);
+      targetPoint = getBorderPoint(targetCenter, targetDim, targetSide);
     } else {
       sourceSide = 'top';
       targetSide = 'bottom';
-      sourcePoint = { x: sourceCenter.x, y: sourceCenter.y };
-      targetPoint = { x: targetCenter.x, y: targetCenter.y };
+      sourcePoint = getBorderPoint(sourceCenter, sourceDim, sourceSide);
+      targetPoint = getBorderPoint(targetCenter, targetDim, targetSide);
     }
   }
   
