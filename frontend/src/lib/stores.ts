@@ -13,6 +13,10 @@ export const folderFilter = writable<string[]>([]);
 export const tagFilter = writable<string[]>([]);
 export const groupByFolder = writable<boolean>(true);
 
+// Exposure filter stores
+export const exposureTypeFilter = writable<string[]>([]);
+export const exposureOwnerFilter = writable<string[]>([]);
+
 // Drag-and-drop state for field linking
 export const draggingField = writable<FieldDragState | null>(null);
 

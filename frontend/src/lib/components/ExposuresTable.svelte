@@ -1,8 +1,16 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { nodes, viewMode } from '$lib/stores';
+    import { 
+        nodes, 
+        viewMode, 
+        folderFilter, 
+        tagFilter,
+        exposureTypeFilter,
+        exposureOwnerFilter
+    } from '$lib/stores';
     import { getExposures } from '$lib/api';
     import type { Exposure, EntityUsage, EntityData } from '$lib/types';
+    import { normalizeTags } from '$lib/utils';
     import Icon from '@iconify/svelte';
 
     let exposures = $state<Exposure[]>([]);
@@ -10,15 +18,72 @@
     let loading = $state(true);
     let error = $state<string | null>(null);
 
-    // Derive entities from nodes (filter out group nodes)
+    // Derive entities from nodes (filter out group nodes and apply filters)
     let entities = $derived(
         $nodes
             .filter((n) => n.type !== 'group')
             .map((n) => ({
                 id: n.id,
                 label: ((n.data as EntityData)?.label || '').trim() || 'Entity',
+                folder: (n.data as EntityData)?.folder,
+                tags: normalizeTags((n.data as EntityData)?.tags),
             }))
+            .filter((entity) => {
+                // Filter by folder
+                if ($folderFilter.length > 0) {
+                    const entityFolder = entity.folder;
+                    if (!entityFolder || !$folderFilter.includes(entityFolder)) {
+                        return false;
+                    }
+                }
+
+                // Filter by tag
+                if ($tagFilter.length > 0) {
+                    const entityTags = entity.tags;
+                    const hasMatch = $tagFilter.some((tag) =>
+                        entityTags.includes(tag),
+                    );
+                    if (!hasMatch) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            .map((e) => ({ id: e.id, label: e.label }))
             .sort((a, b) => a.label.localeCompare(b.label))
+    );
+
+    // Filter exposures by metadata
+    let filteredExposures = $derived(
+        exposures.filter((exposure) => {
+            // Filter by type
+            if ($exposureTypeFilter.length > 0) {
+                const exposureType = exposure.type?.toLowerCase() || '';
+                if (!exposureType || !$exposureTypeFilter.includes(exposureType)) {
+                    return false;
+                }
+            }
+
+            // Filter by owner
+            if ($exposureOwnerFilter.length > 0) {
+                const ownerName = exposure.owner?.name || '';
+                if (!ownerName || !$exposureOwnerFilter.includes(ownerName)) {
+                    return false;
+                }
+            }
+
+            return true;
+        })
+    );
+
+    // Get unique exposure types and owners for filter dropdowns
+    let availableTypes = $derived(
+        Array.from(new Set(exposures.map(e => e.type).filter(Boolean))).sort()
+    );
+
+    let availableOwners = $derived(
+        Array.from(new Set(exposures.map(e => e.owner?.name).filter(Boolean))).sort()
     );
 
     // Map exposure types to icons
@@ -123,8 +188,126 @@
         </div>
     {:else}
         <div class="p-6">
+            <!-- Filter Controls -->
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
+                        <span class="text-sm font-medium text-gray-700">Filters:</span>
+                    </div>
+
+                    <!-- Exposure Type Filter -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-600">Type:</label>
+                        <select
+                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            onchange={(e) => {
+                                const value = (e.target as HTMLSelectElement).value;
+                                if (value) {
+                                    if (!$exposureTypeFilter.includes(value)) {
+                                        $exposureTypeFilter = [...$exposureTypeFilter, value];
+                                    }
+                                    (e.target as HTMLSelectElement).value = '';
+                                }
+                            }}
+                        >
+                            <option value="">Select type...</option>
+                            {#each availableTypes as type}
+                                {#if !$exposureTypeFilter.includes(type)}
+                                    <option value={type}>{type}</option>
+                                {/if}
+                            {/each}
+                        </select>
+                        {#each $exposureTypeFilter as type}
+                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
+                                {type}
+                                <button
+                                    onclick={() => {
+                                        $exposureTypeFilter = $exposureTypeFilter.filter(t => t !== type);
+                                    }}
+                                    class="hover:text-primary-900"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    </div>
+
+                    <!-- Exposure Owner Filter -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-600">Owner:</label>
+                        <select
+                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            onchange={(e) => {
+                                const value = (e.target as HTMLSelectElement).value;
+                                if (value) {
+                                    if (!$exposureOwnerFilter.includes(value)) {
+                                        $exposureOwnerFilter = [...$exposureOwnerFilter, value];
+                                    }
+                                    (e.target as HTMLSelectElement).value = '';
+                                }
+                            }}
+                        >
+                            <option value="">Select owner...</option>
+                            {#each availableOwners as owner}
+                                {#if !$exposureOwnerFilter.includes(owner)}
+                                    <option value={owner}>{owner}</option>
+                                {/if}
+                            {/each}
+                        </select>
+                        {#each $exposureOwnerFilter as owner}
+                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
+                                {owner}
+                                <button
+                                    onclick={() => {
+                                        $exposureOwnerFilter = $exposureOwnerFilter.filter(o => o !== owner);
+                                    }}
+                                    class="hover:text-primary-900"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    </div>
+
+                    <!-- Clear All Filters -->
+                    {#if $exposureTypeFilter.length > 0 || $exposureOwnerFilter.length > 0}
+                        <button
+                            onclick={() => {
+                                $exposureTypeFilter = [];
+                                $exposureOwnerFilter = [];
+                            }}
+                            class="text-xs text-gray-600 hover:text-gray-800 underline"
+                        >
+                            Clear exposure filters
+                        </button>
+                    {/if}
+                </div>
+
+                <!-- Entity Filters Info -->
+                {#if $folderFilter.length > 0 || $tagFilter.length > 0}
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                        <div class="flex items-center gap-2 text-xs text-gray-600">
+                            <Icon icon="lucide:info" class="w-3 h-3" />
+                            <span>Entity filters active:</span>
+                            {#if $folderFilter.length > 0}
+                                <span class="text-gray-700 font-medium">
+                                    {$folderFilter.length} folder{$folderFilter.length === 1 ? '' : 's'}
+                                </span>
+                            {/if}
+                            {#if $tagFilter.length > 0}
+                                <span class="text-gray-700 font-medium">
+                                    {#if $folderFilter.length > 0}, {/if}
+                                    {$tagFilter.length} tag{$tagFilter.length === 1 ? '' : 's'}
+                                </span>
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
+            </div>
+
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-12rem)]">
+                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-18rem)]">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
@@ -133,7 +316,7 @@
                                 >
                                     Entity
                                 </th>
-                                {#each exposures as exposure}
+                                {#each filteredExposures as exposure}
                                     <th
                                         class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]"
                                         title={exposure.description || exposure.name}
@@ -155,24 +338,38 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            {#each entities as entity}
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td
-                                        class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
-                                    >
-                                        {entity.label}
+                            {#if entities.length === 0}
+                                <tr>
+                                    <td colspan={Math.max(filteredExposures.length, 1) + 1} class="px-4 py-8 text-center text-sm text-gray-500">
+                                        No entities match the current filters.
                                     </td>
-                                    {#each exposures as exposure}
-                                        <td class="px-4 py-3 text-sm text-center">
-                                            {#if entityUsage[entity.id]?.includes(exposure.name)}
-                                                <span class="text-green-600 font-semibold">✓</span>
-                                            {:else}
-                                                <span class="text-gray-300">—</span>
-                                            {/if}
-                                        </td>
-                                    {/each}
                                 </tr>
-                            {/each}
+                            {:else if filteredExposures.length === 0}
+                                <tr>
+                                    <td colspan="2" class="px-4 py-8 text-center text-sm text-gray-500">
+                                        No exposures match the current filters.
+                                    </td>
+                                </tr>
+                            {:else}
+                                {#each entities as entity}
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td
+                                            class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
+                                        >
+                                            {entity.label}
+                                        </td>
+                                        {#each filteredExposures as exposure}
+                                            <td class="px-4 py-3 text-sm text-center">
+                                                {#if entityUsage[entity.id]?.includes(exposure.name)}
+                                                    <span class="text-green-600 font-semibold">✓</span>
+                                                {:else}
+                                                    <span class="text-gray-300">—</span>
+                                                {/if}
+                                            </td>
+                                        {/each}
+                                    </tr>
+                                {/each}
+                            {/if}
                         </tbody>
                     </table>
                 </div>
