@@ -11,6 +11,7 @@
         nodes,
         edges,
         draggingField,
+        exposureEntityFilter,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -31,6 +32,12 @@
 import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import { openLineageModal } from "$lib/stores";
 import Icon from "@iconify/svelte";
+
+    function openExposuresView(event: MouseEvent) {
+        event.stopPropagation(); // Prevent collapse toggle
+        exposureEntityFilter.set(id);
+        viewMode.set('exposures');
+    }
 
     let { data: rawData, id, selected }: NodeProps = $props();
     // Cast data to EntityData for proper typing - use $derived to maintain reactivity
@@ -1110,7 +1117,10 @@ import Icon from "@iconify/svelte";
                     title="Bound to {boundModelName}"
                 ></div>
                 <button
-                    onclick={() => boundModelName && openLineageModal(boundModelName)}
+                    onclick={(e) => {
+                        e.stopPropagation(); // Prevent collapse toggle
+                        boundModelName && openLineageModal(boundModelName);
+                    }}
                     aria-label="Show lineage for {boundModelName}"
                     class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
                     title="Show lineage"
@@ -1118,11 +1128,27 @@ import Icon from "@iconify/svelte";
                 >
                     <Icon icon="lucide:git-branch" class="w-4 h-4" />
                 </button>
+                <button
+                    onclick={openExposuresView}
+                    aria-label="Show exposures for {data.label}"
+                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    title="Show exposures"
+                >
+                    <Icon icon="mdi:application-export" class="w-4 h-4" />
+                </button>
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"
                     title="Draft mode (not bound to dbt model)"
                 ></div>
+                <button
+                    onclick={openExposuresView}
+                    aria-label="Show exposures for {data.label}"
+                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    title="Show exposures"
+                >
+                    <Icon icon="mdi:application-export" class="w-4 h-4" />
+                </button>
             {/if}
             <button
                 onclick={handleDeleteClick}

@@ -6,7 +6,8 @@
         folderFilter, 
         tagFilter,
         exposureTypeFilter,
-        exposureOwnerFilter
+        exposureOwnerFilter,
+        exposureEntityFilter
     } from '$lib/stores';
     import { getExposures } from '$lib/api';
     import type { Exposure, EntityUsage, EntityData } from '$lib/types';
@@ -17,6 +18,9 @@
     let entityUsage = $state<EntityUsage>({});
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let autoFitExposureHeaders = $state(true);
+    let tableViewportWidth = $state(0);
+    let tableViewportEl: HTMLDivElement | null = null;
 
     // Derive entities from nodes (filter out group nodes and apply filters)
     let entities = $derived(
@@ -32,6 +36,13 @@
                 };
             })
             .filter((entity) => {
+                // Filter by specific entity ID (from exposures button)
+                if ($exposureEntityFilter !== null) {
+                    if (entity.id !== $exposureEntityFilter) {
+                        return false;
+                    }
+                }
+
                 // Filter by folder
                 if ($folderFilter.length > 0) {
                     const entityFolder = entity.folder;
@@ -80,6 +91,46 @@
         })
     );
 
+    // Progressive header density (delays horizontal scroll for many dashboards)
+    type ExposureHeaderMode = 'normal' | 'narrow' | 'angled';
+    let exposureHeaderMode = $derived<ExposureHeaderMode>(() => {
+        if (!autoFitExposureHeaders) return 'normal';
+
+        const count = filteredExposures.length;
+        if (tableViewportWidth <= 0) {
+            // Fallback when we can't measure container size yet (e.g., first paint)
+            if (count >= 40) return 'angled';
+            if (count >= 20) return 'narrow';
+            return 'normal';
+        }
+
+        // Use measured width to decide when to compact headers.
+        // Roughly subtract space for the sticky entity column + borders/padding.
+        const entityColPx = 240;
+        const available = Math.max(tableViewportWidth - entityColPx, 0);
+        const fits = (minWidth: number) => (minWidth > 0 ? Math.floor(available / minWidth) : 0);
+
+        const fitsNormal = fits(150);
+        const fitsNarrow = fits(120);
+
+        if (count <= fitsNormal) return 'normal';
+        if (count <= fitsNarrow) return 'narrow';
+        return 'angled'; // last resort before relying heavily on horizontal scroll
+    });
+
+    let exposureThClass = $derived(() => {
+        switch (exposureHeaderMode) {
+            case 'angled':
+                return 'px-2 py-2 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[96px] align-bottom';
+            case 'narrow':
+                return 'px-2 py-2 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[120px]';
+            default:
+                return 'px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]';
+        }
+    });
+
+    let exposureIconClass = $derived(() => (exposureHeaderMode === 'normal' ? 'w-4 h-4' : 'w-3.5 h-3.5'));
+
     // Get unique exposure types and owners for filter dropdowns
     let availableTypes = $derived(
         Array.from(new Set(exposures.map(e => e.type).filter(Boolean))).sort()
@@ -127,6 +178,9 @@
     $effect(() => {
         if ($viewMode === 'exposures') {
             loadExposures();
+        } else {
+            // Clear entity filter when switching away from exposures view
+            exposureEntityFilter.set(null);
         }
     });
 
@@ -134,6 +188,21 @@
     onMount(() => {
         if ($viewMode === 'exposures') {
             loadExposures();
+        }
+
+        // Measure table viewport width to auto-fit columns based on screen size.
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver((entries) => {
+                const entry = entries[0];
+                if (!entry) return;
+                tableViewportWidth = Math.round(entry.contentRect.width);
+            });
+
+            if (tableViewportEl) ro.observe(tableViewportEl);
+
+            return () => {
+                ro.disconnect();
+            };
         }
     });
 </script>
@@ -266,18 +335,49 @@
                         {/each}
                     </div>
 
+                    <!-- Entity Filter Badge -->
+                    {#if $exposureEntityFilter !== null}
+                        {#each entities.filter(e => e.id === $exposureEntityFilter) as entity}
+                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
+                                Entity: {entity.label}
+                                <button
+                                    onclick={() => {
+                                        exposureEntityFilter.set(null);
+                                    }}
+                                    class="hover:text-primary-900"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    {/if}
+
                     <!-- Clear All Filters -->
-                    {#if $exposureTypeFilter.length > 0 || $exposureOwnerFilter.length > 0}
+                    {#if $exposureTypeFilter.length > 0 || $exposureOwnerFilter.length > 0 || $exposureEntityFilter !== null}
                         <button
                             onclick={() => {
                                 $exposureTypeFilter = [];
                                 $exposureOwnerFilter = [];
+                                exposureEntityFilter.set(null);
                             }}
                             class="text-xs text-gray-600 hover:text-gray-800 underline"
                         >
                             Clear exposure filters
                         </button>
                     {/if}
+
+                    <!-- Table Density -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <label class="flex items-center gap-2 text-xs text-gray-600 select-none cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={autoFitExposureHeaders}
+                                onchange={(e) => (autoFitExposureHeaders = (e.target as HTMLInputElement).checked)}
+                                class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            Auto-fit columns
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Entity Filters Info -->
@@ -303,7 +403,7 @@
             </div>
 
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-10rem)]">
+                <div bind:this={tableViewportEl} class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-10rem)]">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
@@ -314,16 +414,30 @@
                                 </th>
                                 {#each filteredExposures as exposure}
                                     <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]"
+                                        class={exposureThClass}
                                         title={exposure.description || exposure.name}
                                     >
-                                        <div class="flex items-center gap-2">
-                                            <Icon
-                                                icon={getExposureIcon(exposure.type)}
-                                                class="w-4 h-4 text-gray-500"
-                                            />
-                                            <span>{exposure.label || exposure.name}</span>
-                                        </div>
+                                        {#if exposureHeaderMode === 'angled'}
+                                            <div class="h-20 flex items-end">
+                                                <div class="origin-bottom-right -rotate-45 whitespace-nowrap flex items-center gap-1.5">
+                                                    <Icon
+                                                        icon={getExposureIcon(exposure.type)}
+                                                        class={`${exposureIconClass} text-gray-500`}
+                                                    />
+                                                    <span>{exposure.label || exposure.name}</span>
+                                                </div>
+                                            </div>
+                                        {:else}
+                                            <div class="flex items-center gap-2">
+                                                <Icon
+                                                    icon={getExposureIcon(exposure.type)}
+                                                    class={`${exposureIconClass} text-gray-500`}
+                                                />
+                                                <span class={exposureHeaderMode === 'narrow' ? 'truncate max-w-[9rem]' : ''}>
+                                                    {exposure.label || exposure.name}
+                                                </span>
+                                            </div>
+                                        {/if}
                                         {#if exposure.owner?.name}
                                             <div class="text-[10px] font-normal text-gray-500 mt-1">
                                                 Owner: {exposure.owner.name}

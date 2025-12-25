@@ -16,6 +16,7 @@ export const groupByFolder = writable<boolean>(true);
 // Exposure filter stores
 export const exposureTypeFilter = writable<string[]>([]);
 export const exposureOwnerFilter = writable<string[]>([]);
+export const exposureEntityFilter = writable<string | null>(null); // Filter by specific entity ID
 
 // Drag-and-drop state for field linking
 export const draggingField = writable<FieldDragState | null>(null);

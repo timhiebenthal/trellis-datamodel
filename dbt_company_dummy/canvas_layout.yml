@@ -13,7 +13,7 @@ entities:
       y: 100
     width: 280
     panel_height: 200
-    collapsed: true
+    collapsed: false
   lead:
     position:
       x: 40
