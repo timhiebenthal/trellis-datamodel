@@ -639,25 +639,6 @@ import Icon from "@iconify/svelte";
         showDeleteModal = false;
     }
 
-    function handleDoubleClick(event: MouseEvent) {
-        // Don't trigger if double-clicking on an input field or other interactive element
-        const target = event.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "BUTTON" || target.closest("input, textarea, button")) {
-            return;
-        }
-        
-        // Only trigger lineage modal for entities bound to dbt models
-        if (!boundModelName) {
-            return;
-        }
-        // Prevent double-click from triggering collapse/expand toggle
-        event.stopPropagation();
-        // Open lineage modal with primary bound model
-        if (boundModelName) {
-            openLineageModal(boundModelName);
-        }
-    }
-
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
     let tagInput = $state("");
@@ -1068,7 +1049,6 @@ import Icon from "@iconify/svelte";
     ondragover={onDragOver}
     ondragenter={onDragEnter}
     ondragleave={onDragLeave}
-    ondblclick={handleDoubleClick}
     role="presentation"
 >
     <!-- Handles on all 4 sides for flexible edge routing -->
