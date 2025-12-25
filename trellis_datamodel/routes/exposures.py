@@ -4,8 +4,6 @@ from fastapi import APIRouter, HTTPException
 import yaml
 import os
 import re
-import json
-import time
 from collections import deque
 from typing import Dict, Any, List, Optional
 
@@ -170,11 +168,6 @@ async def get_exposures():
     Reads exposures.yml from the dbt project models directory,
     resolves model references, and maps them to entities.
     """
-    # #region agent log
-    log_data = {"location": "exposures.py:get_exposures", "message": "endpoint called", "data": {"dbt_project_path": cfg.DBT_PROJECT_PATH}, "timestamp": int(time.time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}
-    with open("/home/thiebenthal_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-        log_file.write(json.dumps(log_data) + "\n")
-    # #endregion agent log
     # Find exposures.yml file
     exposures_path = None
     if cfg.DBT_PROJECT_PATH:
@@ -191,11 +184,6 @@ async def get_exposures():
                         exposures_path = os.path.join(models_dir, file)
                         break
 
-    # #region agent log
-    log_data = {"location": "exposures.py:get_exposures", "message": "exposures_path resolved", "data": {"exposures_path": exposures_path, "exists": exposures_path and os.path.exists(exposures_path) if exposures_path else False}, "timestamp": int(time.time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}
-    with open("/home/thiebenthal_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-        log_file.write(json.dumps(log_data) + "\n")
-    # #endregion agent log
     # If no exposures.yml found, return empty response
     if not exposures_path or not os.path.exists(exposures_path):
         return {"exposures": [], "entityUsage": {}}
@@ -210,11 +198,6 @@ async def get_exposures():
         )
 
     exposures_list = exposures_data.get("exposures", [])
-    # #region agent log
-    log_data = {"location": "exposures.py:get_exposures", "message": "exposures parsed", "data": {"exposures_count": len(exposures_list) if isinstance(exposures_list, list) else 0}, "timestamp": int(time.time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}
-    with open("/home/thiebenthal_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-        log_file.write(json.dumps(log_data) + "\n")
-    # #endregion agent log
     if not isinstance(exposures_list, list):
         return {"exposures": [], "entityUsage": {}}
 
@@ -282,11 +265,6 @@ async def get_exposures():
                     if exposure_name not in entity_usage[entity_id]:
                         entity_usage[entity_id].append(exposure_name)
 
-    # #region agent log
-    log_data = {"location": "exposures.py:get_exposures", "message": "response prepared", "data": {"exposures_count": len(exposures_response), "entity_usage_keys": len(entity_usage)}, "timestamp": int(time.time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}
-    with open("/home/thiebenthal_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-        log_file.write(json.dumps(log_data) + "\n")
-    # #endregion agent log
     return {
         "exposures": exposures_response,
         "entityUsage": entity_usage,

@@ -181,37 +181,19 @@ export async function updateModelSchema(modelName: string, columns: { name: stri
 }
 
 export async function getExposures(): Promise<ExposuresResponse> {
-    // #region agent log
     const endpointUrl = `${API_BASE}/exposures`;
-    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:184',message:'getExposures called',data:{endpointUrl,apiBase:API_BASE},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion agent log
     try {
         const res = await fetch(endpointUrl);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:186',message:'fetch response received',data:{status:res.status,ok:res.ok,statusText:res.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion agent log
         if (!res.ok) {
             if (res.status === 404) {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:189',message:'endpoint returned 404',data:{endpointUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                // #endregion agent log
                 // Return empty response if endpoint doesn't exist yet
                 return { exposures: [], entityUsage: {} };
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:193',message:'endpoint returned error status',data:{status:res.status,statusText:res.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion agent log
             throw new Error(`Status: ${res.status}`);
         }
         const jsonData = await res.json();
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:197',message:'successful response parsed',data:{exposuresCount:jsonData.exposures?.length||0,entityUsageKeys:Object.keys(jsonData.entityUsage||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion agent log
         return jsonData;
     } catch (e) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:200',message:'exception caught in getExposures',data:{error:e instanceof Error?e.message:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion agent log
         console.error("Error fetching exposures:", e);
         // Return empty response on error
         return { exposures: [], entityUsage: {} };

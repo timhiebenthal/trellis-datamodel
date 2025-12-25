@@ -109,22 +109,13 @@
         // Only fetch if we're in exposures view mode
         if ($viewMode !== 'exposures') return;
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ExposuresTable.svelte:40',message:'loadExposures called',data:{viewMode:$viewMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion agent log
         loading = true;
         error = null;
         try {
             const data = await getExposures();
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ExposuresTable.svelte:48',message:'getExposures returned data',data:{exposuresCount:data.exposures?.length||0,entityUsageKeys:Object.keys(data.entityUsage||{}).length,exposures:data.exposures},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion agent log
             exposures = data.exposures;
             entityUsage = data.entityUsage;
         } catch (e) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ExposuresTable.svelte:52',message:'error in loadExposures',data:{error:e instanceof Error?e.message:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion agent log
             error = e instanceof Error ? e.message : 'Failed to load exposures';
             console.error('Error loading exposures:', e);
         } finally {
