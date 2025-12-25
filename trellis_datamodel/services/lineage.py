@@ -9,6 +9,7 @@ import json
 import os
 from typing import Any, Optional
 from collections import deque
+from trellis_datamodel import config as cfg
 
 try:
     from dbt_colibri import extract_lineage as colibri_extract_lineage
@@ -91,7 +92,7 @@ def extract_upstream_lineage(
         lineage_data = _extract_lineage_from_manifest(manifest, model_unique_id)
 
         # Transform to our format
-        return _transform_lineage_data(lineage_data, model_unique_id)
+        return _transform_lineage_data(lineage_data, model_unique_id, manifest)
 
     except FileNotFoundError:
         raise
@@ -182,9 +183,47 @@ def _extract_lineage_from_manifest(
     }
 
 
+def _extract_folder_from_path(original_file_path: str) -> Optional[str]:
+    """
+    Extract the first folder after models/ from original_file_path.
+
+    Examples:
+        models/1_clean/employee.sql -> 1_clean
+        models/stg/staging_users.sql -> stg
+        models/3_core/all/employee_history.sql -> 3_core
+        models/employee.sql -> None (no folder)
+
+    Args:
+        original_file_path: Path from manifest node's original_file_path field
+
+    Returns:
+        Folder name or None if no folder exists after models/
+    """
+    if not original_file_path:
+        return None
+
+    # Normalize path separators (handle Windows backslashes)
+    normalized_path = original_file_path.replace("\\", "/")
+
+    # Check if path starts with models/
+    if not normalized_path.startswith("models/"):
+        return None
+
+    # Remove models/ prefix
+    path_after_models = normalized_path[7:]  # len("models/") = 7
+
+    # Split by / and get first part
+    parts = path_after_models.split("/")
+    if len(parts) > 0 and parts[0]:
+        return parts[0]
+
+    return None
+
+
 def _transform_lineage_data(
     lineage_data: dict[str, Any],
     root_model_id: str,
+    manifest: dict[str, Any],
 ) -> dict[str, Any]:
     """
     Transform dbt-colibri lineage output to frontend-friendly format.
@@ -223,7 +262,7 @@ def _transform_lineage_data(
 
     # Create nodes
     for node_id in lineage_nodes:
-        node_info = _get_node_info(node_id, source_set, levels, root_model_id)
+        node_info = _get_node_info(node_id, source_set, levels, root_model_id, manifest)
         nodes.append(node_info)
         node_map[node_id] = node_info
 
@@ -247,15 +286,21 @@ def _transform_lineage_data(
         level = node["level"]
         level_counts[level] = level_counts.get(level, 0) + 1
 
+    # Include configured layers in metadata if layers are configured
+    metadata = {
+        "root_model_id": root_model_id,
+        "level_counts": level_counts,
+        "total_nodes": len(nodes),
+        "total_edges": len(edges),
+    }
+
+    if cfg.LINEAGE_LAYERS:
+        metadata["lineage_layers"] = cfg.LINEAGE_LAYERS
+
     return {
         "nodes": nodes,
         "edges": edges,
-        "metadata": {
-            "root_model_id": root_model_id,
-            "level_counts": level_counts,
-            "total_nodes": len(nodes),
-            "total_edges": len(edges),
-        },
+        "metadata": metadata,
     }
 
 
@@ -306,6 +351,7 @@ def _get_node_info(
     source_set: set[str],
     levels: dict[str, int],
     root_model_id: str,
+    manifest: dict[str, Any],
 ) -> dict[str, Any]:
     """
     Get node information for lineage visualization.
@@ -315,6 +361,7 @@ def _get_node_info(
         source_set: Set of source node IDs
         levels: Dictionary mapping node_id to level
         root_model_id: Root model unique_id
+        manifest: Parsed manifest.json dictionary
 
     Returns:
         Node info dictionary
@@ -345,5 +392,36 @@ def _get_node_info(
     # Add source-name if this is a source node
     if source_name is not None:
         result["sourceName"] = source_name
+
+    # Assign layer based on folder structure
+    layer = None
+    lineage_layers = cfg.LINEAGE_LAYERS
+
+    if is_source:
+        # Sources always get "sources" layer
+        layer = "sources"
+    elif lineage_layers:
+        # Only assign layers if configuration exists
+        # Get node from manifest to extract original_file_path
+        nodes = manifest.get("nodes", {})
+        node = nodes.get(node_id)
+
+        if node:
+            original_file_path = node.get("original_file_path", "")
+            folder = _extract_folder_from_path(original_file_path)
+
+            if folder and folder in lineage_layers:
+                # Match found in configured layers
+                layer = folder
+            else:
+                # No match - assign to unassigned
+                layer = "unassigned"
+        else:
+            # Node not found in manifest (shouldn't happen, but handle gracefully)
+            layer = "unassigned"
+
+    # Only add layer field if layers are configured (backward compatibility)
+    if lineage_layers and layer:
+        result["layer"] = layer
 
     return result

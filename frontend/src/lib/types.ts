@@ -164,6 +164,7 @@ export interface LineageNode {
     level: number;
     isSource: boolean;
     sourceName?: string; // Source-name for source nodes (e.g., "mock_csv" from "source.project.mock_csv.table")
+    layer?: string; // Layer assignment for lineage organization (e.g., "sources", "1_clean", "2_prep", "unassigned")
 }
 
 export interface LineageEdge {
@@ -177,6 +178,7 @@ export interface LineageMetadata {
     level_counts: Record<number, number>;
     total_nodes: number;
     total_edges: number;
+    lineage_layers?: string[]; // Configured layer order from trellis.yml
 }
 
 export interface LineageResponse {
