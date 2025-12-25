@@ -6,6 +6,7 @@ import os
 import re
 import json
 import time
+from collections import deque
 from typing import Dict, Any, List, Optional
 
 from trellis_datamodel import config as cfg
@@ -110,6 +111,57 @@ def _find_entities_for_model(unique_id: str, data_model: Dict[str, Any]) -> List
     return entity_ids
 
 
+def _collect_upstream_model_ids(manifest: Dict[str, Any], model_unique_id: str) -> set[str]:
+    """
+    Collect all upstream model unique_ids (including the starting model) by traversing
+    manifest depends_on relationships.
+
+    Notes:
+    - This is table-level lineage, not column-level.
+    - We only return dbt models (unique_id starts with "model.").
+    - Sources are traversed only as stopping points; they are not returned.
+    """
+    nodes = manifest.get("nodes", {}) if isinstance(manifest, dict) else {}
+    if not nodes or not model_unique_id:
+        return set()
+
+    visited: set[str] = set()
+    upstream_models: set[str] = set()
+
+    queue: deque[str] = deque([model_unique_id])
+    while queue:
+        current_id = queue.popleft()
+        if current_id in visited:
+            continue
+        visited.add(current_id)
+
+        if current_id.startswith("model."):
+            upstream_models.add(current_id)
+
+        current_node = nodes.get(current_id)
+        if not current_node:
+            continue
+
+        depends_on = current_node.get("depends_on")
+        if not depends_on:
+            continue
+
+        if isinstance(depends_on, dict):
+            upstream_nodes = depends_on.get("nodes", [])
+        elif isinstance(depends_on, list):
+            upstream_nodes = depends_on
+        else:
+            upstream_nodes = []
+
+        for upstream_id in upstream_nodes:
+            if isinstance(upstream_id, str) and upstream_id not in visited:
+                # Continue traversal for all upstream ids; non-model ids will
+                # naturally stop when not present in manifest["nodes"].
+                queue.append(upstream_id)
+
+    return upstream_models
+
+
 @router.get("/exposures")
 async def get_exposures():
     """
@@ -173,6 +225,7 @@ async def get_exposures():
     # Build response: extract exposure metadata
     exposures_response = []
     entity_usage: Dict[str, List[str]] = {}  # entity_id -> [exposure_names]
+    upstream_cache: Dict[str, set[str]] = {}  # model_unique_id -> upstream model ids
 
     for exposure in exposures_list:
         if not isinstance(exposure, dict):
@@ -215,13 +268,19 @@ async def get_exposures():
                 print(f"Warning: Could not resolve {ref_string} to a model")
                 continue
 
-            # Find entities bound to this model
-            entity_ids = _find_entities_for_model(unique_id, data_model)
-            for entity_id in entity_ids:
-                if entity_id not in entity_usage:
-                    entity_usage[entity_id] = []
-                if exposure_name not in entity_usage[entity_id]:
-                    entity_usage[entity_id].append(exposure_name)
+            # Expand to *all upstream models* before mapping to entities.
+            # This ensures exposures that depend on mart/int models still mark
+            # the underlying entity-bound models as "used".
+            if unique_id not in upstream_cache:
+                upstream_cache[unique_id] = _collect_upstream_model_ids(manifest, unique_id)
+
+            for upstream_model_id in upstream_cache[unique_id]:
+                entity_ids = _find_entities_for_model(upstream_model_id, data_model)
+                for entity_id in entity_ids:
+                    if entity_id not in entity_usage:
+                        entity_usage[entity_id] = []
+                    if exposure_name not in entity_usage[entity_id]:
+                        entity_usage[entity_id].append(exposure_name)
 
     # #region agent log
     log_data = {"location": "exposures.py:get_exposures", "message": "response prepared", "data": {"exposures_count": len(exposures_response), "entity_usage_keys": len(entity_usage)}, "timestamp": int(time.time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}

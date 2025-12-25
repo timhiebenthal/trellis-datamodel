@@ -13,7 +13,7 @@ entities:
       y: 100
     width: 280
     panel_height: 200
-    collapsed: false
+    collapsed: true
   lead:
     position:
       x: 40
@@ -63,28 +63,67 @@ entities:
     width: 280
     panel_height: 200
     collapsed: false
+  supplier_invoice:
+    position:
+      x: 452.368405456329
+      y: 931.185826822956
+    width: 280
+    panel_height: 200
+    collapsed: false
+  customer_invoice:
+    position:
+      x: 918.8969550752718
+      y: 884.8937438182152
+    width: 280
+    panel_height: 200
+    collapsed: false
+  entity:
+    position:
+      x: 1357.3996374904411
+      y: 913.8322557294612
+    width: 280
+    panel_height: 200
+    collapsed: false
 relationships:
   employee-employee-0:
     label_dx: 0
     label_dy: 0
-  department-employee-1:
+  employee-employee-1:
     label_dx: 0
     label_dy: 0
-  lead-customer-2:
+  employee-employee-2:
     label_dx: 0
     label_dy: 0
-  customer-sale-3:
+  department-employee-3:
     label_dx: 0
     label_dy: 0
-  product-sale-4:
+  lead-customer-4:
     label_dx: 0
     label_dy: 0
-  product-inventory-5:
+  lead-customer-5:
     label_dx: 0
     label_dy: 0
-  product-procurement-6:
+  customer-sale-6:
     label_dx: 0
     label_dy: 0
-  supplier-procurement-7:
+  product-sale-7:
+    label_dx: 0
+    label_dy: 0
+  product-sale-8:
+    label_dx: 0
+    label_dy: 0
+  product-inventory-9:
+    label_dx: 0
+    label_dy: 0
+  product-inventory-10:
+    label_dx: 0
+    label_dy: 0
+  product-procurement-11:
+    label_dx: 0
+    label_dy: 0
+  product-procurement-12:
+    label_dx: 0
+    label_dy: 0
+  supplier-procurement-13:
     label_dx: 0
     label_dy: 0
