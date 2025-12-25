@@ -89,7 +89,11 @@
         // Preserve user-adjusted positions across progressive expansion updates
         const existingPositions = new Map<string, { x: number; y: number }>();
         for (const n of lineageNodes) {
-            existingPositions.set(n.id, { x: n.position.x, y: n.position.y });
+            // Only preserve positions for nodes the user has manually dragged.
+            // Otherwise, allow layout recalculation to keep parents above children, etc.
+            if ((n.data as any)?.__manualPosition === true) {
+                existingPositions.set(n.id, { x: n.position.x, y: n.position.y });
+            }
         }
 
         // Build quick lookup maps
@@ -181,7 +185,7 @@
         const LAYER_MAX_HEIGHT = 520;
         const LAYER_HEADER_HEIGHT = 34; // space for label inside the band
         const LAYER_INNER_PADDING = 30;
-        const LEVEL_SPACING_WITHIN_LAYER = 70;
+        const LEVEL_SPACING_WITHIN_LAYER = 110; // more vertical breathing room within a layer
 
         const layerBounds = new Map<string, { top: number; bottom: number; height: number }>();
         if (layersConfigured) {
@@ -490,8 +494,8 @@
             };
         }
 
-        const H_SPACING = 150; // Horizontal spacing between siblings at the same level
-        const LEVEL_SPACING_WITHIN_LAYER = 70; // vertical spacing within a layer for different levels
+        const H_SPACING = 260; // Horizontal spacing between siblings at the same level (use more width)
+        const LEVEL_SPACING_WITHIN_LAYER = 110; // vertical spacing within a layer for different levels
         
         let yPosition: number;
         let xPosition: number;
@@ -515,7 +519,9 @@
                 // Within layer, position by level (roughly centered)
                 const layerNodes = layerBuckets.get(node.layer) ?? [];
                 const levelsInLayer = new Set(layerNodes.map((n) => n.level));
-                const sortedLevels = Array.from(levelsInLayer).sort((a, b) => a - b);
+                // Higher `level` = further upstream. We want parents above children,
+                // so we place higher levels closer to the top of the band.
+                const sortedLevels = Array.from(levelsInLayer).sort((a, b) => b - a);
                 const levelIndexInLayer = Math.max(0, sortedLevels.indexOf(node.level));
 
                 const baseY = top + 40;
@@ -548,7 +554,7 @@
             }
         }
         
-        // X position: center siblings for this level and spread them horizontally
+        // X position: keep levels vertically aligned (no diagonal drift), but spread siblings.
         const siblingCenterOffset = (countAtLevel - 1) / 2;
         const siblingOffset = (indexInLevel - siblingCenterOffset) * H_SPACING;
         xPosition = existing?.x ?? siblingOffset;
@@ -593,7 +599,11 @@
 
         lineageNodes = lineageNodes.map((n) => {
             if (n.id !== dragged.id) return n;
-            return { ...n, position: { ...n.position, y: clampedY } };
+            return {
+                ...n,
+                position: { ...n.position, y: clampedY },
+                data: { ...(n.data as any), __manualPosition: true },
+            };
         });
     }
 
