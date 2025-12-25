@@ -14,7 +14,13 @@ from importlib.resources import files
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.config import print_config
-from trellis_datamodel.routes import manifest_router, data_model_router, schema_router, exposures_router, lineage_router
+from trellis_datamodel.routes import (
+    manifest_router,
+    data_model_router,
+    schema_router,
+    exposures_router,
+    lineage_router,
+)
 
 
 def create_app() -> FastAPI:
