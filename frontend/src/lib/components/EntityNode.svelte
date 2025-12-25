@@ -1123,6 +1123,14 @@ import Icon from "@iconify/svelte";
                     class="w-2 h-2 rounded-full bg-primary-500"
                     title="Bound to {boundModelName}"
                 ></div>
+                <button
+                    onclick={() => openLineageModal(boundModelName)}
+                    aria-label="Show lineage for {boundModelName}"
+                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    title="Show lineage"
+                >
+                    <Icon icon="lucide:git-branch" class="w-4 h-4" />
+                </button>
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"
