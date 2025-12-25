@@ -3,9 +3,11 @@
 
     let { data, selected }: NodeProps = $props();
 
+    const label = $derived((data?.label as string) || "Expand");
+
     function handleClick(event: MouseEvent) {
         event.stopPropagation();
-        if (typeof data?.onClick === "function") data.onClick();
+        if (typeof data?.onClick === "function") (data.onClick as () => void)();
     }
 
     function handleKeydown(event: KeyboardEvent) {
@@ -26,7 +28,7 @@
     role="button"
     tabindex="0"
     aria-label="Expand lineage"
-    title={data?.label ?? "Expand"}
+    title={label}
 >
     <Handle
         type="target"
@@ -41,7 +43,7 @@
         isConnectable={false}
     />
 
-    <span class="truncate block">{data?.label ?? "..."}</span>
+    <span class="truncate block">{label}</span>
 </div>
 
 

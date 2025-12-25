@@ -3,7 +3,8 @@
 
     let { data, selected }: NodeProps = $props();
     
-    const isTarget = data.level === 0;
+    const isTarget = $derived((data?.level as number) === 0);
+    const label = $derived((data?.label as string) || '');
 </script>
 
 <div
@@ -14,7 +15,7 @@
     class:border-primary-600={isTarget}
     class:ring-2={selected}
     class:ring-primary-500={selected}
-    title={data.label}
+    title={label}
 >
     <Handle
         type="target"
@@ -30,7 +31,7 @@
     />
     
     <div class="flex items-center justify-center">
-        <span class="text-xs font-medium truncate block w-full" class:text-gray-900={!isTarget} class:text-white={isTarget}>{data.label}</span>
+        <span class="text-xs font-medium truncate block w-full" class:text-gray-900={!isTarget} class:text-white={isTarget}>{label}</span>
     </div>
 </div>
 

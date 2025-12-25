@@ -2,13 +2,15 @@
     import { Handle, Position, type NodeProps } from "@xyflow/svelte";
 
     let { data, selected }: NodeProps = $props();
+    
+    const label = $derived((data?.label as string) || '');
 </script>
 
 <div
     class="rounded-lg border-2 bg-blue-50 border-blue-400 shadow-md px-3 py-2 min-w-[120px] max-w-[200px] text-center"
     class:ring-2={selected}
     class:ring-blue-500={selected}
-    title={data.label}
+    title={label}
 >
     <Handle
         type="target"
@@ -31,7 +33,7 @@
             {/if}
         </div>
         <div class="flex items-center gap-2 justify-center w-full">
-            <span class="text-xs font-medium text-blue-900 truncate block w-full">{data.label}</span>
+            <span class="text-xs font-medium text-blue-900 truncate block w-full">{label}</span>
         </div>
     </div>
 </div>

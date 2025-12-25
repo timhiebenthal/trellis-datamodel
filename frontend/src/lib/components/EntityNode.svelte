@@ -118,7 +118,7 @@ import Icon from "@iconify/svelte";
     });
 
     // Preserve edge selection when switching models (defensive measure)
-    let previousModelIndex = $state(activeModelIndex);
+    let previousModelIndex = $state(0);
     let lastKnownSelectedEdges = $state<Set<string>>(new Set());
     
     // Continuously track selected edges
@@ -131,7 +131,8 @@ import Icon from "@iconify/svelte";
     
     // Restore selection when model index changes
     $effect(() => {
-        if (previousModelIndex !== activeModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
+        const currentModelIndex = activeModelIndex;
+        if (previousModelIndex !== currentModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
             // Model switch occurred - restore previously selected edges after a microtask
             queueMicrotask(() => {
                 $edges = $edges.map(edge => ({
@@ -140,7 +141,7 @@ import Icon from "@iconify/svelte";
                 }));
             });
         }
-        previousModelIndex = activeModelIndex;
+        previousModelIndex = currentModelIndex;
     });
 
     async function loadSchema() {
