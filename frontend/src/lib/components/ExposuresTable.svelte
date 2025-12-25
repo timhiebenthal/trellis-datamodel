@@ -312,7 +312,7 @@
             </div>
 
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-18rem)]">
+                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-10rem)]">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
