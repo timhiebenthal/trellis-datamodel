@@ -15,6 +15,7 @@
     import LineageModelNode from "./LineageModelNode.svelte";
     import LineagePlaceholderNode from "./LineagePlaceholderNode.svelte";
     import LineageLayerBandNode from "./LineageLayerBandNode.svelte";
+    import LineageViewportSync from "./LineageViewportSync.svelte";
 
     const { open = false, modelId = null, onClose } = $props<{
         open: boolean;
@@ -28,6 +29,7 @@
     let lineageNodes = $state<Node[]>([]);
     let lineageEdges = $state<Edge[]>([]);
     let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
+    let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -436,13 +438,13 @@
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
-            // Compute horizontal extent based on current visible nodes (exclude placeholders already ok).
+            // Create an "infinite" horizontal strip that spans the entire canvas
             const xs = visibleNodes.map((n) => n.position.x);
             const minX = Math.min(...xs, 0);
-            const maxX = Math.max(...xs, 0);
-            const BAND_MARGIN_X = 500;
-            const BAND_WIDTH = Math.max(1200, maxX - minX + BAND_MARGIN_X * 2);
-            const bandX = minX - BAND_MARGIN_X;
+            
+            // Use massive width to create seamless infinite bands
+            const BAND_WIDTH = 100000;
+            const bandX = minX - 50000;
 
             const bandNodes: Node[] = layerOrder.map((layer) => {
                 const bounds = layerBounds.get(layer);
@@ -454,7 +456,7 @@
                     id: `layer-band-${layer}`,
                     type: "layerBand",
                     position: { x: bandX, y: top },
-                    data: { label, width: BAND_WIDTH, height },
+                    data: { label, width: BAND_WIDTH, height, labelX: 0 },
                     draggable: false,
                     selectable: false,
                     connectable: false,
@@ -466,8 +468,10 @@
             // Ensure layer bands are behind edges and nodes
             // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
             lineageNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
+            layerBandMeta = bandNodes.map((b) => ({ id: b.id as string, bandX }));
         } else {
             lineageNodes = visibleNodes;
+            layerBandMeta = [];
         }
     }
 
@@ -639,6 +643,7 @@
             };
         }
     });
+
 </script>
 
 {#if open}
@@ -712,6 +717,11 @@
                         nodeTypes={nodeTypes}
                         defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
                         fitView
+                        fitViewOptions={{
+                            // Only fit the nodes that are NOT background bands
+                            nodes: lineageNodes.filter(n => !n.id.toString().startsWith('layer-band-')),
+                            padding: 0.2
+                        }}
                         panOnDrag={true}
                         selectionOnDrag={false}
                         nodesDraggable={true}
@@ -720,6 +730,9 @@
                         class="w-full h-full"
                     >
                         <Controls />
+                        {#if layerBandMeta.length > 0}
+                            <LineageViewportSync bands={layerBandMeta} />
+                        {/if}
                         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                         <MiniMap />
                     </SvelteFlow>
