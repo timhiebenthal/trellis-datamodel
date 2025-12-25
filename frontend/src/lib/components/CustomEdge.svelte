@@ -246,6 +246,10 @@
   // Display text for collapsed state - show label or placeholder
   const displayLabel = $derived(label?.trim() || 'relates to');
   
+  // Compact label calculations for overflow prevention
+  const maxLabelWidth = $derived(Math.min(displayLabel.length * 7 + 16, 200));
+  const truncatedLabel = $derived(displayLabel.length > 25 ? displayLabel.substring(0, 22) + '...' : displayLabel);
+  
   // All relationship types with their display text and cardinality descriptors
   // Format: source_cardinality_to_target_cardinality
   // Cardinalities: one (exactly one), zero_or_one (0..1), many (1..*), zero_or_many (0..*)
@@ -590,7 +594,7 @@
             <Icon icon="lucide:arrow-left-right" class="w-3 h-3" />
         </button>
       </div>
-      <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">
+      <div class="text-[10px] text-slate-500 text-center truncate max-w-full" title={relationText}>
         {relationText}
       </div>
       <!-- Field mappings - show in Logical view -->
@@ -623,10 +627,11 @@
     style="cursor: pointer; pointer-events: all;"
   >
     <!-- Background rectangle to mask the edge line - matches canvas bg -->
+    <!-- Limit width to prevent overflow, max 200px -->
     <rect
-      x={edgeLabelPos.x - (displayLabel.length * 3.5) - 8}
+      x={edgeLabelPos.x - maxLabelWidth / 2}
       y={edgeLabelPos.y - 10}
-      width={displayLabel.length * 7 + 16}
+      width={maxLabelWidth}
       height="20"
       fill="#f8fafc"
       stroke="#e2e8f0"
@@ -634,6 +639,7 @@
       rx="4"
       ry="4"
     />
+    <title>{displayLabel}</title>
     <text
       x={edgeLabelPos.x}
       y={edgeLabelPos.y}
@@ -644,7 +650,7 @@
       font-size="11"
       font-weight="500"
     >
-      {displayLabel}
+      {truncatedLabel}
     </text>
   </g>
 {/if}

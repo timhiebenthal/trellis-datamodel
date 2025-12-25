@@ -18,7 +18,7 @@
 </script>
 
 <div
-    class="rounded-full border-2 border-dashed shadow-sm px-3 py-1 bg-gray-50 text-gray-700 text-sm font-semibold select-none cursor-pointer"
+    class="rounded-full border-2 border-dashed shadow-sm px-3 py-1 bg-gray-50 text-gray-700 text-sm font-semibold select-none cursor-pointer max-w-[150px]"
     class:ring-2={selected}
     class:ring-primary-500={selected}
     onclick={handleClick}
@@ -26,7 +26,7 @@
     role="button"
     tabindex="0"
     aria-label="Expand lineage"
-    title="Expand"
+    title={data?.label ?? "Expand"}
 >
     <Handle
         type="target"
@@ -41,7 +41,7 @@
         isConnectable={false}
     />
 
-    <span>{data?.label ?? "..."}</span>
+    <span class="truncate block">{data?.label ?? "..."}</span>
 </div>
 
 
