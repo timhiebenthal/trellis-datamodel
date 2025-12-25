@@ -579,12 +579,9 @@
         };
     }
 
-    function handleNodeDragStop(event: CustomEvent) {
+    function handleNodeDragStop(event: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
         // Enforce "node stays in its layer" by clamping Y to the band bounds.
-        // @xyflow/svelte sometimes calls this handler with params directly (not a CustomEvent),
-        // so support both shapes.
-        const maybeParams = event as unknown as { node?: Node; detail?: { node?: Node } };
-        const dragged = maybeParams?.node ?? maybeParams?.detail?.node;
+        const dragged = event.targetNode;
         if (!dragged) return;
 
         // Ignore background band nodes
