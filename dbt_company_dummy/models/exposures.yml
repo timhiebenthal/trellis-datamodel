@@ -37,3 +37,23 @@ exposures:
     owner:
       name: Clara Stock
       email: clara.stock@example.com
+
+
+  - name: finance_dashboard
+    label: Finance Dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.tool/dashboards/3
+    description: >
+      Finance dashboard showing invoice revenue by customer, supplier, product, and calendar.
+
+    depends_on:
+      - ref('customer_invoice')
+      - ref('supplier_invoice')
+      - ref('product')
+      - ref('calendar')
+      - ref('invoice_revenue')
+
+    owner:
+      name: Peter Penny
+      email: peter.penny@example.com
