@@ -3,7 +3,7 @@ entities:
 - id: employee
   label: employee
   description: Employee records
-  dbt_model: model.company_dummy.employee
+  dbt_model: model.company_dummy.employee_history
   drafted_fields:
   - name: ''
     datatype: text
@@ -45,6 +45,18 @@ relationships:
   target: employee
   label: ''
   type: one_to_many
+- source: employee
+  target: employee
+  label: ''
+  type: one_to_many
+  source_field: employee_id
+  target_field: supervisor_id
+- source: employee
+  target: employee
+  label: ''
+  type: one_to_many
+  source_field: employee_id
+  target_field: supervisor_id
 - source: department
   target: employee
   label: ''

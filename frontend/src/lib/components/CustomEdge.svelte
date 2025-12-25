@@ -82,24 +82,27 @@
   // Build the edge path
   const edgePath = $derived.by(() => {
     const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
+    let path: string;
     if (isSelfEdge) {
-      return buildSelfLoopPath(
+      path = buildSelfLoopPath(
         sourcePoint,
         targetPoint,
         sourceSide,
         baseOffset,
         60 // stable loop radius; label offset handled separately
       );
+    } else {
+      path = buildOrthogonalPath(
+        sourcePoint,
+        targetPoint,
+        sourceSide,
+        targetSide,
+        baseOffset,
+        storedOffsetX + dragOffsetX,
+        storedOffsetY + dragOffsetY
+      );
     }
-    return buildOrthogonalPath(
-      sourcePoint,
-      targetPoint,
-      sourceSide,
-      targetSide,
-      baseOffset,
-      storedOffsetX + dragOffsetX,
-      storedOffsetY + dragOffsetY
-    );
+    return path;
   });
 
 
@@ -242,6 +245,10 @@
   
   // Display text for collapsed state - show label or placeholder
   const displayLabel = $derived(label?.trim() || 'relates to');
+  
+  // Compact label calculations for overflow prevention
+  const maxLabelWidth = $derived(Math.min(displayLabel.length * 7 + 16, 200));
+  const truncatedLabel = $derived(displayLabel.length > 25 ? displayLabel.substring(0, 22) + '...' : displayLabel);
   
   // All relationship types with their display text and cardinality descriptors
   // Format: source_cardinality_to_target_cardinality
@@ -470,11 +477,15 @@
   }
 
   // Style overrides for selection - Use #26A69A (Teal)
-  const edgeStyle = $derived(
-    selected 
-      ? `stroke: #26A69A; stroke-width: 2; ${style || ''}` 
-      : style
-  );
+  const edgeStyle = $derived.by(() => {
+    if (selected) {
+      return `stroke: #26A69A; stroke-width: 2; ${style || ''}`;
+    }
+    
+    // Ensure default stroke styling when not selected
+    const defaultStyle = 'stroke: #64748b; stroke-width: 2';
+    return style ? `${defaultStyle}; ${style}` : defaultStyle;
+  });
   
   // Crow's foot marker positions and rotations based on connection sides
   const markerColor = $derived(selected ? '#26A69A' : '#64748b');
@@ -493,6 +504,7 @@
     const pos = calculateMarkerPosition(targetPoint, targetSide, baseOffset, MARKER_PADDING);
     return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(targetSide)})`;
   });
+
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
@@ -582,7 +594,7 @@
             <Icon icon="lucide:arrow-left-right" class="w-3 h-3" />
         </button>
       </div>
-      <div class="text-[10px] text-slate-500 text-center whitespace-nowrap">
+      <div class="text-[10px] text-slate-500 text-center truncate max-w-full" title={relationText}>
         {relationText}
       </div>
       <!-- Field mappings - show in Logical view -->
@@ -615,10 +627,11 @@
     style="cursor: pointer; pointer-events: all;"
   >
     <!-- Background rectangle to mask the edge line - matches canvas bg -->
+    <!-- Limit width to prevent overflow, max 200px -->
     <rect
-      x={edgeLabelPos.x - (displayLabel.length * 3.5) - 8}
+      x={edgeLabelPos.x - maxLabelWidth / 2}
       y={edgeLabelPos.y - 10}
-      width={displayLabel.length * 7 + 16}
+      width={maxLabelWidth}
       height="20"
       fill="#f8fafc"
       stroke="#e2e8f0"
@@ -626,6 +639,7 @@
       rx="4"
       ry="4"
     />
+    <title>{displayLabel}</title>
     <text
       x={edgeLabelPos.x}
       y={edgeLabelPos.y}
@@ -636,7 +650,7 @@
       font-size="11"
       font-weight="500"
     >
-      {displayLabel}
+      {truncatedLabel}
     </text>
   </g>
 {/if}

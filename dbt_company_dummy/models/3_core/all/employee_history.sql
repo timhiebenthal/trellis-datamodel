@@ -14,5 +14,5 @@ select
     created_at,
     cast(hire_date as timestamp) as valid_from,
     cast(hire_date as timestamp) + interval '1 year' as valid_to
-from {{ ref('prep_employee') }}
+from {{ ref('prep_extra_calc_employee') }}
 

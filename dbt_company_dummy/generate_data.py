@@ -749,7 +749,7 @@ models:
         sources_content = """version: 2
 
 sources:
-  - name: company_source
+  - name: mock_csv
     schema: main
     tables:
       - name: department
@@ -811,43 +811,43 @@ sources:
     # Create clean models if they don't exist
     clean_models = {
         "clean_department.sql": """select * 
-from {{ source('company_source', 'department') }}
+from {{ source('mock_csv', 'department') }}
 """,
         "clean_employee.sql": """select * 
-from {{ source('company_source', 'employee') }}
+from {{ source('mock_csv', 'employee') }}
 """,
         "clean_customer.sql": """select * 
-from {{ source('company_source', 'customer') }}
+from {{ source('mock_csv', 'customer') }}
 """,
         "clean_product.sql": """select * 
-from {{ source('company_source', 'products') }}
+from {{ source('mock_csv', 'products') }}
 """,
         "clean_lead.sql": """select * 
-from {{ source('company_source', 'lead') }}
+from {{ source('mock_csv', 'lead') }}
 """,
         "clean_order.sql": """select * 
-from {{ source('company_source', 'order') }}
+from {{ source('mock_csv', 'order') }}
 """,
         "clean_order_item.sql": """select * 
-from {{ source('company_source', 'order_item') }}
+from {{ source('mock_csv', 'order_item') }}
 """,
         "clean_customer_invoice.sql": """select * 
-from {{ source('company_source', 'customer_invoice') }}
+from {{ source('mock_csv', 'customer_invoice') }}
 """,
         "clean_supplier.sql": """select * 
-from {{ source('company_source', 'supplier') }}
+from {{ source('mock_csv', 'supplier') }}
 """,
         "clean_purchase_order.sql": """select * 
-from {{ source('company_source', 'purchase_order') }}
+from {{ source('mock_csv', 'purchase_order') }}
 """,
         "clean_purchase_order_item.sql": """select * 
-from {{ source('company_source', 'purchase_order_item') }}
+from {{ source('mock_csv', 'purchase_order_item') }}
 """,
         "clean_supplier_invoice.sql": """select * 
-from {{ source('company_source', 'supplier_invoice') }}
+from {{ source('mock_csv', 'supplier_invoice') }}
 """,
         "clean_inventory.sql": """select * 
-from {{ source('company_source', 'inventory') }}
+from {{ source('mock_csv', 'inventory') }}
 """,
     }
 

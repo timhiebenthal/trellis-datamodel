@@ -1,7 +1,7 @@
 version: 2
 
 sources:
-  - name: company_source
+  - name: mock_csv
     schema: main
     tables:
       - name: department

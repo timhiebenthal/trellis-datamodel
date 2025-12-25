@@ -17,6 +17,7 @@
         inferRelationships,
         getModelSchema,
         updateModelSchema,
+        getLineage,
     } from "$lib/api";
     import {
         getParallelOffset,
@@ -27,8 +28,9 @@
         formatModelNameForLabel,
         extractModelNameFromUniqueId,
     } from "$lib/utils";
-    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
-    import Icon from "@iconify/svelte";
+import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
+    import { openLineageModal } from "$lib/stores";
+import Icon from "@iconify/svelte";
 
     let { data: rawData, id, selected }: NodeProps = $props();
     // Cast data to EntityData for proper typing - use $derived to maintain reactivity
@@ -36,6 +38,7 @@
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
+    // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
 
     // Batch editing support
     let selectedEntityNodes = $derived(
@@ -131,7 +134,8 @@
     
     // Restore selection when model index changes
     $effect(() => {
-        if (previousModelIndex !== activeModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
+        const currentModelIndex = activeModelIndex;
+        if (previousModelIndex !== currentModelIndex && allBoundModels.length > 1 && lastKnownSelectedEdges.size > 0) {
             // Model switch occurred - restore previously selected edges after a microtask
             queueMicrotask(() => {
                 $edges = $edges.map(edge => ({
@@ -140,7 +144,7 @@
                 }));
             });
         }
-        previousModelIndex = activeModelIndex;
+        previousModelIndex = currentModelIndex;
     });
 
     async function loadSchema() {
@@ -1092,6 +1096,7 @@
                 oninput={updateLabel}
                 onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}
+                ondblclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => e.stopPropagation()}
                 onkeyup={(e) => e.stopPropagation()}
                 class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm text-gray-800"
@@ -1104,6 +1109,15 @@
                     class="w-2 h-2 rounded-full bg-primary-500"
                     title="Bound to {boundModelName}"
                 ></div>
+                <button
+                    onclick={() => boundModelName && openLineageModal(boundModelName)}
+                    aria-label="Show lineage for {boundModelName}"
+                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    title="Show lineage"
+                    disabled={!boundModelName}
+                >
+                    <Icon icon="lucide:git-branch" class="w-4 h-4" />
+                </button>
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"

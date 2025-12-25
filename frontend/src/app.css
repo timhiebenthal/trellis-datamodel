@@ -27,12 +27,56 @@
     cursor: default !important;
 }
 
+/* Gradient fade effect for pane text */
+.svelte-flow__pane {
+    color: transparent;
+    background-image: linear-gradient(90deg, rgba(15, 23, 42, 0) 85%, rgba(255, 255, 255, 1) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+}
+
 .svelte-flow__pane.dragging,
 .svelte-flow__node.dragging,
 .cursor-grabbing,
 .svelte-flow__pane:active,
 .svelte-flow__node:active {
     cursor: move !important;
+}
+
+/* Remove default Svelte Flow styles from all node wrappers */
+.svelte-flow__node,
+.svelte-flow__node.svelte-flow__node-default,
+.svelte-flow__node.svelte-flow__node-entity,
+.svelte-flow__node.svelte-flow__node-source,
+.svelte-flow__node.svelte-flow__node-group {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: rgba(15, 23, 42, 0);
+}
+
+.svelte-flow__node:focus,
+.svelte-flow__node:focus-visible,
+.svelte-flow__node.svelte-flow__node-default:focus,
+.svelte-flow__node.svelte-flow__node-default:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Remove default styles from the inner node container */
+.svelte-flow__node-default {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.svelte-flow__node-default:focus,
+.svelte-flow__node-default:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* Fix for invisible I-beam cursor */

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import '../app.css';
 	import '@xyflow/svelte/dist/style.css';
+	import '../app.css';
 	import logoHref from '$lib/assets/trellis_squared.svg?url';
 
 	let { children } = $props();
