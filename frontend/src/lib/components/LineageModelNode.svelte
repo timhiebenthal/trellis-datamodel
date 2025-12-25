@@ -30,7 +30,7 @@
     />
     
     <div class="flex items-center justify-center">
-        <span class="text-sm font-medium truncate block w-full" class:text-gray-900={!isTarget} class:text-white={isTarget}>{data.label}</span>
+        <span class="text-xs font-medium truncate block w-full" class:text-gray-900={!isTarget} class:text-white={isTarget}>{data.label}</span>
     </div>
 </div>
 

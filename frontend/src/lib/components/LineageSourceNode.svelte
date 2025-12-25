@@ -31,7 +31,7 @@
             {/if}
         </div>
         <div class="flex items-center gap-2 justify-center w-full">
-            <span class="text-sm font-medium text-blue-900 truncate block w-full">{data.label}</span>
+            <span class="text-xs font-medium text-blue-900 truncate block w-full">{data.label}</span>
         </div>
     </div>
 </div>

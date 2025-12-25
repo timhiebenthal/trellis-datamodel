@@ -18,7 +18,7 @@
 </script>
 
 <div
-    class="rounded-full border-2 border-dashed shadow-sm px-3 py-1 bg-gray-50 text-gray-700 text-sm font-semibold select-none cursor-pointer max-w-[150px]"
+    class="rounded-full border-2 border-dashed shadow-sm px-3 py-1 bg-gray-50 text-gray-700 text-xs font-semibold select-none cursor-pointer max-w-[150px]"
     class:ring-2={selected}
     class:ring-primary-500={selected}
     onclick={handleClick}
