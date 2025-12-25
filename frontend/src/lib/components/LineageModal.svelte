@@ -153,7 +153,8 @@
                     id: `edge-${edge.source}-${edge.target}`,
                     source: edge.source,
                     target: edge.target,
-                    type: "default",
+                    // Prefer orthogonal edges (less "diagonal"/curvy than default Bezier)
+                    type: "smoothstep",
                 });
             } else {
                 droppedEdgesBecauseNotVisible += 1;
@@ -231,7 +232,6 @@
         const BOTTOM_Y = 500; // Target entity position (bottom)
         const TOP_Y = 80; // Sources position (top)
         const LEVEL_SPACING = 120; // Vertical spacing between levels
-        const COLUMN_OFFSET = 180; // Base offset per level (keeps columns apart)
         const H_SPACING = 150; // Horizontal spacing between siblings at the same level
         
         // Y position: sources at top, target at bottom
@@ -252,7 +252,8 @@
         // Example: for 3 siblings, indexes 0,1,2 become offsets -1,0,1.
         const siblingCenterOffset = (countAtLevel - 1) / 2;
         const siblingOffset = (indexInLevel - siblingCenterOffset) * H_SPACING;
-        const xPosition = node.level * COLUMN_OFFSET + siblingOffset;
+        // Keep levels vertically aligned (no per-level X drift) so lineage reads top-to-bottom.
+        const xPosition = siblingOffset;
         
         return {
             id: node.id,
@@ -369,6 +370,7 @@
                         nodes={lineageNodes}
                         edges={lineageEdges}
                         nodeTypes={nodeTypes}
+                        defaultEdgeOptions={{ type: "smoothstep" }}
                         fitView
                         panOnDrag={true}
                         selectionOnDrag={false}
