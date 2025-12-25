@@ -652,7 +652,9 @@ import Icon from "@iconify/svelte";
         // Prevent double-click from triggering collapse/expand toggle
         event.stopPropagation();
         // Open lineage modal with primary bound model
-        openLineageModal(boundModelName);
+        if (boundModelName) {
+            openLineageModal(boundModelName);
+        }
     }
 
     // Tag editing functionality
@@ -1124,10 +1126,11 @@ import Icon from "@iconify/svelte";
                     title="Bound to {boundModelName}"
                 ></div>
                 <button
-                    onclick={() => openLineageModal(boundModelName)}
+                    onclick={() => boundModelName && openLineageModal(boundModelName)}
                     aria-label="Show lineage for {boundModelName}"
                     class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
                     title="Show lineage"
+                    disabled={!boundModelName}
                 >
                     <Icon icon="lucide:git-branch" class="w-4 h-4" />
                 </button>

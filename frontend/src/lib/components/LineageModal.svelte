@@ -13,6 +13,7 @@
     import Icon from "@iconify/svelte";
     import LineageSourceNode from "./LineageSourceNode.svelte";
     import LineageModelNode from "./LineageModelNode.svelte";
+    import LineagePlaceholderNode from "./LineagePlaceholderNode.svelte";
 
     const { open = false, modelId = null, onClose } = $props<{
         open: boolean;
@@ -29,11 +30,15 @@
     const nodeTypes = {
         source: LineageSourceNode,
         default: LineageModelNode, // Use custom node type for regular models
+        placeholder: LineagePlaceholderNode,
     };
 
-    // Progressive display state - show all levels initially, but can collapse later
-    let expandedLevels = $state<Set<number>>(new Set());
-    let placeholderNodes = $state<Map<string, { parentId: string; level: number }>>(new Map());
+    // Edge type constant - use bezier curves (default) for all lineage edges
+    const LINEAGE_EDGE_TYPE = "default";
+
+    // Progressive display state (per-node expansion)
+    // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
+    let expandedNodeIds = $state<Set<string>>(new Set());
 
     // Fetch lineage when modal opens
     $effect(() => {
@@ -45,8 +50,7 @@
             lineageNodes = [];
             lineageEdges = [];
             error = null;
-            expandedLevels = new Set();
-            placeholderNodes = new Map();
+            expandedNodeIds = new Set();
         }
     });
 
@@ -76,14 +80,43 @@
     function updateGraphDisplay() {
         if (!lineageData) return;
 
-        // Filter nodes based on expanded levels and progressive display
-        const visibleNodes: Node[] = [];
-        const visibleEdges: Edge[] = [];
-        const newPlaceholderNodes = new Map<string, { parentId: string; level: number }>();
+        const rootId = lineageData.metadata?.root_model_id ?? modelId ?? "";
+        if (!rootId) return;
 
-        // Bucket nodes by level to spread siblings horizontally
+        // Build quick lookup maps
+        const nodeById = new Map<string, LineageNode>();
+        for (const n of lineageData.nodes) nodeById.set(n.id, n);
+
+        // Build adjacency (upstream): target -> [sources]
+        const upstreamOf = new Map<string, string[]>();
+        for (const e of lineageData.edges) {
+            const list = upstreamOf.get(e.target) ?? [];
+            list.push(e.source);
+            upstreamOf.set(e.target, list);
+        }
+
+        // Compute visible node IDs according to the rule
+        const visibleNodeIds = new Set<string>();
+        visibleNodeIds.add(rootId);
+
+        // Direct parents (one hop upstream of root)
+        for (const up of upstreamOf.get(rootId) ?? []) visibleNodeIds.add(up);
+
+        // Sources (always)
+        for (const n of lineageData.nodes) {
+            if (n.isSource) visibleNodeIds.add(n.id);
+        }
+
+        // Expanded nodes: reveal one more hop upstream for that node
+        for (const expandedId of expandedNodeIds) {
+            for (const up of upstreamOf.get(expandedId) ?? []) visibleNodeIds.add(up);
+        }
+
+        const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
+
+        // Bucket visible nodes by level to spread siblings horizontally
         const levelBuckets = new Map<number, LineageNode[]>();
-        for (const node of lineageData.nodes) {
+        for (const node of visibleLineageNodes) {
             const bucket = levelBuckets.get(node.level) ?? [];
             bucket.push(node);
             levelBuckets.set(node.level, bucket);
@@ -96,117 +129,166 @@
             nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
         }
 
-        // Progressive display threshold - hide models when level has too many
-        const MODELS_THRESHOLD = 10;
-        const levelHasTooManyModels = new Map<number, boolean>();
-        for (const [level, nodes] of levelBuckets) {
-            const modelCount = nodes.filter((n) => !n.isSource).length;
-            levelHasTooManyModels.set(level, modelCount > MODELS_THRESHOLD);
-        }
-
-        // Process nodes - apply progressive display logic
-        // Track which nodes exist in lineage (for edge filtering)
-        const allNodeIds = new Set((lineageData.nodes ?? []).map((n) => n.id));
-        
-        for (const node of lineageData.nodes) {
+        // Build visible flow nodes
+        const visibleNodes: Node[] = [];
+        for (const node of visibleLineageNodes) {
             const pos = levelPositions.get(node.id);
             const indexInLevel = pos?.index ?? 0;
             const countAtLevel = pos?.count ?? 1;
+            visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
+        }
 
-            // Always show sources and root
-            if (node.isSource || node.level === 0) {
-                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
+        // Placeholders + edge compression:
+        // If intermediate (hidden) models exist between two visible nodes, route via a `...` placeholder
+        // attached to the downstream visible node to keep the graph connected without pretending it's a direct edge.
+        const visibleEdges: Edge[] = [];
+        const placeholderIdByTarget = new Map<string, string>();
+        const placeholderToTargetEdgeAdded = new Set<string>();
+        const placeholderUpstreamsByTarget = new Map<string, Set<string>>();
+
+        function ensurePlaceholder(targetId: string): string | null {
+            const targetFlowNode = visibleNodes.find((n) => n.id === targetId);
+            if (!targetFlowNode) return null;
+
+            const existing = placeholderIdByTarget.get(targetId);
+            if (existing) return existing;
+
+            const placeholderId = `placeholder-${targetId}`;
+            placeholderIdByTarget.set(targetId, placeholderId);
+
+            visibleNodes.push({
+                id: placeholderId,
+                type: "placeholder",
+                position: {
+                    x: targetFlowNode.position.x,
+                    // Temporary; we'll reposition "centrically" once we know upstream connections.
+                    y: targetFlowNode.position.y,
+                },
+                data: {
+                    label: "...",
+                    onClick: () => expandNode(targetId),
+                },
+            });
+
+            return placeholderId;
+        }
+
+        function getNearestVisibleUpstream(
+            targetId: string,
+        ): Array<{ upstreamId: string; depth: number }> {
+            const results = new Map<string, number>();
+            const queue: Array<{ id: string; depth: number }> = [];
+            const visited = new Set<string>();
+
+            for (const up of upstreamOf.get(targetId) ?? []) {
+                queue.push({ id: up, depth: 1 });
             }
-            // For level 1 (direct dependencies), always show all
-            else if (node.level === 1) {
-                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (!current) break;
+                const { id, depth } = current;
+                if (visited.has(id)) continue;
+                visited.add(id);
+
+                if (visibleNodeIds.has(id)) {
+                    const existing = results.get(id);
+                    if (existing === undefined || depth < existing) results.set(id, depth);
+                    continue; // stop at first visible node on this path
+                }
+
+                for (const up of upstreamOf.get(id) ?? []) {
+                    queue.push({ id: up, depth: depth + 1 });
+                }
             }
-            // For level 2, also show by default to maintain graph connectivity
-            // (level 2 nodes are dependencies of level 1, so showing them provides complete lineage context)
-            else if (node.level === 2) {
-                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
-            }
-            // For deeper levels (3+), apply threshold logic
-            else if (expandedLevels.has(node.level)) {
-                // If level is expanded, check if too many models - if so, show only sources
-                if (levelHasTooManyModels.get(node.level) && !node.isSource) {
-                    // Hide non-source models when level has too many
+
+            return [...results.entries()].map(([upstreamId, depth]) => ({ upstreamId, depth }));
+        }
+
+        for (const targetNode of visibleLineageNodes) {
+            const targetId = targetNode.id;
+
+            // Skip placeholder nodes (we only added those later)
+            if (targetId.startsWith("placeholder-")) continue;
+
+            // If the lineage node isn't in the lookup, skip
+            if (!nodeById.has(targetId)) continue;
+
+            const nearest = getNearestVisibleUpstream(targetId);
+            for (const { upstreamId, depth } of nearest) {
+                if (depth === 1) {
+                    visibleEdges.push({
+                        id: `edge-${upstreamId}-${targetId}`,
+                        source: upstreamId,
+                        target: targetId,
+                        type: LINEAGE_EDGE_TYPE,
+                    });
                     continue;
                 }
-                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
-            }
-            // Collapsed levels not shown (placeholder will be created)
-        }
 
-        // Process edges - only show edges between visible nodes
-        const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
-        let droppedEdgesBecauseMissingNode = 0;
-        let droppedEdgesBecauseNotVisible = 0;
-        for (const edge of lineageData.edges) {
-            const missingAny = !allNodeIds.has(edge.source) || !allNodeIds.has(edge.target);
-            if (missingAny) {
-                droppedEdgesBecauseMissingNode += 1;
-                continue;
-            }
-            if (visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)) {
+                const placeholderId = ensurePlaceholder(targetId);
+                if (!placeholderId) continue;
+
+                const upstreamSet = placeholderUpstreamsByTarget.get(targetId) ?? new Set<string>();
+                upstreamSet.add(upstreamId);
+                placeholderUpstreamsByTarget.set(targetId, upstreamSet);
+
                 visibleEdges.push({
-                    id: `edge-${edge.source}-${edge.target}`,
-                    source: edge.source,
-                    target: edge.target,
-                    // Prefer orthogonal edges (less "diagonal"/curvy than default Bezier)
-                    type: "smoothstep",
+                    id: `edge-${upstreamId}-${placeholderId}`,
+                    source: upstreamId,
+                    target: placeholderId,
+                    type: LINEAGE_EDGE_TYPE,
                 });
-            } else {
-                droppedEdgesBecauseNotVisible += 1;
-            }
-        }
 
-        // Create placeholder nodes for collapsed sections (levels > 2, since level 2 is shown by default)
-        for (const node of lineageData.nodes) {
-            const level = node.level;
-            if (level > 2 && !expandedLevels.has(level)) {
-                // Check if this node has upstream dependencies
-                const hasUpstream = lineageData.edges.some((e) => e.target === node.id);
-                if (hasUpstream) {
-                    // Find parent node
-                    const parentEdge = lineageData.edges.find((e) => e.target === node.id);
-                    if (parentEdge) {
-                        const placeholderId = `placeholder-${parentEdge.source}-${level}`;
-                        if (!newPlaceholderNodes.has(placeholderId)) {
-                            newPlaceholderNodes.set(placeholderId, {
-                                parentId: parentEdge.source,
-                                level: level,
-                            });
-                        }
-                    }
+                const key = `${placeholderId}=>${targetId}`;
+                if (!placeholderToTargetEdgeAdded.has(key)) {
+                    placeholderToTargetEdgeAdded.add(key);
+                    visibleEdges.push({
+                        id: `edge-${placeholderId}-${targetId}`,
+                        source: placeholderId,
+                        target: targetId,
+                        type: LINEAGE_EDGE_TYPE,
+                    });
                 }
             }
         }
 
-        // Add placeholder nodes
-        for (const [placeholderId, info] of newPlaceholderNodes) {
-            const parentNode = visibleNodes.find((n) => n.id === info.parentId);
-            if (parentNode) {
-                visibleNodes.push({
-                    id: placeholderId,
-                    type: "placeholder",
-                    position: {
-                        x: parentNode.position.x,
-                        y: parentNode.position.y + 60,
-                    },
-                    data: {
-                        label: "...",
-                        level: info.level,
-                        parentId: info.parentId,
-                        onClick: () => expandLevel(info.level),
-                    },
-                });
+        // Move each placeholder node to a more "centric" position between its connected upstream(s) and target.
+        // This reduces the perceived "curl"/hooking near the target when edges converge.
+        for (const [targetId, upstreamIds] of placeholderUpstreamsByTarget) {
+            const placeholderId = placeholderIdByTarget.get(targetId);
+            if (!placeholderId) continue;
+
+            const targetFlowNode = visibleNodes.find((n) => n.id === targetId);
+            const placeholderFlowNode = visibleNodes.find((n) => n.id === placeholderId);
+            if (!targetFlowNode || !placeholderFlowNode) continue;
+
+            const upstreamYs: number[] = [];
+            const upstreamXs: number[] = [];
+            for (const upId of upstreamIds) {
+                const upNode = visibleNodes.find((n) => n.id === upId);
+                if (upNode) {
+                    upstreamYs.push(upNode.position.y);
+                    upstreamXs.push(upNode.position.x);
+                }
             }
+            if (upstreamYs.length === 0) continue;
+
+            const minUpstreamY = Math.min(...upstreamYs);
+            const avgUpstreamX = upstreamXs.reduce((sum, x) => sum + x, 0) / upstreamXs.length;
+
+            // Place placeholder halfway between upstream(s) and the target.
+            // We use the highest upstream Y to keep the placeholder above the target even when upstreams differ.
+            const centeredY = Math.round((minUpstreamY + targetFlowNode.position.y) / 2);
+            const centeredX = Math.round((avgUpstreamX + targetFlowNode.position.x) / 2);
+            placeholderFlowNode.position = {
+                x: centeredX,
+                y: centeredY,
+            };
         }
 
         lineageNodes = visibleNodes;
         lineageEdges = visibleEdges;
-        placeholderNodes = newPlaceholderNodes;
     }
 
     function createFlowNode(
@@ -268,20 +350,19 @@
         };
     }
 
-    function expandLevel(level: number) {
-        expandedLevels = new Set([...expandedLevels, level]);
-        updateGraphDisplay();
-    }
-
-    function collapseLevel(level: number) {
-        const newExpanded = new Set(expandedLevels);
-        newExpanded.delete(level);
-        expandedLevels = newExpanded;
+    function expandNode(nodeId: string) {
+        expandedNodeIds = new Set([...expandedNodeIds, nodeId]);
         updateGraphDisplay();
     }
 
     function handleBackdropClick(event: MouseEvent) {
         if (event.target === event.currentTarget) {
+            onClose();
+        }
+    }
+
+    function handleBackdropKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
             onClose();
         }
     }
@@ -307,6 +388,8 @@
     <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onclick={handleBackdropClick}
+        onkeydown={handleBackdropKeydown}
+        tabindex="-1"
         role="dialog"
         aria-modal="true"
         aria-labelledby="lineage-modal-title"
@@ -370,14 +453,12 @@
                         nodes={lineageNodes}
                         edges={lineageEdges}
                         nodeTypes={nodeTypes}
-                        defaultEdgeOptions={{ type: "smoothstep" }}
+                        defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
                         fitView
                         panOnDrag={true}
                         selectionOnDrag={false}
                         nodesDraggable={true}
                         nodesConnectable={false}
-                        edgesUpdatable={false}
-                        connectOnClick={false}
                         class="w-full h-full"
                     >
                         <Controls />

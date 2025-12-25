@@ -4,14 +4,31 @@
         nodes, 
         viewMode, 
         folderFilter, 
-        tagFilter,
-        exposureTypeFilter,
-        exposureOwnerFilter
+        tagFilter
     } from '$lib/stores';
-    import { getExposures } from '$lib/api';
-    import type { Exposure, EntityUsage, EntityData } from '$lib/types';
     import { normalizeTags } from '$lib/utils';
     import Icon from '@iconify/svelte';
+    import { writable } from 'svelte/store';
+    import type { EntityData } from '$lib/types';
+
+    // Stub types for exposures feature (not yet implemented)
+    type Exposure = {
+        name: string;
+        label?: string;
+        type?: string;
+        description?: string;
+        owner?: { name: string };
+    };
+    type EntityUsage = Record<string, string[]>;
+
+    // Stub stores for exposures feature (not yet implemented)
+    const exposureTypeFilter = writable<string[]>([]);
+    const exposureOwnerFilter = writable<string[]>([]);
+
+    // Stub API function (not yet implemented)
+    async function getExposures(): Promise<{ exposures: Exposure[]; entityUsage: EntityUsage }> {
+        return { exposures: [], entityUsage: {} };
+    }
 
     let exposures = $state<Exposure[]>([]);
     let entityUsage = $state<EntityUsage>({});
@@ -106,7 +123,8 @@
     }
 
     async function loadExposures() {
-        // Only fetch if we're in exposures view mode
+        // Only fetch if we're in exposures view mode (feature not yet implemented)
+        // @ts-expect-error - exposures view mode not yet implemented
         if ($viewMode !== 'exposures') return;
         loading = true;
         error = null;
@@ -122,8 +140,9 @@
         }
     }
 
-    // Fetch data when view mode changes to exposures
+    // Fetch data when view mode changes to exposures (feature not yet implemented)
     $effect(() => {
+        // @ts-expect-error - exposures view mode not yet implemented
         if ($viewMode === 'exposures') {
             loadExposures();
         }
@@ -131,6 +150,7 @@
 
     // Also fetch on mount if already in exposures mode
     onMount(() => {
+        // @ts-expect-error - exposures view mode not yet implemented
         if ($viewMode === 'exposures') {
             loadExposures();
         }
@@ -217,7 +237,7 @@
                                 {type}
                                 <button
                                     onclick={() => {
-                                        $exposureTypeFilter = $exposureTypeFilter.filter(t => t !== type);
+                                        $exposureTypeFilter = $exposureTypeFilter.filter((t: string) => t !== type);
                                     }}
                                     class="hover:text-primary-900"
                                 >
@@ -255,7 +275,7 @@
                                 {owner}
                                 <button
                                     onclick={() => {
-                                        $exposureOwnerFilter = $exposureOwnerFilter.filter(o => o !== owner);
+                                        $exposureOwnerFilter = $exposureOwnerFilter.filter((o: string) => o !== owner);
                                     }}
                                     class="hover:text-primary-900"
                                 >
