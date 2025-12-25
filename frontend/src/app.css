@@ -27,6 +27,14 @@
     cursor: default !important;
 }
 
+/* Gradient fade effect for pane text */
+.svelte-flow__pane {
+    color: transparent;
+    background-image: linear-gradient(90deg, rgba(15, 23, 42, 0) 85%, rgba(255, 255, 255, 1) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+}
+
 .svelte-flow__pane.dragging,
 .svelte-flow__node.dragging,
 .cursor-grabbing,
@@ -44,6 +52,7 @@
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
+    color: rgba(15, 23, 42, 0);
 }
 
 .svelte-flow__node:focus,

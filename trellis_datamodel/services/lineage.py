@@ -12,6 +12,7 @@ from collections import deque
 
 try:
     from dbt_colibri import extract_lineage as colibri_extract_lineage
+
     COLIBRI_AVAILABLE = True
 except ImportError:
     COLIBRI_AVAILABLE = False
@@ -19,6 +20,7 @@ except ImportError:
 
 class LineageError(Exception):
     """Error during lineage extraction."""
+
     pass
 
 
@@ -64,9 +66,14 @@ def extract_upstream_lineage(
         nodes = manifest.get("nodes", {})
         if model_unique_id not in nodes:
             # Check if it's a versioned model issue
-            model_name = model_unique_id.split(".")[-1] if "." in model_unique_id else model_unique_id
+            model_name = (
+                model_unique_id.split(".")[-1]
+                if "." in model_unique_id
+                else model_unique_id
+            )
             matching_models = [
-                uid for uid in nodes.keys()
+                uid
+                for uid in nodes.keys()
                 if uid.endswith(f".{model_name}") or uid.endswith(f".{model_name}.v")
             ]
             if matching_models:
@@ -98,62 +105,41 @@ def _extract_lineage_from_manifest(
 ) -> dict[str, Any]:
     """
     Extract upstream lineage directly from manifest.json.
-    
+
     Traverses depends_on relationships to build upstream lineage graph.
-    
+    Includes all models (no filtering) - frontend handles progressive display
+    based on model count per level threshold.
+
     Args:
         manifest: Parsed manifest.json dictionary
         root_model_id: Starting model unique_id
-        
+
     Returns:
         Dictionary with nodes (list of unique_ids) and edges (list of {source, target})
     """
     nodes = manifest.get("nodes", {})
     sources = manifest.get("sources", {})
-    
+
     # Track all nodes in lineage
     lineage_node_ids: set[str] = {root_model_id}
     lineage_edges: list[dict[str, str]] = []
-    
-    def _is_intermediate_model_only_sources(model_id: str) -> bool:
-        """Check if a model only depends on sources (no other models)."""
-        model_node = nodes.get(model_id)
-        if not model_node:
-            return False
-            
-        depends_on = model_node.get("depends_on")
-        if not depends_on:
-            return False
-            
-        if isinstance(depends_on, dict):
-            upstream_nodes = depends_on.get("nodes", [])
-        elif isinstance(depends_on, list):
-            upstream_nodes = depends_on
-        else:
-            upstream_nodes = []
-        
-        # Check if all dependencies are sources
-        for upstream_id in upstream_nodes:
-            if upstream_id.startswith("model."):
-                return False  # Has at least one model dependency
-        return len(upstream_nodes) > 0  # Has dependencies and they're all sources
-    
+
     # BFS to find all upstream dependencies
     queue = deque([root_model_id])
     visited = {root_model_id}
-    
+
     while queue:
         current_id = queue.popleft()
         current_node = nodes.get(current_id)
-        
+
         if not current_node:
             continue
-            
+
         # Get upstream dependencies
         depends_on = current_node.get("depends_on")
         if not depends_on:
             continue
-            
+
         # Handle both dict and list formats
         if isinstance(depends_on, dict):
             upstream_nodes = depends_on.get("nodes", [])
@@ -161,47 +147,26 @@ def _extract_lineage_from_manifest(
             upstream_nodes = depends_on
         else:
             upstream_nodes = []
-        
+
         for upstream_id in upstream_nodes:
-            # Check if this is an intermediate model that only connects to sources
-            if upstream_id.startswith("model.") and _is_intermediate_model_only_sources(upstream_id):
-                # Skip this intermediate model, connect its sources directly to current
-                upstream_node = nodes.get(upstream_id)
-                if upstream_node:
-                    upstream_depends_on = upstream_node.get("depends_on")
-                    if upstream_depends_on:
-                        if isinstance(upstream_depends_on, dict):
-                            source_deps = upstream_depends_on.get("nodes", [])
-                        elif isinstance(upstream_depends_on, list):
-                            source_deps = upstream_depends_on
-                        else:
-                            source_deps = []
-                        
-                        # Connect sources directly to current (skipping intermediate model)
-                        for source_id in source_deps:
-                            if source_id.startswith("source."):
-                                lineage_edges.append({
-                                    "source": source_id,
-                                    "target": current_id,
-                                })
-                                lineage_node_ids.add(source_id)
-            else:
-                # Normal dependency - add edge
-                lineage_edges.append({
+            # Add edge for all dependencies (models and sources)
+            lineage_edges.append(
+                {
                     "source": upstream_id,
                     "target": current_id,
-                })
-                
-                # Add upstream node to lineage
-                lineage_node_ids.add(upstream_id)
-                
-                # Continue BFS if not visited
-                if upstream_id not in visited:
-                    visited.add(upstream_id)
-                    # Only continue BFS for models (not sources)
-                    if upstream_id.startswith("model."):
-                        queue.append(upstream_id)
-    
+                }
+            )
+
+            # Add upstream node to lineage
+            lineage_node_ids.add(upstream_id)
+
+            # Continue BFS if not visited
+            if upstream_id not in visited:
+                visited.add(upstream_id)
+                # Only continue BFS for models (not sources)
+                if upstream_id.startswith("model."):
+                    queue.append(upstream_id)
+
     # Identify source tables
     source_ids = set()
     for node_id in lineage_node_ids:
@@ -209,7 +174,7 @@ def _extract_lineage_from_manifest(
             source_ids.add(node_id)
         elif node_id in sources:
             source_ids.add(node_id)
-    
+
     return {
         "nodes": list(lineage_node_ids),
         "edges": lineage_edges,
@@ -268,11 +233,13 @@ def _transform_lineage_data(
         target_id = edge.get("target")
         if source_id in node_map and target_id in node_map:
             source_level = node_map[source_id]["level"]
-            edges.append({
-                "source": source_id,
-                "target": target_id,
-                "level": source_level,  # Use source level
-            })
+            edges.append(
+                {
+                    "source": source_id,
+                    "target": target_id,
+                    "level": source_level,  # Use source level
+                }
+            )
 
     # Calculate model counts per level
     level_counts = {}
@@ -374,10 +341,9 @@ def _get_node_info(
         "level": level,
         "isSource": is_source,
     }
-    
+
     # Add source-name if this is a source node
     if source_name is not None:
         result["sourceName"] = source_name
 
     return result
-

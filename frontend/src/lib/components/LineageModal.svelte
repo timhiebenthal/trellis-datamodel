@@ -96,25 +96,58 @@
             nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
         }
 
-        // Process nodes - show all nodes initially (no progressive filtering for now)
-        // Sources should always be visible
+        // Progressive display threshold - hide models when level has too many
+        const MODELS_THRESHOLD = 10;
+        const levelHasTooManyModels = new Map<number, boolean>();
+        for (const [level, nodes] of levelBuckets) {
+            const modelCount = nodes.filter((n) => !n.isSource).length;
+            levelHasTooManyModels.set(level, modelCount > MODELS_THRESHOLD);
+        }
+
+        // Process nodes - apply progressive display logic
+        // Track which nodes exist in lineage (for edge filtering)
+        const allNodeIds = new Set((lineageData.nodes ?? []).map((n) => n.id));
+        
         for (const node of lineageData.nodes) {
             const pos = levelPositions.get(node.id);
             const indexInLevel = pos?.index ?? 0;
             const countAtLevel = pos?.count ?? 1;
 
-            // Always show sources, root, and direct dependencies
-            if (node.isSource || node.level === 0 || node.level === 1) {
-                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
-            } else if (expandedLevels.size === 0 || expandedLevels.has(node.level)) {
-                // Show if no filtering or if level is expanded
+            // Always show sources and root
+            if (node.isSource || node.level === 0) {
                 visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
             }
+            // For level 1 (direct dependencies), always show all
+            else if (node.level === 1) {
+                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
+            }
+            // For level 2, also show by default to maintain graph connectivity
+            // (level 2 nodes are dependencies of level 1, so showing them provides complete lineage context)
+            else if (node.level === 2) {
+                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
+            }
+            // For deeper levels (3+), apply threshold logic
+            else if (expandedLevels.has(node.level)) {
+                // If level is expanded, check if too many models - if so, show only sources
+                if (levelHasTooManyModels.get(node.level) && !node.isSource) {
+                    // Hide non-source models when level has too many
+                    continue;
+                }
+                visibleNodes.push(createFlowNode(node, indexInLevel, countAtLevel));
+            }
+            // Collapsed levels not shown (placeholder will be created)
         }
 
         // Process edges - only show edges between visible nodes
         const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
+        let droppedEdgesBecauseMissingNode = 0;
+        let droppedEdgesBecauseNotVisible = 0;
         for (const edge of lineageData.edges) {
+            const missingAny = !allNodeIds.has(edge.source) || !allNodeIds.has(edge.target);
+            if (missingAny) {
+                droppedEdgesBecauseMissingNode += 1;
+                continue;
+            }
             if (visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)) {
                 visibleEdges.push({
                     id: `edge-${edge.source}-${edge.target}`,
@@ -122,13 +155,15 @@
                     target: edge.target,
                     type: "default",
                 });
+            } else {
+                droppedEdgesBecauseNotVisible += 1;
             }
         }
 
-        // Create placeholder nodes for collapsed sections
+        // Create placeholder nodes for collapsed sections (levels > 2, since level 2 is shown by default)
         for (const node of lineageData.nodes) {
             const level = node.level;
-            if (level > 1 && !expandedLevels.has(level)) {
+            if (level > 2 && !expandedLevels.has(level)) {
                 // Check if this node has upstream dependencies
                 const hasUpstream = lineageData.edges.some((e) => e.target === node.id);
                 if (hasUpstream) {
