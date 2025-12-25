@@ -109,7 +109,9 @@ def _find_entities_for_model(unique_id: str, data_model: Dict[str, Any]) -> List
     return entity_ids
 
 
-def _collect_upstream_model_ids(manifest: Dict[str, Any], model_unique_id: str) -> set[str]:
+def _collect_upstream_model_ids(
+    manifest: Dict[str, Any], model_unique_id: str
+) -> set[str]:
     """
     Collect all upstream model unique_ids (including the starting model) by traversing
     manifest depends_on relationships.
@@ -255,7 +257,9 @@ async def get_exposures():
             # This ensures exposures that depend on mart/int models still mark
             # the underlying entity-bound models as "used".
             if unique_id not in upstream_cache:
-                upstream_cache[unique_id] = _collect_upstream_model_ids(manifest, unique_id)
+                upstream_cache[unique_id] = _collect_upstream_model_ids(
+                    manifest, unique_id
+                )
 
             for upstream_model_id in upstream_cache[unique_id]:
                 entity_ids = _find_entities_for_model(upstream_model_id, data_model)
@@ -269,4 +273,3 @@ async def get_exposures():
         "exposures": exposures_response,
         "entityUsage": entity_usage,
     }
-
