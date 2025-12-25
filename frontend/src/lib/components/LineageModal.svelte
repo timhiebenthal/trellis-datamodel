@@ -27,6 +27,7 @@
     let lineageData = $state<LineageResponse | null>(null);
     let lineageNodes = $state<Node[]>([]);
     let lineageEdges = $state<Edge[]>([]);
+    let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -156,25 +157,10 @@
             }
         }
 
-        // Build per-layer vertical bounds in graph space (used for initial placement + drag clamping)
-        const LAYER_START_Y = 60;
-        const LAYER_HEIGHT = 220;
-        const LAYER_GAP = 24;
-        const LAYER_INNER_PADDING = 30;
-
-        const layerBounds = new Map<string, { top: number; bottom: number }>();
-        if (layersConfigured) {
-            for (let i = 0; i < layerOrder.length; i++) {
-                const top = LAYER_START_Y + i * (LAYER_HEIGHT + LAYER_GAP);
-                const bottom = top + LAYER_HEIGHT;
-                layerBounds.set(layerOrder[i], { top, bottom });
-            }
-        }
-
         // Bucket visible nodes by layer (if configured) or by level (fallback)
         const layerBuckets = new Map<string, LineageNode[]>();
         const levelBuckets = new Map<number, LineageNode[]>();
-        
+
         for (const node of visibleLineageNodes) {
             if (layersConfigured && node.layer) {
                 const bucket = layerBuckets.get(node.layer) ?? [];
@@ -186,6 +172,42 @@
                 levelBuckets.set(node.level, bucket);
             }
         }
+
+        // Build per-layer vertical bounds in graph space (used for initial placement + drag clamping)
+        // Dynamic height per layer so it adapts across projects and to progressive expansion.
+        const LAYER_START_Y = 60;
+        const LAYER_GAP = 24;
+        const LAYER_MIN_HEIGHT = 140;
+        const LAYER_MAX_HEIGHT = 520;
+        const LAYER_HEADER_HEIGHT = 34; // space for label inside the band
+        const LAYER_INNER_PADDING = 30;
+        const LEVEL_SPACING_WITHIN_LAYER = 70;
+
+        const layerBounds = new Map<string, { top: number; bottom: number; height: number }>();
+        if (layersConfigured) {
+            let cursorY = LAYER_START_Y;
+            for (const layer of layerOrder) {
+                const nodesInLayer = layerBuckets.get(layer) ?? [];
+                const levelsInLayer = new Set(nodesInLayer.map((n) => n.level));
+                const levelCount = Math.max(1, levelsInLayer.size);
+
+                const contentHeight =
+                    LAYER_HEADER_HEIGHT +
+                    LAYER_INNER_PADDING * 2 +
+                    (levelCount - 1) * LEVEL_SPACING_WITHIN_LAYER;
+
+                const height = Math.max(LAYER_MIN_HEIGHT, Math.min(LAYER_MAX_HEIGHT, contentHeight));
+                const top = cursorY;
+                const bottom = top + height;
+                layerBounds.set(layer, { top, bottom, height });
+                cursorY = bottom + LAYER_GAP;
+            }
+        }
+
+        // Persist bounds for drag clamping
+        layerBoundsByLayer = Object.fromEntries(
+            [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
+        );
 
         // Precompute each node's sibling index and total at its level/layer
         const levelPositions = new Map<string, { index: number; count: number }>();
@@ -229,7 +251,9 @@
                     layersConfigured,
                     layerOrder,
                     layerBuckets,
-                    layerBounds,
+                    new Map(
+                        [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
+                    ),
                     existingPositions,
                 ),
             );
@@ -387,6 +411,22 @@
             };
         }
 
+        // Apply extents to placeholder nodes too (so they can't be dragged outside their layer)
+        if (layersConfigured) {
+            const padding = 30;
+            for (const n of visibleNodes) {
+                if (typeof n.id !== "string" || !n.id.startsWith("placeholder-")) continue;
+                const layer = (n.data as any)?.layer as string | undefined;
+                if (!layer) continue;
+                const bounds = layerBounds.get(layer);
+                if (!bounds) continue;
+                n.extent = [
+                    [-100000, bounds.top + padding],
+                    [100000, bounds.bottom - padding],
+                ];
+            }
+        }
+
         lineageNodes = visibleNodes;
         lineageEdges = visibleEdges;
 
@@ -403,22 +443,24 @@
             const bandNodes: Node[] = layerOrder.map((layer) => {
                 const bounds = layerBounds.get(layer);
                 const top = bounds?.top ?? 0;
+                const height = bounds?.height ?? 220;
                 const label =
                     layer === "sources" ? "Sources" : layer === "unassigned" ? "Unassigned" : layer;
                 return {
                     id: `layer-band-${layer}`,
                     type: "layerBand",
                     position: { x: bandX, y: top },
-                    data: { label, width: BAND_WIDTH, height: LAYER_HEIGHT },
+                    data: { label, width: BAND_WIDTH, height },
                     draggable: false,
                     selectable: false,
                     connectable: false,
                     focusable: false,
-                    zIndex: 0,
+                    zIndex: -1, // Behind edges (which render at default ~0-5) and nodes (10+)
                 };
             });
 
-            // Ensure layer bands are behind all other nodes
+            // Ensure layer bands are behind edges and nodes
+            // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
             lineageNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
         } else {
             lineageNodes = visibleNodes;
@@ -453,6 +495,7 @@
         
         let yPosition: number;
         let xPosition: number;
+        let extent: Node["extent"] | undefined;
 
         const existing = existingPositions.get(node.id);
         
@@ -482,6 +525,13 @@
             // Clamp to the layer band bounds
             const padding = 30;
             yPosition = Math.min(Math.max(yPosition, top + padding), bottom - padding);
+
+            // Hard constraint: prevent dragging outside of the layer band (works during drag)
+            // Use a very wide X extent and the computed Y bounds.
+            extent = [
+                [-100000, top + padding],
+                [100000, bottom - padding],
+            ];
         } else {
             // Original level-based positioning (backward compatibility)
             const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level), 0);
@@ -515,37 +565,30 @@
                 layer: node.layer,
             },
             zIndex: node.isSource ? 12 : node.level === 0 ? 15 : 10,
+            extent,
         };
     }
 
     function handleNodeDragStop(event: CustomEvent) {
         // Enforce "node stays in its layer" by clamping Y to the band bounds.
-        // Event shape is provided by @xyflow/svelte; we only rely on params.node here.
-        const params = (event as unknown as { detail?: { node?: Node } }).detail;
-        const dragged = params?.node;
+        // @xyflow/svelte sometimes calls this handler with params directly (not a CustomEvent),
+        // so support both shapes.
+        const maybeParams = event as unknown as { node?: Node; detail?: { node?: Node } };
+        const dragged = maybeParams?.node ?? maybeParams?.detail?.node;
         if (!dragged) return;
 
         // Ignore background band nodes
         if (typeof dragged.id === "string" && dragged.id.startsWith("layer-band-")) return;
 
         const layer = (dragged.data as any)?.layer as string | undefined;
-        if (!layer || !lineageData?.metadata?.lineage_layers) return;
+        if (!layer) return;
 
-        const configuredOrder = lineageData.metadata.lineage_layers ?? [];
-        const order: string[] = [];
-        order.push("sources", ...configuredOrder, "unassigned");
-        const layers = order.filter((l, idx) => order.indexOf(l) === idx);
+        const bounds = layerBoundsByLayer[layer];
+        if (!bounds) return;
 
-        const LAYER_START_Y = 60;
-        const LAYER_HEIGHT = 220;
-        const LAYER_GAP = 24;
         const padding = 30;
-
-        const layerIndex = layers.indexOf(layer);
-        if (layerIndex === -1) return;
-
-        const top = LAYER_START_Y + layerIndex * (LAYER_HEIGHT + LAYER_GAP);
-        const bottom = top + LAYER_HEIGHT;
+        const top = bounds.top;
+        const bottom = bounds.bottom;
         const clampedY = Math.min(Math.max(dragged.position.y, top + padding), bottom - padding);
 
         lineageNodes = lineageNodes.map((n) => {
