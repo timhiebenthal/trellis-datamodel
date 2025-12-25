@@ -15,8 +15,18 @@
     class:ring-2={selected}
     class:ring-primary-500={selected}
 >
-    <Handle type="target" position={Position.Top} class="!bg-gray-400 !w-2 !h-2" />
-    <Handle type="source" position={Position.Bottom} class="!bg-gray-400 !w-2 !h-2" />
+    <Handle
+        type="target"
+        position={Position.Top}
+        class="!opacity-0 !pointer-events-none !w-0 !h-0"
+        isConnectable={false}
+    />
+    <Handle
+        type="source"
+        position={Position.Bottom}
+        class="!opacity-0 !pointer-events-none !w-0 !h-0"
+        isConnectable={false}
+    />
     
     <div class="flex items-center justify-center">
         <span class="text-sm font-medium" class:text-gray-900={!isTarget} class:text-white={isTarget}>{data.label}</span>

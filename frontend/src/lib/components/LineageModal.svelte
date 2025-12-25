@@ -372,6 +372,10 @@
                         fitView
                         panOnDrag={true}
                         selectionOnDrag={false}
+                        nodesDraggable={true}
+                        nodesConnectable={false}
+                        edgesUpdatable={false}
+                        connectOnClick={false}
                         class="w-full h-full"
                     >
                         <Controls />
