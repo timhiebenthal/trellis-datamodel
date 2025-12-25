@@ -287,6 +287,9 @@ If you want to collaborate, reach out!
 - Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow, testing, and PR guidelines.
 - All contributors must sign the CLA once per GitHub account. The CLA bot on pull requests will guide you; see [`CLA.md`](CLA.md) for details.
 
+## Acknowledgments
+- Thanks to [dbt-colibri](https://github.com/dbt-labs/dbt-colibri) for providing lineage extraction capabilities that enhance trellis's data model visualization features.
+
 ## License
 - Trellis Datamodel is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 - See [`NOTICE`](NOTICE) for a summary of copyright and licensing information.

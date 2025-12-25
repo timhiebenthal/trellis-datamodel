@@ -38,7 +38,7 @@ frontend:
 
 dev: 
 	@echo "Starting backend and frontend development servers..."
-	@echo "Backend will be available at http://localhost:8000"
+	@echo "Backend will be available at http://localhost:8089"
 	@echo "Frontend will be available at http://localhost:5173"
 	@echo ""
 	@echo "Note: This requires running in separate terminals or using tmux/screen."

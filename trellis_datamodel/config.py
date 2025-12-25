@@ -38,6 +38,7 @@ if _TEST_DIR:
     DBT_MODEL_PATHS: list[str] = ["3_core"]
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
+    LINEAGE_LAYERS: list[str] = []
 else:
     # Production mode: will be set by load_config()
     CONFIG_PATH: str = ""
@@ -51,6 +52,8 @@ else:
     DBT_MODEL_PATHS: list[str] = []
     FRONTEND_BUILD_DIR: str = ""
     DBT_COMPANY_DUMMY_PATH: str = ""
+    LINEAGE_LAYERS: list[str] = []
+    LINEAGE_LAYERS: list[str] = []
 
 
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
@@ -85,7 +88,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -219,6 +222,14 @@ def load_config(config_path: Optional[str] = None) -> None:
                 DBT_COMPANY_DUMMY_PATH = p
         # Note: No default set here - CLI handles fallback to cwd/dbt_company_dummy
 
+        # 10. Load lineage layers configuration
+        if "lineage_layers" in config:
+            LINEAGE_LAYERS = config["lineage_layers"]
+            if not isinstance(LINEAGE_LAYERS, list):
+                LINEAGE_LAYERS = []
+        else:
+            LINEAGE_LAYERS = []
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
@@ -235,5 +246,7 @@ def print_config() -> None:
     print(f"Looking for canvas layout at: {CANVAS_LAYOUT_PATH}")
     print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
     print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
+    if LINEAGE_LAYERS:
+        print(f"Lineage layers: {LINEAGE_LAYERS}")
     if DBT_COMPANY_DUMMY_PATH:
         print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")

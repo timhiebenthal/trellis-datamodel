@@ -1,2 +1,2 @@
 select * 
-from {{ source('company_source', 'purchase_order_item') }}
+from {{ source('mock_csv', 'purchase_order_item') }}

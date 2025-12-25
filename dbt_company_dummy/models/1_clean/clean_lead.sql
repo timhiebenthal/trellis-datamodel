@@ -1,2 +1,2 @@
 select * 
-from {{ source('company_source', 'lead') }}
+from {{ source('mock_csv', 'lead') }}

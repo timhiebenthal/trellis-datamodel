@@ -31,10 +31,12 @@
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
+    import LineageModal from "$lib/components/LineageModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, DbtModel } from "$lib/types";
     import Icon from "@iconify/svelte";
     import logoHref from "$lib/assets/trellis_squared.svg?url";
+    import { lineageModal, closeLineageModal } from "$lib/stores";
 
     const API_BASE = getApiBase();
     let loading = $state(true);
@@ -1016,6 +1018,13 @@
         ></div>
         <Canvas />
     </main>
+
+    <!-- Render global modals outside SvelteFlow viewport (avoid transform/zoom affecting fixed positioning) -->
+    <LineageModal
+        open={$lineageModal.open}
+        modelId={$lineageModal.modelId}
+        onClose={closeLineageModal}
+    />
 
     <ConfigInfoModal
         open={showConfigInfoModal}

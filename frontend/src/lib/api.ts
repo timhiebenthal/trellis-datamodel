@@ -6,6 +6,7 @@ import type {
     ConfigInfo,
     ModelSchema,
     Relationship,
+    LineageResponse,
 } from './types';
 
 /**
@@ -176,4 +177,24 @@ export async function updateModelSchema(modelName: string, columns: { name: stri
         throw new Error(`Failed to update model schema: ${error}`);
     }
     return await res.json();
+}
+
+export async function getLineage(modelId: string): Promise<LineageResponse | null> {
+    try {
+        const res = await fetch(`${API_BASE}/lineage/${encodeURIComponent(modelId)}`);
+        if (!res.ok) {
+            if (res.status === 404) {
+                // Model not found - return null to allow modal to handle gracefully
+                return null;
+            }
+            // For 500 errors, throw with error message
+            const error = await res.text();
+            throw new Error(error || `Failed to fetch lineage: ${res.status}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching lineage:", e);
+        // Return null on error to allow modal to handle error display
+        return null;
+    }
 }

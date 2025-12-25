@@ -1,9 +1,9 @@
 version: 0.1
 entities:
-- id: new_entity
-  label: New Entity
+- id: employee
+  label: employee
   description: Employee records
-  dbt_model: model.company_dummy.employee
+  dbt_model: model.company_dummy.employee_history
   drafted_fields:
   - name: ''
     datatype: text
@@ -12,14 +12,37 @@ entities:
   description: Company departments
   dbt_model: model.company_dummy.department
 relationships:
-- source: new_entity
-  target: new_entity
+- source: employee
+  target: employee
   label: ''
   type: one_to_many
+- source: employee
+  target: employee
+  label: ''
+  type: one_to_many
+  source_field: employee_id
+  target_field: supervisor_id
+- source: employee
+  target: employee
+  label: ''
+  type: one_to_many
+  source_field: employee_id
+  target_field: supervisor_id
 - source: department
-  target: new_entity
+  target: employee
   label: ''
   type: one_to_many
   source_field: department_id
   target_field: department_id
-
+- source: department
+  target: employee
+  label: ''
+  type: one_to_many
+  source_field: department_id
+  target_field: department_id
+- source: department
+  target: employee
+  label: ''
+  type: one_to_many
+  source_field: department_id
+  target_field: department_id

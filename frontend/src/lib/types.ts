@@ -158,3 +158,32 @@ export interface ModelSchema {
     file_path: string;
 }
 
+export interface LineageNode {
+    id: string;
+    label: string;
+    level: number;
+    isSource: boolean;
+    sourceName?: string; // Source-name for source nodes (e.g., "mock_csv" from "source.project.mock_csv.table")
+    layer?: string; // Layer assignment for lineage organization (e.g., "sources", "1_clean", "2_prep", "unassigned")
+}
+
+export interface LineageEdge {
+    source: string;
+    target: string;
+    level: number;
+}
+
+export interface LineageMetadata {
+    root_model_id: string;
+    level_counts: Record<number, number>;
+    total_nodes: number;
+    total_edges: number;
+    lineage_layers?: string[]; // Configured layer order from trellis.yml
+}
+
+export interface LineageResponse {
+    nodes: LineageNode[];
+    edges: LineageEdge[];
+    metadata: LineageMetadata;
+}
+
