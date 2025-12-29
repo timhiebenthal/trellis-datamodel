@@ -93,7 +93,7 @@
 
     // Progressive header density (delays horizontal scroll for many dashboards)
     type ExposureHeaderMode = 'normal' | 'narrow' | 'angled';
-    let exposureHeaderMode: ExposureHeaderMode = $derived(() => {
+    let exposureHeaderMode = $derived.by<ExposureHeaderMode>(() => {
         if (!autoFitExposureHeaders) return 'normal';
 
         const count = filteredExposures.length;
