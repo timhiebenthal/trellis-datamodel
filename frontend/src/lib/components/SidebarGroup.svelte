@@ -16,7 +16,7 @@
     let isModelBound = $derived(
         node.model ? $nodes.some((n) => {
             if (n.type !== 'entity') return false;
-            const data = n.data as EntityData;
+            const data = n.data as unknown as EntityData;
             const primaryMatch = data.dbt_model === node.model!.unique_id;
             const additionalMatch = (data.additional_models || []).includes(node.model!.unique_id);
             return primaryMatch || additionalMatch;
