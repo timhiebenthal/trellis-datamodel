@@ -1,7 +1,7 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
-    import { generateSlug } from "$lib/utils";
+    import { generateSlug, toTitleCase } from "$lib/utils";
 
     type Props = {
         open: boolean;
@@ -142,8 +142,12 @@
 
         // Description is optional (user can add later)
         // If skipped, description will be empty string
+        // Convert label to title-case
+        const formattedLabel = formData.label === "New Entity" 
+            ? formData.label 
+            : toTitleCase(formData.label.trim());
         onComplete({
-            label: formData.label.trim(),
+            label: formattedLabel,
             description: formData.description.trim(),
         });
         reset();
@@ -225,6 +229,7 @@
             role="document"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
         >
             <!-- Header -->
             <div class="flex items-center justify-between mb-4">
@@ -268,7 +273,6 @@
                             bind:value={formData.label}
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors.label ? 'border-red-500' : validationErrors.label === null && formData.label && formData.label !== 'New Entity' ? 'border-green-500' : ''}"
                             placeholder="e.g., Customer, Order, Product"
-                            autofocus
                         />
                         {#if validationErrors.label}
                             <p class="mt-1 text-sm text-red-600 flex items-center gap-1">

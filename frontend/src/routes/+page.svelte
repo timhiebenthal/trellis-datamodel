@@ -70,7 +70,7 @@
         return nodes
             .filter((n) => n.type === "entity")
             .filter((n) => {
-                const data = n.data as EntityData;
+                const data = n.data as unknown as EntityData;
                 return !data.description || data.description.trim().length === 0;
             });
     }
@@ -82,7 +82,7 @@
         for (const node of nodes) {
             if (node.type !== "entity") continue;
             
-            const data = node.data as EntityData;
+            const data = node.data as unknown as EntityData;
             const undescribedAttributes: string[] = [];
             
             // Check unbound entities (drafted_fields)

@@ -27,6 +27,7 @@
         detectFieldSemantics,
         formatModelNameForLabel,
         extractModelNameFromUniqueId,
+        toTitleCase,
     } from "$lib/utils";
 import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
 import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
@@ -339,7 +340,9 @@ import Icon from "@iconify/svelte";
 
     function updateIdFromLabel(e: Event) {
         // Called on blur - update the ID based on final label
-        const label = (e.target as HTMLInputElement).value.trim();
+        // Convert label to title-case before updating
+        const rawLabel = (e.target as HTMLInputElement).value.trim();
+        const label = toTitleCase(rawLabel);
         const newId = generateSlug(label, $nodes.map((n) => n.id), id);
 
         // If ID changes, update the node and all relationships

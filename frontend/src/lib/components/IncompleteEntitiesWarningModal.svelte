@@ -46,6 +46,7 @@
             role="document"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
         >
             <div class="flex items-start gap-3 mb-4">
                 <div class="flex-shrink-0">
@@ -66,7 +67,7 @@
                 <div class="mb-6 max-h-48 overflow-y-auto border border-gray-200 rounded-md">
                     <ul class="divide-y divide-gray-200">
                         {#each incompleteEntities as entity}
-                            {@const data = entity.data as EntityData}
+                            {@const data = entity.data as unknown as EntityData}
                             <li class="px-3 py-2 text-sm">
                                 <span class="font-medium text-gray-900">{data.label || entity.id}</span>
                                 {#if entity.id !== data.label}
