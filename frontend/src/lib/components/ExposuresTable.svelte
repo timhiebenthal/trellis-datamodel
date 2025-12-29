@@ -20,7 +20,7 @@
     let error = $state<string | null>(null);
     let autoFitExposureHeaders = $state(true);
     let tableViewportWidth = $state(0);
-    let tableViewportEl: HTMLDivElement | null = null;
+    let tableViewportEl = $state<HTMLDivElement | null>(null);
 
     // Derive entities from nodes (filter out group nodes and apply filters)
     let entities = $derived(
@@ -93,7 +93,7 @@
 
     // Progressive header density (delays horizontal scroll for many dashboards)
     type ExposureHeaderMode = 'normal' | 'narrow' | 'angled';
-    let exposureHeaderMode = $derived<ExposureHeaderMode>(() => {
+    let exposureHeaderMode: ExposureHeaderMode = $derived(() => {
         if (!autoFitExposureHeaders) return 'normal';
 
         const count = filteredExposures.length;
