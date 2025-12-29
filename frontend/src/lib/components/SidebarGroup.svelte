@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { DbtModel, TreeNode } from "$lib/types";
+    import type { DbtModel, TreeNode, EntityData } from "$lib/types";
     import SidebarGroup from "./SidebarGroup.svelte"; 
     import Icon from "@iconify/svelte";
-    import { folderFilter } from "$lib/stores";
+    import { folderFilter, nodes } from "$lib/stores";
 
     let { node, onDragStart, mainFolderPrefix = "" } = $props<{
         node: TreeNode;
@@ -11,6 +11,17 @@
     }>();
     
     let collapsed = $state(false);
+    
+    // Check if the current model is bound to any entity
+    let isModelBound = $derived(
+        node.model ? $nodes.some((n) => {
+            if (n.type !== 'entity') return false;
+            const data = n.data as EntityData;
+            const primaryMatch = data.dbt_model === node.model!.unique_id;
+            const additionalMatch = (data.additional_models || []).includes(node.model!.unique_id);
+            return primaryMatch || additionalMatch;
+        }) : false
+    );
     
     function toggle(event: MouseEvent) {
         // Only toggle on chevron/folder icon click, not on the whole button
@@ -73,6 +84,9 @@
         title={`${node.name} (${node.model.schema}.${node.model.table})`}
     >
         <Icon icon="lucide:database" class="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
-        {node.name}
+        <span class="flex-1 truncate">{node.name}</span>
+        {#if isModelBound}
+            <Icon icon="mdi:check" class="w-3.5 h-3.5 text-success-600 flex-shrink-0" />
+        {/if}
     </div>
 {/if}
