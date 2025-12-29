@@ -27,7 +27,7 @@
     const DESCRIPTION_EXAMPLES = [
         {
             entity: "Customer",
-            description: "A person or organization that purchases products or services from the business",
+            description: "A person or organization that purchases at least 1 product or service from the business",
         },
         {
             entity: "Order",
