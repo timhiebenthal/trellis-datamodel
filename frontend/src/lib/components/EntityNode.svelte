@@ -19,6 +19,7 @@
         getModelSchema,
         updateModelSchema,
         getLineage,
+        getSourceSystemSuggestions,
     } from "$lib/api";
     import {
         getParallelOffset,
@@ -44,6 +45,9 @@ import Icon from "@iconify/svelte";
     let data = $derived(rawData as unknown as EntityData);
 
     const { updateNodeData, getNodes } = useSvelteFlow();
+    
+    // Shared input field styling for consistent appearance
+    const INPUT_STYLE = "px-1.5 py-0.5 text-[10px] text-gray-900 bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-gray-400";
     let showDeleteModal = $state(false);
     // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
 
@@ -657,6 +661,61 @@ import Icon from "@iconify/svelte";
     // Mock source system editing functionality (unbound entities only)
     let mockSourceSystems = $derived((data.source_system || []) as string[]);
     let mockSourceInput = $state("");
+    let sourceSuggestions = $state<string[]>([]);
+    let showSourceSuggestions = $state(false);
+    let filteredSuggestions = $derived(() => {
+        // Get current sources as a plain array for comparison
+        const currentSources = Array.isArray(mockSourceSystems) ? mockSourceSystems : [];
+        const input = (mockSourceInput || "").trim();
+        const suggestions = Array.isArray(sourceSuggestions) ? sourceSuggestions : [];
+        
+        if (suggestions.length === 0) {
+            return [];
+        }
+        
+        if (!input) {
+            // Show all suggestions that aren't already added to this entity
+            const filtered = suggestions.filter(s => {
+                const sourceStr = String(s || "").trim();
+                return sourceStr && !currentSources.includes(sourceStr);
+            });
+            return filtered;
+        }
+        
+        const inputLower = input.toLowerCase();
+        const filtered = suggestions.filter(s => {
+            const sourceStr = String(s || "").trim();
+            if (!sourceStr) return false;
+            const matchesInput = sourceStr.toLowerCase().includes(inputLower);
+            const notAlreadyAdded = !currentSources.includes(sourceStr);
+            return matchesInput && notAlreadyAdded;
+        });
+        return filtered;
+    });
+
+    // Load suggestions when component mounts or when input is focused
+    async function loadSourceSuggestions() {
+        try {
+            const suggestions = await getSourceSystemSuggestions();
+            sourceSuggestions = suggestions || [];
+            console.log("Loaded source suggestions:", sourceSuggestions);
+            return suggestions || [];
+        } catch (e) {
+            console.error("Failed to load source suggestions:", e);
+            sourceSuggestions = [];
+            return [];
+        }
+    }
+
+    // Load suggestions on mount for unbound entities
+    $effect(() => {
+        if (!isBound) {
+            // Load suggestions when entity becomes unbound
+            loadSourceSuggestions().then(() => {
+                console.log("Effect loaded suggestions:", sourceSuggestions);
+            });
+        }
+    });
 
     function getCurrentTags(nodeId: string): string[] {
         const node = $nodes.find((n) => n.id === nodeId);
@@ -773,17 +832,18 @@ import Icon from "@iconify/svelte";
         });
     }
 
-    function addMockSource() {
-        const trimmed = mockSourceInput.trim();
-        if (!trimmed) return;
+    function addMockSource(source?: string) {
+        const sourceToAdd = source || mockSourceInput.trim();
+        if (!sourceToAdd) return;
         
         const currentSources = mockSourceSystems;
-        if (currentSources.includes(trimmed)) return; // Prevent duplicates
+        if (currentSources.includes(sourceToAdd)) return; // Prevent duplicates
         
         updateNodeData(id, { 
-            source_system: [...currentSources, trimmed]
+            source_system: [...currentSources, sourceToAdd]
         });
         mockSourceInput = "";
+        showSourceSuggestions = false;
     }
 
     function removeMockSource(sourceSystem: string) {
@@ -801,13 +861,50 @@ import Icon from "@iconify/svelte";
             }
         } else if (e.key === "Escape") {
             mockSourceInput = "";
+            showSourceSuggestions = false;
+        } else {
+            // Show suggestions as user types
+            showSourceSuggestions = true;
         }
     }
 
+    function handleMockSourceInputFocus() {
+        // Reload suggestions when focused to get latest data
+        loadSourceSuggestions().then((suggestions) => {
+            // Show dropdown after suggestions are loaded
+            const currentSources = Array.isArray(mockSourceSystems) ? mockSourceSystems : [];
+            const filtered = filteredSuggestions;
+            console.log("Focus handler - suggestions:", suggestions, "current sources:", currentSources, "filtered count:", filtered.length, "filtered items:", filtered);
+            if (suggestions && suggestions.length > 0) {
+                showSourceSuggestions = true;
+            }
+        });
+    }
+    
+    function handleMockSourceInputInput() {
+        // Show suggestions as user types (if we have any)
+        showSourceSuggestions = true;
+        // Debug: log filtered suggestions when typing
+        console.log("Input changed:", mockSourceInput, "filtered:", filteredSuggestions, "all suggestions:", sourceSuggestions, "current sources:", mockSourceSystems);
+    }
+
     function handleMockSourceInputBlur() {
-        if (mockSourceInput.trim()) {
-            addMockSource();
-        }
+        // Delay hiding suggestions to allow clicking on them
+        setTimeout(() => {
+            if (mockSourceInput.trim()) {
+                addMockSource();
+            }
+            // Only hide if input is empty or we've added the source
+            if (!mockSourceInput.trim()) {
+                showSourceSuggestions = false;
+            }
+        }, 300);
+    }
+
+    function selectSuggestion(suggestion: string) {
+        // Prevent blur from firing
+        addMockSource(suggestion);
+        showSourceSuggestions = false;
     }
 
     function handleBatchTagInputKeydown(e: KeyboardEvent) {
@@ -1238,7 +1335,7 @@ import Icon from "@iconify/svelte";
                             <div class="flex flex-wrap gap-1.5">
                                 {#each data.source_system as sourceSystem}
                                     <span
-                                        class="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-semibold uppercase border border-gray-200"
+                                        class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-semibold uppercase border border-blue-200"
                                     >
                                         {sourceSystem}
                                     </span>
@@ -1353,7 +1450,7 @@ import Icon from "@iconify/svelte";
                                 onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                 onblur={handleTagInputBlur}
                                 placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full {INPUT_STYLE}"
                                 onclick={(e) => e.stopPropagation()}
                             />
                         {/if}
@@ -1571,12 +1668,12 @@ import Icon from "@iconify/svelte";
                                 >
                                 {#each (data.source_system || []) as sourceSystem}
                                     <span
-                                        class="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] border border-gray-200 flex items-center gap-1 group"
+                                        class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-200 flex items-center gap-1 group"
                                     >
                                         {sourceSystem}
                                         <button
                                             onclick={() => removeMockSource(sourceSystem)}
-                                            class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700"
+                                            class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-800"
                                             title="Remove source system"
                                         >
                                             <Icon icon="lucide:x" class="w-2.5 h-2.5" />
@@ -1584,24 +1681,55 @@ import Icon from "@iconify/svelte";
                                     </span>
                                 {/each}
                             </div>
-                            <div class="flex items-center gap-1.5">
-                                <input
-                                    type="text"
-                                    bind:value={mockSourceInput}
-                                    onkeydown={handleMockSourceInputKeydown}
-                                    onblur={handleMockSourceInputBlur}
-                                    placeholder="Add source system"
-                                    class="flex-1 px-1.5 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                                    onclick={(e) => e.stopPropagation()}
-                                />
-                                <button
-                                    onclick={addMockSource}
-                                    class="px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 rounded text-[10px] border border-primary-200 transition-colors flex items-center gap-1"
-                                    title="Add source system"
-                                >
-                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
-                                    Add
-                                </button>
+                            <div class="relative">
+                                <div class="flex items-center gap-1.5">
+                                    <input
+                                        type="text"
+                                        bind:value={mockSourceInput}
+                                        onkeydown={handleMockSourceInputKeydown}
+                                        onfocus={handleMockSourceInputFocus}
+                                        oninput={handleMockSourceInputInput}
+                                        onblur={handleMockSourceInputBlur}
+                                        placeholder="Add source system"
+                                        class="flex-1 {INPUT_STYLE}"
+                                        onclick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                        onclick={() => addMockSource()}
+                                        class="px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 rounded text-[10px] border border-primary-200 transition-colors flex items-center gap-1"
+                                        title="Add source system"
+                                    >
+                                        <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
+                                        Add
+                                    </button>
+                                </div>
+                                {#if showSourceSuggestions && filteredSuggestions.length > 0}
+                                    <div
+                                        class="absolute z-[100] mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto"
+                                        onmousedown={(e) => e.preventDefault()}
+                                        role="listbox"
+                                    >
+                                        {#each filteredSuggestions as suggestion}
+                                            <button
+                                                type="button"
+                                                onclick={() => selectSuggestion(suggestion)}
+                                                onmousedown={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                }}
+                                                class="w-full text-left px-2 py-1.5 text-[10px] text-gray-900 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <Icon icon="lucide:tag" class="w-3 h-3 text-gray-400" />
+                                                <span>{suggestion}</span>
+                                            </button>
+                                        {/each}
+                                    </div>
+                                {:else if showSourceSuggestions && sourceSuggestions.length > 0 && filteredSuggestions.length === 0}
+                                    <!-- Debug: Show when suggestions exist but are filtered out -->
+                                    <div class="absolute z-[100] mt-1 w-full bg-white border border-gray-300 rounded shadow-lg p-2 text-[10px] text-gray-500">
+                                        No matches (all suggestions already added or filtered)
+                                    </div>
+                                {/if}
                             </div>
                         </div>
 
@@ -1657,7 +1785,7 @@ import Icon from "@iconify/svelte";
                                     onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                     onblur={handleTagInputBlur}
                                     placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                    class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    class="w-full {INPUT_STYLE}"
                                     onclick={(e) => e.stopPropagation()}
                                 />
                             {/if}
@@ -1878,7 +2006,7 @@ import Icon from "@iconify/svelte";
                                 onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                 onblur={handleTagInputBlur}
                                 placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full {INPUT_STYLE}"
                                 onclick={(e) => e.stopPropagation()}
                             />
                         {/if}

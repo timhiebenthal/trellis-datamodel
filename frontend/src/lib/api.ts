@@ -219,3 +219,18 @@ export async function getLineage(modelId: string): Promise<LineageResponse | nul
         return null;
     }
 }
+
+export async function getSourceSystemSuggestions(): Promise<string[]> {
+    try {
+        const res = await fetch(`${API_BASE}/source-systems/suggestions`);
+        if (!res.ok) {
+            // Return empty array on error
+            return [];
+        }
+        const data = await res.json();
+        return data.suggestions || [];
+    } catch (e) {
+        console.error("Error fetching source system suggestions:", e);
+        return [];
+    }
+}
