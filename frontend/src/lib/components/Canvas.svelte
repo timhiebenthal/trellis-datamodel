@@ -19,7 +19,9 @@
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
+    import EntityCreationWizard from "./EntityCreationWizard.svelte";
     import Icon from "@iconify/svelte";
+    import type { GuidanceConfig, EntityWizardData } from "$lib/types";
 
     const nodeTypes = {
         entity: EntityNode,
@@ -29,6 +31,13 @@
     const edgeTypes = {
         custom: CustomEdge,
     };
+
+    // Props
+    let { guidanceConfig }: { guidanceConfig: GuidanceConfig } = $props();
+
+    // Wizard state
+    let wizardOpen = $state(false);
+    let wizardData = $state<EntityWizardData | null>(null);
 
     function onConnect(connection: Connection) {
         const connectionKey = `${connection.source}-${connection.target}`;
@@ -99,7 +108,21 @@
     }
 
     function addEntity() {
-        const label = "New Entity";
+        // Check if wizard is enabled
+        if (guidanceConfig?.entity_wizard_enabled) {
+            wizardOpen = true;
+            return;
+        }
+
+        // Create entity immediately if wizard is disabled
+        createEntityWithData({
+            label: "New Entity",
+            description: "",
+        });
+    }
+
+    function createEntityWithData(data: EntityWizardData) {
+        const label = data.label || "New Entity";
         const id = generateSlug(label, $nodes.map((n) => n.id));
 
         // Find max zIndex to place new entity on top
@@ -118,7 +141,7 @@
             },
             data: {
                 label,
-                description: "",
+                description: data.description || "",
                 width: 280,
                 panelHeight: 200,
                 collapsed: false,
@@ -126,6 +149,15 @@
             zIndex: maxZIndex + 1, // Place on top of all other nodes
         };
         $nodes = [...$nodes, newNode];
+    }
+
+    function handleWizardComplete(data: EntityWizardData) {
+        wizardOpen = false;
+        createEntityWithData(data);
+    }
+
+    function handleWizardCancel() {
+        wizardOpen = false;
     }
 
     function onEdgesDelete(deletedEdges: Edge[]) {
@@ -348,4 +380,13 @@
             </div>
         {/if}
     </SvelteFlow>
+
+    <!-- Entity Creation Wizard -->
+    <EntityCreationWizard
+        open={wizardOpen}
+        onComplete={handleWizardComplete}
+        onCancel={handleWizardCancel}
+        existingEntityIds={$nodes.filter((n) => n.type === "entity").map((n) => n.id)}
+        config={guidanceConfig}
+    />
 </div>
