@@ -82,9 +82,14 @@
     // Step navigation
     function nextStep() {
         if (currentStep === 1) {
-            const error = validateLabel(formData.label);
-            validationErrors.label = error;
-            if (error) return;
+            // Allow "New Entity" to proceed (will be auto-named when binding dbt model)
+            if (formData.label !== "New Entity") {
+                const error = validateLabel(formData.label);
+                validationErrors.label = error;
+                if (error) return;
+            } else {
+                validationErrors.label = null;
+            }
             currentStep = 2;
         } else if (currentStep === 2) {
             const error = validateDescription(formData.description);
@@ -107,8 +112,9 @@
 
     function skipStep() {
         if (currentStep === 1) {
-            // Can't skip step 1 (required)
-            return;
+            // Skip label - use default "New Entity" (will be auto-named when binding dbt model)
+            validationErrors.label = null;
+            currentStep = 2;
         } else if (currentStep === 2) {
             // Skip description - validate but allow empty
             validationErrors.description = null;
@@ -123,15 +129,18 @@
     }
 
     function complete() {
-        // Validate required steps before completing
-        const labelError = validateLabel(formData.label);
-        if (labelError) {
-            validationErrors.label = labelError;
-            currentStep = 1;
-            return;
+        // Validate label only if it's been changed from default
+        // Allow "New Entity" to pass through (will be auto-named when binding dbt model)
+        if (formData.label !== "New Entity") {
+            const labelError = validateLabel(formData.label);
+            if (labelError) {
+                validationErrors.label = labelError;
+                currentStep = 1;
+                return;
+            }
         }
 
-        // Description is required, but we allow skipping (user can add later)
+        // Description is optional (user can add later)
         // If skipped, description will be empty string
         onComplete({
             label: formData.label.trim(),
@@ -176,7 +185,12 @@
     // Real-time validation
     $effect(() => {
         if (currentStep === 1 && formData.label) {
-            validationErrors.label = validateLabel(formData.label);
+            // Allow "New Entity" without error (can be skipped/auto-named)
+            if (formData.label === "New Entity") {
+                validationErrors.label = null;
+            } else {
+                validationErrors.label = validateLabel(formData.label);
+            }
         }
     });
 
@@ -414,12 +428,6 @@
                             Next
                         </button>
                     {:else}
-                        <button
-                            onclick={skipStep}
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                        >
-                            Skip
-                        </button>
                         <button
                             onclick={complete}
                             class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
