@@ -47,8 +47,19 @@
         if (label === "New Entity") {
             return "Please choose a meaningful name";
         }
-        const slug = generateSlug(label, existingEntityIds);
-        if (existingEntityIds.includes(slug)) {
+        // Generate base slug (without uniqueness counter)
+        const baseSlug = label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'entity';
+        
+        // Check if base slug or any variant exists
+        const isDuplicate = existingEntityIds.some(id => {
+            // Check if ID matches base slug exactly, or starts with base slug followed by underscore and number
+            return id === baseSlug || id.startsWith(`${baseSlug}_`);
+        });
+        
+        if (isDuplicate) {
             return "An entity with this name already exists";
         }
         return null; // Valid
