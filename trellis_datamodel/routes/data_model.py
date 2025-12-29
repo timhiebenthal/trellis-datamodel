@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Tuple
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.models.schemas import DataModelUpdate
+from trellis_datamodel.services.lineage import extract_source_systems_for_model
 
 router = APIRouter(prefix="/api", tags=["data-model"])
 
@@ -89,6 +90,54 @@ async def get_data_model():
         layout_data = _load_canvas_layout()
         merged_data = _merge_layout_into_model(model_data, layout_data)
 
+        # Add source_system field to entities
+        # For bound entities: extract from lineage
+        # For unbound entities: read from persisted YAML
+        entities = merged_data.get("entities", [])
+        for entity in entities:
+            dbt_model = entity.get("dbt_model")
+            additional_models = entity.get("additional_models", [])
+            
+            if dbt_model:
+                # Bound entity: extract source systems from lineage
+                # Extract for primary model
+                source_systems = set()
+                try:
+                    if cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH):
+                        primary_sources = extract_source_systems_for_model(
+                            cfg.MANIFEST_PATH,
+                            cfg.CATALOG_PATH if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH) else None,
+                            dbt_model,
+                        )
+                        source_systems.update(primary_sources)
+                except Exception:
+                    # Gracefully handle errors - log but don't fail
+                    pass
+                
+                # Extract for additional models
+                for model_id in additional_models:
+                    try:
+                        if cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH):
+                            additional_sources = extract_source_systems_for_model(
+                                cfg.MANIFEST_PATH,
+                                cfg.CATALOG_PATH if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH) else None,
+                                model_id,
+                            )
+                            source_systems.update(additional_sources)
+                    except Exception:
+                        # Gracefully handle errors
+                        pass
+                
+                # Set source_system if any sources found
+                if source_systems:
+                    entity["source_system"] = sorted(list(source_systems))
+            else:
+                # Unbound entity: read from persisted YAML
+                if "source_system" in entity:
+                    # Already loaded from YAML, keep as-is
+                    pass
+                # If not present, entity won't have source_system field (optional)
+
         return merged_data
     except Exception as e:
         raise HTTPException(
@@ -130,6 +179,9 @@ def _split_model_and_layout(
             model_entity["drafted_fields"] = entity["drafted_fields"]
         if "tags" in entity:
             model_entity["tags"] = entity["tags"]
+        # Only persist source_system for unbound entities (not for bound entities)
+        if "source_system" in entity and not entity.get("dbt_model"):
+            model_entity["source_system"] = entity["source_system"]
 
         model_data["entities"].append(model_entity)
 
@@ -184,6 +236,83 @@ def _split_model_and_layout(
             layout_data["relationships"][rel_key] = layout_rel
 
     return model_data, layout_data
+
+
+@router.get("/source-systems/suggestions")
+async def get_source_system_suggestions():
+    """
+    Return a consolidated list of known source system names for suggestions.
+    
+    Includes:
+    - Mock sources from data_model.yml (unbound entities)
+    - Lineage-derived sources from all bound entities
+    - dbt sources.yml source-names (if available)
+    """
+    suggestions: set[str] = set()
+    
+    # 1. Collect mock sources from data_model.yml
+    if os.path.exists(cfg.DATA_MODEL_PATH):
+        try:
+            with open(cfg.DATA_MODEL_PATH, "r") as f:
+                model_data = yaml.safe_load(f) or {}
+            
+            entities = model_data.get("entities", [])
+            for entity in entities:
+                # Only collect from unbound entities (mock sources)
+                if not entity.get("dbt_model") and entity.get("source_system"):
+                    source_systems = entity.get("source_system", [])
+                    if isinstance(source_systems, list):
+                        for source in source_systems:
+                            if source and isinstance(source, str):
+                                suggestions.add(source.strip())
+        except Exception:
+            # Gracefully handle errors
+            pass
+    
+    # 2. Collect lineage-derived sources from all bound entities
+    if cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH):
+        try:
+            with open(cfg.DATA_MODEL_PATH, "r") as f:
+                model_data = yaml.safe_load(f) or {}
+            
+            entities = model_data.get("entities", [])
+            for entity in entities:
+                dbt_model = entity.get("dbt_model")
+                additional_models = entity.get("additional_models", [])
+                
+                if dbt_model:
+                    # Extract from primary model
+                    try:
+                        sources = extract_source_systems_for_model(
+                            cfg.MANIFEST_PATH,
+                            cfg.CATALOG_PATH if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH) else None,
+                            dbt_model,
+                        )
+                        suggestions.update(sources)
+                    except Exception:
+                        pass
+                    
+                    # Extract from additional models
+                    for model_id in additional_models:
+                        try:
+                            sources = extract_source_systems_for_model(
+                                cfg.MANIFEST_PATH,
+                                cfg.CATALOG_PATH if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH) else None,
+                                model_id,
+                            )
+                            suggestions.update(sources)
+                        except Exception:
+                            pass
+        except Exception:
+            # Gracefully handle errors
+            pass
+    
+    # 3. Collect from dbt sources.yml (if available)
+    # Note: This would require parsing sources.yml files, which is out of scope for now
+    # Future enhancement: parse sources.yml to extract source-name values
+    
+    # Return sorted list
+    return {"suggestions": sorted(list(suggestions))}
 
 
 @router.post("/data-model")

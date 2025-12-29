@@ -334,6 +334,7 @@
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags: entityTags,
+                            source_system: e.source_system,
                             // Treat saved tags as manifest/display tags by default for bound models,
                             // so they don't get written back to schema.yml. Schema tags will be loaded
                             // explicitly via loadSchema().
@@ -561,7 +562,7 @@
                             ? displayTags
                             : undefined;
 
-                    return {
+                    const entityData: any = {
                         id: n.id,
                         label: ((n.data.label as string) || "").trim() || "Entity",
                         description: n.data.description as string | undefined,
@@ -575,6 +576,16 @@
                         // Persist display tags only; schema writes rely on _schemaTags.
                         tags: tagsToPersist,
                     };
+                    
+                    // Only persist source_system for unbound entities (mock sources)
+                    if (!isBound && n.data?.source_system) {
+                        const sourceSystems = (n.data.source_system as string[]).filter(s => s && s.trim());
+                        if (sourceSystems.length > 0) {
+                            entityData.source_system = sourceSystems;
+                        }
+                    }
+                    
+                    return entityData;
                 }),
             relationships: currentEdges.flatMap((e) => {
                 // If edge has multiple model relationships, expand them

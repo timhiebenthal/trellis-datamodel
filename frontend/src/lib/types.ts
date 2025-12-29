@@ -47,6 +47,7 @@ export interface EntityData {
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
+    source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
     _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
@@ -68,6 +69,7 @@ export interface Entity {
     panel_height?: number;
     collapsed?: boolean;
     tags?: string[];
+    source_system?: string[]; // Only for unbound entities (mock sources)
 }
 
 /**

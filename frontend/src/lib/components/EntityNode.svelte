@@ -654,6 +654,10 @@ import Icon from "@iconify/svelte";
     let tagInput = $state("");
     let showTagInput = $state(false);
 
+    // Mock source system editing functionality (unbound entities only)
+    let mockSourceSystems = $derived((data.source_system || []) as string[]);
+    let mockSourceInput = $state("");
+
     function getCurrentTags(nodeId: string): string[] {
         const node = $nodes.find((n) => n.id === nodeId);
         return normalizeTags(node?.data?.tags);
@@ -767,6 +771,43 @@ import Icon from "@iconify/svelte";
                 }
             }
         });
+    }
+
+    function addMockSource() {
+        const trimmed = mockSourceInput.trim();
+        if (!trimmed) return;
+        
+        const currentSources = mockSourceSystems;
+        if (currentSources.includes(trimmed)) return; // Prevent duplicates
+        
+        updateNodeData(id, { 
+            source_system: [...currentSources, trimmed]
+        });
+        mockSourceInput = "";
+    }
+
+    function removeMockSource(sourceSystem: string) {
+        const newSources = mockSourceSystems.filter((s) => s !== sourceSystem);
+        updateNodeData(id, { 
+            source_system: newSources.length > 0 ? newSources : undefined
+        });
+    }
+
+    function handleMockSourceInputKeydown(e: KeyboardEvent) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (mockSourceInput.trim()) {
+                addMockSource();
+            }
+        } else if (e.key === "Escape") {
+            mockSourceInput = "";
+        }
+    }
+
+    function handleMockSourceInputBlur() {
+        if (mockSourceInput.trim()) {
+            addMockSource();
+        }
     }
 
     function handleBatchTagInputKeydown(e: KeyboardEvent) {
@@ -1187,6 +1228,25 @@ import Icon from "@iconify/svelte";
                         </div>
                     {/if}
 
+                    <!-- Source System Badges (Bound Entities) -->
+                    {#if data.source_system && data.source_system.length > 0}
+                        <div class="mb-2.5 text-gray-500 flex items-center gap-2 flex-wrap">
+                            <span
+                                class="font-medium text-[10px] uppercase tracking-wider"
+                                >Source Systems</span
+                            >
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each data.source_system as sourceSystem}
+                                    <span
+                                        class="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-semibold uppercase border border-gray-200"
+                                    >
+                                        {sourceSystem}
+                                    </span>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
                     <!-- Model Tabs (when multiple models are bound) -->
                     {#if allBoundModels.length > 1}
                         <div class="mb-2.5 flex items-center gap-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
@@ -1500,6 +1560,49 @@ import Icon from "@iconify/svelte";
                                 class="w-3 h-3"
                             />
                             Generic datatypes (draft mode)
+                        </div>
+
+                        <!-- Mock Source Systems Editor (Unbound Entities) -->
+                        <div class="mb-2.5">
+                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                <span
+                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
+                                    >Source Systems</span
+                                >
+                                {#each (data.source_system || []) as sourceSystem}
+                                    <span
+                                        class="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] border border-gray-200 flex items-center gap-1 group"
+                                    >
+                                        {sourceSystem}
+                                        <button
+                                            onclick={() => removeMockSource(sourceSystem)}
+                                            class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700"
+                                            title="Remove source system"
+                                        >
+                                            <Icon icon="lucide:x" class="w-2.5 h-2.5" />
+                                        </button>
+                                    </span>
+                                {/each}
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <input
+                                    type="text"
+                                    bind:value={mockSourceInput}
+                                    onkeydown={handleMockSourceInputKeydown}
+                                    onblur={handleMockSourceInputBlur}
+                                    placeholder="Add source system"
+                                    class="flex-1 px-1.5 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                    onclick={(e) => e.stopPropagation()}
+                                />
+                                <button
+                                    onclick={addMockSource}
+                                    class="px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 rounded text-[10px] border border-primary-200 transition-colors flex items-center gap-1"
+                                    title="Add source system"
+                                >
+                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
+                                    Add
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Tags Editor for Unbound Entities -->
