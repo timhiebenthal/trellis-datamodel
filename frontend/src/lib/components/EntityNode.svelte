@@ -29,6 +29,7 @@
         extractModelNameFromUniqueId,
     } from "$lib/utils";
 import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
+import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import { openLineageModal } from "$lib/stores";
 import Icon from "@iconify/svelte";
 
@@ -38,6 +39,9 @@ import Icon from "@iconify/svelte";
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
+    let showUndescribedAttributesWarning = $state(false);
+    let undescribedAttributeNames = $state<string[]>([]);
+    let warningResolve: ((value: boolean) => void) | null = null;
     // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
 
     // Batch editing support
@@ -208,8 +212,45 @@ import Icon from "@iconify/svelte";
         }
     }
 
+    // Show warning modal and wait for user decision
+    function showUndescribedAttributesWarningModal(attributeNames: string[]): Promise<boolean> {
+        return new Promise((resolve) => {
+            undescribedAttributeNames = attributeNames;
+            warningResolve = resolve;
+            showUndescribedAttributesWarning = true;
+        });
+    }
+
+    function handleWarningConfirm() {
+        showUndescribedAttributesWarning = false;
+        if (warningResolve) {
+            warningResolve(true);
+            warningResolve = null;
+        }
+    }
+
+    function handleWarningCancel() {
+        showUndescribedAttributesWarning = false;
+        if (warningResolve) {
+            warningResolve(false);
+            warningResolve = null;
+        }
+    }
+
     async function saveSchema() {
         if (!modelDetails) return;
+
+        // Check for attributes without descriptions
+        const undescribedAttributes = editableColumns
+            .filter((col) => col.name && (!col.description || col.description.trim().length === 0))
+            .map((col) => col.name);
+
+        if (undescribedAttributes.length > 0) {
+            const proceed = await showUndescribedAttributesWarningModal(undescribedAttributes);
+            if (!proceed) {
+                return;
+            }
+        }
 
         schemaSaving = true;
         schemaError = null;
@@ -1818,6 +1859,13 @@ import Icon from "@iconify/svelte";
     entityLabel={data.label || "Entity"}
     onConfirm={deleteEntity}
     onCancel={cancelDelete}
+/>
+
+<UndescribedAttributesWarningModal
+    open={showUndescribedAttributesWarning}
+    attributeNames={undescribedAttributeNames}
+    onConfirm={handleWarningConfirm}
+    onCancel={handleWarningCancel}
 />
 
 <style>
