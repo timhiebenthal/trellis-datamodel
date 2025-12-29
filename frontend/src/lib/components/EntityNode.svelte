@@ -1343,7 +1343,7 @@ import Icon from "@iconify/svelte";
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="column_name"
                                                     />
                                                     <input
@@ -1359,7 +1359,7 @@ import Icon from "@iconify/svelte";
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
                                                         placeholder="text"
                                                     />
                                                     <button
@@ -1598,7 +1598,7 @@ import Icon from "@iconify/svelte";
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="field_name"
                                                     />
                                                     <select
@@ -1613,7 +1613,7 @@ import Icon from "@iconify/svelte";
                                                                         .value as any,
                                                                 },
                                                             )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
                                                     >
                                                         <option value="text"
                                                             >text</option
