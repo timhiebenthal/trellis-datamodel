@@ -1,10 +1,8 @@
 version: 2
 models:
   - name: employee_history
-    description: |
-      DEMO PURPOSE ONLY: Historical employee records with temporal validity fields.
-      This model is a copy of employee.yml created for testing the deduplication 
-      strategy for entity relationships feature. It does not contain real historical data.
+    description: |-
+      Employee records
     columns:
       - name: employee_id
         data_type: text
@@ -18,20 +16,20 @@ models:
         data_type: text
         description: department ID
         data_tests:
-        - relationships:
-            arguments:
-              to: ref('department')
-              field: department_id
+          - relationships:
+              arguments:
+                to: ref('department')
+                field: department_id
       - name: team
         data_type: text
       - name: supervisor_id
         data_type: text
         description: supervisor employee ID
         data_tests:
-        - relationships:
-            arguments:
-              to: ref('employee')
-              field: employee_id
+          - relationships:
+              arguments:
+                to: ref('employee_history')
+                field: employee_id
       - name: hire_date
         data_type: date
       - name: role
