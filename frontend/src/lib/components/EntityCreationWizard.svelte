@@ -391,10 +391,10 @@
                             <Icon icon="lucide:info" class="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
                             <div class="flex-1">
                                 <h3 class="text-sm font-medium text-gray-900 mb-2">
-                                    Consider adding key fields/attributes
+                                    Consider adding key fields/attributes describing the entity records
                                 </h3>
                                 <p class="text-sm text-gray-600 mb-3">
-                                    Common fields: <code class="bg-gray-200 px-1 rounded">id</code>, <code class="bg-gray-200 px-1 rounded">name</code>, <code class="bg-gray-200 px-1 rounded">created_at</code>, <code class="bg-gray-200 px-1 rounded">updated_at</code>
+                                    Common fields: Unique Identifiers (Primary/Foreign Keys), Timestamps, Status and Categorical Fields
                                 </p>
                                 <p class="text-xs text-gray-500">
                                     You can add fields after creating the entity by editing it in logical view.
