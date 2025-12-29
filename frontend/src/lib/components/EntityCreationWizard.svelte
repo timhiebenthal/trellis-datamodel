@@ -394,8 +394,14 @@
                                     Consider adding key fields/attributes describing the entity records
                                 </h3>
                                 <p class="text-sm text-gray-600 mb-3">
-                                    Common fields: Unique Identifiers (Primary/Foreign Keys), Timestamps, Status and Categorical Fields
+                                    Common fields:
                                 </p>
+                                <ul class="text-sm text-gray-600 list-disc list-inside space-y-1 mb-3">
+                                    <li>Unique Identifiers (Primary/Foreign Keys)</li>
+                                    <li>Timestamps</li>
+                                    <li>Status Indicators</li>
+                                    <li>Categorical Fields</li>
+                                </ul>
                                 <p class="text-xs text-gray-500">
                                     You can add fields after creating the entity by editing it in logical view.
                                 </p>
