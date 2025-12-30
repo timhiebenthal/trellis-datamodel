@@ -229,6 +229,8 @@
             role="document"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
+            aria-label="Entity creation wizard"
         >
             <!-- Header -->
             <div class="flex items-center justify-between mb-4">

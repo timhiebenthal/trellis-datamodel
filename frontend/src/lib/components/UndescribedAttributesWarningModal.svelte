@@ -59,6 +59,8 @@
             role="document"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
+            aria-label="Warning about attributes without descriptions"
         >
             <div class="flex items-start gap-3 mb-4">
                 <div class="flex-shrink-0">
