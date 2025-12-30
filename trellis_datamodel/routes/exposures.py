@@ -1,6 +1,7 @@
 """Routes for exposures operations."""
 
 from fastapi import APIRouter, HTTPException
+import json
 import yaml
 import os
 import re
@@ -167,45 +168,58 @@ async def get_exposures():
     """
     Return exposures data and entity usage mapping.
 
-    Reads exposures.yml from the dbt project models directory,
-    resolves model references, and maps them to entities.
+    First tries to read exposures from manifest.json (canonical source after dbt compilation).
+    Falls back to reading exposures.yml from various locations if manifest doesn't have exposures.
     """
-    # Find exposures.yml file
-    exposures_path = None
-    if cfg.DBT_PROJECT_PATH:
-        # Standard location: models/exposures.yml
-        standard_path = os.path.join(cfg.DBT_PROJECT_PATH, "models", "exposures.yml")
-        if os.path.exists(standard_path):
-            exposures_path = standard_path
-        else:
-            # Also check for exposures.yml directly in models directory
-            models_dir = os.path.join(cfg.DBT_PROJECT_PATH, "models")
-            if os.path.exists(models_dir):
-                for file in os.listdir(models_dir):
-                    if file == "exposures.yml":
-                        exposures_path = os.path.join(models_dir, file)
-                        break
-
-    # If no exposures.yml found, return empty response
-    if not exposures_path or not os.path.exists(exposures_path):
-        return {"exposures": [], "entityUsage": {}}
-
-    # Load exposures.yml
-    try:
-        with open(exposures_path, "r") as f:
-            exposures_data = yaml.safe_load(f) or {}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error reading exposures.yml: {str(e)}"
-        )
-
-    exposures_list = exposures_data.get("exposures", [])
-    if not isinstance(exposures_list, list):
-        return {"exposures": [], "entityUsage": {}}
-
-    # Load manifest and data model for resolution
+    # Load manifest and data model
     manifest = _load_manifest()
     data_model = _load_data_model()
+
+    # Try to read exposures from manifest first (canonical source)
+    exposures_dict = manifest.get("exposures", {})
+    exposures_list = []
+    
+    if exposures_dict and isinstance(exposures_dict, dict):
+        # Convert manifest exposures dict to list format
+        for unique_id, exposure in exposures_dict.items():
+            if not isinstance(exposure, dict):
+                continue
+            exposures_list.append(exposure)
+    else:
+        # Fallback: try to read from exposures.yml file
+        exposures_path = None
+        if cfg.DBT_PROJECT_PATH:
+            # Check multiple locations:
+            # 1. Root of dbt project
+            root_path = os.path.join(cfg.DBT_PROJECT_PATH, "exposures.yml")
+            if os.path.exists(root_path):
+                exposures_path = root_path
+            # 2. Standard location: models/exposures.yml
+            elif os.path.exists(os.path.join(cfg.DBT_PROJECT_PATH, "models", "exposures.yml")):
+                exposures_path = os.path.join(cfg.DBT_PROJECT_PATH, "models", "exposures.yml")
+            # 3. Search in models directory
+            else:
+                models_dir = os.path.join(cfg.DBT_PROJECT_PATH, "models")
+                if os.path.exists(models_dir):
+                    for file in os.listdir(models_dir):
+                        if file == "exposures.yml":
+                            exposures_path = os.path.join(models_dir, file)
+                            break
+
+        # Load exposures.yml if found
+        if exposures_path and os.path.exists(exposures_path):
+            try:
+                with open(exposures_path, "r") as f:
+                    exposures_data = yaml.safe_load(f) or {}
+                exposures_list = exposures_data.get("exposures", [])
+                if not isinstance(exposures_list, list):
+                    exposures_list = []
+            except Exception as e:
+                print(f"Warning: Could not read exposures.yml: {e}")
+
+    # If no exposures found, return empty response
+    if not exposures_list:
+        return {"exposures": [], "entityUsage": {}}
 
     # Build response: extract exposure metadata
     exposures_response = []
@@ -217,8 +231,12 @@ async def get_exposures():
             continue
 
         # Extract exposure metadata
+        exposure_name = exposure.get("name", "")
+        if not exposure_name:
+            continue
+
         exposure_meta = {
-            "name": exposure.get("name", ""),
+            "name": exposure_name,
             "label": exposure.get("label"),
             "type": exposure.get("type"),
             "description": exposure.get("description"),
@@ -235,22 +253,29 @@ async def get_exposures():
         exposures_response.append(exposure_meta)
 
         # Resolve depends_on references
-        depends_on = exposure.get("depends_on", [])
-        if not isinstance(depends_on, list):
-            continue
+        # In manifest, depends_on is a dict with 'nodes' list containing unique_ids
+        # In YAML, depends_on is a list of ref() strings
+        depends_on_nodes = []
+        depends_on = exposure.get("depends_on")
+        
+        if isinstance(depends_on, dict):
+            # Manifest format: depends_on.nodes contains unique_ids
+            depends_on_nodes = depends_on.get("nodes", [])
+        elif isinstance(depends_on, list):
+            # YAML format: list of ref() strings, need to resolve
+            for ref_string in depends_on:
+                if not isinstance(ref_string, str):
+                    continue
+                # Resolve ref() to model unique_id
+                unique_id = _resolve_model_ref(ref_string, manifest)
+                if unique_id:
+                    depends_on_nodes.append(unique_id)
+                else:
+                    print(f"Warning: Could not resolve {ref_string} to a model")
 
-        exposure_name = exposure.get("name", "")
-        if not exposure_name:
-            continue
-
-        for ref_string in depends_on:
-            if not isinstance(ref_string, str):
-                continue
-
-            # Resolve ref() to model unique_id
-            unique_id = _resolve_model_ref(ref_string, manifest)
-            if not unique_id:
-                print(f"Warning: Could not resolve {ref_string} to a model")
+        # Process each model that this exposure depends on
+        for unique_id in depends_on_nodes:
+            if not isinstance(unique_id, str):
                 continue
 
             # Expand to *all upstream models* before mapping to entities.
