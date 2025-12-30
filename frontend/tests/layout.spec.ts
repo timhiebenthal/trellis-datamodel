@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities, resetDataModel } from './helpers';
+import { cleanupTestEntities, resetDataModel, completeEntityWizard } from './helpers';
 
 test.describe('Auto Layout', () => {
     test.beforeEach(async ({ page, request }) => {
@@ -43,6 +43,7 @@ test.describe('Auto Layout', () => {
             const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
             await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
             await addEntityBtn.click();
+            await completeEntityWizard(page);
             await expect(page.getByPlaceholder('Entity Name').first()).toBeVisible({ timeout: 10000 });
         }
 
@@ -92,6 +93,7 @@ test.describe('Auto Layout', () => {
         const entitiesToAdd = Math.max(0, 3 - initialCount);
         for (let i = 0; i < entitiesToAdd; i++) {
             await addEntityBtn.click();
+            await completeEntityWizard(page);
             await page.waitForTimeout(200); // Small delay between clicks
         }
 

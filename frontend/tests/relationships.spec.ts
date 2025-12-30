@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities, resetDataModel } from './helpers';
+import { cleanupTestEntities, resetDataModel, completeEntityWizard } from './helpers';
 
 test.describe('Relationship (Edge) Interactions', () => {
     test.beforeEach(async ({ page, request }) => {
@@ -37,6 +37,7 @@ test.describe('Relationship (Edge) Interactions', () => {
         const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
         await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
         await addEntityBtn.click();
+        await completeEntityWizard(page);
         const entity1 = page.getByPlaceholder('Entity Name').first();
         await expect(entity1).toBeVisible({ timeout: 10000 });
         await entity1.fill('Users');
@@ -45,6 +46,7 @@ test.describe('Relationship (Edge) Interactions', () => {
 
         // 2. Create second entity
         await addEntityBtn.click();
+        await completeEntityWizard(page);
         const entity2 = page.getByPlaceholder('Entity Name').nth(1);
         await expect(entity2).toBeVisible({ timeout: 10000 });
         await entity2.fill('Orders');
@@ -82,6 +84,7 @@ test.describe('Relationship (Edge) Interactions', () => {
         const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
         await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
         await addEntityBtn.click();
+        await completeEntityWizard(page);
         await expect
             .poll(
                 async () => await page.locator('.svelte-flow__node-entity').count(),

@@ -53,7 +53,7 @@
         aria-modal="true"
         aria-labelledby="warning-modal-title"
     >
-        <!-- Modal -->
+        <!-- Modal Content -->
         <div
             class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
             role="document"

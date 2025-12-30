@@ -59,3 +59,48 @@ export async function cleanupTestEntities(page: Page): Promise<void> {
     }
 }
 
+/**
+ * Complete the entity creation wizard by skipping through all steps
+ * This handles the wizard modal that appears when entity_wizard_enabled is true
+ */
+export async function completeEntityWizard(page: Page): Promise<void> {
+    // Check if wizard modal is visible
+    const wizardModal = page.getByRole('dialog', { name: /create new entity/i });
+    const isWizardVisible = await wizardModal.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (!isWizardVisible) {
+        // Wizard might be disabled, entity should appear directly
+        return;
+    }
+
+    // Skip through all steps - the wizard has up to 3 steps
+    // We'll click "Skip" or "Done" until the modal closes
+    let attempts = 0;
+    const maxAttempts = 5; // Safety limit
+    
+    while (await wizardModal.isVisible({ timeout: 500 }).catch(() => false) && attempts < maxAttempts) {
+        // Try "Done" button first (final step)
+        const doneBtn = page.getByRole('button', { name: 'Done' });
+        if (await doneBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+            await doneBtn.click();
+            await page.waitForTimeout(300);
+            break;
+        }
+        
+        // Otherwise try "Skip" button
+        const skipBtn = page.getByRole('button', { name: 'Skip' });
+        if (await skipBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+            await skipBtn.click();
+            await page.waitForTimeout(300);
+        } else {
+            // No buttons found, break to avoid infinite loop
+            break;
+        }
+        
+        attempts++;
+    }
+
+    // Wait for wizard to close
+    await wizardModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+}
+

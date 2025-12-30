@@ -229,7 +229,6 @@
             role="document"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
         >
             <!-- Header -->
             <div class="flex items-center justify-between mb-4">
