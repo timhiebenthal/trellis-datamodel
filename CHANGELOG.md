@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-01-15
+
 ### Added
 - Added a new "Exposures" view mode that provides a cross-table visualization of entity usage across downstream dbt exposures.
 - Added "Exposures" tab to the main navigation for switching between Conceptual, Logical, and Exposures views.
@@ -15,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added upstream table-level lineage visualization: users can now double-click on any entity bound to a dbt model to view its upstream lineage in a modal overlay. The lineage graph shows all upstream models back to source tables, using dbt-colibri for lineage extraction. The modal includes zoom controls, minimap navigation, and progressive display of lineage levels. Requires `dbt docs generate` to be run for full lineage enrichment via catalog.json.
 - Added auto-naming for entities when binding dbt models: when a user binds a dbt model to an unnamed entity (ID starts with `new_entity` and label is `"New Entity"`), the entity ID and label are automatically derived from the dbt model name. Model names are formatted with title-case and spaces (e.g., `entity_booking` → `"Entity Booking"`), and the entity ID is generated as a slugified version. This reduces manual naming steps and improves developer experience.
 - Added layer-based organization for lineage visualization: lineage views now support horizontal layer bands based on dbt folder structure. Configure `lineage_layers` in `trellis.yml` with an ordered list of folder names (e.g., `["1_clean", "2_prep", "3_core"]`) to group models into semantic transformation stages. Models are automatically assigned to layers based on their folder path, with sources displayed at the top and unassigned models at the bottom. Layer bands are displayed with light background shading and labels on the left side, providing visual organization without obscuring the graph. Configuration is optional and backward compatible - projects without `lineage_layers` config display lineage without layers.
+- Added guided entity creation wizard: when creating new entities, users are guided through a 3-step wizard (Entity Name → Description → Optional Attributes) to ensure well-documented entity definitions. The wizard includes real-time validation, example descriptions, and character counters. Users can skip steps or dismiss the wizard entirely. Configure via `guidance.entity_wizard_enabled` in `trellis.yml` (default: true).
+- Added push-to-dbt warning for incomplete entities: before syncing to dbt, users are warned if any entities are missing descriptions. The warning modal lists affected entities and allows users to cancel or continue. This helps prevent syncing incomplete entity definitions. Configure via `guidance.push_warning_enabled` in `trellis.yml` (default: true). Additional guidance settings include `guidance.min_description_length` (default: 10 characters) and `guidance.disabled_guidance` array to disable specific guidance features.
+- Added checkmark indicators in sidebar for dbt models bound to entities: the sidebar now displays a checkmark icon next to dbt models that are already bound to entities, making it easy to identify which models still need to be modeled. Checkmarks appear on the right side of model items and update reactively when entities are bound or unbound. Models bound via either the primary `dbt_model` field or `additional_models` array show the same checkmark indicator.
 
 ## [0.3.5] - 2025-12-23
 
