@@ -111,6 +111,18 @@ export interface ConfigStatus {
     error?: string;
 }
 
+export interface GuidanceConfig {
+    entity_wizard_enabled: boolean;
+    push_warning_enabled: boolean;
+    min_description_length: number;
+    disabled_guidance: string[];
+}
+
+export interface EntityWizardData {
+    label: string;
+    description: string;
+}
+
 export interface ConfigInfo {
     config_path?: string | null;
     framework: string;
@@ -126,6 +138,7 @@ export interface ConfigInfo {
     frontend_build_dir: string;
     model_paths_configured: string[];
     model_paths_resolved: string[];
+    guidance?: GuidanceConfig;
 }
 
 export interface FieldDragState {

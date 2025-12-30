@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities, resetDataModel } from './helpers';
+import { cleanupTestEntities, resetDataModel, completeEntityWizard } from './helpers';
 
 test.describe('Canvas Interactions', () => {
     test.beforeEach(async ({ page, request }) => {
@@ -35,6 +35,9 @@ test.describe('Canvas Interactions', () => {
         await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
         await addEntityBtn.click();
 
+        // Complete wizard if it appears
+        await completeEntityWizard(page);
+
         // Check if new entity appears (default name "New Entity")
         const entity = page.getByPlaceholder('Entity Name').first();
         await expect(entity).toBeVisible({ timeout: 10000 });
@@ -66,10 +69,12 @@ test.describe('Canvas Interactions', () => {
         
         // Create first entity
         await addEntityBtn.click();
+        await completeEntityWizard(page);
         await page.waitForTimeout(500);
         
         // Create second entity
         await addEntityBtn.click();
+        await completeEntityWizard(page);
         await page.waitForTimeout(500);
 
         // Wait for entities to be visible

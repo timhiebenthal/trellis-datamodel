@@ -29,8 +29,10 @@
         detectFieldSemantics,
         formatModelNameForLabel,
         extractModelNameFromUniqueId,
+        toTitleCase,
     } from "$lib/utils";
 import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
+import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import { openLineageModal } from "$lib/stores";
 import Icon from "@iconify/svelte";
 
@@ -49,6 +51,9 @@ import Icon from "@iconify/svelte";
     // Shared input field styling for consistent appearance
     const INPUT_STYLE = "px-1.5 py-0.5 text-[10px] text-gray-900 bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-gray-400";
     let showDeleteModal = $state(false);
+    let showUndescribedAttributesWarning = $state(false);
+    let undescribedAttributeNames = $state<string[]>([]);
+    let warningResolve: ((value: boolean) => void) | null = null;
     // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
 
     // Batch editing support
@@ -222,8 +227,45 @@ import Icon from "@iconify/svelte";
         }
     }
 
+    // Show warning modal and wait for user decision
+    function showUndescribedAttributesWarningModal(attributeNames: string[]): Promise<boolean> {
+        return new Promise((resolve) => {
+            undescribedAttributeNames = attributeNames;
+            warningResolve = resolve;
+            showUndescribedAttributesWarning = true;
+        });
+    }
+
+    function handleWarningConfirm() {
+        showUndescribedAttributesWarning = false;
+        if (warningResolve) {
+            warningResolve(true);
+            warningResolve = null;
+        }
+    }
+
+    function handleWarningCancel() {
+        showUndescribedAttributesWarning = false;
+        if (warningResolve) {
+            warningResolve(false);
+            warningResolve = null;
+        }
+    }
+
     async function saveSchema() {
         if (!modelDetails) return;
+
+        // Check for attributes without descriptions
+        const undescribedAttributes = editableColumns
+            .filter((col) => col.name && (!col.description || col.description.trim().length === 0))
+            .map((col) => col.name);
+
+        if (undescribedAttributes.length > 0) {
+            const proceed = await showUndescribedAttributesWarningModal(undescribedAttributes);
+            if (!proceed) {
+                return;
+            }
+        }
 
         schemaSaving = true;
         schemaError = null;
@@ -312,7 +354,9 @@ import Icon from "@iconify/svelte";
 
     function updateIdFromLabel(e: Event) {
         // Called on blur - update the ID based on final label
-        const label = (e.target as HTMLInputElement).value.trim();
+        // Convert label to title-case before updating
+        const rawLabel = (e.target as HTMLInputElement).value.trim();
+        const label = toTitleCase(rawLabel);
         const newId = generateSlug(label, $nodes.map((n) => n.id), id);
 
         // If ID changes, update the node and all relationships
@@ -1529,7 +1573,7 @@ import Icon from "@iconify/svelte";
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="column_name"
                                                     />
                                                     <input
@@ -1545,7 +1589,7 @@ import Icon from "@iconify/svelte";
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
                                                         placeholder="text"
                                                     />
                                                     <button
@@ -1858,7 +1902,7 @@ import Icon from "@iconify/svelte";
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="field_name"
                                                     />
                                                     <select
@@ -1873,7 +1917,7 @@ import Icon from "@iconify/svelte";
                                                                         .value as any,
                                                                 },
                                                             )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
+                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
                                                     >
                                                         <option value="text"
                                                             >text</option
@@ -2078,6 +2122,13 @@ import Icon from "@iconify/svelte";
     entityLabel={data.label || "Entity"}
     onConfirm={deleteEntity}
     onCancel={cancelDelete}
+/>
+
+<UndescribedAttributesWarningModal
+    open={showUndescribedAttributesWarning}
+    attributeNames={undescribedAttributeNames}
+    onConfirm={handleWarningConfirm}
+    onCancel={handleWarningCancel}
 />
 
 <style>

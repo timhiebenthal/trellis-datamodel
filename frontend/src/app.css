@@ -83,3 +83,51 @@
 input, textarea, [contenteditable] {
     cursor: default !important;
 }
+
+/* Ensure data type inputs and selects have proper background and text colors across all browsers */
+/* This fixes the black background issue in Cursor browser and other browsers with dark mode defaults */
+input[type="text"].font-mono,
+select.font-mono {
+    background-color: white !important;
+    color: rgb(75 85 99) !important; /* text-gray-600 */
+}
+
+/* Ensure select options are visible - needed for Cursor browser */
+select.font-mono option {
+    background-color: white !important;
+    color: rgb(75 85 99) !important;
+}
+
+/* Ensure attribute name inputs have proper background and text colors */
+/* Target inputs that are likely attribute/field name inputs */
+input[type="text"].font-medium:not(.font-mono),
+input[type="text"][placeholder*="field_name"],
+input[type="text"][placeholder*="column_name"] {
+    background-color: white !important;
+    color: rgb(17 24 39) !important; /* text-gray-900 */
+}
+
+/* Fix scrollbar styling for Cursor browser and other browsers */
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(229 231 235) !important; /* gray-200 */
+    border-radius: 3px !important;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+/* Firefox scrollbar */
+.scrollbar-thin {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgb(229 231 235) transparent !important;
+}
