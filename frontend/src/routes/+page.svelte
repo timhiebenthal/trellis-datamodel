@@ -32,8 +32,10 @@
     import Canvas from "$lib/components/Canvas.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
     import LineageModal from "$lib/components/LineageModal.svelte";
+    import IncompleteEntitiesWarningModal from "$lib/components/IncompleteEntitiesWarningModal.svelte";
+    import UndescribedAttributesWarningModal from "$lib/components/UndescribedAttributesWarningModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { ConfigInfo, DbtModel } from "$lib/types";
+    import type { ConfigInfo, DbtModel, GuidanceConfig, EntityData, DraftedField } from "$lib/types";
     import Icon from "@iconify/svelte";
     import logoHref from "$lib/assets/trellis_squared.svg?url";
     import { lineageModal, closeLineageModal } from "$lib/stores";
@@ -50,11 +52,140 @@
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
+    let guidanceConfig = $state<GuidanceConfig>({
+        entity_wizard_enabled: true,
+        push_warning_enabled: true,
+        min_description_length: 10,
+        disabled_guidance: [],
+    });
+    let warningModalOpen = $state(false);
+    let incompleteEntitiesForWarning = $state<Node[]>([]);
+    let warningModalResolve: ((value: boolean) => void) | null = null;
+    let undescribedAttributesModalOpen = $state(false);
+    let entitiesWithUndescribedAttributes = $state<Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>>([]);
+    let undescribedAttributesResolve: ((value: boolean) => void) | null = null;
+
+    // Helper function to get incomplete entities
+    function getIncompleteEntities(nodes: Node[]): Node[] {
+        return nodes
+            .filter((n) => n.type === "entity")
+            .filter((n) => {
+                const data = n.data as unknown as EntityData;
+                return !data.description || data.description.trim().length === 0;
+            });
+    }
+
+    // Helper function to get entities with undescribed attributes
+    function getEntitiesWithUndescribedAttributes(nodes: Node[]): Array<{ entityLabel: string; entityId: string; attributeNames: string[] }> {
+        const result: Array<{ entityLabel: string; entityId: string; attributeNames: string[] }> = [];
+        
+        for (const node of nodes) {
+            if (node.type !== "entity") continue;
+            
+            const data = node.data as unknown as EntityData;
+            const undescribedAttributes: string[] = [];
+            
+            // Check unbound entities (drafted_fields)
+            if (data.drafted_fields && Array.isArray(data.drafted_fields)) {
+                for (const field of data.drafted_fields) {
+                    if (field.name && (!field.description || field.description.trim().length === 0)) {
+                        undescribedAttributes.push(field.name);
+                    }
+                }
+            }
+            
+            // Note: For bound entities, we'd need to fetch schemas which could be slow
+            // For now, we only check unbound entities (drafted_fields)
+            
+            if (undescribedAttributes.length > 0) {
+                result.push({
+                    entityLabel: data.label || node.id,
+                    entityId: node.id,
+                    attributeNames: undescribedAttributes,
+                });
+            }
+        }
+        
+        return result;
+    }
+
+    // Show warning modal for undescribed attributes and wait for user decision
+    function showUndescribedAttributesWarning(entities: Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>): Promise<boolean> {
+        return new Promise((resolve) => {
+            entitiesWithUndescribedAttributes = entities;
+            undescribedAttributesResolve = resolve;
+            undescribedAttributesModalOpen = true;
+        });
+    }
+
+    function handleUndescribedAttributesConfirm() {
+        undescribedAttributesModalOpen = false;
+        if (undescribedAttributesResolve) {
+            undescribedAttributesResolve(true);
+            undescribedAttributesResolve = null;
+        }
+    }
+
+    function handleUndescribedAttributesCancel() {
+        undescribedAttributesModalOpen = false;
+        if (undescribedAttributesResolve) {
+            undescribedAttributesResolve(false);
+            undescribedAttributesResolve = null;
+        }
+    }
+
+    // Show warning modal and wait for user decision
+    function showIncompleteEntitiesWarning(incompleteEntities: Node[]): Promise<boolean> {
+        return new Promise((resolve) => {
+            incompleteEntitiesForWarning = incompleteEntities;
+            warningModalResolve = resolve;
+            warningModalOpen = true;
+        });
+    }
+
+    function handleWarningConfirm() {
+        warningModalOpen = false;
+        if (warningModalResolve) {
+            warningModalResolve(true);
+            warningModalResolve = null;
+        }
+    }
+
+    function handleWarningCancel() {
+        warningModalOpen = false;
+        if (warningModalResolve) {
+            warningModalResolve(false);
+            warningModalResolve = null;
+        }
+    }
 
     async function handleSyncDbt() {
         syncing = true;
         syncMessage = null;
         try {
+            // Check for incomplete entities
+            const incompleteEntities = getIncompleteEntities($nodes);
+
+            if (incompleteEntities.length > 0 && guidanceConfig.push_warning_enabled) {
+                const proceed = await showIncompleteEntitiesWarning(incompleteEntities);
+                if (!proceed) {
+                    syncing = false;
+                    return;
+                }
+            }
+
+            // Check for entities with undescribed attributes
+            const entitiesWithUndescribed = getEntitiesWithUndescribedAttributes($nodes);
+
+            if (entitiesWithUndescribed.length > 0 && guidanceConfig.push_warning_enabled) {
+                const proceed = await showUndescribedAttributesWarning(entitiesWithUndescribed);
+                if (!proceed) {
+                    syncing = false;
+                    return;
+                }
+            }
+
+            // Proceed with sync
             const result = await syncDbtTests();
             syncMessage = `✓ ${result.message}`;
             // Mark current state as synced
@@ -276,6 +407,12 @@
                 // Check Config Status
                 const status = await getConfigStatus();
                 $configStatus = status;
+
+                // Load Config Info (includes guidance config)
+                const info = await getConfigInfo();
+                if (info?.guidance) {
+                    guidanceConfig = info.guidance;
+                }
 
                 // Load Manifest
                 const models = await getManifest();
@@ -1016,7 +1153,7 @@
             class:active={resizingSidebar}
             onpointerdown={startSidebarResize}
         ></div>
-        <Canvas />
+        <Canvas guidanceConfig={guidanceConfig} />
     </main>
 
     <!-- Render global modals outside SvelteFlow viewport (avoid transform/zoom affecting fixed positioning) -->
@@ -1033,6 +1170,20 @@
         error={configInfoError}
         onClose={() => (showConfigInfoModal = false)}
         onRetry={handleOpenConfigInfo}
+    />
+
+    <IncompleteEntitiesWarningModal
+        open={warningModalOpen}
+        incompleteEntities={incompleteEntitiesForWarning}
+        onConfirm={handleWarningConfirm}
+        onCancel={handleWarningCancel}
+    />
+
+    <UndescribedAttributesWarningModal
+        open={undescribedAttributesModalOpen}
+        entitiesWithAttributes={entitiesWithUndescribedAttributes}
+        onConfirm={handleUndescribedAttributesConfirm}
+        onCancel={handleUndescribedAttributesCancel}
     />
 </div>
 

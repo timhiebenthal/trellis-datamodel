@@ -37,6 +37,28 @@ export function generateSlug(label: string, existingIds: string[], currentId?: s
 }
 
 /**
+ * Convert a string to title case (capitalize first letter of each word).
+ * 
+ * @param text - The text to convert
+ * @returns Title-cased text
+ * 
+ * @example
+ * toTitleCase("customer order") // "Customer Order"
+ * toTitleCase("API_KEY") // "Api Key"
+ * toTitleCase("hello world") // "Hello World"
+ */
+export function toTitleCase(text: string): string {
+    if (!text) return text;
+    return text
+        .split(/\s+/)
+        .map(word => {
+            if (!word) return word;
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+}
+
+/**
  * Format a dbt model name for use as an entity label.
  * Replaces underscores with spaces and title-cases each word.
  * 

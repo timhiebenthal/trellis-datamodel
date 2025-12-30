@@ -10,9 +10,23 @@ import os
 import yaml
 from pathlib import Path
 from typing import Optional
+from dataclasses import dataclass, field
 
 # Check for test mode - allows overriding config via environment
 _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
+
+
+@dataclass
+class GuidanceConfig:
+    """Configuration for entity creation guidance features."""
+    entity_wizard_enabled: bool = True
+    push_warning_enabled: bool = True
+    min_description_length: int = 10
+    disabled_guidance: list[str] = field(default_factory=list)
+
+
+# Global guidance configuration (set by load_config)
+GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 
 if _TEST_DIR:
     # Test mode: use temp directory paths
@@ -39,6 +53,7 @@ if _TEST_DIR:
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
+    GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 else:
     # Production mode: will be set by load_config()
     CONFIG_PATH: str = ""
@@ -52,7 +67,6 @@ else:
     DBT_MODEL_PATHS: list[str] = []
     FRONTEND_BUILD_DIR: str = ""
     DBT_COMPANY_DUMMY_PATH: str = ""
-    LINEAGE_LAYERS: list[str] = []
     LINEAGE_LAYERS: list[str] = []
 
 
@@ -88,7 +102,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -229,6 +243,21 @@ def load_config(config_path: Optional[str] = None) -> None:
                 LINEAGE_LAYERS = []
         else:
             LINEAGE_LAYERS = []
+
+        # 11. Load guidance configuration
+        if "guidance" in config:
+            guidance_config = config["guidance"]
+            GUIDANCE_CONFIG = GuidanceConfig(
+                entity_wizard_enabled=guidance_config.get("entity_wizard_enabled", True),
+                push_warning_enabled=guidance_config.get("push_warning_enabled", True),
+                min_description_length=guidance_config.get("min_description_length", 10),
+                disabled_guidance=guidance_config.get("disabled_guidance", [])
+                if isinstance(guidance_config.get("disabled_guidance"), list)
+                else [],
+            )
+        else:
+            # Use defaults if guidance section is missing
+            GUIDANCE_CONFIG = GuidanceConfig()
 
     except Exception as e:
         print(f"Error loading config: {e}")

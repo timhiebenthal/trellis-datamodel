@@ -94,6 +94,12 @@ async def get_config_info():
         "frontend_build_dir": cfg.FRONTEND_BUILD_DIR,
         "model_paths_configured": cfg.DBT_MODEL_PATHS,
         "model_paths_resolved": model_dirs,
+        "guidance": {
+            "entity_wizard_enabled": cfg.GUIDANCE_CONFIG.entity_wizard_enabled,
+            "push_warning_enabled": cfg.GUIDANCE_CONFIG.push_warning_enabled,
+            "min_description_length": cfg.GUIDANCE_CONFIG.min_description_length,
+            "disabled_guidance": cfg.GUIDANCE_CONFIG.disabled_guidance,
+        },
     }
 
 
