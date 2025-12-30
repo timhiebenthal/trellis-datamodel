@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0b2] - 2025-01-XX
+
+### Fixed
+- Fixed exposures not loading: added missing `import json` statement that was causing manifest loading to fail silently
+- Fixed exposures.yml file location detection: now checks project root directory (`dbt_concept/exposures.yml`) in addition to `models/exposures.yml`
+- Improved exposure loading to read from manifest.json first (canonical source with resolved model references), then fallback to YAML file
+
 ## [0.5.0b1] - 2025-12-30
 
 ### Added
