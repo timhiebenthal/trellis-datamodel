@@ -6,6 +6,7 @@ import type {
     ConfigInfo,
     ModelSchema,
     Relationship,
+    ExposuresResponse,
     LineageResponse,
 } from './types';
 
@@ -177,6 +178,26 @@ export async function updateModelSchema(modelName: string, columns: { name: stri
         throw new Error(`Failed to update model schema: ${error}`);
     }
     return await res.json();
+}
+
+export async function getExposures(): Promise<ExposuresResponse> {
+    const endpointUrl = `${API_BASE}/exposures`;
+    try {
+        const res = await fetch(endpointUrl);
+        if (!res.ok) {
+            if (res.status === 404) {
+                // Return empty response if endpoint doesn't exist yet
+                return { exposures: [], entityUsage: {} };
+            }
+            throw new Error(`Status: ${res.status}`);
+        }
+        const jsonData = await res.json();
+        return jsonData;
+    } catch (e) {
+        console.error("Error fetching exposures:", e);
+        // Return empty response on error
+        return { exposures: [], entityUsage: {} };
+    }
 }
 
 export async function getLineage(modelId: string): Promise<LineageResponse | null> {

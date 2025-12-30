@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0b2] - 2025-01-XX
+
+### Fixed
+- Fixed exposures not loading: added missing `import json` statement that was causing manifest loading to fail silently
+- Fixed exposures.yml file location detection: now checks project root directory (`dbt_concept/exposures.yml`) in addition to `models/exposures.yml`
+- Improved exposure loading to read from manifest.json first (canonical source with resolved model references), then fallback to YAML file
+
+## [0.5.0b1] - 2025-12-30
+
+### Added
+- Added a new "Exposures" view mode that provides a cross-table visualization of entity usage across downstream dbt exposures.
+- Added "Exposures" tab to the main navigation for switching between Conceptual, Logical, and Exposures views.
+- Added support for fetching and displaying exposure metadata (labels, types, owners, descriptions) from the backend API.
+- Added automated empty state handling for projects without `exposures.yml` with helpful guidance for users.
+
 ## [0.4.0] - 2025-01-15
 
 ### Added

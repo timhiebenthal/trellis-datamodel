@@ -5,13 +5,18 @@ import type { DbtModel, FieldDragState } from './types';
 export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
 export const dbtModels = writable<DbtModel[]>([]);
-export const viewMode = writable<'conceptual' | 'logical'>('conceptual');
+export const viewMode = writable<'conceptual' | 'logical' | 'exposures'>('conceptual');
 export const configStatus = writable<any>(null);
 
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
 export const tagFilter = writable<string[]>([]);
 export const groupByFolder = writable<boolean>(true);
+
+// Exposure filter stores
+export const exposureTypeFilter = writable<string[]>([]);
+export const exposureOwnerFilter = writable<string[]>([]);
+export const exposureEntityFilter = writable<string | null>(null); // Filter by specific entity ID
 
 // Drag-and-drop state for field linking
 export const draggingField = writable<FieldDragState | null>(null);

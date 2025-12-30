@@ -1,0 +1,59 @@
+exposures:
+
+  - name: sales_dashboard
+    label: Sales Dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.tool/dashboards/1
+    description: >
+      Sales dashboard showing sales by product, customer, and date.
+
+    depends_on:
+      - ref('sale')
+      - ref('lead')
+      - ref('product')
+      - ref('customer')
+
+    owner:
+      name: Jeff Cash
+      email: jeff.cash@example.com
+
+
+  - name: operations_dashboard
+    label: Operations Dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.tool/dashboards/2
+    description: >
+      Operations dashboard showing operations by product, supplier, procurement, and inventory.
+
+    depends_on:
+      - ref('product')
+      - ref('supplier')
+      - ref('supplier_invoice')
+      - ref('inventory')
+      - ref('procurement')
+
+    owner:
+      name: Clara Stock
+      email: clara.stock@example.com
+
+
+  - name: finance_dashboard
+    label: Finance Dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.tool/dashboards/3
+    description: >
+      Finance dashboard showing invoice revenue by customer, supplier, product, and calendar.
+
+    depends_on:
+      - ref('customer_invoice')
+      - ref('supplier_invoice')
+      - ref('product')
+      - ref('calendar')
+      - ref('invoice_revenue')
+
+    owner:
+      name: Peter Penny
+      email: peter.penny@example.com
