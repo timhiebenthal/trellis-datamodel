@@ -56,6 +56,7 @@
 
     // SvelteFlow ref (for fitView after layout)
     let flowRef: any = null;
+    let flowInitialized = false;
 
     // Fetch lineage when modal opens
     $effect(() => {
@@ -100,12 +101,12 @@
         const rootId = lineageData.metadata?.root_model_id ?? modelId ?? "";
         if (!rootId) return;
 
-        // Preserve user-adjusted positions across progressive expansion updates
+        // Preserve ALL existing node positions across progressive expansion updates
+        // This prevents nodes from jumping around when new layers are added
         const existingPositions = new Map<string, { x: number; y: number }>();
         for (const n of lineageNodes) {
-            // Only preserve positions for nodes the user has manually dragged.
-            // Otherwise, allow layout recalculation to keep parents above children, etc.
-            if ((n.data as any)?.__manualPosition === true) {
+            // Skip layer bands - they need to recalculate to span the full width
+            if (!String(n.id).startsWith('layer-band-')) {
                 existingPositions.set(n.id, { x: n.position.x, y: n.position.y });
             }
         }
@@ -144,38 +145,13 @@
         // Expanded nodes: reveal one more hop upstream for that node
         const expandedParents: string[] = [];
         for (const expandedId of expandedNodeIds) {
-            for (const up of upstreamOf.get(expandedId) ?? []) {
+            const upstreams = upstreamOf.get(expandedId) ?? [];
+            for (const up of upstreams) {
                 visibleNodeIds.add(up);
                 expandedParents.push(up);
             }
         }
         
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                location: "LineageModal.svelte:updateGraphDisplay",
-                message: "Visibility computation",
-                data: {
-                    rootId,
-                    directParentsCount: directParents.length,
-                    directParentsSample: directParents.slice(0, 3),
-                    directParentsFull: directParents,
-                    sourcesCount: sources.length,
-                    sourcesFull: sources,
-                    expandedNodeIdsCount: expandedNodeIds.size,
-                    expandedParentsCount: expandedParents.length,
-                    totalVisibleCount: visibleNodeIds.size,
-                    visibleNodeIdsList: Array.from(visibleNodeIds),
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run3",
-                hypothesisId: "F",
-            }),
-        }).catch(() => {});
-        // #endregion
 
         // Track which nodes are visible vs ghosted (for styling)
         // All nodes will be rendered, but unexpanded ones will be ghosted
@@ -187,52 +163,14 @@
         }
         visibleNodeIdsSet = visibleNodeIds;
 
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                location: "LineageModal.svelte:updateGraphDisplay",
-                message: "Visibility sets",
-                data: {
-                    totalNodes: lineageData.nodes.length,
-                    visibleCount: visibleNodeIds.size,
-                    ghostedCount: ghostedNodeIds.size,
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run-ghost",
-                hypothesisId: "ghost-visibility",
-            }),
-        }).catch(() => {});
-        // #endregion
 
         // Filter to only visible nodes for layout calculation
         // Ghosted nodes will be added later for edge anchoring but won't affect layout
         const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
         
+        
         // All nodes (including ghosted) for edge creation
         const allLineageNodes = lineageData.nodes;
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                location: "LineageModal.svelte:updateGraphDisplay",
-                message: "Node filtering",
-                data: {
-                    totalNodes: lineageData.nodes.length,
-                    visibleNodesCount: visibleLineageNodes.length,
-                    ghostedNodesCount: ghostedNodeIds.size,
-                    ghostedNodeIdsSample: Array.from(ghostedNodeIds).slice(0, 5),
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run1",
-                hypothesisId: "C",
-            }),
-        }).catch(() => {});
-        // #endregion
 
         // Check if layers are configured (any node has a layer field)
         const layersConfigured = visibleLineageNodes.some((n) => n.layer !== undefined);
@@ -487,11 +425,6 @@
             // Mark node as _notInDefaultView so fitView can exclude it
             ghostedFlowNode.data = { ...ghostedFlowNode.data, _notInDefaultView: true };
             ghostedNodes.push(ghostedFlowNode);
-            // #region agent log
-            if (ghostedNodes.length <= 3) {
-                fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageModal.svelte:updateGraphDisplay',message:'Ghosted node created',data:{nodeId:ghostedNode.id,layer:ghostedNode.layer,level:ghostedNode.level,posX:ghostedFlowNode.position.x,posY:ghostedFlowNode.position.y,isGhosted:(ghostedFlowNode.data as any)?._ghosted},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'E'})}).catch(()=>{});
-            }
-            // #endregion
         }
         
         // Create edges for ALL nodes (visible and ghosted)
@@ -532,28 +465,6 @@
                 }
             }
         }
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                location: "LineageModal.svelte:updateGraphDisplay",
-                message: "Edge creation stats",
-                data: {
-                    visibleEdgesCount: visibleEdges.length,
-                    ghostedEdgesCount: ghostedEdges.length,
-                    skippedEdgesCount,
-                    skippedEdgesSample: skippedEdgesDetails.slice(0, 5),
-                    totalPossibleEdges: lineageData.edges.length,
-                    totalCreatedEdges: visibleEdges.length + ghostedEdges.length,
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run1",
-                hypothesisId: "A",
-            }),
-        }).catch(() => {});
-        // #endregion
 
         // Compute source overlays for nodes with hidden upstream
         const sourceOverlays: Edge[] = [];
@@ -570,32 +481,7 @@
         // Combine visible and ghosted edges
         baseLineageEdges = [...visibleEdges, ...ghostedEdges];
         lineageEdges = [...baseLineageEdges, ...overlayEdges];
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                location: "LineageModal.svelte:updateGraphDisplay",
-                message: "Final edge/node counts",
-                data: {
-                    lineageNodesCount: lineageNodes.length,
-                    visibleNodesCount: visibleNodes.length,
-                    ghostedNodesCount: ghostedNodes.length,
-                    baseLineageEdgesCount: baseLineageEdges.length,
-                    visibleEdgesCount: visibleEdges.length,
-                    ghostedEdgesCount: ghostedEdges.length,
-                    overlayEdgesCount: overlayEdges.length,
-                    totalLineageEdgesCount: lineageEdges.length,
-                    ghostedNodeIdsTracked: ghostedNodeIds.size,
-                    nodeIdsInGraph: lineageNodes.map(n => n.id).slice(0, 10),
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run1",
-                hypothesisId: "B",
-            }),
-        }).catch(() => {});
-        // #endregion
+        
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
@@ -641,162 +527,59 @@
             layerBandMeta = [];
         }
 
-        // #region agent log - node bounds and NaN detection
-        (() => {
-            const coords = lineageNodes
-                .map((n) => ({
-                    x: n.position?.x,
-                    y: n.position?.y,
-                }))
-                .filter((p) => p.x !== undefined && p.y !== undefined);
-            const finiteCoords = coords.filter(
-                (p) => Number.isFinite(p.x as number) && Number.isFinite(p.y as number),
-            );
-            const hasNaN = coords.length !== finiteCoords.length;
-            const xs = finiteCoords.map((p) => p.x as number);
-            const ys = finiteCoords.map((p) => p.y as number);
-            const minX = xs.length ? Math.min(...xs) : null;
-            const maxX = xs.length ? Math.max(...xs) : null;
-            const minY = ys.length ? Math.min(...ys) : null;
-            const maxY = ys.length ? Math.max(...ys) : null;
-
-            // Fit nodes only (exclude layer bands)
-            const fitNodes = lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-"));
-            const fitCoords = fitNodes
-                .map((n) => ({
-                    x: n.position?.x,
-                    y: n.position?.y,
-                }))
-                .filter((p) => p.x !== undefined && p.y !== undefined)
-                .filter((p) => Number.isFinite(p.x as number) && Number.isFinite(p.y as number));
-            const fitXs = fitCoords.map((p) => p.x as number);
-            const fitYs = fitCoords.map((p) => p.y as number);
-            const minFitX = fitXs.length ? Math.min(...fitXs) : null;
-            const maxFitX = fitXs.length ? Math.max(...fitXs) : null;
-            const minFitY = fitYs.length ? Math.min(...fitYs) : null;
-            const maxFitY = fitYs.length ? Math.max(...fitYs) : null;
-
-            // Disable grid fallback - it was causing positioning issues
-            const shouldForceGrid = false;
-
-            // Recentering: if the span is excessively large, shift nodes toward center
-            // Only consider non-band nodes for recentering calculation
-            let shifted = false;
-            if (minFitX !== null && maxFitX !== null) {
-                const spanX = maxFitX - minFitX;
-                if (spanX > 8000) {
-                    const offsetX = -(minFitX + maxFitX) / 2;
-                    lineageNodes = lineageNodes.map((n) => {
-                        // Don't shift layer bands
-                        if (String(n.id).startsWith("layer-band-")) return n;
-                        return {
-                            ...n,
-                            position: {
-                                x: (n.position?.x ?? 0) + offsetX,
-                                y: n.position?.y ?? 0,
-                            },
-                        };
+    // Fit view only on initial load (not on expansion)
+        // On expansion, preserve the current viewport so users don't lose context
+        if (!flowInitialized) {
+            queueMicrotask(() => {
+                try {
+                    // Only fit visible nodes (not ghosted nodes or layer bands)
+                    const fitNodes = lineageNodes.filter((n) => {
+                        if (n.id.toString().startsWith("layer-band-")) return false;
+                        // Exclude nodes not in default view (ghosted nodes)
+                        const notInDefaultView = (n.data as any)?._notInDefaultView ?? false;
+                        return !notInDefaultView;
                     });
-                    shifted = true;
+                    
+                    // Sample actual nodes being passed to SvelteFlow
+                    const actualNodesSample = lineageNodes.filter(n => !String(n.id).startsWith("layer-band-")).slice(0, 3).map(n => ({
+                        id: n.id,
+                        type: n.type,
+                        x: n.position.x,
+                        y: n.position.y,
+                        hidden: n.hidden,
+                        draggable: n.draggable,
+                        selectable: n.selectable,
+                        ghosted: (n.data as any)?._ghosted,
+                    }));
+                    
+                    flowRef?.fitView?.({
+                        padding: 0.2,
+                        nodes: fitNodes,
+                    });
+                    flowInitialized = true;
+                    fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            location: "LineageModal.svelte:updateGraphDisplay",
+                            message: "fitView invoked (initial load)",
+                            data: {
+                                fitNodesCount: fitNodes.length,
+                                hasFlowRef: Boolean(flowRef),
+                                actualNodesSample,
+                                initialized: flowInitialized
+                            },
+                            timestamp: Date.now(),
+                            sessionId: "debug-session",
+                            runId: "run-ghost",
+                            hypothesisId: "fit",
+                        }),
+                    }).catch(() => {});
+                } catch (e) {
+                    console.error("fitView error", e);
                 }
-            }
-
-            // #region agent log - after grid/recenter
-            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageModal.svelte:updateGraphDisplay',message:'After grid/recenter',data:{lineageNodesCount:lineageNodes.length,shouldForceGrid,shifted,sampleAfter:lineageNodes.slice(0,8).map(n=>({id:n.id,type:n.type,x:n.position.x,y:n.position.y}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run-ghost',hypothesisId:'after-transform'})}).catch(()=>{});
-            // #endregion
-
-            // Sample first 5 nodes to check properties
-            const sampleNodes = lineageNodes.slice(0, 5).map(n => ({
-                id: n.id,
-                type: n.type,
-                hidden: n.hidden,
-                draggable: n.draggable,
-                selectable: n.selectable,
-                ghosted: (n.data as any)?._ghosted,
-                hasPosition: n.position !== undefined,
-                x: n.position?.x,
-                y: n.position?.y,
-            }));
-
-            fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    location: "LineageModal.svelte:updateGraphDisplay",
-                    message: "Node bounds",
-                    data: {
-                        nodeCount: lineageNodes.length,
-                        edgeCount: lineageEdges.length,
-                        hasNaN,
-                        minX,
-                        maxX,
-                        minY,
-                        maxY,
-                    fitNodesCount: lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-")).length,
-                    shifted,
-                    minFitX,
-                    maxFitX,
-                    minFitY,
-                    maxFitY,
-                        sampleNodes,
-                    },
-                    timestamp: Date.now(),
-                    sessionId: "debug-session",
-                    runId: "run-ghost",
-                    hypothesisId: "bounds",
-                }),
-            }).catch(() => {});
-        })();
-        // #endregion
-
-    // Fit view after layout (microtask to ensure nodes are set)
-        queueMicrotask(() => {
-            try {
-                // Only fit visible nodes (not ghosted nodes or layer bands)
-                const fitNodes = lineageNodes.filter((n) => {
-                    if (n.id.toString().startsWith("layer-band-")) return false;
-                    // Exclude nodes not in default view (ghosted nodes)
-                    const notInDefaultView = (n.data as any)?._notInDefaultView ?? false;
-                    return !notInDefaultView;
-                });
-                
-                // Sample actual nodes being passed to SvelteFlow
-                const actualNodesSample = lineageNodes.filter(n => !String(n.id).startsWith("layer-band-")).slice(0, 3).map(n => ({
-                    id: n.id,
-                    type: n.type,
-                    x: n.position.x,
-                    y: n.position.y,
-                    hidden: n.hidden,
-                    draggable: n.draggable,
-                    selectable: n.selectable,
-                    ghosted: (n.data as any)?._ghosted,
-                }));
-                
-                flowRef?.fitView?.({
-                    padding: 0.2,
-                    nodes: fitNodes,
-                });
-                fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        location: "LineageModal.svelte:updateGraphDisplay",
-                        message: "fitView invoked",
-                        data: {
-                            fitNodesCount: fitNodes.length,
-                            hasFlowRef: Boolean(flowRef),
-                            actualNodesSample,
-                        },
-                        timestamp: Date.now(),
-                        sessionId: "debug-session",
-                        runId: "run-ghost",
-                        hypothesisId: "fit",
-                    }),
-                }).catch(() => {});
-            } catch (e) {
-                console.error("fitView error", e);
-            }
-        });
+            });
+        }
 
         // Apply connected node highlighting based on current selection
         // Use microtask to ensure nodes are fully updated
@@ -846,8 +629,10 @@
             const bounds = layerBounds.get(node.layer);
             const top = bounds?.top ?? 0;
             const bottom = bounds?.bottom ?? top + 200;
+            const padding = 30;
 
-            // If we have an existing user-dragged position, keep it (but clamp to band)
+            // If we have an existing position, use it AS-IS (don't clamp)
+            // This preserves node positions when layers are added/removed
             if (existing) {
                 yPosition = existing.y;
             } else if (layerIndex === -1) {
@@ -863,11 +648,10 @@
 
                 const baseY = top + 40;
                 yPosition = baseY + levelIndexInLayer * LEVEL_SPACING_WITHIN_LAYER;
+                
+                // Only clamp NEW nodes (not existing ones)
+                yPosition = Math.min(Math.max(yPosition, top + padding), bottom - padding);
             }
-
-            // Clamp to the layer band bounds
-            const padding = 30;
-            yPosition = Math.min(Math.max(yPosition, top + padding), bottom - padding);
 
             // Hard constraint: prevent dragging outside of the layer band (works during drag)
             // Use a very wide X extent and the computed Y bounds.
@@ -1009,6 +793,7 @@
 
     // Handle node selection changes to update connected highlighting
     function handleNodesChange(changes: any) {
+
         // Check if any change affects selection
         const hasSelectionChange = changes.some((change: any) => 
             change.type === 'select' || change.type === 'position' && change.selected !== undefined
@@ -1196,12 +981,6 @@
                         nodeTypes={nodeTypes}
                         edgeTypes={edgeTypes}
                         defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
-                        fitView
-                        fitViewOptions={{
-                            // Only fit the nodes that are NOT background bands
-                            nodes: lineageNodes.filter(n => !n.id.toString().startsWith('layer-band-')),
-                            padding: 0.2
-                        }}
                         panOnDrag={true}
                         selectionOnDrag={false}
                         nodesDraggable={true}

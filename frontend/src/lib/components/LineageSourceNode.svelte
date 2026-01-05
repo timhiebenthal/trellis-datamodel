@@ -1,11 +1,15 @@
 <script lang="ts">
     import { Handle, Position, type NodeProps } from "@xyflow/svelte";
+    import { onMount } from "svelte";
 
     let { data, selected }: NodeProps = $props();
     
     const label = $derived((data?.label as string) || '');
     const connectedToSelected = $derived((data?._connectedToSelected as boolean) ?? false);
     const isGhosted = $derived((data?._ghosted as boolean) ?? false);
+
+    onMount(() => {
+    });
 </script>
 
 <div

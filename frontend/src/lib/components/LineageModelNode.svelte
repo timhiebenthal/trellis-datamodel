@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Handle, Position, type NodeProps } from "@xyflow/svelte";
+import { onMount } from "svelte";
 
     let { data, selected }: NodeProps = $props();
     
@@ -11,6 +12,9 @@
     const expandHidden = $derived((data?._expandHidden as (() => void) | undefined));
     const onHoverInSources = $derived((data?._onHoverInSources as (() => void) | undefined));
     const onHoverOutSources = $derived((data?._onHoverOutSources as (() => void) | undefined));
+
+onMount(() => {
+});
 </script>
 
 <div
