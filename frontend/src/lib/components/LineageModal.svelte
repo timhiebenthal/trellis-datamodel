@@ -118,10 +118,15 @@
 
         // Build adjacency (upstream): target -> [sources]
         const upstreamOf = new Map<string, string[]>();
+        const downstreamOf = new Map<string, string[]>();
         for (const e of lineageData.edges) {
             const list = upstreamOf.get(e.target) ?? [];
             list.push(e.source);
             upstreamOf.set(e.target, list);
+
+            const downList = downstreamOf.get(e.source) ?? [];
+            downList.push(e.target);
+            downstreamOf.set(e.source, downList);
         }
         upstreamOfMap = upstreamOf;
 
@@ -169,8 +174,15 @@
         const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
         
         
-        // All nodes (including ghosted) for edge creation
-        const allLineageNodes = lineageData.nodes;
+        // Ghosted nodes (not visible) that still anchor edges to visible nodes
+        const ghostedLineageNodes: LineageNode[] = lineageData.nodes.filter((n) => {
+            if (visibleNodeIds.has(n.id)) return false;
+            const ups = upstreamOf.get(n.id) ?? [];
+            const downs = downstreamOf.get(n.id) ?? [];
+            const upstreamTouchesVisible = ups.some((u) => visibleNodeIds.has(u));
+            const downstreamTouchesVisible = downs.some((d) => visibleNodeIds.has(d));
+            return upstreamTouchesVisible || downstreamTouchesVisible;
+        });
 
         // Check if layers are configured (any node has a layer field)
         const layersConfigured = visibleLineageNodes.some((n) => n.layer !== undefined);
@@ -345,11 +357,8 @@
             );
         }
         
-        // Don't render ghosted nodes at all
-        // The overlay edges (green edges) already handle showing connections through hidden paths
-        // This keeps the graph clean and focused on the default visible set
+        // Ghost anchors: nodes not in default view but needed so edges keep endpoints
         const ghostedNodes: Node[] = [];
-        const ghostedLineageNodes: LineageNode[] = [];
         
         // Compute positions for ghosted nodes
         // We need to compute their level positions similar to visible nodes
@@ -419,7 +428,7 @@
                     [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
                 ),
                 existingPositions,
-                false, // isGhosted = false - render nodes as visible, only edges are ghosted
+                true, // isGhosted = true - keep nodes as ghost anchors, not in default view
                 undefined, // no hidden info for ghosted nodes
             );
             // Mark node as _notInDefaultView so fitView can exclude it
@@ -557,24 +566,6 @@
                         nodes: fitNodes,
                     });
                     flowInitialized = true;
-                    fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            location: "LineageModal.svelte:updateGraphDisplay",
-                            message: "fitView invoked (initial load)",
-                            data: {
-                                fitNodesCount: fitNodes.length,
-                                hasFlowRef: Boolean(flowRef),
-                                actualNodesSample,
-                                initialized: flowInitialized
-                            },
-                            timestamp: Date.now(),
-                            sessionId: "debug-session",
-                            runId: "run-ghost",
-                            hypothesisId: "fit",
-                        }),
-                    }).catch(() => {});
                 } catch (e) {
                     console.error("fitView error", e);
                 }
@@ -687,7 +678,7 @@
         if (xPosition > CLAMP_X) xPosition = CLAMP_X;
         if (xPosition < -CLAMP_X) xPosition = -CLAMP_X;
         
-        return {
+        const baseNode: Node = {
             id: node.id,
             type: node.isSource ? "source" : "default",
             position: { x: xPosition, y: yPosition },
@@ -708,6 +699,14 @@
             draggable: !isGhosted,
             selectable: !isGhosted,
         };
+
+        // Keep ghost anchors completely hidden but present for edge endpoints
+        if (isGhosted) {
+            baseNode.hidden = true;
+            baseNode.focusable = false;
+        }
+
+        return baseNode;
     }
 
     function handleNodeDragStop(event: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
