@@ -47,6 +47,26 @@
     const nodes = getNodes();
     return nodes.find(n => String(n.id) === nodeId);
   };
+  
+  // #region agent log
+  const sourceNodeExists = $derived.by(() => {
+    const nodes = getNodes();
+    const found = nodes.find(n => String(n.id) === source);
+    return { exists: !!found, nodeId: source, totalNodes: nodes.length };
+  });
+  const targetNodeExists = $derived.by(() => {
+    const nodes = getNodes();
+    const found = nodes.find(n => String(n.id) === target);
+    return { exists: !!found, nodeId: target, totalNodes: nodes.length };
+  });
+  $effect(() => {
+    const src = sourceNodeExists();
+    const tgt = targetNodeExists();
+    if (!src.exists || !tgt.exists) {
+      fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageEdge.svelte:effect',message:'Edge missing node anchor',data:{edgeId:id,sourceExists:src.exists,targetExists:tgt.exists,source:source,target:target,totalNodes:src.totalNodes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    }
+  });
+  // #endregion
 
   // Compute highlight state
   const highlightState = $derived.by(() => {

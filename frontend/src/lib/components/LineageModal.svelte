@@ -129,17 +129,53 @@
         visibleNodeIds.add(rootId);
 
         // Direct parents (one hop upstream of root)
-        for (const up of upstreamOf.get(rootId) ?? []) visibleNodeIds.add(up);
+        const directParents = upstreamOf.get(rootId) ?? [];
+        for (const up of directParents) visibleNodeIds.add(up);
 
         // Sources (always)
+        const sources: string[] = [];
         for (const n of lineageData.nodes) {
-            if (n.isSource) visibleNodeIds.add(n.id);
+            if (n.isSource) {
+                visibleNodeIds.add(n.id);
+                sources.push(n.id);
+            }
         }
 
         // Expanded nodes: reveal one more hop upstream for that node
+        const expandedParents: string[] = [];
         for (const expandedId of expandedNodeIds) {
-            for (const up of upstreamOf.get(expandedId) ?? []) visibleNodeIds.add(up);
+            for (const up of upstreamOf.get(expandedId) ?? []) {
+                visibleNodeIds.add(up);
+                expandedParents.push(up);
+            }
         }
+        
+        // #region agent log
+        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                location: "LineageModal.svelte:updateGraphDisplay",
+                message: "Visibility computation",
+                data: {
+                    rootId,
+                    directParentsCount: directParents.length,
+                    directParentsSample: directParents.slice(0, 3),
+                    directParentsFull: directParents,
+                    sourcesCount: sources.length,
+                    sourcesFull: sources,
+                    expandedNodeIdsCount: expandedNodeIds.size,
+                    expandedParentsCount: expandedParents.length,
+                    totalVisibleCount: visibleNodeIds.size,
+                    visibleNodeIdsList: Array.from(visibleNodeIds),
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                runId: "run3",
+                hypothesisId: "F",
+            }),
+        }).catch(() => {});
+        // #endregion
 
         // Track which nodes are visible vs ghosted (for styling)
         // All nodes will be rendered, but unexpanded ones will be ghosted
@@ -177,6 +213,26 @@
         
         // All nodes (including ghosted) for edge creation
         const allLineageNodes = lineageData.nodes;
+        // #region agent log
+        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                location: "LineageModal.svelte:updateGraphDisplay",
+                message: "Node filtering",
+                data: {
+                    totalNodes: lineageData.nodes.length,
+                    visibleNodesCount: visibleLineageNodes.length,
+                    ghostedNodesCount: ghostedNodeIds.size,
+                    ghostedNodeIdsSample: Array.from(ghostedNodeIds).slice(0, 5),
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                runId: "run1",
+                hypothesisId: "C",
+            }),
+        }).catch(() => {});
+        // #endregion
 
         // Check if layers are configured (any node has a layer field)
         const layersConfigured = visibleLineageNodes.some((n) => n.layer !== undefined);
@@ -351,22 +407,153 @@
             );
         }
         
-        // Create edges only between visible nodes (direct edges)
+        // Don't render ghosted nodes at all
+        // The overlay edges (green edges) already handle showing connections through hidden paths
+        // This keeps the graph clean and focused on the default visible set
+        const ghostedNodes: Node[] = [];
+        const ghostedLineageNodes: LineageNode[] = [];
+        
+        // Compute positions for ghosted nodes
+        // We need to compute their level positions similar to visible nodes
+        const ghostedLevelPositions = new Map<string, { index: number; count: number }>();
+        
+        if (layersConfigured) {
+            // Group ghosted nodes by layer, then by level within each layer
+            for (const layer of layerOrder) {
+                const ghostedInLayer = ghostedLineageNodes.filter(n => n.layer === layer);
+                const levelBucketsInLayer = new Map<number, LineageNode[]>();
+                for (const node of ghostedInLayer) {
+                    const levelSafe = node.level ?? 0;
+                    const bucket = levelBucketsInLayer.get(levelSafe) ?? [];
+                    bucket.push(node);
+                    levelBucketsInLayer.set(levelSafe, bucket);
+                }
+                // Assign positions within each level in the layer
+                for (const [, nodes] of levelBucketsInLayer) {
+                    const count = nodes.length;
+                    nodes.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                }
+            }
+        } else {
+            // Original behavior: bucket by level only
+            const ghostedLevelBuckets = new Map<number, LineageNode[]>();
+            for (const node of ghostedLineageNodes) {
+                const levelSafe = node.level ?? 0;
+                const bucket = ghostedLevelBuckets.get(levelSafe) ?? [];
+                bucket.push(node);
+                ghostedLevelBuckets.set(levelSafe, bucket);
+            }
+            for (const [, nodes] of ghostedLevelBuckets) {
+                const count = nodes.length;
+                nodes.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+            }
+        }
+        
+        // For ghosted nodes, we need to compute approximate positions based on their level/layer
+        // We'll use a simplified positioning that doesn't affect the main layout
+        for (const ghostedNode of ghostedLineageNodes) {
+            // Try to get position from existing nodes if it was manually positioned
+            const existing = existingPositions.get(ghostedNode.id);
+            
+            // Compute approximate position based on level/layer if not already positioned
+            if (!existing) {
+                // Use the same positioning logic as visible nodes, but with ghosted level positions
+                const pos = ghostedLevelPositions.get(ghostedNode.id);
+                const indexInLevel = pos?.index ?? 0;
+                const countAtLevel = pos?.count ?? 1;
+                
+                // Don't store position in existingPositions - let createFlowNode compute it
+                // This ensures consistent positioning logic
+            }
+            
+            const pos = ghostedLevelPositions.get(ghostedNode.id);
+            const indexInLevel = pos?.index ?? 0;
+            const countAtLevel = pos?.count ?? 1;
+            
+            const ghostedFlowNode = createFlowNode(
+                ghostedNode,
+                indexInLevel,
+                countAtLevel,
+                layersConfigured,
+                layerOrder,
+                layerBuckets,
+                new Map(
+                    [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
+                ),
+                existingPositions,
+                false, // isGhosted = false - render nodes as visible, only edges are ghosted
+                undefined, // no hidden info for ghosted nodes
+            );
+            // Mark node as _notInDefaultView so fitView can exclude it
+            ghostedFlowNode.data = { ...ghostedFlowNode.data, _notInDefaultView: true };
+            ghostedNodes.push(ghostedFlowNode);
+            // #region agent log
+            if (ghostedNodes.length <= 3) {
+                fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageModal.svelte:updateGraphDisplay',message:'Ghosted node created',data:{nodeId:ghostedNode.id,layer:ghostedNode.layer,level:ghostedNode.level,posX:ghostedFlowNode.position.x,posY:ghostedFlowNode.position.y,isGhosted:(ghostedFlowNode.data as any)?._ghosted},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'E'})}).catch(()=>{});
+            }
+            // #endregion
+        }
+        
+        // Create edges for ALL nodes (visible and ghosted)
+        // Edges connecting to/from ghosted nodes will be marked as ghosted
         const visibleEdges: Edge[] = [];
-        for (const targetNode of visibleLineageNodes) {
+        const ghostedEdges: Edge[] = [];
+        let skippedEdgesCount = 0;
+        let skippedEdgesDetails: Array<{source: string, target: string, sourceVisible: boolean, targetVisible: boolean}> = [];
+        
+        // Iterate over all nodes (visible + ghosted) to create edges
+        const allNodesForEdges = [...visibleLineageNodes, ...ghostedLineageNodes];
+        
+        for (const targetNode of allNodesForEdges) {
             const targetId = targetNode.id;
             const directUpstream = upstreamOf.get(targetId) ?? [];
             for (const upstreamId of directUpstream) {
-                if (!visibleNodeIds.has(upstreamId)) continue;
-                visibleEdges.push({
+                const sourceVisible = visibleNodeIds.has(upstreamId);
+                const targetVisible = visibleNodeIds.has(targetId);
+                const sourceGhosted = ghostedNodeIds.has(upstreamId);
+                const targetGhosted = ghostedNodeIds.has(targetId);
+                
+                // Skip only if both endpoints are ghosted and neither is in the graph
+                // Actually, we want to create edges if at least one endpoint is visible OR ghosted
+                const edgeIsGhosted = sourceGhosted || targetGhosted;
+                
+                const edge = {
                     id: `edge-${upstreamId}-${targetId}`,
                     source: upstreamId,
                     target: targetId,
                     type: LINEAGE_EDGE_TYPE,
-                    data: { _ghosted: false },
-                });
+                    data: { _ghosted: edgeIsGhosted },
+                };
+                
+                if (edgeIsGhosted) {
+                    ghostedEdges.push(edge);
+                } else {
+                    visibleEdges.push(edge);
+                }
             }
         }
+        // #region agent log
+        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                location: "LineageModal.svelte:updateGraphDisplay",
+                message: "Edge creation stats",
+                data: {
+                    visibleEdgesCount: visibleEdges.length,
+                    ghostedEdgesCount: ghostedEdges.length,
+                    skippedEdgesCount,
+                    skippedEdgesSample: skippedEdgesDetails.slice(0, 5),
+                    totalPossibleEdges: lineageData.edges.length,
+                    totalCreatedEdges: visibleEdges.length + ghostedEdges.length,
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                runId: "run1",
+                hypothesisId: "A",
+            }),
+        }).catch(() => {});
+        // #endregion
 
         // Compute source overlays for nodes with hidden upstream
         const sourceOverlays: Edge[] = [];
@@ -378,9 +565,37 @@
         }
         
         overlayEdges = sourceOverlays;
-        lineageNodes = visibleNodes;
-        baseLineageEdges = visibleEdges;
+        // Combine visible and ghosted nodes (ghosted nodes are added for edge anchoring)
+        lineageNodes = [...visibleNodes, ...ghostedNodes];
+        // Combine visible and ghosted edges
+        baseLineageEdges = [...visibleEdges, ...ghostedEdges];
         lineageEdges = [...baseLineageEdges, ...overlayEdges];
+        // #region agent log
+        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                location: "LineageModal.svelte:updateGraphDisplay",
+                message: "Final edge/node counts",
+                data: {
+                    lineageNodesCount: lineageNodes.length,
+                    visibleNodesCount: visibleNodes.length,
+                    ghostedNodesCount: ghostedNodes.length,
+                    baseLineageEdgesCount: baseLineageEdges.length,
+                    visibleEdgesCount: visibleEdges.length,
+                    ghostedEdgesCount: ghostedEdges.length,
+                    overlayEdgesCount: overlayEdges.length,
+                    totalLineageEdgesCount: lineageEdges.length,
+                    ghostedNodeIdsTracked: ghostedNodeIds.size,
+                    nodeIdsInGraph: lineageNodes.map(n => n.id).slice(0, 10),
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                runId: "run1",
+                hypothesisId: "B",
+            }),
+        }).catch(() => {});
+        // #endregion
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
@@ -413,10 +628,16 @@
 
             // Ensure layer bands are behind edges and nodes
             // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
-            lineageNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
+            // Include both visible and ghosted nodes
+            lineageNodes = [
+                ...bandNodes,
+                ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
+                ...ghostedNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
+            ];
             layerBandMeta = bandNodes.map((b) => ({ id: b.id as string, bandX }));
         } else {
-            lineageNodes = visibleNodes;
+            // Include both visible and ghosted nodes
+            lineageNodes = [...visibleNodes, ...ghostedNodes];
             layerBandMeta = [];
         }
 
@@ -531,7 +752,13 @@
     // Fit view after layout (microtask to ensure nodes are set)
         queueMicrotask(() => {
             try {
-                const fitNodes = lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-"));
+                // Only fit visible nodes (not ghosted nodes or layer bands)
+                const fitNodes = lineageNodes.filter((n) => {
+                    if (n.id.toString().startsWith("layer-band-")) return false;
+                    // Exclude nodes not in default view (ghosted nodes)
+                    const notInDefaultView = (n.data as any)?._notInDefaultView ?? false;
+                    return !notInDefaultView;
+                });
                 
                 // Sample actual nodes being passed to SvelteFlow
                 const actualNodesSample = lineageNodes.filter(n => !String(n.id).startsWith("layer-band-")).slice(0, 3).map(n => ({
