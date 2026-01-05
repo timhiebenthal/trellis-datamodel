@@ -36,6 +36,7 @@
     let nodeByIdMap = new Map<string, LineageNode>();
     let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
     let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
+    let layerRankById = new Map<string, number>();
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -238,12 +239,12 @@
         // Build per-layer vertical bounds in graph space (used for initial placement + drag clamping)
         // Dynamic height per layer so it adapts across projects and to progressive expansion.
         const LAYER_START_Y = 60;
-        const LAYER_GAP = 24;
+        const LAYER_GAP = 48; // Increased gap between layers for better separation
         const LAYER_MIN_HEIGHT = 140;
-        const LAYER_MAX_HEIGHT = 520;
+        const LAYER_MAX_HEIGHT = 720;
         const LAYER_HEADER_HEIGHT = 34; // space for label inside the band
         const LAYER_INNER_PADDING = 30;
-        const LEVEL_SPACING_WITHIN_LAYER = 110; // more vertical breathing room within a layer
+        const LEVEL_SPACING_WITHIN_LAYER = 220; // Increased vertical spacing so parent nodes end above child nodes
 
         const layerBounds = new Map<string, { top: number; bottom: number; height: number }>();
         if (layersConfigured) {
@@ -271,34 +272,79 @@
             [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
         );
 
+        // Precompute per-layer upstream ranks to ensure parents are always above their children
+        const computedLayerRankById = new Map<string, number>();
+        function computeLayerRank(node: LineageNode): number {
+            const cached = computedLayerRankById.get(node.id);
+            if (cached !== undefined) return cached;
+
+            const sameLayerUpstreams =
+                upstreamOf
+                    .get(node.id)
+                    ?.map((id) => nodeById.get(id))
+                    .filter((n): n is LineageNode => !!n && n.layer === node.layer) ?? [];
+
+            if (sameLayerUpstreams.length === 0) {
+                computedLayerRankById.set(node.id, 0);
+                return 0;
+            }
+
+            const rank = Math.max(...sameLayerUpstreams.map((n) => computeLayerRank(n))) + 1;
+            computedLayerRankById.set(node.id, rank);
+            return rank;
+        }
+
         // Precompute each node's sibling index and total at its level/layer
         const levelPositions = new Map<string, { index: number; count: number }>();
+        
+        // Collect all sources first to place them consecutively
+        const allSources = visibleLineageNodes.filter(n => n.isSource);
         
         if (layersConfigured) {
             // Group by layer, then by level within each layer
             for (const layer of layerOrder) {
                 const layerNodes = layerBuckets.get(layer) ?? [];
-                // Further bucket by level within layer
-                const levelBucketsInLayer = new Map<number, LineageNode[]>();
-                for (const node of layerNodes) {
-                    const levelSafe = node.level ?? 0;
-                    const bucket = levelBucketsInLayer.get(levelSafe) ?? [];
-                    bucket.push(node);
-                    levelBucketsInLayer.set(levelSafe, bucket);
-                }
-                // Assign positions within each level in the layer
-                for (const [, nodes] of levelBucketsInLayer) {
-                    const count = nodes.length;
-                    nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                
+                // Special handling for sources layer: place all sources consecutively
+                if (layer === "sources") {
+                    const sourcesInLayer = layerNodes.filter(n => n.isSource);
+                    const count = sourcesInLayer.length;
+                    sourcesInLayer.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                } else {
+                    // Within layer, bucket by computed rank (parents above children)
+                    const rankBucketsInLayer = new Map<number, LineageNode[]>();
+                    for (const node of layerNodes) {
+                        const rank = computeLayerRank(node);
+                        const bucket = rankBucketsInLayer.get(rank) ?? [];
+                        bucket.push(node);
+                        rankBucketsInLayer.set(rank, bucket);
+                    }
+                    // Assign positions within each rank bucket
+                    for (const [, nodes] of rankBucketsInLayer) {
+                        const count = nodes.length;
+                        nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                    }
                 }
             }
         } else {
-            // Original behavior: bucket by level only
-            for (const [, nodes] of levelBuckets) {
-                const count = nodes.length;
-                nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+            // When layers not configured, still group all sources together
+            if (allSources.length > 0) {
+                const count = allSources.length;
+                allSources.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+            }
+            
+            // Original behavior: bucket by level only for non-sources
+            for (const [level, nodes] of levelBuckets) {
+                const nonSourceNodes = nodes.filter(n => !n.isSource);
+                if (nonSourceNodes.length > 0) {
+                    const count = nonSourceNodes.length;
+                    nonSourceNodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                }
             }
         }
+
+        // Persist computed ranks for downstream use
+        layerRankById = new Map(computedLayerRankById);
 
         // Precompute hidden upstream info for visible nodes
         const hiddenInfoById = new Map<string, { hiddenCount: number; hiddenSources: string[] }>();
@@ -364,31 +410,52 @@
         // We need to compute their level positions similar to visible nodes
         const ghostedLevelPositions = new Map<string, { index: number; count: number }>();
         
+        // Collect all ghosted sources to place them consecutively
+        const ghostedSources = ghostedLineageNodes.filter(n => n.isSource);
+        
         if (layersConfigured) {
             // Group ghosted nodes by layer, then by level within each layer
             for (const layer of layerOrder) {
                 const ghostedInLayer = ghostedLineageNodes.filter(n => n.layer === layer);
-                const levelBucketsInLayer = new Map<number, LineageNode[]>();
-                for (const node of ghostedInLayer) {
-                    const levelSafe = node.level ?? 0;
-                    const bucket = levelBucketsInLayer.get(levelSafe) ?? [];
-                    bucket.push(node);
-                    levelBucketsInLayer.set(levelSafe, bucket);
-                }
-                // Assign positions within each level in the layer
-                for (const [, nodes] of levelBucketsInLayer) {
-                    const count = nodes.length;
-                    nodes.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                
+                // Special handling for sources layer: place all ghosted sources consecutively
+                if (layer === "sources") {
+                    const ghostedSourcesInLayer = ghostedInLayer.filter(n => n.isSource);
+                    if (ghostedSourcesInLayer.length > 0) {
+                        const count = ghostedSourcesInLayer.length;
+                        ghostedSourcesInLayer.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                    }
+                } else {
+                    const levelBucketsInLayer = new Map<number, LineageNode[]>();
+                    for (const node of ghostedInLayer) {
+                        const levelSafe = node.level ?? 0;
+                        const bucket = levelBucketsInLayer.get(levelSafe) ?? [];
+                        bucket.push(node);
+                        levelBucketsInLayer.set(levelSafe, bucket);
+                    }
+                    // Assign positions within each level in the layer
+                    for (const [, nodes] of levelBucketsInLayer) {
+                        const count = nodes.length;
+                        nodes.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                    }
                 }
             }
         } else {
-            // Original behavior: bucket by level only
+            // When layers not configured, still group all ghosted sources together
+            if (ghostedSources.length > 0) {
+                const count = ghostedSources.length;
+                ghostedSources.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+            }
+            
+            // Original behavior: bucket by level only for non-source ghosted nodes
             const ghostedLevelBuckets = new Map<number, LineageNode[]>();
             for (const node of ghostedLineageNodes) {
-                const levelSafe = node.level ?? 0;
-                const bucket = ghostedLevelBuckets.get(levelSafe) ?? [];
-                bucket.push(node);
-                ghostedLevelBuckets.set(levelSafe, bucket);
+                if (!node.isSource) {
+                    const levelSafe = node.level ?? 0;
+                    const bucket = ghostedLevelBuckets.get(levelSafe) ?? [];
+                    bucket.push(node);
+                    ghostedLevelBuckets.set(levelSafe, bucket);
+                }
             }
             for (const [, nodes] of ghostedLevelBuckets) {
                 const count = nodes.length;
@@ -606,7 +673,7 @@
         }
 
         const H_SPACING = 260; // Horizontal spacing between siblings at the same level (use more width)
-        const LEVEL_SPACING_WITHIN_LAYER = 110; // vertical spacing within a layer for different levels
+        const LEVEL_SPACING_WITHIN_LAYER = 220; // vertical spacing within a layer for different levels (increased for better separation)
         
         let yPosition: number;
         let xPosition: number;
@@ -629,16 +696,18 @@
             } else if (layerIndex === -1) {
                 yPosition = top + 40;
             } else {
-                // Within layer, position by level (roughly centered)
-                const layerNodes = layerBuckets.get(node.layer) ?? [];
-                const levelsInLayer = new Set(layerNodes.map((n) => n.level));
-                // Higher `level` = further upstream. We want parents above children,
-                // so we place higher levels closer to the top of the band.
-                const sortedLevels = Array.from(levelsInLayer).sort((a, b) => b - a);
-                const levelIndexInLayer = Math.max(0, sortedLevels.indexOf(node.level));
+                // Special handling for sources: place all sources on the same Y line
+                if (node.isSource && node.layer === "sources") {
+                    // All sources get the same Y position (centered in the layer)
+                    const baseY = top + 40;
+                    yPosition = baseY;
+                } else {
+                    // Within layer, position by computed rank so parents stay above children
+                    const rank = layerRankById.get(node.id) ?? 0;
 
-                const baseY = top + 40;
-                yPosition = baseY + levelIndexInLayer * LEVEL_SPACING_WITHIN_LAYER;
+                    const baseY = top + 40;
+                    yPosition = baseY + rank * LEVEL_SPACING_WITHIN_LAYER;
+                }
                 
                 // Only clamp NEW nodes (not existing ones)
                 yPosition = Math.min(Math.max(yPosition, top + padding), bottom - padding);
@@ -655,7 +724,7 @@
             const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level ?? 0), 0);
             const BOTTOM_Y = 500;
             const TOP_Y = 80;
-            const LEVEL_SPACING = 120;
+            const LEVEL_SPACING = 180; // Increased spacing for better vertical separation
             
             const levelSafe = node.level ?? 0;
 
