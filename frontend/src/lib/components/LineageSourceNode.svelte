@@ -5,13 +5,16 @@
     
     const label = $derived((data?.label as string) || '');
     const connectedToSelected = $derived((data?._connectedToSelected as boolean) ?? false);
+    const isGhosted = $derived((data?._ghosted as boolean) ?? false);
 </script>
 
 <div
-    class="rounded-lg border-2 bg-blue-50 border-blue-400 shadow-md px-3 py-2 min-w-[120px] max-w-[200px] text-center"
+    class="rounded-lg border-2 bg-blue-50 border-blue-400 shadow-md px-3 py-2 min-w-[120px] max-w-[200px] text-center transition-opacity"
     class:ring-2={selected || connectedToSelected}
     class:ring-blue-500={selected}
     class:ring-[#26A69A]={connectedToSelected && !selected}
+    class:opacity-30={isGhosted}
+    class:pointer-events-none={isGhosted}
     title={label}
 >
     <Handle

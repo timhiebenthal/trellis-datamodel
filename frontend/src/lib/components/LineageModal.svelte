@@ -51,6 +51,9 @@
     // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
     let expandedNodeIds = $state<Set<string>>(new Set());
 
+    // SvelteFlow ref (for fitView after layout)
+    let flowRef: any = null;
+
     // Fetch lineage when modal opens
     $effect(() => {
         if (open && modelId) {
@@ -133,13 +136,38 @@
             for (const up of upstreamOf.get(expandedId) ?? []) visibleNodeIds.add(up);
         }
 
-        // FIX: Keep all nodes visible to prevent edges from disappearing when upstream nodes are pruned.
-        // This addresses the observed hiddenNodesCount/hiddenEdgesCount during lineage expansion.
+        // Track which nodes are visible vs ghosted (for styling)
+        // All nodes will be rendered, but unexpanded ones will be ghosted
+        const ghostedNodeIds = new Set<string>();
         for (const n of lineageData.nodes) {
-            visibleNodeIds.add(n.id);
+            if (!visibleNodeIds.has(n.id)) {
+                ghostedNodeIds.add(n.id);
+            }
         }
 
-        const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
+        // #region agent log
+        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                location: "LineageModal.svelte:updateGraphDisplay",
+                message: "Visibility sets",
+                data: {
+                    totalNodes: lineageData.nodes.length,
+                    visibleCount: visibleNodeIds.size,
+                    ghostedCount: ghostedNodeIds.size,
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                runId: "run-ghost",
+                hypothesisId: "ghost-visibility",
+            }),
+        }).catch(() => {});
+        // #endregion
+
+        // Use all nodes for rendering (not just visible ones)
+        // Ghosted nodes will be rendered with reduced opacity
+        const visibleLineageNodes = lineageData.nodes;
 
         // Check if layers are configured (any node has a layer field)
         const layersConfigured = visibleLineageNodes.some((n) => n.layer !== undefined);
@@ -180,14 +208,15 @@
         const levelBuckets = new Map<number, LineageNode[]>();
 
         for (const node of visibleLineageNodes) {
+            const levelSafe = node.level ?? 0;
             if (layersConfigured && node.layer) {
                 const bucket = layerBuckets.get(node.layer) ?? [];
                 bucket.push(node);
                 layerBuckets.set(node.layer, bucket);
             } else {
-                const bucket = levelBuckets.get(node.level) ?? [];
+                const bucket = levelBuckets.get(levelSafe) ?? [];
                 bucket.push(node);
-                levelBuckets.set(node.level, bucket);
+                levelBuckets.set(levelSafe, bucket);
             }
         }
 
@@ -237,9 +266,10 @@
                 // Further bucket by level within layer
                 const levelBucketsInLayer = new Map<number, LineageNode[]>();
                 for (const node of layerNodes) {
-                    const bucket = levelBucketsInLayer.get(node.level) ?? [];
+                    const levelSafe = node.level ?? 0;
+                    const bucket = levelBucketsInLayer.get(levelSafe) ?? [];
                     bucket.push(node);
-                    levelBucketsInLayer.set(node.level, bucket);
+                    levelBucketsInLayer.set(levelSafe, bucket);
                 }
                 // Assign positions within each level in the layer
                 for (const [, nodes] of levelBucketsInLayer) {
@@ -255,12 +285,13 @@
             }
         }
 
-        // Build visible flow nodes
+        // Build flow nodes for ALL nodes (visible and ghosted)
         const visibleNodes: Node[] = [];
         for (const node of visibleLineageNodes) {
             const pos = levelPositions.get(node.id);
             const indexInLevel = pos?.index ?? 0;
             const countAtLevel = pos?.count ?? 1;
+            const isGhosted = ghostedNodeIds.has(node.id);
             visibleNodes.push(
                 createFlowNode(
                     node,
@@ -273,13 +304,19 @@
                         [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
                     ),
                     existingPositions,
+                    isGhosted,
                 ),
             );
         }
 
+        // #region agent log - visibleNodes check
+        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageModal.svelte:updateGraphDisplay',message:'visibleNodes built',data:{visibleNodesCount:visibleNodes.length,visibleLineageNodesCount:visibleLineageNodes.length,sampleVisibleNodes:visibleNodes.slice(0,3).map(n=>({id:n.id,type:n.type,x:n.position.x,y:n.position.y}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run-ghost',hypothesisId:'visible-nodes'})}).catch(()=>{});
+        // #endregion
+
         // Placeholders + edge compression:
-        // If intermediate (hidden) models exist between two visible nodes, route via a `...` placeholder
+        // If intermediate (ghosted) models exist between two visible nodes, route via a `...` placeholder
         // attached to the downstream visible node to keep the graph connected without pretending it's a direct edge.
+        // All nodes and edges are rendered, but unexpanded nodes/edges are ghosted (reduced opacity, no interactivity).
         const visibleEdges: Edge[] = [];
         const placeholderIdByTarget = new Map<string, string>();
         const placeholderToTargetEdgeAdded = new Set<string>();
@@ -347,6 +384,9 @@
             return [...results.entries()].map(([upstreamId, depth]) => ({ upstreamId, depth }));
         }
 
+        // Create edges for ALL nodes (not just visible ones)
+        // Edges will be ghosted if either endpoint is ghosted
+        // Use placeholders for multi-hop compression when appropriate
         for (const targetNode of visibleLineageNodes) {
             const targetId = targetNode.id;
 
@@ -356,44 +396,89 @@
             // If the lineage node isn't in the lookup, skip
             if (!nodeById.has(targetId)) continue;
 
+            const targetIsGhosted = ghostedNodeIds.has(targetId);
+            
+            // Find nearest visible upstream for placeholder compression
             const nearest = getNearestVisibleUpstream(targetId);
-            for (const { upstreamId, depth } of nearest) {
-                if (depth === 1) {
+            
+            // Also get all direct upstream edges (for ghosted edges)
+            const directUpstream = upstreamOf.get(targetId) ?? [];
+            
+            // Create direct edges for all upstream connections
+            for (const upstreamId of directUpstream) {
+                const sourceIsGhosted = ghostedNodeIds.has(upstreamId);
+                const edgeIsGhosted = sourceIsGhosted || targetIsGhosted;
+                
+                // Check if this edge should use a placeholder (multi-hop compression)
+                const nearestEntry = nearest.find(n => n.upstreamId === upstreamId);
+                const shouldUsePlaceholder = nearestEntry && nearestEntry.depth > 1;
+                
+                if (shouldUsePlaceholder) {
+                    const placeholderId = ensurePlaceholder(targetId);
+                    if (!placeholderId) continue;
+
+                    const upstreamSet = placeholderUpstreamsByTarget.get(targetId) ?? new Set<string>();
+                    upstreamSet.add(upstreamId);
+                    placeholderUpstreamsByTarget.set(targetId, upstreamSet);
+
+                    // Placeholder edges: ghosted if source is ghosted
+                    visibleEdges.push({
+                        id: `edge-${upstreamId}-${placeholderId}`,
+                        source: upstreamId,
+                        target: placeholderId,
+                        type: LINEAGE_EDGE_TYPE,
+                        data: {
+                            _ghosted: sourceIsGhosted,
+                        },
+                    });
+
+                    const key = `${placeholderId}=>${targetId}`;
+                    if (!placeholderToTargetEdgeAdded.has(key)) {
+                        placeholderToTargetEdgeAdded.add(key);
+                        // Placeholder-to-target edge: ghosted if target is ghosted
+                        visibleEdges.push({
+                            id: `edge-${placeholderId}-${targetId}`,
+                            source: placeholderId,
+                            target: targetId,
+                            type: LINEAGE_EDGE_TYPE,
+                            data: {
+                                _ghosted: targetIsGhosted,
+                            },
+                        });
+                    }
+                } else {
+                    // Direct edge (depth 1 or both nodes visible)
                     visibleEdges.push({
                         id: `edge-${upstreamId}-${targetId}`,
                         source: upstreamId,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
-                    });
-                    continue;
-                }
-
-                const placeholderId = ensurePlaceholder(targetId);
-                if (!placeholderId) continue;
-
-                const upstreamSet = placeholderUpstreamsByTarget.get(targetId) ?? new Set<string>();
-                upstreamSet.add(upstreamId);
-                placeholderUpstreamsByTarget.set(targetId, upstreamSet);
-
-                visibleEdges.push({
-                    id: `edge-${upstreamId}-${placeholderId}`,
-                    source: upstreamId,
-                    target: placeholderId,
-                    type: LINEAGE_EDGE_TYPE,
-                });
-
-                const key = `${placeholderId}=>${targetId}`;
-                if (!placeholderToTargetEdgeAdded.has(key)) {
-                    placeholderToTargetEdgeAdded.add(key);
-                    visibleEdges.push({
-                        id: `edge-${placeholderId}-${targetId}`,
-                        source: placeholderId,
-                        target: targetId,
-                        type: LINEAGE_EDGE_TYPE,
+                        data: {
+                            _ghosted: edgeIsGhosted,
+                        },
                     });
                 }
             }
         }
+
+        // #region agent log
+        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                location: "LineageModal.svelte:updateGraphDisplay",
+                message: "Edges built",
+                data: {
+                    totalEdges: visibleEdges.length,
+                    placeholderCount: placeholderIdByTarget.size,
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                runId: "run-ghost",
+                hypothesisId: "edges",
+            }),
+        }).catch(() => {});
+        // #endregion
 
         // Move each placeholder node to a more "centric" position between its connected upstream(s) and target.
         // This reduces the perceived "curl"/hooking near the target when edges converge.
@@ -486,6 +571,157 @@
             layerBandMeta = [];
         }
 
+        // #region agent log - node bounds and NaN detection
+        (() => {
+            const coords = lineageNodes
+                .map((n) => ({
+                    x: n.position?.x,
+                    y: n.position?.y,
+                }))
+                .filter((p) => p.x !== undefined && p.y !== undefined);
+            const finiteCoords = coords.filter(
+                (p) => Number.isFinite(p.x as number) && Number.isFinite(p.y as number),
+            );
+            const hasNaN = coords.length !== finiteCoords.length;
+            const xs = finiteCoords.map((p) => p.x as number);
+            const ys = finiteCoords.map((p) => p.y as number);
+            const minX = xs.length ? Math.min(...xs) : null;
+            const maxX = xs.length ? Math.max(...xs) : null;
+            const minY = ys.length ? Math.min(...ys) : null;
+            const maxY = ys.length ? Math.max(...ys) : null;
+
+            // Fit nodes only (exclude layer bands)
+            const fitNodes = lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-"));
+            const fitCoords = fitNodes
+                .map((n) => ({
+                    x: n.position?.x,
+                    y: n.position?.y,
+                }))
+                .filter((p) => p.x !== undefined && p.y !== undefined)
+                .filter((p) => Number.isFinite(p.x as number) && Number.isFinite(p.y as number));
+            const fitXs = fitCoords.map((p) => p.x as number);
+            const fitYs = fitCoords.map((p) => p.y as number);
+            const minFitX = fitXs.length ? Math.min(...fitXs) : null;
+            const maxFitX = fitXs.length ? Math.max(...fitXs) : null;
+            const minFitY = fitYs.length ? Math.min(...fitYs) : null;
+            const maxFitY = fitYs.length ? Math.max(...fitYs) : null;
+
+            // Disable grid fallback - it was causing positioning issues
+            const shouldForceGrid = false;
+
+            // Recentering: if the span is excessively large, shift nodes toward center
+            // Only consider non-band nodes for recentering calculation
+            let shifted = false;
+            if (minFitX !== null && maxFitX !== null) {
+                const spanX = maxFitX - minFitX;
+                if (spanX > 8000) {
+                    const offsetX = -(minFitX + maxFitX) / 2;
+                    lineageNodes = lineageNodes.map((n) => {
+                        // Don't shift layer bands
+                        if (String(n.id).startsWith("layer-band-")) return n;
+                        return {
+                            ...n,
+                            position: {
+                                x: (n.position?.x ?? 0) + offsetX,
+                                y: n.position?.y ?? 0,
+                            },
+                        };
+                    });
+                    shifted = true;
+                }
+            }
+
+            // #region agent log - after grid/recenter
+            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageModal.svelte:updateGraphDisplay',message:'After grid/recenter',data:{lineageNodesCount:lineageNodes.length,shouldForceGrid,shifted,sampleAfter:lineageNodes.slice(0,8).map(n=>({id:n.id,type:n.type,x:n.position.x,y:n.position.y}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run-ghost',hypothesisId:'after-transform'})}).catch(()=>{});
+            // #endregion
+
+            // Sample first 5 nodes to check properties
+            const sampleNodes = lineageNodes.slice(0, 5).map(n => ({
+                id: n.id,
+                type: n.type,
+                hidden: n.hidden,
+                draggable: n.draggable,
+                selectable: n.selectable,
+                ghosted: (n.data as any)?._ghosted,
+                hasPosition: n.position !== undefined,
+                x: n.position?.x,
+                y: n.position?.y,
+            }));
+
+            fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    location: "LineageModal.svelte:updateGraphDisplay",
+                    message: "Node bounds",
+                    data: {
+                        nodeCount: lineageNodes.length,
+                        edgeCount: lineageEdges.length,
+                        hasNaN,
+                        minX,
+                        maxX,
+                        minY,
+                        maxY,
+                    fitNodesCount: lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-")).length,
+                    shifted,
+                    minFitX,
+                    maxFitX,
+                    minFitY,
+                    maxFitY,
+                        sampleNodes,
+                    },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    runId: "run-ghost",
+                    hypothesisId: "bounds",
+                }),
+            }).catch(() => {});
+        })();
+        // #endregion
+
+        // Fit view after layout (microtask to ensure nodes are set)
+        queueMicrotask(() => {
+            try {
+                const fitNodes = lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-"));
+                
+                // Sample actual nodes being passed to SvelteFlow
+                const actualNodesSample = lineageNodes.filter(n => !String(n.id).startsWith("layer-band-")).slice(0, 3).map(n => ({
+                    id: n.id,
+                    type: n.type,
+                    x: n.position.x,
+                    y: n.position.y,
+                    hidden: n.hidden,
+                    draggable: n.draggable,
+                    selectable: n.selectable,
+                    ghosted: (n.data as any)?._ghosted,
+                }));
+                
+                flowRef?.fitView?.({
+                    padding: 0.2,
+                    nodes: fitNodes,
+                });
+                fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        location: "LineageModal.svelte:updateGraphDisplay",
+                        message: "fitView invoked",
+                        data: {
+                            fitNodesCount: fitNodes.length,
+                            hasFlowRef: Boolean(flowRef),
+                            actualNodesSample,
+                        },
+                        timestamp: Date.now(),
+                        sessionId: "debug-session",
+                        runId: "run-ghost",
+                        hypothesisId: "fit",
+                    }),
+                }).catch(() => {});
+            } catch (e) {
+                console.error("fitView error", e);
+            }
+        });
+
         // Apply connected node highlighting based on current selection
         // Use microtask to ensure nodes are fully updated
         queueMicrotask(() => {
@@ -503,6 +739,7 @@
         layerBuckets: Map<string, LineageNode[]>,
         layerBounds: Map<string, { top: number; bottom: number }>,
         existingPositions: Map<string, { x: number; y: number }>,
+        isGhosted: boolean = false,
     ): Node {
         if (!lineageData) {
             return {
@@ -563,17 +800,19 @@
             ];
         } else {
             // Original level-based positioning (backward compatibility)
-            const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level), 0);
+            const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level ?? 0), 0);
             const BOTTOM_Y = 500;
             const TOP_Y = 80;
             const LEVEL_SPACING = 120;
             
+            const levelSafe = node.level ?? 0;
+
             if (node.isSource) {
                 yPosition = TOP_Y;
-            } else if (node.level === 0) {
+            } else if (levelSafe === 0) {
                 yPosition = BOTTOM_Y;
             } else {
-                yPosition = BOTTOM_Y - (node.level * LEVEL_SPACING);
+                yPosition = BOTTOM_Y - (levelSafe * LEVEL_SPACING);
             }
         }
         
@@ -581,6 +820,11 @@
         const siblingCenterOffset = (countAtLevel - 1) / 2;
         const siblingOffset = (indexInLevel - siblingCenterOffset) * H_SPACING;
         xPosition = existing?.x ?? siblingOffset;
+
+        // Clamp X to a sane range to avoid huge off-screen layouts
+        const CLAMP_X = 4000;
+        if (xPosition > CLAMP_X) xPosition = CLAMP_X;
+        if (xPosition < -CLAMP_X) xPosition = -CLAMP_X;
         
         return {
             id: node.id,
@@ -592,9 +836,13 @@
                 isSource: node.isSource,
                 sourceName: node.sourceName,
                 layer: node.layer,
+                _ghosted: isGhosted,
             },
             zIndex: node.isSource ? 12 : node.level === 0 ? 15 : 10,
             extent,
+            // Disable interactivity for ghosted nodes
+            draggable: !isGhosted,
+            selectable: !isGhosted,
         };
     }
 
@@ -737,7 +985,7 @@
             class="bg-white rounded-xl shadow-2xl w-[94vw] h-[92vh] max-w-[1600px] max-h-[920px] border border-gray-200 flex flex-col"
         >
             <!-- Header -->
-            <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
+            <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0 relative z-40">
                 <div class="flex items-center gap-2">
                     <Icon icon="lucide:git-branch" class="w-5 h-5 text-primary-600" />
                     <h2 id="lineage-modal-title" class="text-lg font-semibold text-gray-900">
@@ -749,7 +997,10 @@
                 </div>
                 <button
                     class="p-2 rounded-md hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
-                    onclick={onClose}
+                    onclick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                    }}
                     aria-label="Close"
                     title="Close (Esc)"
                 >
@@ -789,6 +1040,7 @@
                     </div>
                 {:else if lineageData && lineageNodes.length > 0}
                     <SvelteFlow
+                        bind:this={flowRef}
                         bind:nodes={lineageNodes}
                         edges={lineageEdges}
                         nodeTypes={nodeTypes}

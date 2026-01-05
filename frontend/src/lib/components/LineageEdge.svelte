@@ -20,6 +20,7 @@
     style,
     markerEnd,
     selected,
+    data,
   }: EdgeProps = $props();
 
   const { getNodes } = useSvelteFlow();
@@ -56,8 +57,12 @@
     );
   });
 
+  // Check if edge is ghosted
+  const isGhosted = $derived((data as any)?._ghosted ?? false);
+
   // Apply visual styling based on highlight state
   // Visual hierarchy: selected (teal-600, 3px) > connected (teal-300, 2.5px) > unselected (slate-500, 2px)
+  // Ghosted edges have reduced opacity regardless of highlight state
   const edgeStyle = $derived.by(() => {
     const { highlightLevel } = highlightState;
     
@@ -83,6 +88,11 @@
         strokeColor = '#94a3b8'; // slate-400 (lighter grey)
         strokeWidth = 1.5;
         opacity = 0.8;
+    }
+    
+    // Apply ghosting: reduce opacity further if ghosted
+    if (isGhosted) {
+      opacity = opacity * 0.3; // Reduce opacity to 30% of base opacity
     }
     
     const baseStyle = `stroke: ${strokeColor}; stroke-width: ${strokeWidth}; opacity: ${opacity}`;
