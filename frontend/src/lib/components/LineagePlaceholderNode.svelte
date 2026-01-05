@@ -1,9 +1,16 @@
 <script lang="ts">
     import { Handle, Position, type NodeProps } from "@xyflow/svelte";
+    import Icon from "@iconify/svelte";
 
     let { data, selected }: NodeProps = $props();
 
     const label = $derived((data?.label as string) || "Expand");
+    const hiddenCount = $derived((data?.hiddenCount as number) || 0);
+    const tooltipText = $derived(
+        hiddenCount > 0 
+            ? `${hiddenCount} hidden upstream model${hiddenCount !== 1 ? 's' : ''} - click to expand`
+            : "Click to expand hidden upstream models"
+    );
 
     function handleClick(event: MouseEvent) {
         event.stopPropagation();
@@ -20,15 +27,15 @@
 </script>
 
 <div
-    class="rounded-full border-2 border-dashed shadow-sm px-3 py-1 bg-gray-50 text-gray-700 text-xs font-semibold select-none cursor-pointer max-w-[150px]"
+    class="rounded-lg border-2 border-primary-400 shadow-md px-4 py-2 bg-primary-50 text-primary-700 text-sm font-semibold select-none cursor-pointer hover:bg-primary-100 hover:border-primary-500 transition-colors"
     class:ring-2={selected}
-    class:ring-primary-500={selected}
+    class:ring-primary-600={selected}
     onclick={handleClick}
     onkeydown={handleKeydown}
     role="button"
     tabindex="0"
     aria-label="Expand lineage"
-    title={label}
+    title={tooltipText}
 >
     <Handle
         type="target"
@@ -43,7 +50,13 @@
         isConnectable={false}
     />
 
-    <span class="truncate block">{label}</span>
+    <div class="flex items-center gap-2">
+        <Icon icon="lucide:chevrons-up" class="w-4 h-4 flex-shrink-0" />
+        <span class="truncate">{label}</span>
+        {#if hiddenCount > 0}
+            <span class="text-xs bg-primary-200 text-primary-800 px-1.5 py-0.5 rounded-full font-bold">{hiddenCount}</span>
+        {/if}
+    </div>
 </div>
 
 

@@ -13,7 +13,6 @@
     import Icon from "@iconify/svelte";
     import LineageSourceNode from "./LineageSourceNode.svelte";
     import LineageModelNode from "./LineageModelNode.svelte";
-    import LineagePlaceholderNode from "./LineagePlaceholderNode.svelte";
     import LineageLayerBandNode from "./LineageLayerBandNode.svelte";
     import LineageViewportSync from "./LineageViewportSync.svelte";
     import LineageEdgeComponent from "./LineageEdge.svelte";
@@ -30,13 +29,17 @@
     let lineageData = $state<LineageResponse | null>(null);
     let lineageNodes = $state<Node[]>([]);
     let lineageEdges = $state<Edge[]>([]);
+    let baseLineageEdges = $state<Edge[]>([]);
+    let overlayEdges = $state<Edge[]>([]);
+    let upstreamOfMap = new Map<string, string[]>();
+    let visibleNodeIdsSet = new Set<string>();
+    let nodeByIdMap = new Map<string, LineageNode>();
     let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
     let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
 
     const nodeTypes = {
         source: LineageSourceNode,
         default: LineageModelNode, // Use custom node type for regular models
-        placeholder: LineagePlaceholderNode,
         layerBand: LineageLayerBandNode,
     };
 
@@ -110,6 +113,7 @@
         // Build quick lookup maps
         const nodeById = new Map<string, LineageNode>();
         for (const n of lineageData.nodes) nodeById.set(n.id, n);
+        nodeByIdMap = nodeById;
 
         // Build adjacency (upstream): target -> [sources]
         const upstreamOf = new Map<string, string[]>();
@@ -118,6 +122,7 @@
             list.push(e.source);
             upstreamOf.set(e.target, list);
         }
+        upstreamOfMap = upstreamOf;
 
         // Compute visible node IDs according to the rule
         const visibleNodeIds = new Set<string>();
@@ -144,6 +149,7 @@
                 ghostedNodeIds.add(n.id);
             }
         }
+        visibleNodeIdsSet = visibleNodeIds;
 
         // #region agent log
         fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
@@ -165,9 +171,12 @@
         }).catch(() => {});
         // #endregion
 
-        // Use all nodes for rendering (not just visible ones)
-        // Ghosted nodes will be rendered with reduced opacity
-        const visibleLineageNodes = lineageData.nodes;
+        // Filter to only visible nodes for layout calculation
+        // Ghosted nodes will be added later for edge anchoring but won't affect layout
+        const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
+        
+        // All nodes (including ghosted) for edge creation
+        const allLineageNodes = lineageData.nodes;
 
         // Check if layers are configured (any node has a layer field)
         const layersConfigured = visibleLineageNodes.some((n) => n.layer !== undefined);
@@ -285,13 +294,45 @@
             }
         }
 
-        // Build flow nodes for ALL nodes (visible and ghosted)
+        // Precompute hidden upstream info for visible nodes
+        const hiddenInfoById = new Map<string, { hiddenCount: number; hiddenSources: string[] }>();
+
+        function computeHiddenInfo(targetId: string): { hiddenCount: number; hiddenSources: string[] } {
+            const hiddenNodes = new Set<string>();
+            const hiddenSources = new Set<string>();
+            const queue: string[] = [];
+            const visited = new Set<string>();
+
+            for (const up of upstreamOf.get(targetId) ?? []) queue.push(up);
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (!current || visited.has(current)) continue;
+                visited.add(current);
+
+                if (visibleNodeIds.has(current)) {
+                    const n = nodeById.get(current);
+                    if (n?.isSource) hiddenSources.add(n.label ?? n.id);
+                    continue;
+                }
+
+                hiddenNodes.add(current);
+                for (const up of upstreamOf.get(current) ?? []) queue.push(up);
+            }
+
+            return { hiddenCount: hiddenNodes.size, hiddenSources: [...hiddenSources] };
+        }
+
+        for (const node of visibleLineageNodes) {
+            hiddenInfoById.set(node.id, computeHiddenInfo(node.id));
+        }
+
+        // Build flow nodes for visible nodes first (they participate in layout)
         const visibleNodes: Node[] = [];
         for (const node of visibleLineageNodes) {
             const pos = levelPositions.get(node.id);
             const indexInLevel = pos?.index ?? 0;
             const countAtLevel = pos?.count ?? 1;
-            const isGhosted = ghostedNodeIds.has(node.id);
             visibleNodes.push(
                 createFlowNode(
                     node,
@@ -304,234 +345,42 @@
                         [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
                     ),
                     existingPositions,
-                    isGhosted,
+                    false, // Not ghosted - these are visible nodes
+                    hiddenInfoById.get(node.id),
                 ),
             );
         }
-
-        // #region agent log - visibleNodes check
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LineageModal.svelte:updateGraphDisplay',message:'visibleNodes built',data:{visibleNodesCount:visibleNodes.length,visibleLineageNodesCount:visibleLineageNodes.length,sampleVisibleNodes:visibleNodes.slice(0,3).map(n=>({id:n.id,type:n.type,x:n.position.x,y:n.position.y}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run-ghost',hypothesisId:'visible-nodes'})}).catch(()=>{});
-        // #endregion
-
-        // Placeholders + edge compression:
-        // If intermediate (ghosted) models exist between two visible nodes, route via a `...` placeholder
-        // attached to the downstream visible node to keep the graph connected without pretending it's a direct edge.
-        // All nodes and edges are rendered, but unexpanded nodes/edges are ghosted (reduced opacity, no interactivity).
+        
+        // Create edges only between visible nodes (direct edges)
         const visibleEdges: Edge[] = [];
-        const placeholderIdByTarget = new Map<string, string>();
-        const placeholderToTargetEdgeAdded = new Set<string>();
-        const placeholderUpstreamsByTarget = new Map<string, Set<string>>();
-
-        function ensurePlaceholder(targetId: string): string | null {
-            const targetFlowNode = visibleNodes.find((n) => n.id === targetId);
-            if (!targetFlowNode) return null;
-
-            const existing = placeholderIdByTarget.get(targetId);
-            if (existing) return existing;
-
-            const placeholderId = `placeholder-${targetId}`;
-            placeholderIdByTarget.set(targetId, placeholderId);
-
-            visibleNodes.push({
-                id: placeholderId,
-                type: "placeholder",
-                position: {
-                    x: targetFlowNode.position.x,
-                    // Temporary; we'll reposition "centrically" once we know upstream connections.
-                    y: targetFlowNode.position.y,
-                },
-                data: {
-                    label: "...",
-                    onClick: () => expandNode(targetId),
-                    // Keep placeholder in the same layer as its target (for band clamping)
-                    layer: (nodeById.get(targetId)?.layer as string | undefined),
-                },
-                zIndex: 20,
-            });
-
-            return placeholderId;
-        }
-
-        function getNearestVisibleUpstream(
-            targetId: string,
-        ): Array<{ upstreamId: string; depth: number }> {
-            const results = new Map<string, number>();
-            const queue: Array<{ id: string; depth: number }> = [];
-            const visited = new Set<string>();
-
-            for (const up of upstreamOf.get(targetId) ?? []) {
-                queue.push({ id: up, depth: 1 });
-            }
-
-            while (queue.length > 0) {
-                const current = queue.shift();
-                if (!current) break;
-                const { id, depth } = current;
-                if (visited.has(id)) continue;
-                visited.add(id);
-
-                if (visibleNodeIds.has(id)) {
-                    const existing = results.get(id);
-                    if (existing === undefined || depth < existing) results.set(id, depth);
-                    continue; // stop at first visible node on this path
-                }
-
-                for (const up of upstreamOf.get(id) ?? []) {
-                    queue.push({ id: up, depth: depth + 1 });
-                }
-            }
-
-            return [...results.entries()].map(([upstreamId, depth]) => ({ upstreamId, depth }));
-        }
-
-        // Create edges for ALL nodes (not just visible ones)
-        // Edges will be ghosted if either endpoint is ghosted
-        // Use placeholders for multi-hop compression when appropriate
         for (const targetNode of visibleLineageNodes) {
             const targetId = targetNode.id;
-
-            // Skip placeholder nodes (we only added those later)
-            if (targetId.startsWith("placeholder-")) continue;
-
-            // If the lineage node isn't in the lookup, skip
-            if (!nodeById.has(targetId)) continue;
-
-            const targetIsGhosted = ghostedNodeIds.has(targetId);
-            
-            // Find nearest visible upstream for placeholder compression
-            const nearest = getNearestVisibleUpstream(targetId);
-            
-            // Also get all direct upstream edges (for ghosted edges)
             const directUpstream = upstreamOf.get(targetId) ?? [];
-            
-            // Create direct edges for all upstream connections
             for (const upstreamId of directUpstream) {
-                const sourceIsGhosted = ghostedNodeIds.has(upstreamId);
-                const edgeIsGhosted = sourceIsGhosted || targetIsGhosted;
-                
-                // Check if this edge should use a placeholder (multi-hop compression)
-                const nearestEntry = nearest.find(n => n.upstreamId === upstreamId);
-                const shouldUsePlaceholder = nearestEntry && nearestEntry.depth > 1;
-                
-                if (shouldUsePlaceholder) {
-                    const placeholderId = ensurePlaceholder(targetId);
-                    if (!placeholderId) continue;
-
-                    const upstreamSet = placeholderUpstreamsByTarget.get(targetId) ?? new Set<string>();
-                    upstreamSet.add(upstreamId);
-                    placeholderUpstreamsByTarget.set(targetId, upstreamSet);
-
-                    // Placeholder edges: ghosted if source is ghosted
-                    visibleEdges.push({
-                        id: `edge-${upstreamId}-${placeholderId}`,
-                        source: upstreamId,
-                        target: placeholderId,
-                        type: LINEAGE_EDGE_TYPE,
-                        data: {
-                            _ghosted: sourceIsGhosted,
-                        },
-                    });
-
-                    const key = `${placeholderId}=>${targetId}`;
-                    if (!placeholderToTargetEdgeAdded.has(key)) {
-                        placeholderToTargetEdgeAdded.add(key);
-                        // Placeholder-to-target edge: ghosted if target is ghosted
-                        visibleEdges.push({
-                            id: `edge-${placeholderId}-${targetId}`,
-                            source: placeholderId,
-                            target: targetId,
-                            type: LINEAGE_EDGE_TYPE,
-                            data: {
-                                _ghosted: targetIsGhosted,
-                            },
-                        });
-                    }
-                } else {
-                    // Direct edge (depth 1 or both nodes visible)
-                    visibleEdges.push({
-                        id: `edge-${upstreamId}-${targetId}`,
-                        source: upstreamId,
-                        target: targetId,
-                        type: LINEAGE_EDGE_TYPE,
-                        data: {
-                            _ghosted: edgeIsGhosted,
-                        },
-                    });
-                }
+                if (!visibleNodeIds.has(upstreamId)) continue;
+                visibleEdges.push({
+                    id: `edge-${upstreamId}-${targetId}`,
+                    source: upstreamId,
+                    target: targetId,
+                    type: LINEAGE_EDGE_TYPE,
+                    data: { _ghosted: false },
+                });
             }
         }
 
-        // #region agent log
-        fetch("http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                location: "LineageModal.svelte:updateGraphDisplay",
-                message: "Edges built",
-                data: {
-                    totalEdges: visibleEdges.length,
-                    placeholderCount: placeholderIdByTarget.size,
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run-ghost",
-                hypothesisId: "edges",
-            }),
-        }).catch(() => {});
-        // #endregion
-
-        // Move each placeholder node to a more "centric" position between its connected upstream(s) and target.
-        // This reduces the perceived "curl"/hooking near the target when edges converge.
-        for (const [targetId, upstreamIds] of placeholderUpstreamsByTarget) {
-            const placeholderId = placeholderIdByTarget.get(targetId);
-            if (!placeholderId) continue;
-
-            const targetFlowNode = visibleNodes.find((n) => n.id === targetId);
-            const placeholderFlowNode = visibleNodes.find((n) => n.id === placeholderId);
-            if (!targetFlowNode || !placeholderFlowNode) continue;
-
-            const upstreamYs: number[] = [];
-            const upstreamXs: number[] = [];
-            for (const upId of upstreamIds) {
-                const upNode = visibleNodes.find((n) => n.id === upId);
-                if (upNode) {
-                    upstreamYs.push(upNode.position.y);
-                    upstreamXs.push(upNode.position.x);
-                }
-            }
-            if (upstreamYs.length === 0) continue;
-
-            const minUpstreamY = Math.min(...upstreamYs);
-            const avgUpstreamX = upstreamXs.reduce((sum, x) => sum + x, 0) / upstreamXs.length;
-
-            // Place placeholder halfway between upstream(s) and the target.
-            // We use the highest upstream Y to keep the placeholder above the target even when upstreams differ.
-            const centeredY = Math.round((minUpstreamY + targetFlowNode.position.y) / 2);
-            const centeredX = Math.round((avgUpstreamX + targetFlowNode.position.x) / 2);
-            placeholderFlowNode.position = {
-                x: centeredX,
-                y: centeredY,
-            };
-        }
-
-        // Apply extents to placeholder nodes too (so they can't be dragged outside their layer)
-        if (layersConfigured) {
-            const padding = 30;
-            for (const n of visibleNodes) {
-                if (typeof n.id !== "string" || !n.id.startsWith("placeholder-")) continue;
-                const layer = (n.data as any)?.layer as string | undefined;
-                if (!layer) continue;
-                const bounds = layerBounds.get(layer);
-                if (!bounds) continue;
-                n.extent = [
-                    [-100000, bounds.top + padding],
-                    [100000, bounds.bottom - padding],
-                ];
+        // Compute source overlays for nodes with hidden upstream
+        const sourceOverlays: Edge[] = [];
+        for (const node of visibleLineageNodes) {
+            const hiddenInfo = hiddenInfoById.get(node.id);
+            if (hiddenInfo && hiddenInfo.hiddenCount > 0) {
+                sourceOverlays.push(...computeSourceOverlayEdges(node.id));
             }
         }
-
+        
+        overlayEdges = sourceOverlays;
         lineageNodes = visibleNodes;
-        lineageEdges = visibleEdges;
+        baseLineageEdges = visibleEdges;
+        lineageEdges = [...baseLineageEdges, ...overlayEdges];
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
@@ -679,7 +528,7 @@
         })();
         // #endregion
 
-        // Fit view after layout (microtask to ensure nodes are set)
+    // Fit view after layout (microtask to ensure nodes are set)
         queueMicrotask(() => {
             try {
                 const fitNodes = lineageNodes.filter((n) => !n.id.toString().startsWith("layer-band-"));
@@ -740,6 +589,7 @@
         layerBounds: Map<string, { top: number; bottom: number }>,
         existingPositions: Map<string, { x: number; y: number }>,
         isGhosted: boolean = false,
+        hiddenInfo?: { hiddenCount: number; hiddenSources: string[] },
     ): Node {
         if (!lineageData) {
             return {
@@ -837,6 +687,9 @@
                 sourceName: node.sourceName,
                 layer: node.layer,
                 _ghosted: isGhosted,
+                _hiddenCount: hiddenInfo?.hiddenCount ?? 0,
+                _hiddenSources: hiddenInfo?.hiddenSources ?? [],
+                _expandHidden: () => expandNode(node.id),
             },
             zIndex: node.isSource ? 12 : node.level === 0 ? 15 : 10,
             extent,
@@ -889,8 +742,8 @@
         for (const node of lineageNodes) {
             if (node.selected && !node.hidden) {
                 const nodeId = String(node.id);
-                // Exclude placeholder nodes and layer band background nodes
-                if (!nodeId.startsWith('placeholder-') && node.type !== 'layerBand') {
+                // Exclude layer band background nodes
+                if (node.type !== 'layerBand') {
                     selectedNodeIds.add(nodeId);
                 }
             }
@@ -940,6 +793,76 @@
             });
         }
     }
+
+    function computeSourceOverlayEdges(targetId: string): Edge[] {
+        if (!upstreamOfMap.size || !nodeByIdMap.size) return [];
+        const edges: Edge[] = [];
+        const seenSources = new Set<string>();
+        const queue: Array<{ id: string; hiddenSeen: boolean }> = [];
+        const visited = new Set<string>();
+
+        for (const up of upstreamOfMap.get(targetId) ?? []) {
+            // Start with hiddenSeen = true only if that upstream is hidden
+            queue.push({ id: up, hiddenSeen: !visibleNodeIdsSet.has(up) });
+        }
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (!current) break;
+            const { id, hiddenSeen } = current;
+            if (visited.has(id)) continue;
+            visited.add(id);
+
+            const node = nodeByIdMap.get(id);
+            const isVisible = visibleNodeIdsSet.has(id);
+            const isSource = node?.isSource === true;
+
+            // Only add overlay if there was at least one hidden hop between target and this source
+            if (isVisible && isSource && hiddenSeen) {
+                if (!seenSources.has(id)) {
+                    seenSources.add(id);
+                    edges.push({
+                        id: `overlay-${id}-${targetId}`,
+                        source: id,
+                        target: targetId,
+                        type: LINEAGE_EDGE_TYPE,
+                        data: { _overlay: true },
+                    });
+                }
+                continue;
+            }
+
+            // Traverse further upstream only if not a source
+            if (!isSource) {
+                for (const up of upstreamOfMap.get(id) ?? []) {
+                    const nextHidden = hiddenSeen || !visibleNodeIdsSet.has(up);
+                    queue.push({ id: up, hiddenSeen: nextHidden });
+                }
+            }
+        }
+
+        // Fallback: if we know there are hidden upstreams (badge) but could not
+        // resolve any source via hidden hops, connect to nearest visible upstream
+        if (edges.length === 0) {
+            for (const up of upstreamOfMap.get(targetId) ?? []) {
+                if (!visibleNodeIdsSet.has(up)) continue;
+                const upstreamNode = nodeByIdMap.get(up);
+                if (upstreamNode?.isSource) {
+                    edges.push({
+                        id: `overlay-${up}-${targetId}`,
+                        source: up,
+                        target: targetId,
+                        type: LINEAGE_EDGE_TYPE,
+                        data: { _overlay: true },
+                    });
+                }
+            }
+        }
+
+        return edges;
+    }
+
+
 
     function handleBackdropClick(event: MouseEvent) {
         if (event.target === event.currentTarget) {

@@ -57,8 +57,9 @@
     );
   });
 
-  // Check if edge is ghosted
+  // Check flags
   const isGhosted = $derived((data as any)?._ghosted ?? false);
+  const isOverlay = $derived((data as any)?._overlay ?? false);
 
   // Apply visual styling based on highlight state
   // Visual hierarchy: selected (teal-600, 3px) > connected (teal-300, 2.5px) > unselected (slate-500, 2px)
@@ -70,33 +71,35 @@
     let strokeWidth: number;
     let opacity: number;
     
-    switch (highlightLevel) {
-      case 'selected':
-        // Directly selected edge: most prominent
-        strokeColor = '#26A69A'; // teal-600
-        strokeWidth = 3;
-        opacity = 1.0;
-        break;
-      case 'connected':
-        // Edge connected to selected node: highlighted but less prominent
-        strokeColor = '#26A69A'; // teal-600 (primary teal)
-        strokeWidth = 2.5;
-        opacity = 0.7;
-        break;
-      default:
-        // Unselected edge: default styling - subtle grey, thin
-        strokeColor = '#94a3b8'; // slate-400 (lighter grey)
-        strokeWidth = 1.5;
-        opacity = 0.8;
+    if (isOverlay) {
+      strokeColor = '#22c55e'; // green-500
+      strokeWidth = 1.5;
+      opacity = 0.55;
+    } else {
+      switch (highlightLevel) {
+        case 'selected':
+          strokeColor = '#26A69A'; // teal-600
+          strokeWidth = 3;
+          opacity = 1.0;
+          break;
+        case 'connected':
+          strokeColor = '#26A69A'; // teal-600
+          strokeWidth = 2.5;
+          opacity = 0.7;
+          break;
+        default:
+          strokeColor = '#94a3b8'; // slate-400
+          strokeWidth = 1.5;
+          opacity = 0.8;
+      }
     }
     
-    // Apply ghosting: reduce opacity further if ghosted
     if (isGhosted) {
-      opacity = opacity * 0.3; // Reduce opacity to 30% of base opacity
+      opacity = opacity * 0.3;
     }
     
-    const baseStyle = `stroke: ${strokeColor}; stroke-width: ${strokeWidth}; opacity: ${opacity}`;
-    return style ? `${baseStyle}; ${style}` : baseStyle;
+    const baseStyle = `stroke: ${strokeColor}; stroke-width: ${strokeWidth}; opacity: ${opacity};`;
+    return style ? `${baseStyle} ${style}` : baseStyle;
   });
 
   // Use Svelte Flow's built-in bezier path calculation
