@@ -315,6 +315,7 @@
             clearTimeout(timer2);
         };
     });
+
 </script>
 
 <div class="flex-1 h-full relative w-full">

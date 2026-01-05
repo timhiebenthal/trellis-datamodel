@@ -127,6 +127,12 @@
             for (const up of upstreamOf.get(expandedId) ?? []) visibleNodeIds.add(up);
         }
 
+        // FIX: Keep all nodes visible to prevent edges from disappearing when upstream nodes are pruned.
+        // This addresses the observed hiddenNodesCount/hiddenEdgesCount during lineage expansion.
+        for (const n of lineageData.nodes) {
+            visibleNodeIds.add(n.id);
+        }
+
         const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
 
         // Check if layers are configured (any node has a layer field)
@@ -474,6 +480,7 @@
             layerBandMeta = [];
         }
     }
+
 
     function createFlowNode(
         node: LineageNode,

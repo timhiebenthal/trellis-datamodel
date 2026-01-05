@@ -159,6 +159,7 @@ export function calculateConnectionInfo(
   const sourceDim = getNodeDimensions(sourceNode);
   const targetDim = getNodeDimensions(targetNode);
   
+  
   const dx = targetCenter.x - sourceCenter.x;
   const dy = targetCenter.y - sourceCenter.y;
   
