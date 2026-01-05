@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added edge highlighting in lineage modal: when a model node is selected, all connected edges and connected model nodes are automatically highlighted to improve visual clarity of data flow relationships. Edges connected to selected nodes are highlighted in primary teal with reduced opacity, and connected nodes display a teal ring. Lineage edges are now selectable (click to select, turns teal) matching main canvas behavior. Visual hierarchy: selected edge (teal-600, 3px) > connected edge (teal-600, 2.5px, 70% opacity) > unselected edge (slate-400, 1.5px, 80% opacity). Placeholder nodes and hidden nodes are excluded from highlighting logic.
+
 ### Fixed
 - Fixed lineage edges disappearing in complex lineage graphs: edges were being hidden when their source or target nodes were marked as hidden by progressive expansion rules. The lineage modal now ensures all lineage nodes remain visible, preventing edges from disappearing during progressive expansion or when navigating complex lineage graphs.
 

@@ -16,6 +16,8 @@
     import LineagePlaceholderNode from "./LineagePlaceholderNode.svelte";
     import LineageLayerBandNode from "./LineageLayerBandNode.svelte";
     import LineageViewportSync from "./LineageViewportSync.svelte";
+    import LineageEdgeComponent from "./LineageEdge.svelte";
+    import { getConnectedNodeIds } from "$lib/edge-highlight-utils";
 
     const { open = false, modelId = null, onClose } = $props<{
         open: boolean;
@@ -38,7 +40,11 @@
         layerBand: LineageLayerBandNode,
     };
 
-    // Edge type constant - use bezier curves (default) for all lineage edges
+    const edgeTypes = {
+        default: LineageEdgeComponent,
+    };
+
+    // Edge type constant - use custom LineageEdge for all lineage edges
     const LINEAGE_EDGE_TYPE = "default";
 
     // Progressive display state (per-node expansion)
@@ -479,6 +485,12 @@
             lineageNodes = visibleNodes;
             layerBandMeta = [];
         }
+
+        // Apply connected node highlighting based on current selection
+        // Use microtask to ensure nodes are fully updated
+        queueMicrotask(() => {
+            applyConnectedNodeHighlighting();
+        });
     }
 
 
@@ -620,6 +632,67 @@
         updateGraphDisplay();
     }
 
+    // Compute and apply connected node highlighting
+    // When nodes are selected, highlight their connected edges and connected nodes
+    function applyConnectedNodeHighlighting() {
+        // Get selected node IDs (excluding placeholders and layer bands)
+        // Placeholders ("...") and layer bands should not trigger highlighting
+        const selectedNodeIds = new Set<string>();
+        for (const node of lineageNodes) {
+            if (node.selected && !node.hidden) {
+                const nodeId = String(node.id);
+                // Exclude placeholder nodes and layer band background nodes
+                if (!nodeId.startsWith('placeholder-') && node.type !== 'layerBand') {
+                    selectedNodeIds.add(nodeId);
+                }
+            }
+        }
+
+        // If no nodes are selected, clear connected highlighting
+        if (selectedNodeIds.size === 0) {
+            lineageNodes = lineageNodes.map((node) => {
+                const data = node.data as any;
+                return {
+                    ...node,
+                    data: { ...data, _connectedToSelected: false },
+                };
+            });
+            return;
+        }
+
+        // Get connected node IDs using utility function
+        const getNode = (id: string) => {
+            return lineageNodes.find((n) => String(n.id) === id);
+        };
+
+        const connectedNodeIds = getConnectedNodeIds(selectedNodeIds, lineageEdges, getNode);
+
+        // Update nodes with connected state
+        lineageNodes = lineageNodes.map((node) => {
+            const nodeId = String(node.id);
+            const isConnected = connectedNodeIds.has(nodeId);
+            const data = node.data as any;
+            return {
+                ...node,
+                data: { ...data, _connectedToSelected: isConnected },
+            };
+        });
+    }
+
+    // Handle node selection changes to update connected highlighting
+    function handleNodesChange(changes: any) {
+        // Check if any change affects selection
+        const hasSelectionChange = changes.some((change: any) => 
+            change.type === 'select' || change.type === 'position' && change.selected !== undefined
+        );
+        if (hasSelectionChange || changes.length > 0) {
+            // Use a microtask to ensure nodes are updated
+            queueMicrotask(() => {
+                applyConnectedNodeHighlighting();
+            });
+        }
+    }
+
     function handleBackdropClick(event: MouseEvent) {
         if (event.target === event.currentTarget) {
             onClose();
@@ -719,6 +792,7 @@
                         bind:nodes={lineageNodes}
                         edges={lineageEdges}
                         nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
                         defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
                         fitView
                         fitViewOptions={{
@@ -730,7 +804,9 @@
                         selectionOnDrag={false}
                         nodesDraggable={true}
                         nodesConnectable={false}
+                        edgesSelectable={true}
                         onnodedragstop={handleNodeDragStop}
+                        onnodeschange={handleNodesChange}
                         class="w-full h-full"
                     >
                         <Controls />

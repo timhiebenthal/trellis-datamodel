@@ -5,6 +5,7 @@
     
     const isTarget = $derived((data?.level as number) === 0);
     const label = $derived((data?.label as string) || '');
+    const connectedToSelected = $derived((data?._connectedToSelected as boolean) ?? false);
 </script>
 
 <div
@@ -13,8 +14,9 @@
     class:border-gray-300={!isTarget}
     class:bg-primary-600={isTarget}
     class:border-primary-600={isTarget}
-    class:ring-2={selected}
+    class:ring-2={selected || connectedToSelected}
     class:ring-primary-500={selected}
+    class:ring-[#26A69A]={connectedToSelected && !selected}
     title={label}
 >
     <Handle
