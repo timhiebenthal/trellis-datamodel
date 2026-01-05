@@ -37,8 +37,17 @@ Work through tasks in order:
    - Reference `agent-os/standards/` for coding guidelines if needed
    - Follow the tech stack from `.cursor/project.md`
    - Make sure implementation matches the spec requirements
-5. **Verify the task** - ensure it's complete and working
-6. **Move to next task**
+5. **Check for issues** - run automatic checks before moving on:
+   - Run linting checks (`read_lints` tool) on modified files
+   - Check for type errors (TypeScript/type checking)
+   - Look for common issues:
+     - Duplicate imports/declarations
+     - Unused imports/variables
+     - Missing dependencies
+     - Syntax errors
+   - Fix any issues found before proceeding
+6. **Verify the task** - ensure it's complete and working
+7. **Move to next task**
 
 ### Implementation Guidelines
 
@@ -50,6 +59,18 @@ Work through tasks in order:
 - **Write tests**: Include tests for new functionality
 - **Handle errors**: Implement proper error handling
 - **Document code**: Add comments where helpful
+- **Check as you go**: After implementing each task, run linting checks on modified files to catch issues early
+
+### Common Issues to Check For
+
+When running checks, watch for:
+- **Duplicate imports/declarations**: Same identifier imported/declared multiple times
+- **Type conflicts**: Type imports conflicting with value imports (e.g., `LineageEdge` as type vs component)
+- **Unused imports**: Imports that are no longer needed
+- **Missing dependencies**: Imports that don't exist or are misspelled
+- **Syntax errors**: Invalid code that prevents compilation
+- **Type errors**: TypeScript type mismatches or missing types
+- **Linting violations**: Code style or best practice violations
 
 ## Step 3: Update Progress
 
@@ -84,9 +105,14 @@ When implementing, reference:
 When all tasks are marked complete:
 
 1. **Final verification**: Review that all requirements from spec.md are met
-2. **Run tests**: Ensure all tests pass
-3. **Check for issues**: Look for linting errors, type errors, etc.
-4. **Inform user**: Let them know implementation is complete
+2. **Run comprehensive checks**:
+   - Run linting on all modified files/directories (`read_lints`)
+   - Check for type errors across the codebase
+   - Verify no duplicate imports/declarations exist
+   - Check for unused code/variables
+3. **Run tests**: Ensure all tests pass
+4. **Check for issues**: Look for any remaining linting errors, type errors, etc.
+5. **Inform user**: Let them know implementation is complete
 
 ## Guidelines
 
