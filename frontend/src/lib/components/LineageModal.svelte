@@ -18,7 +18,11 @@
     import LineageEdgeComponent from "./LineageEdge.svelte";
     import { getConnectedNodeIds } from "$lib/edge-highlight-utils";
 
-    const { open = false, modelId = null, onClose } = $props<{
+    const {
+        open = false,
+        modelId = null,
+        onClose,
+    } = $props<{
         open: boolean;
         modelId: string | null;
         onClose: () => void;
@@ -34,7 +38,9 @@
     let upstreamOfMap = new Map<string, string[]>();
     let visibleNodeIdsSet = new Set<string>();
     let nodeByIdMap = new Map<string, LineageNode>();
-    let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
+    let layerBoundsByLayer = $state<
+        Record<string, { top: number; bottom: number }>
+    >({});
     let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
     let layerRankById = new Map<string, number>();
 
@@ -102,13 +108,23 @@
         const rootId = lineageData.metadata?.root_model_id ?? modelId ?? "";
         if (!rootId) return;
 
-        // Preserve ALL existing node positions across progressive expansion updates
-        // This prevents nodes from jumping around when new layers are added
-        const existingPositions = new Map<string, { x: number; y: number }>();
+        // Preserve existing node positions across progressive expansion updates
+        // - X positions: always preserved (keep horizontal layout stable)
+        // - Y positions: only preserved for manually dragged nodes (__manualPosition: true)
+        // Auto-laid-out nodes should recalculate Y when graph structure changes
+        const existingPositions = new Map<
+            string,
+            { x: number; y: number; manualPosition: boolean }
+        >();
         for (const n of lineageNodes) {
             // Skip layer bands - they need to recalculate to span the full width
-            if (!String(n.id).startsWith('layer-band-')) {
-                existingPositions.set(n.id, { x: n.position.x, y: n.position.y });
+            if (!String(n.id).startsWith("layer-band-")) {
+                const isManual = (n.data as any)?.__manualPosition === true;
+                existingPositions.set(n.id, {
+                    x: n.position.x,
+                    y: n.position.y,
+                    manualPosition: isManual,
+                });
             }
         }
 
@@ -157,7 +173,6 @@
                 expandedParents.push(up);
             }
         }
-        
 
         // Track which nodes are visible vs ghosted (for styling)
         // All nodes will be rendered, but unexpanded ones will be ghosted
@@ -169,25 +184,33 @@
         }
         visibleNodeIdsSet = visibleNodeIds;
 
-
         // Filter to only visible nodes for layout calculation
         // Ghosted nodes will be added later for edge anchoring but won't affect layout
-        const visibleLineageNodes = lineageData.nodes.filter((n) => visibleNodeIds.has(n.id));
-        
-        
+        const visibleLineageNodes = lineageData.nodes.filter((n) =>
+            visibleNodeIds.has(n.id),
+        );
+
         // Ghosted nodes (not visible) that still anchor edges to visible nodes
-        const ghostedLineageNodes: LineageNode[] = lineageData.nodes.filter((n) => {
-            if (visibleNodeIds.has(n.id)) return false;
-            const ups = upstreamOf.get(n.id) ?? [];
-            const downs = downstreamOf.get(n.id) ?? [];
-            const upstreamTouchesVisible = ups.some((u) => visibleNodeIds.has(u));
-            const downstreamTouchesVisible = downs.some((d) => visibleNodeIds.has(d));
-            return upstreamTouchesVisible || downstreamTouchesVisible;
-        });
+        const ghostedLineageNodes: LineageNode[] = lineageData.nodes.filter(
+            (n) => {
+                if (visibleNodeIds.has(n.id)) return false;
+                const ups = upstreamOf.get(n.id) ?? [];
+                const downs = downstreamOf.get(n.id) ?? [];
+                const upstreamTouchesVisible = ups.some((u) =>
+                    visibleNodeIds.has(u),
+                );
+                const downstreamTouchesVisible = downs.some((d) =>
+                    visibleNodeIds.has(d),
+                );
+                return upstreamTouchesVisible || downstreamTouchesVisible;
+            },
+        );
 
         // Check if layers are configured (any node has a layer field)
-        const layersConfigured = visibleLineageNodes.some((n) => n.layer !== undefined);
-        
+        const layersConfigured = visibleLineageNodes.some(
+            (n) => n.layer !== undefined,
+        );
+
         // Extract unique layers and compute layer ordering
         const layerOrder: string[] = [];
         const layerSet = new Set<string>();
@@ -198,22 +221,23 @@
                     layerSet.add(node.layer);
                 }
             }
-            
+
             // Get configured layer order from metadata (if available)
-            const configuredLayersOrder = lineageData.metadata?.lineage_layers ?? [];
-            
+            const configuredLayersOrder =
+                lineageData.metadata?.lineage_layers ?? [];
+
             // Order: sources → configured layers (in config order) → unassigned
             if (layerSet.has("sources")) {
                 layerOrder.push("sources");
             }
-            
+
             // Add configured layers in their configured order (only if they exist in visible nodes)
             for (const layer of configuredLayersOrder) {
                 if (layerSet.has(layer)) {
                     layerOrder.push(layer);
                 }
             }
-            
+
             if (layerSet.has("unassigned")) {
                 layerOrder.push("unassigned");
             }
@@ -246,33 +270,8 @@
         const LAYER_INNER_PADDING = 30;
         const LEVEL_SPACING_WITHIN_LAYER = 220; // Increased vertical spacing so parent nodes end above child nodes
 
-        const layerBounds = new Map<string, { top: number; bottom: number; height: number }>();
-        if (layersConfigured) {
-            let cursorY = LAYER_START_Y;
-            for (const layer of layerOrder) {
-                const nodesInLayer = layerBuckets.get(layer) ?? [];
-                const levelsInLayer = new Set(nodesInLayer.map((n) => n.level));
-                const levelCount = Math.max(1, levelsInLayer.size);
-
-                const contentHeight =
-                    LAYER_HEADER_HEIGHT +
-                    LAYER_INNER_PADDING * 2 +
-                    (levelCount - 1) * LEVEL_SPACING_WITHIN_LAYER;
-
-                const height = Math.max(LAYER_MIN_HEIGHT, Math.min(LAYER_MAX_HEIGHT, contentHeight));
-                const top = cursorY;
-                const bottom = top + height;
-                layerBounds.set(layer, { top, bottom, height });
-                cursorY = bottom + LAYER_GAP;
-            }
-        }
-
-        // Persist bounds for drag clamping
-        layerBoundsByLayer = Object.fromEntries(
-            [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
-        );
-
-        // Precompute per-layer upstream ranks to ensure parents are always above their children
+        // FIRST: Compute per-layer upstream ranks to ensure parents are always above their children
+        // This must happen BEFORE layer bounds calculation so we can size layers correctly
         const computedLayerRankById = new Map<string, number>();
         function computeLayerRank(node: LineageNode): number {
             const cached = computedLayerRankById.get(node.id);
@@ -282,34 +281,91 @@
                 upstreamOf
                     .get(node.id)
                     ?.map((id) => nodeById.get(id))
-                    .filter((n): n is LineageNode => !!n && n.layer === node.layer) ?? [];
+                    .filter(
+                        (n): n is LineageNode => !!n && n.layer === node.layer,
+                    ) ?? [];
 
             if (sameLayerUpstreams.length === 0) {
                 computedLayerRankById.set(node.id, 0);
                 return 0;
             }
 
-            const rank = Math.max(...sameLayerUpstreams.map((n) => computeLayerRank(n))) + 1;
+            const rank =
+                Math.max(
+                    ...sameLayerUpstreams.map((n) => computeLayerRank(n)),
+                ) + 1;
             computedLayerRankById.set(node.id, rank);
             return rank;
         }
 
+        // Pre-compute ranks for all visible nodes so we can determine layer heights
+        for (const node of visibleLineageNodes) {
+            computeLayerRank(node);
+        }
+
+        // NOW calculate layer bounds using the computed ranks (not global levels)
+        const layerBounds = new Map<
+            string,
+            { top: number; bottom: number; height: number }
+        >();
+        if (layersConfigured) {
+            let cursorY = LAYER_START_Y;
+            for (const layer of layerOrder) {
+                const nodesInLayer = layerBuckets.get(layer) ?? [];
+
+                // Use computed ranks to determine layer height (not global levels)
+                const ranksInLayer = nodesInLayer.map(
+                    (n) => computedLayerRankById.get(n.id) ?? 0,
+                );
+                const maxRank =
+                    ranksInLayer.length > 0 ? Math.max(...ranksInLayer) : 0;
+                const rankCount = maxRank + 1; // +1 because rank 0 is first row, so maxRank 2 means 3 rows
+
+                const contentHeight =
+                    LAYER_HEADER_HEIGHT +
+                    LAYER_INNER_PADDING * 2 +
+                    (rankCount - 1) * LEVEL_SPACING_WITHIN_LAYER;
+
+                const height = Math.max(
+                    LAYER_MIN_HEIGHT,
+                    Math.min(LAYER_MAX_HEIGHT, contentHeight),
+                );
+                const top = cursorY;
+                const bottom = top + height;
+                layerBounds.set(layer, { top, bottom, height });
+                cursorY = bottom + LAYER_GAP;
+            }
+        }
+
+        // Persist bounds for drag clamping
+        layerBoundsByLayer = Object.fromEntries(
+            [...layerBounds.entries()].map(([k, v]) => [
+                k,
+                { top: v.top, bottom: v.bottom },
+            ]),
+        );
+
         // Precompute each node's sibling index and total at its level/layer
-        const levelPositions = new Map<string, { index: number; count: number }>();
-        
+        const levelPositions = new Map<
+            string,
+            { index: number; count: number }
+        >();
+
         // Collect all sources first to place them consecutively
-        const allSources = visibleLineageNodes.filter(n => n.isSource);
-        
+        const allSources = visibleLineageNodes.filter((n) => n.isSource);
+
         if (layersConfigured) {
             // Group by layer, then by level within each layer
             for (const layer of layerOrder) {
                 const layerNodes = layerBuckets.get(layer) ?? [];
-                
+
                 // Special handling for sources layer: place all sources consecutively
                 if (layer === "sources") {
-                    const sourcesInLayer = layerNodes.filter(n => n.isSource);
+                    const sourcesInLayer = layerNodes.filter((n) => n.isSource);
                     const count = sourcesInLayer.length;
-                    sourcesInLayer.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                    sourcesInLayer.forEach((n, idx) =>
+                        levelPositions.set(n.id, { index: idx, count }),
+                    );
                 } else {
                     // Within layer, bucket by computed rank (parents above children)
                     const rankBucketsInLayer = new Map<number, LineageNode[]>();
@@ -322,7 +378,9 @@
                     // Assign positions within each rank bucket
                     for (const [, nodes] of rankBucketsInLayer) {
                         const count = nodes.length;
-                        nodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                        nodes.forEach((n, idx) =>
+                            levelPositions.set(n.id, { index: idx, count }),
+                        );
                     }
                 }
             }
@@ -330,15 +388,19 @@
             // When layers not configured, still group all sources together
             if (allSources.length > 0) {
                 const count = allSources.length;
-                allSources.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                allSources.forEach((n, idx) =>
+                    levelPositions.set(n.id, { index: idx, count }),
+                );
             }
-            
+
             // Original behavior: bucket by level only for non-sources
             for (const [level, nodes] of levelBuckets) {
-                const nonSourceNodes = nodes.filter(n => !n.isSource);
+                const nonSourceNodes = nodes.filter((n) => !n.isSource);
                 if (nonSourceNodes.length > 0) {
                     const count = nonSourceNodes.length;
-                    nonSourceNodes.forEach((n, idx) => levelPositions.set(n.id, { index: idx, count }));
+                    nonSourceNodes.forEach((n, idx) =>
+                        levelPositions.set(n.id, { index: idx, count }),
+                    );
                 }
             }
         }
@@ -347,9 +409,15 @@
         layerRankById = new Map(computedLayerRankById);
 
         // Precompute hidden upstream info for visible nodes
-        const hiddenInfoById = new Map<string, { hiddenCount: number; hiddenSources: string[] }>();
+        const hiddenInfoById = new Map<
+            string,
+            { hiddenCount: number; hiddenSources: string[] }
+        >();
 
-        function computeHiddenInfo(targetId: string): { hiddenCount: number; hiddenSources: string[] } {
+        function computeHiddenInfo(targetId: string): {
+            hiddenCount: number;
+            hiddenSources: string[];
+        } {
             const hiddenNodes = new Set<string>();
             const hiddenSources = new Set<string>();
             const queue: string[] = [];
@@ -372,7 +440,10 @@
                 for (const up of upstreamOf.get(current) ?? []) queue.push(up);
             }
 
-            return { hiddenCount: hiddenNodes.size, hiddenSources: [...hiddenSources] };
+            return {
+                hiddenCount: hiddenNodes.size,
+                hiddenSources: [...hiddenSources],
+            };
         }
 
         for (const node of visibleLineageNodes) {
@@ -394,7 +465,10 @@
                     layerOrder,
                     layerBuckets,
                     new Map(
-                        [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
+                        [...layerBounds.entries()].map(([k, v]) => [
+                            k,
+                            { top: v.top, bottom: v.bottom },
+                        ]),
                     ),
                     existingPositions,
                     false, // Not ghosted - these are visible nodes
@@ -402,31 +476,46 @@
                 ),
             );
         }
-        
+
         // Ghost anchors: nodes not in default view but needed so edges keep endpoints
         const ghostedNodes: Node[] = [];
-        
+
         // Compute positions for ghosted nodes
         // We need to compute their level positions similar to visible nodes
-        const ghostedLevelPositions = new Map<string, { index: number; count: number }>();
-        
+        const ghostedLevelPositions = new Map<
+            string,
+            { index: number; count: number }
+        >();
+
         // Collect all ghosted sources to place them consecutively
-        const ghostedSources = ghostedLineageNodes.filter(n => n.isSource);
-        
+        const ghostedSources = ghostedLineageNodes.filter((n) => n.isSource);
+
         if (layersConfigured) {
             // Group ghosted nodes by layer, then by level within each layer
             for (const layer of layerOrder) {
-                const ghostedInLayer = ghostedLineageNodes.filter(n => n.layer === layer);
-                
+                const ghostedInLayer = ghostedLineageNodes.filter(
+                    (n) => n.layer === layer,
+                );
+
                 // Special handling for sources layer: place all ghosted sources consecutively
                 if (layer === "sources") {
-                    const ghostedSourcesInLayer = ghostedInLayer.filter(n => n.isSource);
+                    const ghostedSourcesInLayer = ghostedInLayer.filter(
+                        (n) => n.isSource,
+                    );
                     if (ghostedSourcesInLayer.length > 0) {
                         const count = ghostedSourcesInLayer.length;
-                        ghostedSourcesInLayer.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                        ghostedSourcesInLayer.forEach((n, idx) =>
+                            ghostedLevelPositions.set(n.id, {
+                                index: idx,
+                                count,
+                            }),
+                        );
                     }
                 } else {
-                    const levelBucketsInLayer = new Map<number, LineageNode[]>();
+                    const levelBucketsInLayer = new Map<
+                        number,
+                        LineageNode[]
+                    >();
                     for (const node of ghostedInLayer) {
                         const levelSafe = node.level ?? 0;
                         const bucket = levelBucketsInLayer.get(levelSafe) ?? [];
@@ -436,7 +525,12 @@
                     // Assign positions within each level in the layer
                     for (const [, nodes] of levelBucketsInLayer) {
                         const count = nodes.length;
-                        nodes.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                        nodes.forEach((n, idx) =>
+                            ghostedLevelPositions.set(n.id, {
+                                index: idx,
+                                count,
+                            }),
+                        );
                     }
                 }
             }
@@ -444,9 +538,11 @@
             // When layers not configured, still group all ghosted sources together
             if (ghostedSources.length > 0) {
                 const count = ghostedSources.length;
-                ghostedSources.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                ghostedSources.forEach((n, idx) =>
+                    ghostedLevelPositions.set(n.id, { index: idx, count }),
+                );
             }
-            
+
             // Original behavior: bucket by level only for non-source ghosted nodes
             const ghostedLevelBuckets = new Map<number, LineageNode[]>();
             for (const node of ghostedLineageNodes) {
@@ -459,31 +555,33 @@
             }
             for (const [, nodes] of ghostedLevelBuckets) {
                 const count = nodes.length;
-                nodes.forEach((n, idx) => ghostedLevelPositions.set(n.id, { index: idx, count }));
+                nodes.forEach((n, idx) =>
+                    ghostedLevelPositions.set(n.id, { index: idx, count }),
+                );
             }
         }
-        
+
         // For ghosted nodes, we need to compute approximate positions based on their level/layer
         // We'll use a simplified positioning that doesn't affect the main layout
         for (const ghostedNode of ghostedLineageNodes) {
             // Try to get position from existing nodes if it was manually positioned
             const existing = existingPositions.get(ghostedNode.id);
-            
+
             // Compute approximate position based on level/layer if not already positioned
             if (!existing) {
                 // Use the same positioning logic as visible nodes, but with ghosted level positions
                 const pos = ghostedLevelPositions.get(ghostedNode.id);
                 const indexInLevel = pos?.index ?? 0;
                 const countAtLevel = pos?.count ?? 1;
-                
+
                 // Don't store position in existingPositions - let createFlowNode compute it
                 // This ensures consistent positioning logic
             }
-            
+
             const pos = ghostedLevelPositions.get(ghostedNode.id);
             const indexInLevel = pos?.index ?? 0;
             const countAtLevel = pos?.count ?? 1;
-            
+
             const ghostedFlowNode = createFlowNode(
                 ghostedNode,
                 indexInLevel,
@@ -492,27 +590,41 @@
                 layerOrder,
                 layerBuckets,
                 new Map(
-                    [...layerBounds.entries()].map(([k, v]) => [k, { top: v.top, bottom: v.bottom }]),
+                    [...layerBounds.entries()].map(([k, v]) => [
+                        k,
+                        { top: v.top, bottom: v.bottom },
+                    ]),
                 ),
                 existingPositions,
                 true, // isGhosted = true - keep nodes as ghost anchors, not in default view
                 undefined, // no hidden info for ghosted nodes
             );
             // Mark node as _notInDefaultView so fitView can exclude it
-            ghostedFlowNode.data = { ...ghostedFlowNode.data, _notInDefaultView: true };
+            ghostedFlowNode.data = {
+                ...ghostedFlowNode.data,
+                _notInDefaultView: true,
+            };
             ghostedNodes.push(ghostedFlowNode);
         }
-        
+
         // Create edges for ALL nodes (visible and ghosted)
         // Edges connecting to/from ghosted nodes will be marked as ghosted
         const visibleEdges: Edge[] = [];
         const ghostedEdges: Edge[] = [];
         let skippedEdgesCount = 0;
-        let skippedEdgesDetails: Array<{source: string, target: string, sourceVisible: boolean, targetVisible: boolean}> = [];
-        
+        let skippedEdgesDetails: Array<{
+            source: string;
+            target: string;
+            sourceVisible: boolean;
+            targetVisible: boolean;
+        }> = [];
+
         // Iterate over all nodes (visible + ghosted) to create edges
-        const allNodesForEdges = [...visibleLineageNodes, ...ghostedLineageNodes];
-        
+        const allNodesForEdges = [
+            ...visibleLineageNodes,
+            ...ghostedLineageNodes,
+        ];
+
         for (const targetNode of allNodesForEdges) {
             const targetId = targetNode.id;
             const directUpstream = upstreamOf.get(targetId) ?? [];
@@ -521,11 +633,11 @@
                 const targetVisible = visibleNodeIds.has(targetId);
                 const sourceGhosted = ghostedNodeIds.has(upstreamId);
                 const targetGhosted = ghostedNodeIds.has(targetId);
-                
+
                 // Skip only if both endpoints are ghosted and neither is in the graph
                 // Actually, we want to create edges if at least one endpoint is visible OR ghosted
                 const edgeIsGhosted = sourceGhosted || targetGhosted;
-                
+
                 const edge = {
                     id: `edge-${upstreamId}-${targetId}`,
                     source: upstreamId,
@@ -533,7 +645,7 @@
                     type: LINEAGE_EDGE_TYPE,
                     data: { _ghosted: edgeIsGhosted },
                 };
-                
+
                 if (edgeIsGhosted) {
                     ghostedEdges.push(edge);
                 } else {
@@ -550,21 +662,20 @@
                 sourceOverlays.push(...computeSourceOverlayEdges(node.id));
             }
         }
-        
+
         overlayEdges = sourceOverlays;
         // Combine visible and ghosted nodes (ghosted nodes are added for edge anchoring)
         lineageNodes = [...visibleNodes, ...ghostedNodes];
         // Combine visible and ghosted edges
         baseLineageEdges = [...visibleEdges, ...ghostedEdges];
         lineageEdges = [...baseLineageEdges, ...overlayEdges];
-        
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
             // Create an "infinite" horizontal strip that spans the entire canvas
             const xs = visibleNodes.map((n) => n.position.x);
             const minX = Math.min(...xs, 0);
-            
+
             // Use massive width to create seamless infinite bands
             const BAND_WIDTH = 100000;
             const bandX = minX - 50000;
@@ -574,7 +685,11 @@
                 const top = bounds?.top ?? 0;
                 const height = bounds?.height ?? 220;
                 const label =
-                    layer === "sources" ? "Sources" : layer === "unassigned" ? "Unassigned" : layer;
+                    layer === "sources"
+                        ? "Sources"
+                        : layer === "unassigned"
+                          ? "Unassigned"
+                          : layer;
                 return {
                     id: `layer-band-${layer}`,
                     type: "layerBand",
@@ -596,38 +711,46 @@
                 ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
                 ...ghostedNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
             ];
-            layerBandMeta = bandNodes.map((b) => ({ id: b.id as string, bandX }));
+            layerBandMeta = bandNodes.map((b) => ({
+                id: b.id as string,
+                bandX,
+            }));
         } else {
             // Include both visible and ghosted nodes
             lineageNodes = [...visibleNodes, ...ghostedNodes];
             layerBandMeta = [];
         }
 
-    // Fit view only on initial load (not on expansion)
+        // Fit view only on initial load (not on expansion)
         // On expansion, preserve the current viewport so users don't lose context
         if (!flowInitialized) {
             queueMicrotask(() => {
                 try {
                     // Only fit visible nodes (not ghosted nodes or layer bands)
                     const fitNodes = lineageNodes.filter((n) => {
-                        if (n.id.toString().startsWith("layer-band-")) return false;
+                        if (n.id.toString().startsWith("layer-band-"))
+                            return false;
                         // Exclude nodes not in default view (ghosted nodes)
-                        const notInDefaultView = (n.data as any)?._notInDefaultView ?? false;
+                        const notInDefaultView =
+                            (n.data as any)?._notInDefaultView ?? false;
                         return !notInDefaultView;
                     });
-                    
+
                     // Sample actual nodes being passed to SvelteFlow
-                    const actualNodesSample = lineageNodes.filter(n => !String(n.id).startsWith("layer-band-")).slice(0, 3).map(n => ({
-                        id: n.id,
-                        type: n.type,
-                        x: n.position.x,
-                        y: n.position.y,
-                        hidden: n.hidden,
-                        draggable: n.draggable,
-                        selectable: n.selectable,
-                        ghosted: (n.data as any)?._ghosted,
-                    }));
-                    
+                    const actualNodesSample = lineageNodes
+                        .filter((n) => !String(n.id).startsWith("layer-band-"))
+                        .slice(0, 3)
+                        .map((n) => ({
+                            id: n.id,
+                            type: n.type,
+                            x: n.position.x,
+                            y: n.position.y,
+                            hidden: n.hidden,
+                            draggable: n.draggable,
+                            selectable: n.selectable,
+                            ghosted: (n.data as any)?._ghosted,
+                        }));
+
                     flowRef?.fitView?.({
                         padding: 0.2,
                         nodes: fitNodes,
@@ -645,7 +768,6 @@
             applyConnectedNodeHighlighting();
         });
     }
-
 
     function createFlowNode(
         node: LineageNode,
@@ -674,13 +796,13 @@
 
         const H_SPACING = 260; // Horizontal spacing between siblings at the same level (use more width)
         const LEVEL_SPACING_WITHIN_LAYER = 220; // vertical spacing within a layer for different levels (increased for better separation)
-        
+
         let yPosition: number;
         let xPosition: number;
         let extent: Node["extent"] | undefined;
 
         const existing = existingPositions.get(node.id);
-        
+
         if (layersConfigured && node.layer) {
             // Layer-based positioning
             const layerIndex = layerOrder.indexOf(node.layer);
@@ -689,11 +811,9 @@
             const bottom = bounds?.bottom ?? top + 200;
             const padding = 30;
 
-            // If we have an existing position, use it AS-IS (don't clamp)
-            // This preserves node positions when layers are added/removed
-            if (existing) {
-                yPosition = existing.y;
-            } else if (layerIndex === -1) {
+            // Do not preserve Y for layer-based nodes, as layer bounds might change (e.g. expansion)
+            // requiring nodes to shift vertically. X position is preserved later.
+            if (layerIndex === -1) {
                 yPosition = top + 40;
             } else {
                 // Special handling for sources: place all sources on the same Y line
@@ -708,9 +828,12 @@
                     const baseY = top + 40;
                     yPosition = baseY + rank * LEVEL_SPACING_WITHIN_LAYER;
                 }
-                
-                // Only clamp NEW nodes (not existing ones)
-                yPosition = Math.min(Math.max(yPosition, top + padding), bottom - padding);
+
+                // Clamp auto-laid-out nodes to layer bounds
+                yPosition = Math.min(
+                    Math.max(yPosition, top + padding),
+                    bottom - padding,
+                );
             }
 
             // Hard constraint: prevent dragging outside of the layer band (works during drag)
@@ -721,11 +844,14 @@
             ];
         } else {
             // Original level-based positioning (backward compatibility)
-            const maxLevel = Math.max(...lineageData.nodes.map((n) => n.level ?? 0), 0);
+            const maxLevel = Math.max(
+                ...lineageData.nodes.map((n) => n.level ?? 0),
+                0,
+            );
             const BOTTOM_Y = 500;
             const TOP_Y = 80;
             const LEVEL_SPACING = 180; // Increased spacing for better vertical separation
-            
+
             const levelSafe = node.level ?? 0;
 
             if (node.isSource) {
@@ -733,10 +859,10 @@
             } else if (levelSafe === 0) {
                 yPosition = BOTTOM_Y;
             } else {
-                yPosition = BOTTOM_Y - (levelSafe * LEVEL_SPACING);
+                yPosition = BOTTOM_Y - levelSafe * LEVEL_SPACING;
             }
         }
-        
+
         // X position: keep levels vertically aligned (no diagonal drift), but spread siblings.
         const siblingCenterOffset = (countAtLevel - 1) / 2;
         const siblingOffset = (indexInLevel - siblingCenterOffset) * H_SPACING;
@@ -746,7 +872,7 @@
         const CLAMP_X = 4000;
         if (xPosition > CLAMP_X) xPosition = CLAMP_X;
         if (xPosition < -CLAMP_X) xPosition = -CLAMP_X;
-        
+
         const baseNode: Node = {
             id: node.id,
             type: node.isSource ? "source" : "default",
@@ -778,13 +904,21 @@
         return baseNode;
     }
 
-    function handleNodeDragStop(event: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    function handleNodeDragStop(event: {
+        targetNode: Node | null;
+        nodes: Node[];
+        event: MouseEvent | TouchEvent;
+    }) {
         // Enforce "node stays in its layer" by clamping Y to the band bounds.
         const dragged = event.targetNode;
         if (!dragged) return;
 
         // Ignore background band nodes
-        if (typeof dragged.id === "string" && dragged.id.startsWith("layer-band-")) return;
+        if (
+            typeof dragged.id === "string" &&
+            dragged.id.startsWith("layer-band-")
+        )
+            return;
 
         const layer = (dragged.data as any)?.layer as string | undefined;
         if (!layer) return;
@@ -795,7 +929,10 @@
         const padding = 30;
         const top = bounds.top;
         const bottom = bounds.bottom;
-        const clampedY = Math.min(Math.max(dragged.position.y, top + padding), bottom - padding);
+        const clampedY = Math.min(
+            Math.max(dragged.position.y, top + padding),
+            bottom - padding,
+        );
 
         lineageNodes = lineageNodes.map((n) => {
             if (n.id !== dragged.id) return n;
@@ -822,7 +959,7 @@
             if (node.selected && !node.hidden) {
                 const nodeId = String(node.id);
                 // Exclude layer band background nodes
-                if (node.type !== 'layerBand') {
+                if (node.type !== "layerBand") {
                     selectedNodeIds.add(nodeId);
                 }
             }
@@ -845,7 +982,11 @@
             return lineageNodes.find((n) => String(n.id) === id);
         };
 
-        const connectedNodeIds = getConnectedNodeIds(selectedNodeIds, lineageEdges, getNode);
+        const connectedNodeIds = getConnectedNodeIds(
+            selectedNodeIds,
+            lineageEdges,
+            getNode,
+        );
 
         // Update nodes with connected state
         lineageNodes = lineageNodes.map((node) => {
@@ -861,10 +1002,11 @@
 
     // Handle node selection changes to update connected highlighting
     function handleNodesChange(changes: any) {
-
         // Check if any change affects selection
-        const hasSelectionChange = changes.some((change: any) => 
-            change.type === 'select' || change.type === 'position' && change.selected !== undefined
+        const hasSelectionChange = changes.some(
+            (change: any) =>
+                change.type === "select" ||
+                (change.type === "position" && change.selected !== undefined),
         );
         if (hasSelectionChange || changes.length > 0) {
             // Use a microtask to ensure nodes are updated
@@ -942,8 +1084,6 @@
         return edges;
     }
 
-
-
     function handleBackdropClick(event: MouseEvent) {
         if (event.target === event.currentTarget) {
             onClose();
@@ -971,7 +1111,6 @@
             };
         }
     });
-
 </script>
 
 {#if open}
@@ -988,14 +1127,24 @@
             class="bg-white rounded-xl shadow-2xl w-[94vw] h-[92vh] max-w-[1600px] max-h-[920px] border border-gray-200 flex flex-col"
         >
             <!-- Header -->
-            <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0 relative z-40">
+            <div
+                class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0 relative z-40"
+            >
                 <div class="flex items-center gap-2">
-                    <Icon icon="lucide:git-branch" class="w-5 h-5 text-primary-600" />
-                    <h2 id="lineage-modal-title" class="text-lg font-semibold text-gray-900">
+                    <Icon
+                        icon="lucide:git-branch"
+                        class="w-5 h-5 text-primary-600"
+                    />
+                    <h2
+                        id="lineage-modal-title"
+                        class="text-lg font-semibold text-gray-900"
+                    >
                         Upstream Lineage
                     </h2>
                     {#if modelId}
-                        <span class="text-sm text-gray-500 font-mono">{modelId}</span>
+                        <span class="text-sm text-gray-500 font-mono"
+                            >{modelId}</span
+                        >
                     {/if}
                 </div>
                 <button
@@ -1014,22 +1163,40 @@
             <!-- Content -->
             <div class="flex-1 overflow-hidden relative">
                 {#if loading}
-                    <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                        <div class="flex flex-col items-center gap-3 text-gray-600">
-                            <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin" />
+                    <div
+                        class="absolute inset-0 flex items-center justify-center bg-white/80 z-10"
+                    >
+                        <div
+                            class="flex flex-col items-center gap-3 text-gray-600"
+                        >
+                            <Icon
+                                icon="lucide:loader-2"
+                                class="w-8 h-8 animate-spin"
+                            />
                             <span class="text-sm">Generating lineage...</span>
                         </div>
                     </div>
                 {:else if error}
                     <div class="p-5 flex flex-col items-center gap-4">
-                        <div class="flex items-center gap-3 text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-4 py-3">
-                            <Icon icon="lucide:alert-triangle" class="w-5 h-5" />
+                        <div
+                            class="flex items-center gap-3 text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-4 py-3"
+                        >
+                            <Icon
+                                icon="lucide:alert-triangle"
+                                class="w-5 h-5"
+                            />
                             <span class="text-sm">{error}</span>
                         </div>
                         {#if error.includes("catalog") || error.includes("Catalog")}
-                            <div class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-                                <p class="font-medium mb-1">To generate lineage, you need to:</p>
-                                <code class="block bg-white px-2 py-1 rounded border border-gray-300 mt-2">
+                            <div
+                                class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3"
+                            >
+                                <p class="font-medium mb-1">
+                                    To generate lineage, you need to:
+                                </p>
+                                <code
+                                    class="block bg-white px-2 py-1 rounded border border-gray-300 mt-2"
+                                >
                                     dbt docs generate
                                 </code>
                             </div>
@@ -1046,8 +1213,8 @@
                         bind:this={flowRef}
                         bind:nodes={lineageNodes}
                         edges={lineageEdges}
-                        nodeTypes={nodeTypes}
-                        edgeTypes={edgeTypes}
+                        {nodeTypes}
+                        {edgeTypes}
                         defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
                         panOnDrag={true}
                         selectionOnDrag={false}
@@ -1062,7 +1229,11 @@
                         {#if layerBandMeta.length > 0}
                             <LineageViewportSync bands={layerBandMeta} />
                         {/if}
-                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+                        <Background
+                            variant={BackgroundVariant.Dots}
+                            gap={20}
+                            size={1}
+                        />
                         <MiniMap />
                     </SvelteFlow>
                 {:else if lineageData}
@@ -1071,8 +1242,6 @@
                     </div>
                 {/if}
             </div>
-
         </div>
     </div>
 {/if}
-
