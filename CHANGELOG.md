@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed lineage edges disappearing in complex lineage graphs: edges were being hidden when their source or target nodes were marked as hidden by progressive expansion rules. The lineage modal now ensures all lineage nodes remain visible, preventing edges from disappearing during progressive expansion or when navigating complex lineage graphs.
+
 ## [0.4.0] - 2025-01-15
 
 ### Added
