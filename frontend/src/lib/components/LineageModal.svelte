@@ -15,7 +15,6 @@
     import LineageModelNode from "./LineageModelNode.svelte";
     import LineageLayerBandNode from "./LineageLayerBandNode.svelte";
     import LineageViewportSync from "./LineageViewportSync.svelte";
-    import LineageBackgroundLayer from "./LineageBackgroundLayer.svelte";
     import LineageEdgeComponent from "./LineageEdge.svelte";
     import { getConnectedNodeIds } from "$lib/edge-highlight-utils";
 
@@ -883,7 +882,7 @@
             // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
             // Include both visible and ghosted nodes
             lineageNodes = [
-                // ...bandNodes,
+                ...bandNodes,
                 ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
                 ...ghostedNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
             ];
@@ -1404,11 +1403,7 @@
                         </button>
                     </div>
                 {:else if lineageData && lineageNodes.length > 0}
-                    <!-- External Background Layer for Bands (Behind Graph) -->
-                    <LineageBackgroundLayer
-                        bands={externalBands}
-                        viewport={viewportState}
-                    />
+
 
                     <SvelteFlow
                         bind:this={flowRef}
