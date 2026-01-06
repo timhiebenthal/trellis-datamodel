@@ -9,15 +9,15 @@ entities:
     collapsed: false
   department:
     position:
-      x: 638.5344987976794
-      y: 383.0180305131761
+      x: 40
+      y: 100
     width: 280
     panel_height: 200
     collapsed: false
   vip_customer:
     position:
-      x: 40
-      y: 401.4395018685962
+      x: 266.38149594872584
+      y: 423.88249500144406
     width: 280
     panel_height: 200
     collapsed: true

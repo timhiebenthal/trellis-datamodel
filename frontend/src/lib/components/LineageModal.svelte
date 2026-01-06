@@ -659,7 +659,10 @@
             for (const [, nodes] of ghostedLevelBuckets) {
                 const count = nodes.length;
                 nodes.forEach((n, idx) =>
-                    ghostedLevelPositions.set(n.id, { index: idx, count }),
+                    ghostedLevelPositions.set(n.id, {
+                        index: idx,
+                        count,
+                    }),
                 );
             }
         }
@@ -667,20 +670,6 @@
         // For ghosted nodes, we need to compute approximate positions based on their level/layer
         // We'll use a simplified positioning that doesn't affect the main layout
         for (const ghostedNode of ghostedLineageNodes) {
-            // Try to get position from existing nodes if it was manually positioned
-            const existing = existingPositions.get(ghostedNode.id);
-
-            // Compute approximate position based on level/layer if not already positioned
-            if (!existing) {
-                // Use the same positioning logic as visible nodes, but with ghosted level positions
-                const pos = ghostedLevelPositions.get(ghostedNode.id);
-                const indexInLevel = pos?.index ?? 0;
-                const countAtLevel = pos?.count ?? 1;
-
-                // Don't store position in existingPositions - let createFlowNode compute it
-                // This ensures consistent positioning logic
-            }
-
             const pos = ghostedLevelPositions.get(ghostedNode.id);
             const indexInLevel = pos?.index ?? 0;
             const countAtLevel = pos?.count ?? 1;
@@ -710,36 +699,23 @@
             ghostedNodes.push(ghostedFlowNode);
         }
 
-        // Create edges for ALL nodes (visible and ghosted)
-        // Edges connecting to/from ghosted nodes will be marked as ghosted
+        // Render visible edges
+        const seenEdgeIds = new Set<string>();
+        let duplicateEdgeIdCount = 0;
+        let missingEndpointCount = 0;
         const visibleEdges: Edge[] = [];
-        const ghostedEdges: Edge[] = [];
-        let skippedEdgesCount = 0;
-        let skippedEdgesDetails: Array<{
-            source: string;
-            target: string;
-            sourceVisible: boolean;
-            targetVisible: boolean;
-        }> = [];
-
-        // Iterate over all nodes (visible + ghosted) to create edges
-        const allNodesForEdges = [
-            ...visibleLineageNodes,
-            ...ghostedLineageNodes,
-        ];
-
-        for (const targetNode of allNodesForEdges) {
+        
+        for (const targetNode of visibleLineageNodes) {
             const targetId = targetNode.id;
             const directUpstream = upstreamOf.get(targetId) ?? [];
             for (const upstreamId of directUpstream) {
                 const sourceVisible = visibleNodeIds.has(upstreamId);
-                const targetVisible = visibleNodeIds.has(targetId);
-                const sourceGhosted = ghostedNodeIds.has(upstreamId);
-                const targetGhosted = ghostedNodeIds.has(targetId);
 
-                // Skip only if both endpoints are ghosted and neither is in the graph
-                // Actually, we want to create edges if at least one endpoint is visible OR ghosted
-                const edgeIsGhosted = sourceGhosted || targetGhosted;
+                // Only render edges where both endpoints are visible.
+                // Hidden upstream relationships are handled by overlay edges.
+                if (!sourceVisible) continue;
+
+                const edgeIsGhosted = false;
 
                 const edge = {
                     id: `edge-${upstreamId}-${targetId}`,
@@ -750,11 +726,18 @@
                     data: { _ghosted: edgeIsGhosted },
                 };
 
-                if (edgeIsGhosted) {
-                    ghostedEdges.push(edge);
-                } else {
-                    visibleEdges.push(edge);
+                if (seenEdgeIds.has(edge.id)) {
+                    duplicateEdgeIdCount += 1;
+                    continue;
                 }
+                seenEdgeIds.add(edge.id);
+
+                if (!nodeById.has(upstreamId) || !nodeById.has(targetId)) {
+                    missingEndpointCount += 1;
+                    continue;
+                }
+
+                visibleEdges.push(edge);
             }
         }
 
@@ -770,8 +753,8 @@
         overlayEdges = sourceOverlays;
         // Combine visible and ghosted nodes (ghosted nodes are added for edge anchoring)
         lineageNodes = [...visibleNodes, ...ghostedNodes];
-        // Combine visible and ghosted edges
-        baseLineageEdges = [...visibleEdges, ...ghostedEdges];
+        // Base edges are visible-only
+        baseLineageEdges = [...visibleEdges];
         lineageEdges = [...baseLineageEdges, ...overlayEdges];
 
         // ======== DEBUG LOGGING (writes to debug.log) ========
@@ -836,10 +819,12 @@
                     source: e.source,
                     target: e.target,
                 })),
-                ghosted: ghostedEdges.map((e) => ({
-                    source: e.source,
-                    target: e.target,
-                })),
+            },
+            edgeStats: {
+                duplicateEdgeIdCount,
+                missingEndpointCount,
+                visibleEdgesCount: visibleEdges.length,
+                overlayEdgesCount: sourceOverlays.length,
             },
         });
         // ======== END DEBUG LOGGING ========
@@ -1081,8 +1066,8 @@
 
         // Keep ghost anchors completely hidden but present for edge endpoints
         if (isGhosted) {
-            baseNode.hidden = true;
             baseNode.focusable = false;
+            baseNode.style = "opacity: 0; pointer-events: none;";
         }
 
         return baseNode;
