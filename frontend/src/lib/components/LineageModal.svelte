@@ -421,6 +421,31 @@
             connectedVisibleById.set(e.target, tList);
         }
 
+        // Overlay edges represent "skipped" connections to visible sources when intermediate
+        // models are hidden. They are critical for ordering in partially-expanded views,
+        // otherwise crossings can remain until fully expanded.
+        const overlayKeySeen = new Set<string>();
+        for (const node of visibleLineageNodes) {
+            const overlays = computeSourceOverlayEdges(node.id);
+            for (const oe of overlays) {
+                const source = String(oe.source);
+                const target = String(oe.target);
+                if (!visibleNodeIds.has(source) || !visibleNodeIds.has(target)) {
+                    continue;
+                }
+                const key = `${source}→${target}`;
+                if (overlayKeySeen.has(key)) continue;
+                overlayKeySeen.add(key);
+
+                const sList = connectedVisibleById.get(source) ?? [];
+                sList.push(target);
+                connectedVisibleById.set(source, sList);
+                const tList = connectedVisibleById.get(target) ?? [];
+                tList.push(source);
+                connectedVisibleById.set(target, tList);
+            }
+        }
+
         function stableFallbackKey(id: string): number {
             const existing = existingPositions.get(id);
             if (existing) return existing.x;
@@ -431,25 +456,37 @@
             return nodeById.get(id)?.label ?? id;
         }
 
-        function reorderRow(
-            rowIds: string[],
-            referenceRowIds: string[],
-        ): string[] {
-            const refIndexById = new Map<string, number>();
-            referenceRowIds.forEach((id, idx) => refIndexById.set(id, idx));
+        function reorderRowAt(rowIndex: number, rowOrders: string[][]): string[] {
+            const rowIndexById = new Map<string, number>();
+            const indexInRowById = new Map<string, number>();
+            for (let r = 0; r < rowOrders.length; r++) {
+                const ids = rowOrders[r];
+                for (let i = 0; i < ids.length; i++) {
+                    const id = ids[i];
+                    rowIndexById.set(id, r);
+                    indexInRowById.set(id, i);
+                }
+            }
 
+            const rowIds = rowOrders[rowIndex] ?? [];
             const scored = rowIds.map((id, originalIndex) => {
                 const neighborIds = connectedVisibleById.get(id) ?? [];
-                const neighborIndices: number[] = [];
+                let weightedSum = 0;
+                let weightTotal = 0;
                 for (const nId of neighborIds) {
-                    const idx = refIndexById.get(nId);
-                    if (idx !== undefined) neighborIndices.push(idx);
+                    const nRow = rowIndexById.get(nId);
+                    const nIdx = indexInRowById.get(nId);
+                    if (nRow === undefined || nIdx === undefined) continue;
+                    const dist = Math.abs(nRow - rowIndex);
+                    if (dist === 0) continue;
+                    const w = 1 / dist;
+                    weightedSum += w * nIdx;
+                    weightTotal += w;
                 }
 
                 const barycenter =
-                    neighborIndices.length > 0
-                        ? neighborIndices.reduce((a, b) => a + b, 0) /
-                          neighborIndices.length
+                    weightTotal > 0
+                        ? weightedSum / weightTotal
                         : Number.POSITIVE_INFINITY;
 
                 return {
@@ -542,10 +579,10 @@
         const SWEEPS = 4;
         for (let pass = 0; pass < SWEEPS; pass++) {
             for (let i = 1; i < rowOrders.length; i++) {
-                rowOrders[i] = reorderRow(rowOrders[i], rowOrders[i - 1]);
+                rowOrders[i] = reorderRowAt(i, rowOrders);
             }
             for (let i = rowOrders.length - 2; i >= 0; i--) {
-                rowOrders[i] = reorderRow(rowOrders[i], rowOrders[i + 1]);
+                rowOrders[i] = reorderRowAt(i, rowOrders);
             }
         }
 
@@ -1139,6 +1176,30 @@
         });
     }
 
+    // React to selection changes from SvelteFlow interactions.
+    // We cannot rely on a nodes-change callback prop (not present in @xyflow/svelte typings).
+    // This effect only re-runs when the selection set changes, preventing update loops
+    // when applyConnectedNodeHighlighting() mutates node data.
+    let lastSelectionKey = "";
+    $effect(() => {
+        const selectedIds: string[] = [];
+        for (const node of lineageNodes) {
+            if (node.selected && !node.hidden) {
+                const nodeId = String(node.id);
+                if (node.type !== "layerBand") {
+                    selectedIds.push(nodeId);
+                }
+            }
+        }
+        selectedIds.sort();
+        const selectionKey = selectedIds.join("|");
+        if (selectionKey === lastSelectionKey) return;
+        lastSelectionKey = selectionKey;
+        queueMicrotask(() => {
+            applyConnectedNodeHighlighting();
+        });
+    });
+
     // Handle node selection changes to update connected highlighting
     function handleNodesChange(changes: any) {
         // Check if any change affects selection
@@ -1364,7 +1425,6 @@
                         nodesDraggable={true}
                         nodesConnectable={false}
                         onnodedragstop={handleNodeDragStop}
-                        onnodeschange={handleNodesChange}
                         class="w-full h-full bg-transparent"
                     >
                         <Controls />
