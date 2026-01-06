@@ -400,64 +400,158 @@
             ]),
         );
 
-        // Precompute each node's sibling index and total at its level/layer
+        // Precompute each node's sibling index and total at its row.
+        // Reorder nodes within each row using a lightweight barycenter heuristic
+        // to reduce edge crossings.
         const levelPositions = new Map<
             string,
             { index: number; count: number }
         >();
 
-        // Collect all sources first to place them consecutively
-        const allSources = visibleLineageNodes.filter((n) => n.isSource);
+        const connectedVisibleById = new Map<string, string[]>();
+        for (const e of lineageData.edges) {
+            if (!visibleNodeIds.has(e.source) || !visibleNodeIds.has(e.target)) {
+                continue;
+            }
+            const sList = connectedVisibleById.get(e.source) ?? [];
+            sList.push(e.target);
+            connectedVisibleById.set(e.source, sList);
+            const tList = connectedVisibleById.get(e.target) ?? [];
+            tList.push(e.source);
+            connectedVisibleById.set(e.target, tList);
+        }
+
+        function stableFallbackKey(id: string): number {
+            const existing = existingPositions.get(id);
+            if (existing) return existing.x;
+            return 0;
+        }
+
+        function stableFallbackLabel(id: string): string {
+            return nodeById.get(id)?.label ?? id;
+        }
+
+        function reorderRow(
+            rowIds: string[],
+            referenceRowIds: string[],
+        ): string[] {
+            const refIndexById = new Map<string, number>();
+            referenceRowIds.forEach((id, idx) => refIndexById.set(id, idx));
+
+            const scored = rowIds.map((id, originalIndex) => {
+                const neighborIds = connectedVisibleById.get(id) ?? [];
+                const neighborIndices: number[] = [];
+                for (const nId of neighborIds) {
+                    const idx = refIndexById.get(nId);
+                    if (idx !== undefined) neighborIndices.push(idx);
+                }
+
+                const barycenter =
+                    neighborIndices.length > 0
+                        ? neighborIndices.reduce((a, b) => a + b, 0) /
+                          neighborIndices.length
+                        : Number.POSITIVE_INFINITY;
+
+                return {
+                    id,
+                    barycenter,
+                    originalIndex,
+                    fallbackX: stableFallbackKey(id),
+                    fallbackLabel: stableFallbackLabel(id),
+                };
+            });
+
+            scored.sort((a, b) => {
+                if (a.barycenter !== b.barycenter) {
+                    return a.barycenter - b.barycenter;
+                }
+                if (a.fallbackX !== b.fallbackX) {
+                    return a.fallbackX - b.fallbackX;
+                }
+                const labelCmp = a.fallbackLabel.localeCompare(b.fallbackLabel);
+                if (labelCmp !== 0) return labelCmp;
+                return a.originalIndex - b.originalIndex;
+            });
+
+            return scored.map((s) => s.id);
+        }
+
+        function initialRowOrder(nodes: LineageNode[]): string[] {
+            return [...nodes]
+                .sort((a, b) => {
+                    const ax = stableFallbackKey(a.id);
+                    const bx = stableFallbackKey(b.id);
+                    if (ax !== bx) return ax - bx;
+                    return (a.label ?? a.id).localeCompare(b.label ?? b.id);
+                })
+                .map((n) => n.id);
+        }
+
+        const rows: Array<{ key: string; ids: string[] }> = [];
 
         if (layersConfigured) {
-            // Group by layer, then by level within each layer
             for (const layer of layerOrder) {
                 const layerNodes = layerBuckets.get(layer) ?? [];
 
-                // Special handling for sources layer: place all sources consecutively
                 if (layer === "sources") {
                     const sourcesInLayer = layerNodes.filter((n) => n.isSource);
-                    const count = sourcesInLayer.length;
-                    sourcesInLayer.forEach((n, idx) =>
-                        levelPositions.set(n.id, { index: idx, count }),
-                    );
-                } else {
-                    // Within layer, bucket by computed rank (parents above children)
-                    const rankBucketsInLayer = new Map<number, LineageNode[]>();
-                    for (const node of layerNodes) {
-                        const rank = computeLayerRank(node);
-                        const bucket = rankBucketsInLayer.get(rank) ?? [];
-                        bucket.push(node);
-                        rankBucketsInLayer.set(rank, bucket);
+                    const ids = initialRowOrder(sourcesInLayer);
+                    if (ids.length > 0) {
+                        rows.push({ key: `layer:${layer}:rank:0`, ids });
                     }
-                    // Assign positions within each rank bucket
-                    for (const [, nodes] of rankBucketsInLayer) {
-                        const count = nodes.length;
-                        nodes.forEach((n, idx) =>
-                            levelPositions.set(n.id, { index: idx, count }),
-                        );
+                    continue;
+                }
+
+                const rankBucketsInLayer = new Map<number, LineageNode[]>();
+                for (const node of layerNodes) {
+                    const rank = computeLayerRank(node);
+                    const bucket = rankBucketsInLayer.get(rank) ?? [];
+                    bucket.push(node);
+                    rankBucketsInLayer.set(rank, bucket);
+                }
+
+                const ranks = [...rankBucketsInLayer.keys()].sort((a, b) => a - b);
+                for (const rank of ranks) {
+                    const bucket = rankBucketsInLayer.get(rank) ?? [];
+                    const ids = initialRowOrder(bucket);
+                    if (ids.length > 0) {
+                        rows.push({ key: `layer:${layer}:rank:${rank}`, ids });
                     }
                 }
             }
         } else {
-            // When layers not configured, still group all sources together
-            if (allSources.length > 0) {
-                const count = allSources.length;
-                allSources.forEach((n, idx) =>
-                    levelPositions.set(n.id, { index: idx, count }),
-                );
+            const allSources = visibleLineageNodes.filter((n) => n.isSource);
+            const sourceIds = initialRowOrder(allSources);
+            if (sourceIds.length > 0) {
+                rows.push({ key: "sources", ids: sourceIds });
             }
 
-            // Original behavior: bucket by level only for non-sources
-            for (const [level, nodes] of levelBuckets) {
-                const nonSourceNodes = nodes.filter((n) => !n.isSource);
-                if (nonSourceNodes.length > 0) {
-                    const count = nonSourceNodes.length;
-                    nonSourceNodes.forEach((n, idx) =>
-                        levelPositions.set(n.id, { index: idx, count }),
-                    );
+            const levelsDesc = [...levelBuckets.keys()].sort((a, b) => b - a);
+            for (const level of levelsDesc) {
+                const nodes = (levelBuckets.get(level) ?? []).filter(
+                    (n) => !n.isSource,
+                );
+                const ids = initialRowOrder(nodes);
+                if (ids.length > 0) {
+                    rows.push({ key: `level:${level}`, ids });
                 }
             }
+        }
+
+        let rowOrders = rows.map((r) => [...r.ids]);
+        const SWEEPS = 4;
+        for (let pass = 0; pass < SWEEPS; pass++) {
+            for (let i = 1; i < rowOrders.length; i++) {
+                rowOrders[i] = reorderRow(rowOrders[i], rowOrders[i - 1]);
+            }
+            for (let i = rowOrders.length - 2; i >= 0; i--) {
+                rowOrders[i] = reorderRow(rowOrders[i], rowOrders[i + 1]);
+            }
+        }
+
+        for (const ids of rowOrders) {
+            const count = ids.length;
+            ids.forEach((id, idx) => levelPositions.set(id, { index: idx, count }));
         }
 
         // Persist computed ranks for downstream use
