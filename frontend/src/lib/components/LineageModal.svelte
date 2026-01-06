@@ -57,7 +57,7 @@
         // Actually layerBandMeta only has {id, bandX}.
         // But we have layerBoundsByLayer available in state!
 
-        return layerBandMeta
+        const result = layerBandMeta
             .map((meta) => {
                 const layer = meta.id.replace("layer-band-", "");
                 const bounds = layerBoundsByLayer[layer];
@@ -77,9 +77,9 @@
 
                 return {
                     id: meta.id,
-                    x: meta.bandX,
+                    x: 0, // Screen coordinate - bands span full width
                     y: bounds.top,
-                    width,
+                    width: 100000, // Keep as number for backward compatibility
                     height,
                     label,
                     isUnassigned,
@@ -94,6 +94,21 @@
             label: string;
             isUnassigned: boolean;
         }>;
+
+        // Debug: Log external bands only once to avoid spam
+        if (result.length > 0) {
+            console.log("✅ External bands computed:", result.length, "bands");
+            console.log("📊 Band positions (screen coordinates):", result.map(b => ({id: b.id, x: b.x, y: b.y, width: b.width})));
+            debugLog("EXTERNAL_BANDS_COMPUTED", {
+                bands: result.map(b => ({ id: b.id, x: b.x, y: b.y, width: b.width, height: b.height, label: b.label })),
+                layerBoundsByLayer: layerBoundsByLayer,
+                layerBandMeta: layerBandMeta
+            });
+        } else if (layerBandMeta.length === 0) {
+            console.log("ℹ️ No layer bands needed (no layers configured)");
+        }
+
+        return result;
     });
 
     // Debug logging helper - writes to debug.log via backend

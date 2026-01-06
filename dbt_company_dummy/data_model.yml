@@ -11,6 +11,10 @@ entities:
   label: department
   description: Company departments
   dbt_model: model.company_dummy.department
+- id: vip_customer
+  label: Vip Customer
+  description: ''
+  dbt_model: model.company_dummy.vip_customer
 relationships:
 - source: employee
   target: employee
