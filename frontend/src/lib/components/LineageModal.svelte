@@ -94,34 +94,8 @@
             isUnassigned: boolean;
         }>;
 
-        // Debug: Log external bands only once to avoid spam
-        if (result.length > 0) {
-            console.log("✅ External bands computed:", result.length, "bands");
-            console.log("📊 Band positions (screen coordinates):", result.map(b => ({id: b.id, x: b.x, y: b.y, width: b.width})));
-            debugLog("EXTERNAL_BANDS_COMPUTED", {
-                bands: result.map(b => ({ id: b.id, x: b.x, y: b.y, width: b.width, height: b.height, label: b.label })),
-                layerBoundsByLayer: layerBoundsByLayer,
-                layerBandMeta: layerBandMeta
-            });
-        } else if (layerBandMeta.length === 0) {
-            console.log("ℹ️ No layer bands needed (no layers configured)");
-        }
-
         return result;
     });
-
-    // Debug logging helper - writes to debug.log via backend
-    async function debugLog(action: string, data: any) {
-        try {
-            await fetch("/api/debug-log", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action, data }),
-            });
-        } catch (e) {
-            console.error("Failed to write debug log:", e);
-        }
-    }
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -246,35 +220,13 @@
         // Expanded nodes: reveal one more hop upstream for that node
         const expandedParents: string[] = [];
 
-        // DEBUG: Trace visibility calculation
-        const debugVisibility: any[] = [];
-
         for (const expandedId of expandedNodeIds) {
             const upstreams = upstreamOf.get(expandedId) ?? [];
-            debugVisibility.push({ expandedId, upstreams });
 
             for (const up of upstreams) {
                 visibleNodeIds.add(up);
                 expandedParents.push(up);
             }
-        }
-
-        // Log the trace if we have expanded nodes
-        if (expandedNodeIds.size > 0) {
-            debugLog("VISIBILITY_CALCULATION", {
-                expandedNodeIds: [...expandedNodeIds],
-                details: debugVisibility,
-                finalVisibleCount: visibleNodeIds.size,
-                hasCleanOrder: visibleNodeIds.has(
-                    "model.company_dummy.clean_order",
-                ),
-                hasPrepOrder: visibleNodeIds.has(
-                    "model.company_dummy.prep_order",
-                ),
-                upstreamOfPrepOrder: upstreamOf.get(
-                    "model.company_dummy.prep_order",
-                ),
-            });
         }
 
         // Track which nodes are visible vs ghosted (for styling)
@@ -701,8 +653,6 @@
 
         // Render visible edges
         const seenEdgeIds = new Set<string>();
-        let duplicateEdgeIdCount = 0;
-        let missingEndpointCount = 0;
         const visibleEdges: Edge[] = [];
         
         for (const targetNode of visibleLineageNodes) {
@@ -727,13 +677,11 @@
                 };
 
                 if (seenEdgeIds.has(edge.id)) {
-                    duplicateEdgeIdCount += 1;
                     continue;
                 }
                 seenEdgeIds.add(edge.id);
 
                 if (!nodeById.has(upstreamId) || !nodeById.has(targetId)) {
-                    missingEndpointCount += 1;
                     continue;
                 }
 
@@ -756,78 +704,6 @@
         // Base edges are visible-only
         baseLineageEdges = [...visibleEdges];
         lineageEdges = [...baseLineageEdges, ...overlayEdges];
-
-        // ======== DEBUG LOGGING (writes to debug.log) ========
-        debugLog("LINEAGE_GRAPH_UPDATE", {
-            rootModel: rootId,
-            expandedNodeIds: [...expandedNodeIds],
-            allLineageNodes: lineageData.nodes.map((n) => ({
-                id: n.id,
-                layer: n.layer,
-                level: n.level,
-                isSource: n.isSource,
-            })),
-            allLineageEdges: lineageData.edges.map((e) => ({
-                source: e.source,
-                target: e.target,
-            })),
-            visibleNodes: [...visibleNodeIds].map((id) => {
-                const node = nodeById.get(id);
-                const rank = computedLayerRankById.get(id) ?? "N/A";
-                const pos = levelPositions.get(id);
-                return {
-                    id,
-                    layer: node?.layer,
-                    rank,
-                    levelPosIndex: pos?.index,
-                    levelPosCount: pos?.count,
-                };
-            }),
-            ghostedNodes: [...ghostedNodeIds],
-            layerBounds: Object.fromEntries(
-                [...layerBounds.entries()].map(([layer, bounds]) => [
-                    layer,
-                    {
-                        top: bounds.top,
-                        bottom: bounds.bottom,
-                        height: bounds.height,
-                    },
-                ]),
-            ),
-            computedRanks: Object.fromEntries(
-                [...computedLayerRankById.entries()].map(([id, rank]) => [
-                    id,
-                    rank,
-                ]),
-            ),
-            flowNodes: {
-                visible: visibleNodes.map((n) => ({
-                    id: n.id,
-                    x: Math.round(n.position.x),
-                    y: Math.round(n.position.y),
-                    type: n.type,
-                })),
-                ghosted: ghostedNodes.map((n) => ({
-                    id: n.id,
-                    x: Math.round(n.position.x),
-                    y: Math.round(n.position.y),
-                    type: n.type,
-                })),
-            },
-            flowEdges: {
-                visible: visibleEdges.map((e) => ({
-                    source: e.source,
-                    target: e.target,
-                })),
-            },
-            edgeStats: {
-                duplicateEdgeIdCount,
-                missingEndpointCount,
-                visibleEdgesCount: visibleEdges.length,
-                overlayEdgesCount: sourceOverlays.length,
-            },
-        });
-        // ======== END DEBUG LOGGING ========
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
@@ -1114,15 +990,7 @@
     }
 
     function expandNode(nodeId: string) {
-        debugLog("USER_EXPAND_CLICK", {
-            nodeId,
-            previousExpandedNodes: [...expandedNodeIds],
-        });
         expandedNodeIds = new Set([...expandedNodeIds, nodeId]);
-        debugLog("USER_EXPAND_CLICK_RESULT", {
-            nodeId,
-            newExpandedNodes: [...expandedNodeIds],
-        });
         updateGraphDisplay();
     }
 
@@ -1401,7 +1269,6 @@
                         selectionOnDrag={false}
                         nodesDraggable={true}
                         nodesConnectable={false}
-                        edgesSelectable={true}
                         onnodedragstop={handleNodeDragStop}
                         onnodeschange={handleNodesChange}
                         class="w-full h-full bg-transparent"
