@@ -115,8 +115,44 @@
     let expandedNodeIds = $state<Set<string>>(new Set());
 
     // SvelteFlow ref (for fitView after layout)
-    let flowRef: any = null;
+    let flowRef = $state<any>(null);
+    let flowContainer = $state<HTMLDivElement | null>(null);
     let flowInitialized = false;
+    let needsInitialFit = $state(false);
+    let initialFitTimeouts: Array<ReturnType<typeof setTimeout>> = [];
+    let didFitAfterVisible = false;
+    let didReceiveNodesInitialized = false;
+    let didReceiveViewportInitialized = false;
+
+    const fitNodeIds = $derived.by(() => {
+        return lineageNodes
+            .filter((n) => {
+                if (String(n.id).startsWith("layer-band-")) return false;
+                const notInDefaultView = (n.data as any)?._notInDefaultView ?? false;
+                return !notInDefaultView;
+            })
+            .map((n) => String(n.id));
+    });
+
+    function fitToDefaultView() {
+        const fitNodes = lineageNodes.filter((n) => {
+            if (n.id.toString().startsWith("layer-band-")) return false;
+            const notInDefaultView = (n.data as any)?._notInDefaultView ?? false;
+            return !notInDefaultView;
+        });
+
+        try {
+            flowRef?.fitView?.({
+                padding: 0.3,
+                nodes: fitNodes,
+                includeHiddenNodes: false,
+                maxZoom: 0.85,
+                minZoom: 0.05,
+            });
+        } catch (e) {
+            console.error("fitView error", e);
+        }
+    }
 
     // Fetch lineage when modal opens
     $effect(() => {
@@ -129,7 +165,73 @@
             lineageEdges = [];
             error = null;
             expandedNodeIds = new Set();
+            flowInitialized = false;
+            needsInitialFit = false;
+            didFitAfterVisible = false;
+            didReceiveNodesInitialized = false;
+            didReceiveViewportInitialized = false;
+            for (const t of initialFitTimeouts) clearTimeout(t);
+            initialFitTimeouts = [];
         }
+    });
+
+    $effect(() => {
+        if (!open) return;
+        if (!flowContainer) return;
+        if (!flowRef) return;
+        if (!lineageNodes.length) return;
+        if (!needsInitialFit) return;
+        if (didFitAfterVisible) return;
+        if (!didReceiveNodesInitialized) return;
+        if (!didReceiveViewportInitialized) return;
+
+        const rect = flowContainer.getBoundingClientRect();
+        if (rect.width < 10 || rect.height < 10) return;
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                fitToDefaultView();
+                didFitAfterVisible = true;
+                flowInitialized = true;
+                needsInitialFit = false;
+                for (const t of initialFitTimeouts) clearTimeout(t);
+                initialFitTimeouts = [];
+            });
+        });
+    });
+
+    // Run initial fitView only once, and only after SvelteFlow has mounted (flowRef exists)
+    // and nodes are present. This avoids skipping fitView due to a null ref.
+    $effect(() => {
+        if (!open) return;
+        if (flowInitialized) return;
+        if (!needsInitialFit) return;
+        if (!flowRef) return;
+        if (!lineageNodes.length) return;
+        if (!didReceiveNodesInitialized) return;
+        if (!didReceiveViewportInitialized) return;
+        if (didFitAfterVisible) return;
+        if (initialFitTimeouts.length) return;
+
+        const doFit = () => {
+            fitToDefaultView();
+        };
+
+        const delaysMs = [0, 120, 400];
+        initialFitTimeouts = delaysMs.map((delay, idx) =>
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        doFit();
+                        if (idx === delaysMs.length - 1) {
+                            flowInitialized = true;
+                            needsInitialFit = false;
+                            initialFitTimeouts = [];
+                        }
+                    });
+                });
+            }, delay),
+        );
     });
 
     async function loadLineage() {
@@ -846,6 +948,10 @@
             const BAND_WIDTH = 100000;
             const bandX = minX - 50000;
 
+            // Initial labelX position to ensure labels are visible on modal open
+            // Position labels 20px from the left edge of the visible area
+            const initialLabelX = 20 - bandX;
+
             const bandNodes: Node[] = layerOrder.map((layer) => {
                 const bounds = layerBounds.get(layer);
                 const top = bounds?.top ?? 0;
@@ -860,7 +966,7 @@
                     id: `layer-band-${layer}`,
                     type: "layerBand",
                     position: { x: bandX, y: top },
-                    data: { label, width: BAND_WIDTH, height, labelX: 0 },
+                    data: { label, width: BAND_WIDTH, height, labelX: initialLabelX },
                     draggable: false,
                     selectable: false,
                     connectable: false,
@@ -888,45 +994,10 @@
             layerBandMeta = [];
         }
 
-        // Fit view only on initial load (not on expansion)
-        // On expansion, preserve the current viewport so users don't lose context
+        // Trigger initial fit after the modal mounts and the SvelteFlow ref is available.
+        // Do not refit on expansion.
         if (!flowInitialized) {
-            queueMicrotask(() => {
-                try {
-                    // Only fit visible nodes (not ghosted nodes or layer bands)
-                    const fitNodes = lineageNodes.filter((n) => {
-                        if (n.id.toString().startsWith("layer-band-"))
-                            return false;
-                        // Exclude nodes not in default view (ghosted nodes)
-                        const notInDefaultView =
-                            (n.data as any)?._notInDefaultView ?? false;
-                        return !notInDefaultView;
-                    });
-
-                    // Sample actual nodes being passed to SvelteFlow
-                    const actualNodesSample = lineageNodes
-                        .filter((n) => !String(n.id).startsWith("layer-band-"))
-                        .slice(0, 3)
-                        .map((n) => ({
-                            id: n.id,
-                            type: n.type,
-                            x: n.position.x,
-                            y: n.position.y,
-                            hidden: n.hidden,
-                            draggable: n.draggable,
-                            selectable: n.selectable,
-                            ghosted: (n.data as any)?._ghosted,
-                        }));
-
-                    flowRef?.fitView?.({
-                        padding: 0.2,
-                        nodes: fitNodes,
-                    });
-                    flowInitialized = true;
-                } catch (e) {
-                    console.error("fitView error", e);
-                }
-            });
+            needsInitialFit = false;
         }
 
         // Apply connected node highlighting based on current selection
@@ -1413,35 +1484,44 @@
                 {:else if lineageData && lineageNodes.length > 0}
 
 
-                    <SvelteFlow
-                        bind:this={flowRef}
-                        bind:nodes={lineageNodes}
-                        edges={lineageEdges}
-                        {nodeTypes}
-                        {edgeTypes}
-                        defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
-                        panOnDrag={true}
-                        selectionOnDrag={false}
-                        nodesDraggable={true}
-                        nodesConnectable={false}
-                        onnodedragstop={handleNodeDragStop}
-                        class="w-full h-full bg-transparent"
-                    >
-                        <Controls />
-                        <LineageViewportSync
-                            bands={layerBandMeta}
-                            onViewportChange={(v) => {
-                                viewportState = v;
-                            }}
-                        />
-                        <Background
-                            variant={BackgroundVariant.Dots}
-                            gap={20}
-                            size={1}
-                            bgColor="transparent"
-                        />
-                        <MiniMap />
-                    </SvelteFlow>
+                    <div bind:this={flowContainer} class="w-full h-full">
+                        <SvelteFlow
+                            bind:this={flowRef}
+                            bind:nodes={lineageNodes}
+                            edges={lineageEdges}
+                            {nodeTypes}
+                            {edgeTypes}
+                            defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
+                            panOnDrag={true}
+                            selectionOnDrag={false}
+                            nodesDraggable={true}
+                            nodesConnectable={false}
+                            onnodedragstop={handleNodeDragStop}
+                            class="w-full h-full bg-transparent"
+                        >
+                            <Controls />
+                            <LineageViewportSync
+                                bands={layerBandMeta}
+                                fitNodeIds={fitNodeIds}
+                                onNodesInitialized={() => {
+                                    didReceiveNodesInitialized = true;
+                                }}
+                                onViewportInitialized={() => {
+                                    didReceiveViewportInitialized = true;
+                                }}
+                                onViewportChange={(v) => {
+                                    viewportState = v;
+                                }}
+                            />
+                            <Background
+                                variant={BackgroundVariant.Dots}
+                                gap={20}
+                                size={1}
+                                bgColor="transparent"
+                            />
+                            <MiniMap />
+                        </SvelteFlow>
+                    </div>
                 {:else if lineageData}
                     <div class="p-5 text-center text-gray-500 text-sm">
                         No upstream dependencies found for this model.
