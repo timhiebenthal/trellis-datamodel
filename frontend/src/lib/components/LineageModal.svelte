@@ -110,6 +110,15 @@
     // Edge type constant - use custom LineageEdge for all lineage edges
     const LINEAGE_EDGE_TYPE = "default";
 
+    const LAYER_START_Y = 60;
+    const LAYER_GAP = 28; // Increased gap between layers for better separation
+    const LAYER_MIN_HEIGHT = 96;
+    const LAYER_SINGLE_NODE_MIN_HEIGHT = 72;
+    const LAYER_MAX_HEIGHT = 720;
+    const LAYER_HEADER_HEIGHT = 34; // space for label inside the band
+    const LAYER_INNER_PADDING = 12;
+    const LEVEL_SPACING_WITHIN_LAYER = 220; // Increased vertical spacing so parent nodes end above child nodes
+
     // Progressive display state (per-node expansion)
     // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
     let expandedNodeIds = $state<Set<string>>(new Set());
@@ -419,13 +428,6 @@
 
         // Build per-layer vertical bounds in graph space (used for initial placement + drag clamping)
         // Dynamic height per layer so it adapts across projects and to progressive expansion.
-        const LAYER_START_Y = 60;
-        const LAYER_GAP = 48; // Increased gap between layers for better separation
-        const LAYER_MIN_HEIGHT = 140;
-        const LAYER_MAX_HEIGHT = 720;
-        const LAYER_HEADER_HEIGHT = 34; // space for label inside the band
-        const LAYER_INNER_PADDING = 30;
-        const LEVEL_SPACING_WITHIN_LAYER = 220; // Increased vertical spacing so parent nodes end above child nodes
 
         // FIRST: Compute per-layer upstream ranks to ensure parents are always above their children
         // This must happen BEFORE layer bounds calculation so we can size layers correctly
@@ -465,6 +467,8 @@
             string,
             { top: number; bottom: number; height: number }
         >();
+
+        const layerSpacingByLayer = new Map<string, number>();
         if (layersConfigured) {
             let cursorY = LAYER_START_Y;
             for (const layer of layerOrder) {
@@ -478,13 +482,22 @@
                     ranksInLayer.length > 0 ? Math.max(...ranksInLayer) : 0;
                 const rankCount = maxRank + 1; // +1 because rank 0 is first row, so maxRank 2 means 3 rows
 
+                const rankSpacing = Math.min(
+                    LEVEL_SPACING_WITHIN_LAYER,
+                    60 + 40 * rankCount,
+                );
+                layerSpacingByLayer.set(layer, rankSpacing);
+
                 const contentHeight =
                     LAYER_HEADER_HEIGHT +
                     LAYER_INNER_PADDING * 2 +
-                    (rankCount - 1) * LEVEL_SPACING_WITHIN_LAYER;
+                    (rankCount - 1) * rankSpacing;
+
+                const minHeight =
+                    rankCount <= 1 ? LAYER_SINGLE_NODE_MIN_HEIGHT : LAYER_MIN_HEIGHT;
 
                 const height = Math.max(
-                    LAYER_MIN_HEIGHT,
+                    minHeight,
                     Math.min(LAYER_MAX_HEIGHT, contentHeight),
                 );
                 const top = cursorY;
@@ -758,6 +771,7 @@
                             { top: v.top, bottom: v.bottom },
                         ]),
                     ),
+                    layerSpacingByLayer,
                     existingPositions,
                     false, // Not ghosted - these are visible nodes
                     hiddenInfoById.get(node.id),
@@ -872,6 +886,7 @@
                         { top: v.top, bottom: v.bottom },
                     ]),
                 ),
+                layerSpacingByLayer,
                 existingPositions,
                 true, // isGhosted = true - keep nodes as ghost anchors, not in default view
                 undefined, // no hidden info for ghosted nodes
@@ -1015,6 +1030,7 @@
         layerOrder: string[],
         layerBuckets: Map<string, LineageNode[]>,
         layerBounds: Map<string, { top: number; bottom: number }>,
+        layerSpacingByLayer: Map<string, number>,
         existingPositions: Map<
             string,
             { x: number; y: number; manualPosition?: boolean }
@@ -1036,7 +1052,6 @@
         }
 
         const H_SPACING = 260; // Horizontal spacing between siblings at the same level (use more width)
-        const LEVEL_SPACING_WITHIN_LAYER = 220; // vertical spacing within a layer for different levels (increased for better separation)
 
         let yPosition: number;
         let xPosition: number;
@@ -1050,24 +1065,26 @@
             const bounds = layerBounds.get(node.layer);
             const top = bounds?.top ?? 0;
             const bottom = bounds?.bottom ?? top + 200;
-            const padding = 30;
+            const padding = LAYER_INNER_PADDING;
+            const rankSpacing =
+                layerSpacingByLayer.get(node.layer) ?? LEVEL_SPACING_WITHIN_LAYER;
 
             // Do not preserve Y for layer-based nodes, as layer bounds might change (e.g. expansion)
             // requiring nodes to shift vertically. X position is preserved later.
             if (layerIndex === -1) {
-                yPosition = top + 40;
+                yPosition = top + LAYER_HEADER_HEIGHT + LAYER_INNER_PADDING;
             } else {
                 // Special handling for sources: place all sources on the same Y line
                 if (node.isSource && node.layer === "sources") {
                     // All sources get the same Y position (centered in the layer)
-                    const baseY = top + 40;
+                    const baseY = top + LAYER_HEADER_HEIGHT + LAYER_INNER_PADDING;
                     yPosition = baseY;
                 } else {
                     // Within layer, position by computed rank so parents stay above children
                     const rank = layerRankById.get(node.id) ?? 0;
 
-                    const baseY = top + 40;
-                    yPosition = baseY + rank * LEVEL_SPACING_WITHIN_LAYER;
+                    const baseY = top + LAYER_HEADER_HEIGHT + LAYER_INNER_PADDING;
+                    yPosition = baseY + rank * rankSpacing;
                 }
 
                 // Clamp auto-laid-out nodes to layer bounds
@@ -1173,7 +1190,7 @@
         const bounds = layerBoundsByLayer[layer];
         if (!bounds) return;
 
-        const padding = 30;
+        const padding = LAYER_INNER_PADDING;
         const top = bounds.top;
         const bottom = bounds.bottom;
         const clampedY = Math.min(
