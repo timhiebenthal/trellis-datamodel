@@ -1,12 +1,51 @@
 """Routes for lineage operations."""
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Any
+from datetime import datetime
+import json
 import os
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.services.lineage import extract_upstream_lineage, LineageError
 
 router = APIRouter(prefix="/api", tags=["lineage"])
+
+# Debug log file path
+DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "debug.log")
+
+
+class DebugLogEntry(BaseModel):
+    """Debug log entry from frontend."""
+    action: str
+    data: Any
+
+
+@router.post("/debug-log")
+async def write_debug_log(entry: DebugLogEntry):
+    """
+    Write debug log entry to debug.log file.
+    
+    This is a temporary endpoint for debugging lineage rendering issues.
+    """
+    try:
+        timestamp = datetime.now().isoformat()
+        log_line = f"\n{'='*80}\n[{timestamp}] {entry.action}\n{'='*80}\n"
+        
+        if isinstance(entry.data, (dict, list)):
+            log_line += json.dumps(entry.data, indent=2, default=str)
+        else:
+            log_line += str(entry.data)
+        
+        log_line += "\n"
+        
+        with open(DEBUG_LOG_PATH, "a") as f:
+            f.write(log_line)
+        
+        return {"status": "ok", "path": DEBUG_LOG_PATH}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.get("/lineage/{model_id}")

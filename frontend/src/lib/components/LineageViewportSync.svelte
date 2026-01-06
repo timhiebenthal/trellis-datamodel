@@ -1,8 +1,13 @@
 <script lang="ts">
     import { useSvelteFlow } from "@xyflow/svelte";
 
-    const { bands = [] } = $props<{
+    const { bands = [], onViewportChange } = $props<{
         bands: Array<{ id: string; bandX: number }>;
+        onViewportChange?: (viewport: {
+            x: number;
+            y: number;
+            zoom: number;
+        }) => void;
     }>();
 
     const { getViewport, updateNodeData } = useSvelteFlow();
@@ -18,9 +23,14 @@
 
             for (const band of bands) {
                 // labelX is interpreted inside the band as padding from the band's left edge (bandX)
-                updateNodeData(band.id, { labelX: leftEdgeInGraph + 20 - band.bandX });
+                updateNodeData(band.id, {
+                    labelX: leftEdgeInGraph + 20 - band.bandX,
+                });
             }
         }
+
+        // Sync external layers every frame
+        onViewportChange?.(viewport);
     }
 
     // Keep labels pinned while panning/zooming (and after fitView)
@@ -39,5 +49,3 @@
 </script>
 
 <!-- This component renders nothing; it only syncs viewport -> band label positions -->
-
-

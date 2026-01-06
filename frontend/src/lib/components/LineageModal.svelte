@@ -15,6 +15,7 @@
     import LineageModelNode from "./LineageModelNode.svelte";
     import LineageLayerBandNode from "./LineageLayerBandNode.svelte";
     import LineageViewportSync from "./LineageViewportSync.svelte";
+    import LineageBackgroundLayer from "./LineageBackgroundLayer.svelte";
     import LineageEdgeComponent from "./LineageEdge.svelte";
     import { getConnectedNodeIds } from "$lib/edge-highlight-utils";
 
@@ -43,6 +44,70 @@
     >({});
     let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
     let layerRankById = new Map<string, number>();
+
+    // Viewport state for external background layer sync
+    let viewportState = $state({ x: 0, y: 0, zoom: 1 });
+
+    // Compute external bands for background layer (instead of using nodes)
+    // Re-use layerBoundsByLayer data
+    const externalBands = $derived.by(() => {
+        if (!layerBandMeta.length) return [];
+
+        // We need to reconstruct the full band info from layerBandMeta + layerBoundsByLayer?
+        // Actually layerBandMeta only has {id, bandX}.
+        // But we have layerBoundsByLayer available in state!
+
+        return layerBandMeta
+            .map((meta) => {
+                const layer = meta.id.replace("layer-band-", "");
+                const bounds = layerBoundsByLayer[layer];
+                // If bounds missing, skip or default
+                if (!bounds) return null;
+
+                // Re-derive properties used in LineageLayerBandNode
+                const label =
+                    layer === "sources"
+                        ? "Sources"
+                        : layer === "unassigned"
+                          ? "Unassigned"
+                          : layer;
+                const isUnassigned = label === "Unassigned";
+                const width = 100000; // Same as BAND_WIDTH in original code
+                const height = bounds.bottom - bounds.top; // height from calculation
+
+                return {
+                    id: meta.id,
+                    x: meta.bandX,
+                    y: bounds.top,
+                    width,
+                    height,
+                    label,
+                    isUnassigned,
+                };
+            })
+            .filter((b) => b !== null) as Array<{
+            id: string;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            label: string;
+            isUnassigned: boolean;
+        }>;
+    });
+
+    // Debug logging helper - writes to debug.log via backend
+    async function debugLog(action: string, data: any) {
+        try {
+            await fetch("/api/debug-log", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, data }),
+            });
+        } catch (e) {
+            console.error("Failed to write debug log:", e);
+        }
+    }
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -166,12 +231,36 @@
 
         // Expanded nodes: reveal one more hop upstream for that node
         const expandedParents: string[] = [];
+
+        // DEBUG: Trace visibility calculation
+        const debugVisibility: any[] = [];
+
         for (const expandedId of expandedNodeIds) {
             const upstreams = upstreamOf.get(expandedId) ?? [];
+            debugVisibility.push({ expandedId, upstreams });
+
             for (const up of upstreams) {
                 visibleNodeIds.add(up);
                 expandedParents.push(up);
             }
+        }
+
+        // Log the trace if we have expanded nodes
+        if (expandedNodeIds.size > 0) {
+            debugLog("VISIBILITY_CALCULATION", {
+                expandedNodeIds: [...expandedNodeIds],
+                details: debugVisibility,
+                finalVisibleCount: visibleNodeIds.size,
+                hasCleanOrder: visibleNodeIds.has(
+                    "model.company_dummy.clean_order",
+                ),
+                hasPrepOrder: visibleNodeIds.has(
+                    "model.company_dummy.prep_order",
+                ),
+                upstreamOfPrepOrder: upstreamOf.get(
+                    "model.company_dummy.prep_order",
+                ),
+            });
         }
 
         // Track which nodes are visible vs ghosted (for styling)
@@ -643,6 +732,7 @@
                     source: upstreamId,
                     target: targetId,
                     type: LINEAGE_EDGE_TYPE,
+                    zIndex: 5, // Ensure edges render above layer bands (-1)
                     data: { _ghosted: edgeIsGhosted },
                 };
 
@@ -669,6 +759,76 @@
         // Combine visible and ghosted edges
         baseLineageEdges = [...visibleEdges, ...ghostedEdges];
         lineageEdges = [...baseLineageEdges, ...overlayEdges];
+
+        // ======== DEBUG LOGGING (writes to debug.log) ========
+        debugLog("LINEAGE_GRAPH_UPDATE", {
+            rootModel: rootId,
+            expandedNodeIds: [...expandedNodeIds],
+            allLineageNodes: lineageData.nodes.map((n) => ({
+                id: n.id,
+                layer: n.layer,
+                level: n.level,
+                isSource: n.isSource,
+            })),
+            allLineageEdges: lineageData.edges.map((e) => ({
+                source: e.source,
+                target: e.target,
+            })),
+            visibleNodes: [...visibleNodeIds].map((id) => {
+                const node = nodeById.get(id);
+                const rank = computedLayerRankById.get(id) ?? "N/A";
+                const pos = levelPositions.get(id);
+                return {
+                    id,
+                    layer: node?.layer,
+                    rank,
+                    levelPosIndex: pos?.index,
+                    levelPosCount: pos?.count,
+                };
+            }),
+            ghostedNodes: [...ghostedNodeIds],
+            layerBounds: Object.fromEntries(
+                [...layerBounds.entries()].map(([layer, bounds]) => [
+                    layer,
+                    {
+                        top: bounds.top,
+                        bottom: bounds.bottom,
+                        height: bounds.height,
+                    },
+                ]),
+            ),
+            computedRanks: Object.fromEntries(
+                [...computedLayerRankById.entries()].map(([id, rank]) => [
+                    id,
+                    rank,
+                ]),
+            ),
+            flowNodes: {
+                visible: visibleNodes.map((n) => ({
+                    id: n.id,
+                    x: Math.round(n.position.x),
+                    y: Math.round(n.position.y),
+                    type: n.type,
+                })),
+                ghosted: ghostedNodes.map((n) => ({
+                    id: n.id,
+                    x: Math.round(n.position.x),
+                    y: Math.round(n.position.y),
+                    type: n.type,
+                })),
+            },
+            flowEdges: {
+                visible: visibleEdges.map((e) => ({
+                    source: e.source,
+                    target: e.target,
+                })),
+                ghosted: ghostedEdges.map((e) => ({
+                    source: e.source,
+                    target: e.target,
+                })),
+            },
+        });
+        // ======== END DEBUG LOGGING ========
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
@@ -700,6 +860,7 @@
                     connectable: false,
                     focusable: false,
                     zIndex: -1, // Behind edges (which render at default ~0-5) and nodes (10+)
+                    style: "mix-blend-mode: multiply;",
                 };
             });
 
@@ -707,7 +868,7 @@
             // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
             // Include both visible and ghosted nodes
             lineageNodes = [
-                ...bandNodes,
+                // ...bandNodes,
                 ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
                 ...ghostedNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 })),
             ];
@@ -777,7 +938,10 @@
         layerOrder: string[],
         layerBuckets: Map<string, LineageNode[]>,
         layerBounds: Map<string, { top: number; bottom: number }>,
-        existingPositions: Map<string, { x: number; y: number }>,
+        existingPositions: Map<
+            string,
+            { x: number; y: number; manualPosition?: boolean }
+        >,
         isGhosted: boolean = false,
         hiddenInfo?: { hiddenCount: number; hiddenSources: string[] },
     ): Node {
@@ -866,7 +1030,13 @@
         // X position: keep levels vertically aligned (no diagonal drift), but spread siblings.
         const siblingCenterOffset = (countAtLevel - 1) / 2;
         const siblingOffset = (indexInLevel - siblingCenterOffset) * H_SPACING;
-        xPosition = existing?.x ?? siblingOffset;
+
+        // Use existing X only if manually positioned, otherwise let layout decide
+        if (existing?.manualPosition) {
+            xPosition = existing.x;
+        } else {
+            xPosition = siblingOffset;
+        }
 
         // Clamp X to a sane range to avoid huge off-screen layouts
         const CLAMP_X = 4000;
@@ -945,7 +1115,15 @@
     }
 
     function expandNode(nodeId: string) {
+        debugLog("USER_EXPAND_CLICK", {
+            nodeId,
+            previousExpandedNodes: [...expandedNodeIds],
+        });
         expandedNodeIds = new Set([...expandedNodeIds, nodeId]);
+        debugLog("USER_EXPAND_CLICK_RESULT", {
+            nodeId,
+            newExpandedNodes: [...expandedNodeIds],
+        });
         updateGraphDisplay();
     }
 
@@ -1048,6 +1226,7 @@
                         source: id,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
+                        zIndex: 5,
                         data: { _overlay: true },
                     });
                 }
@@ -1075,6 +1254,7 @@
                         source: up,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
+                        zIndex: 5,
                         data: { _overlay: true },
                     });
                 }
@@ -1209,6 +1389,12 @@
                         </button>
                     </div>
                 {:else if lineageData && lineageNodes.length > 0}
+                    <!-- External Background Layer for Bands (Behind Graph) -->
+                    <LineageBackgroundLayer
+                        bands={externalBands}
+                        viewport={viewportState}
+                    />
+
                     <SvelteFlow
                         bind:this={flowRef}
                         bind:nodes={lineageNodes}
@@ -1223,16 +1409,20 @@
                         edgesSelectable={true}
                         onnodedragstop={handleNodeDragStop}
                         onnodeschange={handleNodesChange}
-                        class="w-full h-full"
+                        class="w-full h-full bg-transparent"
                     >
                         <Controls />
-                        {#if layerBandMeta.length > 0}
-                            <LineageViewportSync bands={layerBandMeta} />
-                        {/if}
+                        <LineageViewportSync
+                            bands={layerBandMeta}
+                            onViewportChange={(v) => {
+                                viewportState = v;
+                            }}
+                        />
                         <Background
                             variant={BackgroundVariant.Dots}
                             gap={20}
                             size={1}
+                            bgColor="transparent"
                         />
                         <MiniMap />
                     </SvelteFlow>
