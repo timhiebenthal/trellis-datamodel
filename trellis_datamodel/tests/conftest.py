@@ -126,10 +126,10 @@ def mock_manifest(mock_manifest_data):
 
 
 @pytest.fixture
-async def test_client(mock_manifest):
-    """Create a test client. Config is already set via environment variables."""
+def test_client(mock_manifest):
+    """Create a synchronous test client against the ASGI app."""
     from trellis_datamodel.server import app
 
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=True)
+    with httpx.Client(transport=transport, base_url="http://testserver") as client:
         yield client
