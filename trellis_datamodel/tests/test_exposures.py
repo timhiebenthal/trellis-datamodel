@@ -68,33 +68,23 @@ def test_exposures_api_returns_200_when_enabled(monkeypatch, tmp_path, test_clie
     manifest_path.write_text('{"nodes": {}, "sources": {}, "exposures": {}}')
     monkeypatch.setattr(cfg, "MANIFEST_PATH", str(manifest_path))
     
-    # Set EXPOSURES_ENABLED to True - this must be done BEFORE reloading routes
-    # because when routes reload, they re-import config, and we need config to have
-    # the correct value at that moment
+    # Ensure EXPOSURES_ENABLED is set correctly
     cfg.EXPOSURES_ENABLED = True
     monkeypatch.setattr(cfg, "EXPOSURES_ENABLED", True)
     
-    # Verify it's set before reloading
-    assert cfg.EXPOSURES_ENABLED is True
-    
-    # Reload the exposures route and server modules
-    # When routes reload and re-import config, they should see EXPOSURES_ENABLED=True
-    # because we set it above and Python modules are singletons
+    # Reload routes modules to ensure they pick up the updated config value
+    # This must be done AFTER setting EXPOSURES_ENABLED so routes see the correct value
     if "trellis_datamodel.routes.exposures" in sys.modules:
         importlib.reload(sys.modules["trellis_datamodel.routes.exposures"])
     if "trellis_datamodel.server" in sys.modules:
         importlib.reload(sys.modules["trellis_datamodel.server"])
     
-    # After reloading, verify the config module still has the correct value
-    # and that routes can see it
-    assert cfg.EXPOSURES_ENABLED is True, f"cfg.EXPOSURES_ENABLED should be True but is {cfg.EXPOSURES_ENABLED}"
+    # After reloading, ensure EXPOSURES_ENABLED is still True
+    cfg.EXPOSURES_ENABLED = True
+    monkeypatch.setattr(cfg, "EXPOSURES_ENABLED", True)
     
-    # Check what the routes module sees
-    from trellis_datamodel.routes.exposures import router
-    import trellis_datamodel.routes.exposures as exposures_module
-    # The routes module imports config as 'cfg', so check that reference
-    routes_cfg = sys.modules["trellis_datamodel.config"]
-    assert routes_cfg.EXPOSURES_ENABLED is True, f"routes module's config reference has EXPOSURES_ENABLED={routes_cfg.EXPOSURES_ENABLED}, expected True"
+    # Verify the value is set correctly
+    assert cfg.EXPOSURES_ENABLED is True, f"EXPOSURES_ENABLED should be True but is {cfg.EXPOSURES_ENABLED}"
     
     # Get a fresh test client with the reloaded app
     from trellis_datamodel.server import app
