@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 tbd
 
-## [0.5.0b3] - 2026-01-07
+## [0.5.0] - 2026-01-07
 
 ### Added
 - Added a new "Exposures" view mode that provides a cross-table visualization of entity usage across downstream dbt exposures.
