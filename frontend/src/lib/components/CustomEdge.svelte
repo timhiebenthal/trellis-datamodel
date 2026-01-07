@@ -482,8 +482,8 @@
       return `stroke: #26A69A; stroke-width: 2; ${style || ''}`;
     }
     
-    // Ensure default stroke styling when not selected
-    const defaultStyle = 'stroke: #64748b; stroke-width: 2';
+    // Ensure default stroke styling when not selected - using very light gray
+    const defaultStyle = 'stroke: #cbd5e1; stroke-width: 2'; // Very light gray for edges
     return style ? `${defaultStyle}; ${style}` : defaultStyle;
   });
   
