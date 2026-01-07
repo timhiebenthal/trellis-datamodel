@@ -125,8 +125,25 @@ def mock_manifest(mock_manifest_data):
     return manifest_path
 
 
+class _PatchedASGITransport(httpx.ASGITransport):
+    """ASGITransport with sync context manager support for httpx.Client/TestClient."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+
 @pytest.fixture
 def test_client(mock_manifest):
-    """Create a test client. Config is already set via environment variables."""
+    """Create a synchronous test client against the ASGI app."""
     from trellis_datamodel.server import app
-    return TestClient(app)
+
+    transport = _PatchedASGITransport(app=app, raise_app_exceptions=True)
+    client = httpx.Client(transport=transport, base_url="http://testserver")
+    try:
+        yield client
+    finally:
+        client.close()
