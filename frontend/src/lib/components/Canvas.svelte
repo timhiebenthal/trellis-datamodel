@@ -38,13 +38,21 @@
     let {
         guidanceConfig,
         lineageEnabled = false,
-    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean } = $props();
+        exposuresEnabled = false,
+    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean } = $props();
 
     const lineageEnabledStore = writable(lineageEnabled);
     setContext("lineageEnabled", lineageEnabledStore);
 
+    const exposuresEnabledStore = writable(exposuresEnabled);
+    setContext("exposuresEnabled", exposuresEnabledStore);
+
     $effect(() => {
         lineageEnabledStore.set(lineageEnabled);
+    });
+
+    $effect(() => {
+        exposuresEnabledStore.set(exposuresEnabled);
     });
 
     // Wizard state

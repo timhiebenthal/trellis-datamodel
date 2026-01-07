@@ -30,6 +30,8 @@ let tableViewportWidth = $state(0);
 let tableViewportEl = $state<HTMLDivElement | null>(null);
 let isTransposed = $state(exposuresDefaultLayout === 'dashboards-as-rows');
 let userHasToggledLayout = $state(false);
+let stickyColumnWidth = $state(240); // Width of the sticky row-label column
+let isResizing = $state(false);
 
 // Sync isTransposed when exposuresDefaultLayout prop changes (unless user has manually toggled)
 $effect(() => {
@@ -126,8 +128,7 @@ $effect(() => {
 
         // Use measured width to decide when to compact headers.
         // Roughly subtract space for the sticky entity column + borders/padding.
-        const stickyColPx = 240;
-        const available = Math.max(tableViewportWidth - stickyColPx, 0);
+        const available = Math.max(tableViewportWidth - stickyColumnWidth, 0);
         const fits = (minWidth: number) => (minWidth > 0 ? Math.floor(available / minWidth) : 0);
 
         const fitsNormal = fits(150);
@@ -192,6 +193,28 @@ $effect(() => {
         } finally {
             loading = false;
         }
+    }
+
+    // Resize handle functions
+    function startResize(e: MouseEvent) {
+        e.preventDefault();
+        isResizing = true;
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', stopResize);
+    }
+
+    function handleResize(e: MouseEvent) {
+        if (!tableViewportEl) return;
+        const tableRect = tableViewportEl.getBoundingClientRect();
+        const newWidth = e.clientX - tableRect.left;
+        // Constrain width to reasonable bounds (100px to 600px)
+        stickyColumnWidth = Math.max(100, Math.min(600, newWidth));
+    }
+
+    function stopResize() {
+        isResizing = false;
+        document.removeEventListener('mousemove', handleResize);
+        document.removeEventListener('mouseup', stopResize);
     }
 
     // Fetch data when view mode changes to exposures
@@ -443,9 +466,18 @@ $effect(() => {
                             <thead class="bg-gray-50 sticky top-0 z-10">
                                 <tr>
                                     <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200"
+                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200 relative"
+                                        style={`width: ${stickyColumnWidth}px; min-width: ${stickyColumnWidth}px; max-width: ${stickyColumnWidth}px;`}
                                     >
-                                        Entity
+                                        <div class="flex items-center justify-between">
+                                            <span>Entity</span>
+                                            <button
+                                                onmousedown={startResize}
+                                                class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary-500 hover:w-1.5 transition-all"
+                                                title="Drag to resize column"
+                                                type="button"
+                                            />
+                                        </div>
                                     </th>
                                     {#each filteredExposures as exposure}
                                         <th
@@ -500,8 +532,9 @@ $effect(() => {
                                         <tr class="hover:bg-gray-50 transition-colors">
                                             <td
                                                 class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
+                                                style={`width: ${stickyColumnWidth}px; min-width: ${stickyColumnWidth}px; max-width: ${stickyColumnWidth}px;`}
                                             >
-                                                {entity.label}
+                                                <div class="truncate" title={entity.label}>{entity.label}</div>
                                             </td>
                                             {#each filteredExposures as exposure}
                                                 <td class="px-4 py-3 text-sm text-center">
@@ -521,9 +554,18 @@ $effect(() => {
                             <thead class="bg-gray-50 sticky top-0 z-10">
                                 <tr>
                                     <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200"
+                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200 relative"
+                                        style={`width: ${stickyColumnWidth}px; min-width: ${stickyColumnWidth}px; max-width: ${stickyColumnWidth}px;`}
                                     >
-                                        Dashboard
+                                        <div class="flex items-center justify-between">
+                                            <span>Dashboard</span>
+                                            <button
+                                                onmousedown={startResize}
+                                                class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary-500 hover:w-1.5 transition-all"
+                                                title="Drag to resize column"
+                                                type="button"
+                                            />
+                                        </div>
                                     </th>
                                     {#each entities as entity}
                                         <th
@@ -555,19 +597,22 @@ $effect(() => {
                                         <tr class="hover:bg-gray-50 transition-colors">
                                             <td
                                                 class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
+                                                style={`width: ${stickyColumnWidth}px; min-width: ${stickyColumnWidth}px; max-width: ${stickyColumnWidth}px;`}
                                             >
-                                                <div class="flex items-center gap-2">
-                                                    <Icon
-                                                        icon={getExposureIcon(exposure.type)}
-                                                        class={`${iconClass} text-gray-500`}
-                                                    />
-                                                    <span class="truncate">{exposure.label || exposure.name}</span>
-                                                </div>
-                                                {#if exposure.owner?.name}
-                                                    <div class="text-[10px] font-normal text-gray-500 mt-1">
-                                                        Owner: {exposure.owner.name}
+                                                <div>
+                                                    <div class="flex items-center gap-2 truncate" title={exposure.label || exposure.name}>
+                                                        <Icon
+                                                            icon={getExposureIcon(exposure.type)}
+                                                            class={`${iconClass} text-gray-500 flex-shrink-0`}
+                                                        />
+                                                        <span class="truncate">{exposure.label || exposure.name}</span>
                                                     </div>
-                                                {/if}
+                                                    {#if exposure.owner?.name}
+                                                        <div class="text-[10px] font-normal text-gray-500 mt-1 truncate">
+                                                            Owner: {exposure.owner.name}
+                                                        </div>
+                                                    {/if}
+                                                </div>
                                             </td>
                                             {#each entities as entity}
                                                 <td class="px-4 py-3 text-sm text-center">
