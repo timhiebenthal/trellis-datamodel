@@ -8,6 +8,7 @@ import pytest
 import httpx
 from starlette.testclient import TestClient
 from trellis_datamodel import config as cfg
+from trellis_datamodel.routes.lineage import ensure_lineage_enabled
 
 
 # Create a persistent temp directory for the entire test session
@@ -134,4 +135,9 @@ def test_client(mock_manifest):
     with TestClient(app, backend="asyncio") as client:
         # Ensure lineage is enabled for tests that expect it (can be overridden per test)
         cfg.LINEAGE_ENABLED = True
-        yield client
+        cfg.LINEAGE_LAYERS = []
+        client.app.dependency_overrides[ensure_lineage_enabled] = lambda: None
+        try:
+            yield client
+        finally:
+            client.app.dependency_overrides.pop(ensure_lineage_enabled, None)
