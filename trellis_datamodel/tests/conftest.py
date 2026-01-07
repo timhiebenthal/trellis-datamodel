@@ -5,7 +5,8 @@ import tempfile
 import json
 import shutil
 import pytest
-from fastapi.testclient import TestClient
+import httpx
+from starlette.testclient import TestClient
 
 
 # Create a persistent temp directory for the entire test session
@@ -19,6 +20,9 @@ os.makedirs(os.path.join(_TEST_TEMP_DIR, "models", "3_core"), exist_ok=True)
 # Create minimal config.yml
 with open(os.path.join(_TEST_TEMP_DIR, "config.yml"), "w") as f:
     f.write("dbt_project_path: .\n")
+
+# Import config after DATAMODEL_TEST_DIR is set so test-mode defaults apply
+from trellis_datamodel import config as cfg  # noqa: E402
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -34,17 +38,17 @@ def clean_test_files():
     data_model_path = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
     if os.path.exists(data_model_path):
         os.remove(data_model_path)
-    
+
     # Clean canvas layout file before each test
     canvas_layout_path = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
     if os.path.exists(canvas_layout_path):
         os.remove(canvas_layout_path)
-    
+
     # Clean manifest file
     manifest_path = os.path.join(_TEST_TEMP_DIR, "manifest.json")
     if os.path.exists(manifest_path):
         os.remove(manifest_path)
-    
+
     # Clean model yml files (recursively) to avoid cross-test leakage
     models_dir = os.path.join(_TEST_TEMP_DIR, "models", "3_core")
     if os.path.exists(models_dir):
@@ -52,8 +56,11 @@ def clean_test_files():
             for fname in files:
                 if fname.endswith((".yml", ".yaml")):
                     os.remove(os.path.join(root, fname))
-    
     yield
+    # After each test, ensure config is reset to test mode values
+    # This is needed because some tests (like CLI tests) may reload modules
+    cfg.LINEAGE_ENABLED = False
+    cfg.LINEAGE_LAYERS = []
 
 
 @pytest.fixture
@@ -127,6 +134,23 @@ def mock_manifest(mock_manifest_data):
 
 @pytest.fixture
 def test_client(mock_manifest):
-    """Create a test client. Config is already set via environment variables."""
+    """Create a synchronous test client against the ASGI app.
+
+    Tests can override config values using monkeypatch.
+    Default test mode values: LINEAGE_ENABLED=True, LINEAGE_LAYERS=[]
+    """
+    # Import fresh to handle module reloads from CLI tests
+    import importlib
+    import sys
+
+    # Ensure we're using the current config module
+    if 'trellis_datamodel.config' in sys.modules:
+        cfg_module = sys.modules['trellis_datamodel.config']
+        # Reset to test defaults in case of module reload
+        cfg_module.LINEAGE_ENABLED = False
+        cfg_module.LINEAGE_LAYERS = []
+
     from trellis_datamodel.server import app
-    return TestClient(app)
+
+    with TestClient(app) as client:
+        yield client

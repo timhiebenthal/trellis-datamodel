@@ -6,7 +6,11 @@ import os
 from trellis_datamodel import config as cfg
 from trellis_datamodel.services.lineage import extract_upstream_lineage, LineageError
 
-router = APIRouter(prefix="/api", tags=["lineage"])
+
+router = APIRouter(
+    prefix="/api",
+    tags=["lineage"],
+)
 
 
 @router.get("/lineage/{model_id}")
@@ -21,9 +25,17 @@ async def get_lineage(model_id: str):
         JSON response with nodes, edges, and metadata
 
     Raises:
+        403: If lineage is disabled
         404: If model not found
         500: If lineage extraction fails
     """
+    # Check if lineage is enabled
+    if not cfg.LINEAGE_ENABLED:
+        raise HTTPException(
+            status_code=403,
+            detail="Lineage is disabled. Set lineage.enabled: true in trellis.yml to enable.",
+        )
+
     try:
         # Validate paths exist
         if not cfg.MANIFEST_PATH or not os.path.exists(cfg.MANIFEST_PATH):
@@ -57,4 +69,3 @@ async def get_lineage(model_id: str):
             status_code=500,
             detail=f"Error extracting lineage: {str(e)}",
         )
-

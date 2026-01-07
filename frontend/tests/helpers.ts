@@ -61,7 +61,7 @@ export async function cleanupTestEntities(page: Page): Promise<void> {
 
 /**
  * Complete the entity creation wizard by skipping through all steps
- * This handles the wizard modal that appears when entity_wizard_enabled is true
+ * This handles the wizard modal that appears when `guidance.entity_wizard.enabled` is true
  */
 export async function completeEntityWizard(page: Page): Promise<void> {
     // Check if wizard modal is visible
@@ -103,4 +103,3 @@ export async function completeEntityWizard(page: Page): Promise<void> {
     // Wait for wizard to close
     await wizardModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 }
-

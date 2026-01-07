@@ -29,10 +29,12 @@
         extractModelNameFromUniqueId,
         toTitleCase,
     } from "$lib/utils";
+    import { getContext } from "svelte";
 import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
 import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import { openLineageModal } from "$lib/stores";
 import Icon from "@iconify/svelte";
+    import { readable, type Readable } from "svelte/store";
 
     let { data: rawData, id, selected }: NodeProps = $props();
     // Cast data to EntityData for proper typing - use $derived to maintain reactivity
@@ -50,6 +52,10 @@ import Icon from "@iconify/svelte";
         $nodes.filter((n) => n.selected && n.type === "entity" && n.id !== id)
     );
     let isBatchEditing = $derived(selected && selectedEntityNodes.length > 0);
+
+    const lineageEnabledStore =
+        getContext<Readable<boolean>>("lineageEnabled") ?? readable(false);
+    let lineageEnabled = $derived($lineageEnabledStore);
 
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
@@ -1150,15 +1156,16 @@ import Icon from "@iconify/svelte";
                     class="w-2 h-2 rounded-full bg-primary-500"
                     title="Bound to {boundModelName}"
                 ></div>
-                <button
-                    onclick={() => boundModelName && openLineageModal(boundModelName)}
-                    aria-label="Show lineage for {boundModelName}"
-                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    title="Show lineage"
-                    disabled={!boundModelName}
-                >
-                    <Icon icon="lucide:git-branch" class="w-4 h-4" />
-                </button>
+                {#if lineageEnabled && boundModelName}
+                    <button
+                        onclick={() => openLineageModal(boundModelName)}
+                        aria-label="Show lineage for {boundModelName}"
+                        class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        title="Show lineage"
+                    >
+                        <Icon icon="lucide:git-branch" class="w-4 h-4" />
+                    </button>
+                {/if}
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"

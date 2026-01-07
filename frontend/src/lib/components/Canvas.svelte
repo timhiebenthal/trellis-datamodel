@@ -14,6 +14,7 @@
         type Connection,
         type Edge,
     } from "@xyflow/svelte";
+    import { setContext } from "svelte";
     import { nodes, edges, viewMode } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import EntityNode from "./EntityNode.svelte";
@@ -22,6 +23,7 @@
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
     import Icon from "@iconify/svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
+    import { writable } from "svelte/store";
 
     const nodeTypes = {
         entity: EntityNode,
@@ -33,7 +35,17 @@
     };
 
     // Props
-    let { guidanceConfig }: { guidanceConfig: GuidanceConfig } = $props();
+    let {
+        guidanceConfig,
+        lineageEnabled = false,
+    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean } = $props();
+
+    const lineageEnabledStore = writable(lineageEnabled);
+    setContext("lineageEnabled", lineageEnabledStore);
+
+    $effect(() => {
+        lineageEnabledStore.set(lineageEnabled);
+    });
 
     // Wizard state
     let wizardOpen = $state(false);

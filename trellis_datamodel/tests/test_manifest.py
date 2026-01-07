@@ -1,7 +1,7 @@
 """Tests for manifest API endpoints."""
 import os
 import json
-import pytest
+from trellis_datamodel import config as cfg
 
 
 class TestGetConfigStatus:
@@ -15,6 +15,24 @@ class TestGetConfigStatus:
         assert data["config_present"] is True
         assert data["manifest_exists"] is True
         assert "dbt_project_path" in data
+
+
+class TestGetConfigInfo:
+    """Tests for GET /api/config-info endpoint."""
+
+    def test_includes_lineage_fields(self, test_client, monkeypatch):
+        import sys
+        # Patch the actual config module in sys.modules to handle module reloads
+        config_module = sys.modules['trellis_datamodel.config']
+        monkeypatch.setattr(config_module, "LINEAGE_ENABLED", True)
+        monkeypatch.setattr(config_module, "LINEAGE_LAYERS", ["one", "two"])
+
+        response = test_client.get("/api/config-info")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["lineage_enabled"] is True
+        assert data["lineage_layers"] == ["one", "two"]
 
 
 class TestGetManifest:
