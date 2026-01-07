@@ -6,10 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-01-07
 ### Changed
 - Added `lineage.enabled` feature flag (default: false) with nested `lineage.layers` configuration; top-level `lineage_layers` remains supported with deprecation warning. Lineage UI and API routes are now disabled unless explicitly enabled.
 - Added `guidance.entity_wizard.enabled` feature flag (default: true) so the entity creation wizard mirrors the nested feature-flag style; the loader still honors legacy `guidance.entity_wizard_enabled` for compatibility.
- - Renamed guidance block to `entity_creation_guidance` with flat `enabled`; `guidance`, `entity_wizard_enabled`, and `entity_creation_guidance.wizard.enabled` remain supported with deprecation warnings.
+- Renamed guidance block to `entity_creation_guidance` with flat `enabled`; `guidance`, `entity_wizard_enabled`, and `entity_creation_guidance.wizard.enabled` remain supported with deprecation warnings.
 
 ## [0.4.0] - 2025-01-15
 
