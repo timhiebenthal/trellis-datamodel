@@ -7,6 +7,7 @@ import shutil
 import pytest
 import httpx
 from starlette.testclient import TestClient
+from trellis_datamodel import config as cfg
 
 
 # Create a persistent temp directory for the entire test session
