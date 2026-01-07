@@ -14,12 +14,30 @@
     import { normalizeTags } from '$lib/utils';
     import Icon from '@iconify/svelte';
 
-    interface Props {
-        exposuresEnabled: boolean;
-        exposuresDefaultLayout: 'dashboards-as-rows' | 'entities-as-rows';
-    }
+interface Props {
+    exposuresEnabled: boolean;
+    exposuresDefaultLayout: 'dashboards-as-rows' | 'entities-as-rows';
+}
 
-    let { exposuresEnabled = true, exposuresDefaultLayout = 'dashboards-as-rows' }: Props = $props();
+let { exposuresEnabled = true, exposuresDefaultLayout = 'dashboards-as-rows' }: Props = $props();
+
+// #region agent log
+console.log("ExposuresTable props received:", {exposuresEnabled, exposuresDefaultLayout});
+fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+        location: 'frontend/src/lib/components/ExposuresTable.svelte:22',
+        message: 'ExposuresTable props received',
+        data: {exposuresEnabled, exposuresDefaultLayout, hypothesisId: 'B'},
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'pre-fix'
+    })
+}).catch(() => {});
+// #endregion
+
+let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
 
     let exposures = $state<Exposure[]>([]);
     let entityUsage = $state<EntityUsage>({});
@@ -166,6 +184,22 @@
     }
 
     async function loadExposures() {
+        // #region agent log
+        console.log("Loading exposures data");
+        fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                location: 'frontend/src/lib/components/ExposuresTable.svelte:168',
+                message: 'Loading exposures data',
+                data: {hypothesisId: 'D'},
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'pre-fix'
+            })
+        }).catch(() => {});
+        // #endregion
+
         // Only fetch if we're in exposures view mode
         if ($viewMode !== 'exposures') return;
 
@@ -175,6 +209,22 @@
             const data = await getExposures();
             exposures = data.exposures;
             entityUsage = data.entityUsage;
+            
+            // #region agent log
+            console.log("Exposures data loaded:", {exposuresCount: exposures.length});
+            fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    location: 'frontend/src/lib/components/ExposuresTable.svelte:176',
+                    message: 'Exposures data loaded',
+                    data: {exposuresCount: exposures.length, hypothesisId: 'D'},
+                    timestamp: Date.now(),
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix'
+                })
+            }).catch(() => {});
+            // #endregion
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load exposures';
             console.error('Error loading exposures:', e);
@@ -195,6 +245,22 @@
 
     // Also fetch on mount if already in exposures mode
     onMount(() => {
+        // #region agent log
+        console.log("ExposuresTable mounted");
+        fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                location: 'frontend/src/lib/components/ExposuresTable.svelte:197',
+                message: 'ExposuresTable mounted',
+                data: {hypothesisId: 'C'},
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'pre-fix'
+            })
+        }).catch(() => {});
+        // #endregion
+
         if ($viewMode === 'exposures') {
             loadExposures();
         }

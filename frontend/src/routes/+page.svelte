@@ -221,14 +221,62 @@
         configInfoLoading = true;
         configInfoError = null;
         try {
+            // #region agent log
+            console.log("Fetching config info from backend...");
+            fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    location: 'frontend/src/routes/+page.svelte:219',
+                    message: 'Fetching config info',
+                    data: {hypothesisId: 'A'},
+                    timestamp: Date.now(),
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix'
+                })
+            }).catch(() => {});
+            // #endregion
+
             const info = await getConfigInfo();
             if (!info) {
                 configInfoError = "Unable to fetch config info";
             } else {
+                // #region agent log
+                console.log("Config info received:", info);
+                fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        location: 'frontend/src/routes/+page.svelte:224',
+                        message: 'Config info received',
+                        data: {configInfo: info, hypothesisId: 'A'},
+                        timestamp: Date.now(),
+                        sessionId: 'debug-session',
+                        runId: 'pre-fix'
+                    })
+                }).catch(() => {});
+                // #endregion
+
                 configInfo = info;
                 lineageEnabled = info.lineage_enabled ?? false;
                 exposuresEnabled = info.exposures_enabled ?? false;
                 exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
+                
+                // #region agent log
+                console.log("Setting exposures config:", {exposuresEnabled, exposuresDefaultLayout});
+                fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        location: 'frontend/src/routes/+page.svelte:230',
+                        message: 'Setting exposures config',
+                        data: {exposuresEnabled, exposuresDefaultLayout, hypothesisId: 'A'},
+                        timestamp: Date.now(),
+                        sessionId: 'debug-session',
+                        runId: 'pre-fix'
+                    })
+                }).catch(() => {});
+                // #endregion
             }
         } catch (e) {
             console.error(e);
@@ -424,14 +472,30 @@
                 const status = await getConfigStatus();
                 $configStatus = status;
 
-                // Load Config Info (includes guidance config)
-                const info = await getConfigInfo();
-                if (info?.guidance) {
-                    guidanceConfig = info.guidance;
-                }
-                lineageEnabled = info?.lineage_enabled ?? false;
-                exposuresEnabled = info?.exposures_enabled ?? false;
-                exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
+// Load Config Info (includes guidance config)
+        const info = await getConfigInfo();
+        if (info?.guidance) {
+            guidanceConfig = info.guidance;
+        }
+        lineageEnabled = info?.lineage_enabled ?? false;
+        exposuresEnabled = info?.exposures_enabled ?? false;
+        exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
+        
+        // #region agent log
+        console.log("Initial config loaded during page mount");
+        fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                location: 'frontend/src/routes/+page.svelte:428',
+                message: 'Initial config loaded during page mount',
+                data: {lineageEnabled, exposuresEnabled, exposuresDefaultLayout, hypothesisId: 'E'},
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'pre-fix'
+            })
+        }).catch(() => {});
+        // #endregion
 
                 // Load Manifest
                 const models = await getManifest();
