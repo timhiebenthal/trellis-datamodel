@@ -1179,7 +1179,7 @@
         {#if $viewMode === 'exposures'}
             <ExposuresTable {exposuresEnabled} {exposuresDefaultLayout} />
         {:else}
-            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} />
+            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} {exposuresEnabled} />
         {/if}
     </main>
 

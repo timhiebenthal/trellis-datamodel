@@ -64,6 +64,10 @@ import Icon from "@iconify/svelte";
         getContext<Readable<boolean>>("lineageEnabled") ?? readable(false);
     let lineageEnabled = $derived($lineageEnabledStore);
 
+    const exposuresEnabledStore =
+        getContext<Readable<boolean>>("exposuresEnabled") ?? readable(false);
+    let exposuresEnabled = $derived($exposuresEnabledStore);
+
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
     let additionalModels = $derived((data.additional_models as string[]) || []);
@@ -1176,27 +1180,31 @@ import Icon from "@iconify/svelte";
                         <Icon icon="lucide:git-branch" class="w-4 h-4" />
                     </button>
                 {/if}
-                <button
-                    onclick={openExposuresView}
-                    aria-label="Show exposures for {data.label}"
-                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    title="Show exposures"
-                >
-                    <Icon icon="mdi:application-export" class="w-4 h-4" />
-                </button>
+                {#if exposuresEnabled}
+                    <button
+                        onclick={openExposuresView}
+                        aria-label="Show exposures for {data.label}"
+                        class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        title="Show exposures"
+                    >
+                        <Icon icon="mdi:application-export" class="w-4 h-4" />
+                    </button>
+                {/if}
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"
                     title="Draft mode (not bound to dbt model)"
                 ></div>
-                <button
-                    onclick={openExposuresView}
-                    aria-label="Show exposures for {data.label}"
-                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    title="Show exposures"
-                >
-                    <Icon icon="mdi:application-export" class="w-4 h-4" />
-                </button>
+                {#if exposuresEnabled}
+                    <button
+                        onclick={openExposuresView}
+                        aria-label="Show exposures for {data.label}"
+                        class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        title="Show exposures"
+                    >
+                        <Icon icon="mdi:application-export" class="w-4 h-4" />
+                    </button>
+                {/if}
             {/if}
             <button
                 onclick={handleDeleteClick}
