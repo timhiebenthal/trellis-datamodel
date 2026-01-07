@@ -53,6 +53,7 @@ if _TEST_DIR:
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
+    LINEAGE_ENABLED: bool = False
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 else:
     # Production mode: will be set by load_config()
@@ -68,6 +69,7 @@ else:
     FRONTEND_BUILD_DIR: str = ""
     DBT_COMPANY_DUMMY_PATH: str = ""
     LINEAGE_LAYERS: list[str] = []
+    LINEAGE_ENABLED: bool = False
 
 
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
@@ -102,7 +104,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -236,27 +238,65 @@ def load_config(config_path: Optional[str] = None) -> None:
                 DBT_COMPANY_DUMMY_PATH = p
         # Note: No default set here - CLI handles fallback to cwd/dbt_company_dummy
 
-        # 10. Load lineage layers configuration
-        if "lineage_layers" in config:
-            LINEAGE_LAYERS = config["lineage_layers"]
-            if not isinstance(LINEAGE_LAYERS, list):
-                LINEAGE_LAYERS = []
-        else:
-            LINEAGE_LAYERS = []
+        # 10. Load lineage configuration (nested structure, with legacy fallback)
+        LINEAGE_ENABLED = False
+        LINEAGE_LAYERS = []
 
-        # 11. Load guidance configuration
-        if "guidance" in config:
-            guidance_config = config["guidance"]
+        lineage_config = config.get("lineage")
+        if isinstance(lineage_config, dict):
+            LINEAGE_ENABLED = bool(lineage_config.get("enabled", False))
+            lineage_layers = lineage_config.get("layers", [])
+            if isinstance(lineage_layers, list):
+                LINEAGE_LAYERS = lineage_layers
+            elif lineage_layers is not None:
+                print("Warning: 'lineage.layers' must be a list. Ignoring provided value.")
+
+        legacy_lineage_present = "lineage_layers" in config
+        if lineage_config and legacy_lineage_present:
+            print(
+                "Warning: 'lineage_layers' at top level is deprecated and ignored when 'lineage' section is present. "
+                "Use 'lineage.enabled' and 'lineage.layers' instead."
+            )
+        elif not lineage_config and legacy_lineage_present:
+            print(
+                "Warning: 'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' and 'lineage.layers' instead."
+            )
+            legacy_layers = config["lineage_layers"]
+            if isinstance(legacy_layers, list):
+                LINEAGE_LAYERS = legacy_layers
+            else:
+                print("Warning: 'lineage_layers' must be a list. Ignoring provided value.")
+
+        # 11. Load guidance configuration (new: entity_creation_guidance, legacy: guidance)
+        guidance_section = config.get("entity_creation_guidance")
+        legacy_guidance_section = config.get("guidance")
+        if guidance_section is None and legacy_guidance_section is not None:
+            print(
+                "Warning: 'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
+            )
+            guidance_section = legacy_guidance_section
+
+        if isinstance(guidance_section, dict):
+            entity_wizard_enabled = guidance_section.get("enabled")
+            if entity_wizard_enabled is None:
+                entity_wizard_enabled = guidance_section.get("entity_wizard_enabled", True)
+            wizard_section = guidance_section.get("wizard") or guidance_section.get(
+                "entity_wizard"
+            )
+            if isinstance(wizard_section, dict):
+                entity_wizard_enabled = wizard_section.get(
+                    "enabled", entity_wizard_enabled
+                )
             GUIDANCE_CONFIG = GuidanceConfig(
-                entity_wizard_enabled=guidance_config.get("entity_wizard_enabled", True),
-                push_warning_enabled=guidance_config.get("push_warning_enabled", True),
-                min_description_length=guidance_config.get("min_description_length", 10),
-                disabled_guidance=guidance_config.get("disabled_guidance", [])
-                if isinstance(guidance_config.get("disabled_guidance"), list)
+                entity_wizard_enabled=bool(entity_wizard_enabled),
+                push_warning_enabled=guidance_section.get("push_warning_enabled", True),
+                min_description_length=guidance_section.get("min_description_length", 10),
+                disabled_guidance=guidance_section.get("disabled_guidance", [])
+                if isinstance(guidance_section.get("disabled_guidance"), list)
                 else [],
             )
         else:
-            # Use defaults if guidance section is missing
+            # Use defaults if guidance section is missing or invalid
             GUIDANCE_CONFIG = GuidanceConfig()
 
     except Exception as e:
@@ -275,6 +315,7 @@ def print_config() -> None:
     print(f"Looking for canvas layout at: {CANVAS_LAYOUT_PATH}")
     print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
     print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
+    print(f"Lineage enabled: {LINEAGE_ENABLED}")
     if LINEAGE_LAYERS:
         print(f"Lineage layers: {LINEAGE_LAYERS}")
     if DBT_COMPANY_DUMMY_PATH:

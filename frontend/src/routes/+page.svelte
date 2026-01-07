@@ -53,6 +53,7 @@
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
+    let lineageEnabled = $state(false);
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
         push_warning_enabled: true,
@@ -65,6 +66,12 @@
     let undescribedAttributesModalOpen = $state(false);
     let entitiesWithUndescribedAttributes = $state<Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>>([]);
     let undescribedAttributesResolve: ((value: boolean) => void) | null = null;
+
+    $effect(() => {
+        if (!lineageEnabled) {
+            closeLineageModal();
+        }
+    });
 
     // Helper function to get incomplete entities
     function getIncompleteEntities(nodes: Node[]): Node[] {
@@ -214,6 +221,7 @@
                 configInfoError = "Unable to fetch config info";
             } else {
                 configInfo = info;
+                lineageEnabled = info.lineage_enabled ?? false;
             }
         } catch (e) {
             console.error(e);
@@ -414,6 +422,7 @@
                 if (info?.guidance) {
                     guidanceConfig = info.guidance;
                 }
+                lineageEnabled = info?.lineage_enabled ?? false;
 
                 // Load Manifest
                 const models = await getManifest();
@@ -1159,16 +1168,18 @@
         {#if $viewMode === 'exposures'}
             <ExposuresTable />
         {:else}
-            <Canvas guidanceConfig={guidanceConfig} />
+            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} />
         {/if}
     </main>
 
     <!-- Render global modals outside SvelteFlow viewport (avoid transform/zoom affecting fixed positioning) -->
-    <LineageModal
-        open={$lineageModal.open}
-        modelId={$lineageModal.modelId}
-        onClose={closeLineageModal}
-    />
+    {#if lineageEnabled}
+        <LineageModal
+            open={$lineageModal.open}
+            modelId={$lineageModal.modelId}
+            onClose={closeLineageModal}
+        />
+    {/if}
 
     <ConfigInfoModal
         open={showConfigInfoModal}

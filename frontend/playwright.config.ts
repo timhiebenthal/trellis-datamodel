@@ -71,8 +71,8 @@ export default defineConfig({
             // Frontend dev server
             command: 'npm run dev',
             env: {
-                // Point frontend to backend API during tests (Vite public env)
-                VITE_PUBLIC_API_URL: 'http://localhost:8000/api',
+                // Point frontend Vite proxy to test backend API
+                VITE_DEV_API_TARGET: 'http://localhost:8000',
             },
             url: 'http://localhost:5173',
             reuseExistingServer: !process.env.CI,

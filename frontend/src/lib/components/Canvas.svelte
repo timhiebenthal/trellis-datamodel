@@ -14,6 +14,7 @@
         type Connection,
         type Edge,
     } from "@xyflow/svelte";
+    import { setContext } from "svelte";
     import { nodes, edges, viewMode } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import EntityNode from "./EntityNode.svelte";
@@ -22,6 +23,7 @@
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
     import Icon from "@iconify/svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
+    import { writable } from "svelte/store";
 
     const nodeTypes = {
         entity: EntityNode,
@@ -33,7 +35,17 @@
     };
 
     // Props
-    let { guidanceConfig }: { guidanceConfig: GuidanceConfig } = $props();
+    let {
+        guidanceConfig,
+        lineageEnabled = false,
+    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean } = $props();
+
+    const lineageEnabledStore = writable(lineageEnabled);
+    setContext("lineageEnabled", lineageEnabledStore);
+
+    $effect(() => {
+        lineageEnabledStore.set(lineageEnabled);
+    });
 
     // Wizard state
     let wizardOpen = $state(false);
@@ -383,15 +395,14 @@
         <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
         {#if $viewMode === "conceptual" || $viewMode === "logical"}
             <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
-                <div
-                    class="flex bg-white rounded-full p-1 border-[3px] border-primary-600 shadow-lg"
+                <button
+                    class="flex bg-white rounded-full border-[3px] border-primary-600 shadow-lg relative overflow-hidden transition-all duration-200"
                     style="box-shadow: 0 0 8px rgba(13, 148, 136, 0.4), 0 0 16px rgba(13, 148, 136, 0.25);"
                 >
-                    <button
-                        class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
-                        class:bg-primary-50={$viewMode === "conceptual"}
+                    <!-- Conceptual Option -->
+                    <div
+                        class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 cursor-pointer"
                         class:text-primary-600={$viewMode === "conceptual"}
-                        class:shadow-sm={$viewMode === "conceptual"}
                         class:text-gray-500={$viewMode !== "conceptual"}
                         class:hover:text-gray-900={$viewMode !== "conceptual"}
                         onclick={() => ($viewMode = "conceptual")}
@@ -399,12 +410,15 @@
                     >
                         <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
                         Conceptual
-                    </button>
-                    <button
-                        class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
-                        class:bg-primary-50={$viewMode === "logical"}
+                    </div>
+
+                    <!-- Vertical Divider -->
+                    <div class="w-[1px] bg-gray-200"></div>
+
+                    <!-- Logical Option -->
+                    <div
+                        class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 cursor-pointer"
                         class:text-primary-600={$viewMode === "logical"}
-                        class:shadow-sm={$viewMode === "logical"}
                         class:text-gray-500={$viewMode !== "logical"}
                         class:hover:text-gray-900={$viewMode !== "logical"}
                         onclick={() => ($viewMode = "logical")}
@@ -412,8 +426,8 @@
                     >
                         <Icon icon="lucide:database" class="w-3.5 h-3.5" />
                         Logical
-                    </button>
-                </div>
+                    </div>
+                </button>
             </div>
         {/if}
     </SvelteFlow>

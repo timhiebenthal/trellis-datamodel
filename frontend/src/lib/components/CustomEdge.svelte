@@ -108,8 +108,8 @@
 
   // Label position at the middle of the edge
   const edgeLabelPos = $derived.by(() => {
-    const { sourceSide, sourcePoint, targetPoint } = connectionInfo;
-    
+    const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
+
     // Special handling for self-loops: position label outside the loop curve
     if (isSelfEdge) {
       const midY = (sourcePoint.y + targetPoint.y) / 2 + baseOffset;
@@ -119,12 +119,12 @@
       const midX = sourcePoint.x + labelOffset + storedOffsetX + dragOffsetX;
       return { x: midX, y: midY + storedOffsetY + dragOffsetY };
     }
-    
+
     let sX = sourcePoint.x;
     let sY = sourcePoint.y;
     let tX = targetPoint.x;
     let tY = targetPoint.y;
-    
+
     if (sourceSide === 'left' || sourceSide === 'right') {
       sY += baseOffset;
       tY += baseOffset;
@@ -481,12 +481,12 @@
     if (selected) {
       return `stroke: #26A69A; stroke-width: 2; ${style || ''}`;
     }
-    
-    // Ensure default stroke styling when not selected
-    const defaultStyle = 'stroke: #64748b; stroke-width: 2';
+
+    // Ensure default stroke styling when not selected - using very light gray
+    const defaultStyle = 'stroke: #cbd5e1; stroke-width: 2'; // Very light gray for edges
     return style ? `${defaultStyle}; ${style}` : defaultStyle;
   });
-  
+
   // Crow's foot marker positions and rotations based on connection sides
   const markerColor = $derived(selected ? '#26A69A' : '#64748b');
 
@@ -504,7 +504,6 @@
     const pos = calculateMarkerPosition(targetPoint, targetSide, baseOffset, MARKER_PADDING);
     return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(targetSide)})`;
   });
-
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
@@ -616,41 +615,29 @@
     </div>
   </EdgeLabel>
 {:else}
-  <!-- Compact text-only view - SVG text with background to mask edge line -->
-  <g 
-    class="edge-label-compact"
-    onclick={selectThisEdge}
-    onpointerdown={(e) => { e.stopPropagation(); startLabelDrag(e); }}
-    onkeydown={handleCompactLabelKeydown}
-    role="button"
-    tabindex="0"
-    style="cursor: pointer; pointer-events: all;"
-  >
-    <!-- Background rectangle to mask the edge line - matches canvas bg -->
-    <!-- Limit width to prevent overflow, max 200px -->
-    <rect
-      x={edgeLabelPos.x - maxLabelWidth / 2}
-      y={edgeLabelPos.y - 10}
-      width={maxLabelWidth}
-      height="20"
-      fill="#f8fafc"
-      stroke="#e2e8f0"
-      stroke-width="1"
-      rx="4"
-      ry="4"
-    />
-    <title>{displayLabel}</title>
-    <text
-      x={edgeLabelPos.x}
-      y={edgeLabelPos.y}
-      text-anchor="middle"
-      dominant-baseline="middle"
-      class="pointer-events-none"
-      fill="#64748b"
-      font-size="11"
-      font-weight="500"
+  <!-- Compact text-only view - use EdgeLabel (HTML overlay) to render on top of all edge paths -->
+  <EdgeLabel x={edgeLabelPos.x} y={edgeLabelPos.y} style="background: transparent; pointer-events: none;">
+    <div
+      class="pointer-events-auto nodrag nopan inline-block px-2 py-0.5 rounded bg-[#f8fafc] border border-[#e2e8f0] cursor-move select-none text-center"
+      style="width: {maxLabelWidth}px;"
+      onclick={(e) => {
+        e.stopPropagation();
+        selectThisEdge(e as unknown as MouseEvent);
+      }}
+      onpointerdown={(e) => {
+        e.stopPropagation();
+        startLabelDrag(e);
+      }}
+      onkeydown={handleCompactLabelKeydown}
+      role="button"
+      tabindex="0"
     >
-      {truncatedLabel}
-    </text>
-  </g>
+      <span
+        class="pointer-events-none text-[11px] font-medium text-[#64748b]"
+        style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+      >
+        {truncatedLabel}
+      </span>
+    </div>
+  </EdgeLabel>
 {/if}
