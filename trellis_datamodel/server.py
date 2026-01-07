@@ -4,7 +4,7 @@ Trellis Data - FastAPI Server
 This is the FastAPI application that serves the API and frontend.
 """
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -14,7 +14,12 @@ from importlib.resources import files
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.config import print_config
-from trellis_datamodel.routes import manifest_router, data_model_router, schema_router, lineage_router
+from trellis_datamodel.routes import (
+    manifest_router,
+    data_model_router,
+    schema_router,
+    lineage_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -34,6 +39,18 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health_check():
         return {"status": "ok"}
+
+    # Favicon endpoint - serves trellis_squared.svg
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        # Serve the trellis_squared.svg as favicon (browsers accept SVG)
+        favicon_path = os.path.join(
+            os.path.dirname(__file__), "static/trellis_squared.svg"
+        )
+        if os.path.exists(favicon_path):
+            return FileResponse(favicon_path, media_type="image/svg+xml")
+        # Fallback to 204 if file doesn't exist
+        return Response(status_code=204)
 
     # Find static files directory
     # Priority: 1) configured FRONTEND_BUILD_DIR, 2) package static dir (if it has index.html)

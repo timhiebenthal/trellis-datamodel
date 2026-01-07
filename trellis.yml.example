@@ -1,0 +1,36 @@
+# Trellis configuration for data model UI
+
+# Transformation framework currently supported.
+framework: dbt-core
+
+# Path to the dbt project directory (relative to this file or absolute)
+dbt_project_path: "."
+# Path to dbt manifest.json (relative to dbt_project_path or absolute)
+dbt_manifest_path: "target/manifest.json"
+# Path to dbt catalog.json (relative to dbt_project_path or absolute)
+dbt_catalog_path: "target/catalog.json"
+
+# Where the generated data_model.yml is written (relative to dbt_project_path)
+data_model_file: "data_model.yml"
+
+# List of path patterns to include (empty list includes all models)
+dbt_model_paths: []  # Empty = include all models
+
+# Path to the compiled frontend build directory
+frontend_build_dir: "./frontend/build"
+
+# Helper project used by `trellis generate-company-data`.
+# Run the command to populate ./dbt_company_dummy or replace with your own project.
+dbt_company_dummy_path: "./dbt_company_dummy"
+
+# Lineage configuration is opt-in. Uncomment to customize defaults.
+#lineage:
+#  enabled: false  # Set to true to enable lineage UI/endpoints
+#  layers: []  # Ordered folder names that become lineage layers
+
+# Entity creation guidance (preferred block). Defaults match new schema.
+#entity_creation_guidance:
+#  enabled: true  # Set false to disable the step-by-step wizard
+#  push_warning_enabled: true  # Show push warnings when interacting with dbt
+#  min_description_length: 10  # Minimum characters required for descriptions
+#  disabled_guidance: []  # Helper flows to disable

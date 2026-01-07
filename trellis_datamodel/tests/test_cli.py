@@ -45,7 +45,7 @@ class TestCLIInit:
 
     def test_init_creates_config(self):
         """Test trellis init creates trellis.yml."""
-        from trellis_datamodel.cli import app
+        from trellis_datamodel.cli import app, DEFAULT_CONFIG_TEMPLATE
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Change to temp directory for the test
@@ -62,8 +62,7 @@ class TestCLIInit:
 
                 # Verify content
                 content = config_path.read_text()
-                assert "framework: dbt-core" in content
-                assert "dbt_project_path" in content
+                assert content == DEFAULT_CONFIG_TEMPLATE
             finally:
                 os.chdir(original_cwd)
 
