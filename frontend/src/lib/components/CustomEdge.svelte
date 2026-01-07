@@ -504,7 +504,7 @@
     const pos = calculateMarkerPosition(targetPoint, targetSide, baseOffset, MARKER_PADDING);
     return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(targetSide)})`;
   });
-
+</script>
 
 <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
 
