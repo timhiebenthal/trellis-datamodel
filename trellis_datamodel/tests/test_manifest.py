@@ -21,8 +21,11 @@ class TestGetConfigInfo:
     """Tests for GET /api/config-info endpoint."""
 
     def test_includes_lineage_fields(self, test_client, monkeypatch):
-        monkeypatch.setattr(cfg, "LINEAGE_ENABLED", True)
-        monkeypatch.setattr(cfg, "LINEAGE_LAYERS", ["one", "two"])
+        import sys
+        # Patch the actual config module in sys.modules to handle module reloads
+        config_module = sys.modules['trellis_datamodel.config']
+        monkeypatch.setattr(config_module, "LINEAGE_ENABLED", True)
+        monkeypatch.setattr(config_module, "LINEAGE_LAYERS", ["one", "two"])
 
         response = test_client.get("/api/config-info")
 

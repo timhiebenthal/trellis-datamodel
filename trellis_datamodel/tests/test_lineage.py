@@ -3,8 +3,11 @@
 from trellis_datamodel import config as cfg
 
 
-def test_lineage_returns_forbidden_when_disabled(test_client):
-    cfg.LINEAGE_ENABLED = False
+def test_lineage_returns_forbidden_when_disabled(test_client, monkeypatch):
+    import sys
+    # Patch the actual config module in sys.modules to handle module reloads
+    config_module = sys.modules['trellis_datamodel.config']
+    monkeypatch.setattr(config_module, "LINEAGE_ENABLED", False)
 
     response = test_client.get("/api/lineage/model.project.users")
 
