@@ -125,7 +125,7 @@
 {:else}
     <!-- Full container when expanded -->
     <div
-        class="group-node rounded-xl bg-gray-200/50 border border-gray-300 relative"
+        class="group-node rounded-xl border border-primary-600/10 bg-primary-500/[0.03] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4)] relative"
         style={`width:${nodeWidth}px; height:${nodeHeight}px;`}
     >
         <div
