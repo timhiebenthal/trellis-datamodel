@@ -137,6 +137,8 @@ export interface ConfigInfo {
     model_paths_configured: string[];
     model_paths_resolved: string[];
     guidance?: GuidanceConfig;
+    lineage_enabled?: boolean;
+    lineage_layers?: string[];
 }
 
 export interface FieldDragState {
@@ -199,4 +201,3 @@ export interface LineageResponse {
     edges: LineageEdge[];
     metadata: LineageMetadata;
 }
-

@@ -5,7 +5,7 @@ import tempfile
 import json
 import shutil
 import pytest
-from fastapi.testclient import TestClient
+import httpx
 
 
 # Create a persistent temp directory for the entire test session
@@ -126,7 +126,10 @@ def mock_manifest(mock_manifest_data):
 
 
 @pytest.fixture
-def test_client(mock_manifest):
+async def test_client(mock_manifest):
     """Create a test client. Config is already set via environment variables."""
     from trellis_datamodel.server import app
-    return TestClient(app)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client

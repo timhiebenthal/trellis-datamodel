@@ -2,13 +2,15 @@
 import os
 import json
 import pytest
+from trellis_datamodel import config as cfg
 
 
 class TestGetConfigStatus:
     """Tests for GET /api/config-status endpoint."""
 
-    def test_returns_status(self, test_client, mock_manifest):
-        response = test_client.get("/api/config-status")
+    @pytest.mark.anyio(specific_backend="asyncio")
+    async def test_returns_status(self, test_client, mock_manifest):
+        response = await test_client.get("/api/config-status")
         assert response.status_code == 200
         data = response.json()
 
@@ -17,11 +19,28 @@ class TestGetConfigStatus:
         assert "dbt_project_path" in data
 
 
+class TestGetConfigInfo:
+    """Tests for GET /api/config-info endpoint."""
+
+    @pytest.mark.anyio(specific_backend="asyncio")
+    async def test_includes_lineage_fields(self, test_client, monkeypatch):
+        monkeypatch.setattr(cfg, "LINEAGE_ENABLED", True)
+        monkeypatch.setattr(cfg, "LINEAGE_LAYERS", ["one", "two"])
+
+        response = await test_client.get("/api/config-info")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["lineage_enabled"] is True
+        assert data["lineage_layers"] == ["one", "two"]
+
+
 class TestGetManifest:
     """Tests for GET /api/manifest endpoint."""
 
-    def test_returns_models_from_manifest(self, test_client):
-        response = test_client.get("/api/manifest")
+    @pytest.mark.anyio(specific_backend="asyncio")
+    async def test_returns_models_from_manifest(self, test_client):
+        response = await test_client.get("/api/manifest")
         assert response.status_code == 200
         data = response.json()
 
@@ -33,8 +52,9 @@ class TestGetManifest:
         assert models[0]["name"] == "orders"
         assert models[1]["name"] == "users"
 
-    def test_model_fields(self, test_client):
-        response = test_client.get("/api/manifest")
+    @pytest.mark.anyio(specific_backend="asyncio")
+    async def test_model_fields(self, test_client):
+        response = await test_client.get("/api/manifest")
         data = response.json()
 
         users_model = next(m for m in data["models"] if m["name"] == "users")
@@ -44,7 +64,8 @@ class TestGetManifest:
         assert users_model["materialization"] == "table"
         assert users_model["tags"] == ["core"]
 
-    def test_filters_by_model_path(self, test_client, temp_dir, mock_manifest):
+    @pytest.mark.anyio(specific_backend="asyncio")
+    async def test_filters_by_model_path(self, test_client, temp_dir, mock_manifest):
         # Update manifest to have models in different paths
         with open(mock_manifest, "r") as f:
             manifest = json.load(f)
@@ -64,7 +85,7 @@ class TestGetManifest:
             json.dump(manifest, f)
 
         # DBT_MODEL_PATHS is set to ["3_core"] so staging model should be filtered out
-        response = test_client.get("/api/manifest")
+        response = await test_client.get("/api/manifest")
         data = response.json()
 
         model_names = [m["name"] for m in data["models"]]

@@ -31,27 +31,29 @@ frontend_build_dir: "./frontend/build"
 # Defaults to "./dbt_company_dummy" if not specified
 # dbt_company_dummy_path: "./dbt_company_dummy"
 
-# Ordered list of folder names to organize lineage into layers
-# Models are assigned to layers based on the first folder after models/ in their original_file_path
-# Sources are always assigned to "sources" layer (displayed at top)
-# Models without a matching folder are assigned to "unassigned" layer (displayed at bottom)
-# If not specified, lineage displays without layer organization (backward compatible)
-# Example:
-lineage_layers:
-  - "1_clean"
-  - "2_prep"
-  - "3_core"
+# Lineage configuration (opt-in)
+# When enabled: false, all lineage UI and endpoints are disabled (default: false)
+# layers: Ordered list of folder names to organize lineage into layers
+#   Models are assigned to layers based on the first folder after models/ in their original_file_path
+#   Sources are always assigned to "sources" layer (displayed at top)
+#   Models without a matching folder are assigned to "unassigned" layer (displayed at bottom)
+# Legacy top-level key `lineage_layers` is deprecated; use nested `lineage.layers` instead.
+lineage:
+  enabled: true
+  layers:
+    - "1_clean"
+    - "2_prep"
+    - "3_core"
 
 # Guidance settings for entity creation
 # Controls the entity creation wizard and push-to-dbt warnings
-# guidance:
-#   # Enable/disable entity creation wizard (default: true)
-#   entity_wizard_enabled: true
-#   # Enable/disable push-to-dbt warnings for incomplete entities (default: true)
-#   push_warning_enabled: true
-#   # Minimum description length in characters (default: 10)
-#   min_description_length: 10
-#   # Disable specific guidance types (optional)
-#   disabled_guidance:
-#     - attribute_suggestions  # Don't show attribute suggestions in wizard step 3
-
+#guidance:
+  # Enable/disable entity creation wizard (default: true)
+  #entity_wizard_enabled: true
+  # Enable/disable push-to-dbt warnings for incomplete entities (default: true)
+  #push_warning_enabled: true
+  # Minimum description length in characters (default: 10)
+  #min_description_length: 10
+  # Disable specific guidance types (optional)
+  #disabled_guidance:
+    #- attribute_suggestions  # Don't show attribute suggestions in wizard step 3

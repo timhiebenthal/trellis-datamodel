@@ -169,6 +169,8 @@ Options:
 - `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
 - `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
 - `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
+- `lineage.enabled`: Feature flag for lineage UI + API. Defaults to `false` (opt-in).
+- `lineage.layers`: Ordered list of folder names to organize lineage bands. Prefer this nested structure; legacy `lineage_layers` is deprecated.
 
 **Example `trellis.yml`:**
 ```yaml
@@ -179,6 +181,12 @@ dbt_catalog_path: "target/catalog.json"
 data_model_file: "data_model.yml"
 dbt_model_paths:
   - "3_core"
+lineage:
+  enabled: false  # Set to true to enable lineage UI/endpoints
+  layers:
+    - "1_clean"
+    - "2_prep"
+    - "3_core"
 ```
 
 

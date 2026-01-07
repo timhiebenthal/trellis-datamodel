@@ -22,6 +22,6 @@
 - Aim to keep test data deterministic; avoid reusing production `trellis.yml` or dbt artifacts in tests.
 
 ## Commit & Pull Request Guidelines
-- Commit messages follow short, sentence-style summaries (see `git log`); conventional commit prefixes are not required.
+- Commit messages follow short, sentence-style summaries (see `git log`); add commit prefixes like (fix:, feat:, style:, ...).
 - Create branches from `main`, keep PRs focused, and include context plus linked issues. Run backend pytest and at least `npm run test:smoke` (or `make test-all` for larger changes) before opening a PR.
 - Documentation and changelog updates should accompany behavior changes. Signing the CLA (`CLA.md`) is required once; add a DCO sign-off (`git commit -s`) if your organization prefers.

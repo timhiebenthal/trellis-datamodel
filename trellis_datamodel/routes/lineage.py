@@ -1,12 +1,26 @@
 """Routes for lineage operations."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 import os
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.services.lineage import extract_upstream_lineage, LineageError
 
-router = APIRouter(prefix="/api", tags=["lineage"])
+
+def ensure_lineage_enabled():
+    """Guard lineage routes behind configuration flag."""
+    if not cfg.LINEAGE_ENABLED:
+        raise HTTPException(
+            status_code=403,
+            detail="Lineage is disabled. Set lineage.enabled: true in trellis.yml to enable.",
+        )
+
+
+router = APIRouter(
+    prefix="/api",
+    tags=["lineage"],
+    dependencies=[Depends(ensure_lineage_enabled)],
+)
 
 
 @router.get("/lineage/{model_id}")
@@ -57,4 +71,3 @@ async def get_lineage(model_id: str):
             status_code=500,
             detail=f"Error extracting lineage: {str(e)}",
         )
-
