@@ -394,41 +394,39 @@
 
         <!-- Floating View Mode Switcher -->
         <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
-            <div
-                class="flex bg-white rounded-full p-1 border-[3px] border-primary-600 shadow-lg"
+            <button
+                class="flex bg-white rounded-full border-[3px] border-primary-600 shadow-lg relative overflow-hidden transition-all duration-200"
                 style="box-shadow: 0 0 8px rgba(13, 148, 136, 0.4), 0 0 16px rgba(13, 148, 136, 0.25);"
             >
-                <button
-                    class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2 border-[3px]"
-                    class:bg-primary-50={$viewMode === "conceptual"}
+                <!-- Conceptual Option -->
+                <div
+                    class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 cursor-pointer"
                     class:text-primary-600={$viewMode === "conceptual"}
-                    class:shadow-sm={$viewMode === "conceptual"}
                     class:text-gray-500={$viewMode !== "conceptual"}
                     class:hover:text-gray-900={$viewMode !== "conceptual"}
-                    class:border-primary-600={$viewMode === "conceptual"}
-                    class:border-gray-300={$viewMode !== "conceptual"}
                     onclick={() => ($viewMode = "conceptual")}
                     title="Conceptual View"
                 >
                     <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
                     Conceptual
-                </button>
-                <button
-                    class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2 border-[3px]"
-                    class:bg-primary-50={$viewMode === "logical"}
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="w-[1px] bg-gray-200"></div>
+
+                <!-- Logical Option -->
+                <div
+                    class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 cursor-pointer"
                     class:text-primary-600={$viewMode === "logical"}
-                    class:shadow-sm={$viewMode === "logical"}
                     class:text-gray-500={$viewMode !== "logical"}
                     class:hover:text-gray-900={$viewMode !== "logical"}
-                    class:border-primary-600={$viewMode === "logical"}
-                    class:border-gray-300={$viewMode !== "logical"}
                     onclick={() => ($viewMode = "logical")}
                     title="Logical View"
                 >
                     <Icon icon="lucide:database" class="w-3.5 h-3.5" />
                     Logical
-                </button>
-            </div>
+                </div>
+            </button>
         </div>
     </SvelteFlow>
 
