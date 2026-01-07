@@ -45,15 +45,11 @@ lineage:
     - "2_prep"
     - "3_core"
 
-# Guidance settings for entity creation
+# Entity creation guidance (preferred block)
 # Controls the entity creation wizard and push-to-dbt warnings
-#guidance:
-  # Enable/disable entity creation wizard (default: true)
-  #entity_wizard_enabled: true
-  # Enable/disable push-to-dbt warnings for incomplete entities (default: true)
-  #push_warning_enabled: true
-  # Minimum description length in characters (default: 10)
-  #min_description_length: 10
-  # Disable specific guidance types (optional)
-  #disabled_guidance:
+entity_creation_guidance:
+  enabled: false  # Set false to disable the step-by-step wizard (default: true)
+  push_warning_enabled: true
+  min_description_length: 10
+  disabled_guidance:
     #- attribute_suggestions  # Don't show attribute suggestions in wizard step 3

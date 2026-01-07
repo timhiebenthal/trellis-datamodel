@@ -136,6 +136,7 @@ export interface ConfigInfo {
     frontend_build_dir: string;
     model_paths_configured: string[];
     model_paths_resolved: string[];
+    entity_creation_guidance?: GuidanceConfig;
     guidance?: GuidanceConfig;
     lineage_enabled?: boolean;
     lineage_layers?: string[];

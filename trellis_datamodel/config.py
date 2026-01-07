@@ -267,19 +267,36 @@ def load_config(config_path: Optional[str] = None) -> None:
             else:
                 print("Warning: 'lineage_layers' must be a list. Ignoring provided value.")
 
-        # 11. Load guidance configuration
-        if "guidance" in config:
-            guidance_config = config["guidance"]
+        # 11. Load guidance configuration (new: entity_creation_guidance, legacy: guidance)
+        guidance_section = config.get("entity_creation_guidance")
+        legacy_guidance_section = config.get("guidance")
+        if guidance_section is None and legacy_guidance_section is not None:
+            print(
+                "Warning: 'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
+            )
+            guidance_section = legacy_guidance_section
+
+        if isinstance(guidance_section, dict):
+            entity_wizard_enabled = guidance_section.get("enabled")
+            if entity_wizard_enabled is None:
+                entity_wizard_enabled = guidance_section.get("entity_wizard_enabled", True)
+            wizard_section = guidance_section.get("wizard") or guidance_section.get(
+                "entity_wizard"
+            )
+            if isinstance(wizard_section, dict):
+                entity_wizard_enabled = wizard_section.get(
+                    "enabled", entity_wizard_enabled
+                )
             GUIDANCE_CONFIG = GuidanceConfig(
-                entity_wizard_enabled=guidance_config.get("entity_wizard_enabled", True),
-                push_warning_enabled=guidance_config.get("push_warning_enabled", True),
-                min_description_length=guidance_config.get("min_description_length", 10),
-                disabled_guidance=guidance_config.get("disabled_guidance", [])
-                if isinstance(guidance_config.get("disabled_guidance"), list)
+                entity_wizard_enabled=bool(entity_wizard_enabled),
+                push_warning_enabled=guidance_section.get("push_warning_enabled", True),
+                min_description_length=guidance_section.get("min_description_length", 10),
+                disabled_guidance=guidance_section.get("disabled_guidance", [])
+                if isinstance(guidance_section.get("disabled_guidance"), list)
                 else [],
             )
         else:
-            # Use defaults if guidance section is missing
+            # Use defaults if guidance section is missing or invalid
             GUIDANCE_CONFIG = GuidanceConfig()
 
     except Exception as e:

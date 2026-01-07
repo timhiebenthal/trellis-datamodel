@@ -100,6 +100,12 @@ async def get_config_info():
             "min_description_length": cfg.GUIDANCE_CONFIG.min_description_length,
             "disabled_guidance": cfg.GUIDANCE_CONFIG.disabled_guidance,
         },
+        "entity_creation_guidance": {
+            "entity_wizard_enabled": cfg.GUIDANCE_CONFIG.entity_wizard_enabled,
+            "push_warning_enabled": cfg.GUIDANCE_CONFIG.push_warning_enabled,
+            "min_description_length": cfg.GUIDANCE_CONFIG.min_description_length,
+            "disabled_guidance": cfg.GUIDANCE_CONFIG.disabled_guidance,
+        },
         "lineage_enabled": cfg.LINEAGE_ENABLED,
         "lineage_layers": cfg.LINEAGE_LAYERS,
     }
