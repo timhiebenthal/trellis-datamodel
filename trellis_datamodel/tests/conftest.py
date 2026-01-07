@@ -131,4 +131,6 @@ def test_client(mock_manifest):
     from trellis_datamodel.server import app
 
     with TestClient(app, backend="asyncio") as client:
+        # Ensure lineage is enabled for tests that expect it (can be overridden per test)
+        cfg.LINEAGE_ENABLED = True
         yield client
