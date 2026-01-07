@@ -21,32 +21,25 @@ interface Props {
 
 let { exposuresEnabled = true, exposuresDefaultLayout = 'dashboards-as-rows' }: Props = $props();
 
-// #region agent log
-console.log("ExposuresTable props received:", {exposuresEnabled, exposuresDefaultLayout});
-fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-        location: 'frontend/src/lib/components/ExposuresTable.svelte:22',
-        message: 'ExposuresTable props received',
-        data: {exposuresEnabled, exposuresDefaultLayout, hypothesisId: 'B'},
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'pre-fix'
-    })
-}).catch(() => {});
-// #endregion
+let exposures = $state<Exposure[]>([]);
+let entityUsage = $state<EntityUsage>({});
+let loading = $state(true);
+let error = $state<string | null>(null);
+let autoFitExposureHeaders = $state(true);
+let tableViewportWidth = $state(0);
+let tableViewportEl = $state<HTMLDivElement | null>(null);
+let isTransposed = $state(exposuresDefaultLayout === 'dashboards-as-rows');
+let userHasToggledLayout = $state(false);
 
-let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
-
-    let exposures = $state<Exposure[]>([]);
-    let entityUsage = $state<EntityUsage>({});
-    let loading = $state(true);
-    let error = $state<string | null>(null);
-    let autoFitExposureHeaders = $state(true);
-    let tableViewportWidth = $state(0);
-    let tableViewportEl = $state<HTMLDivElement | null>(null);
-    let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
+// Sync isTransposed when exposuresDefaultLayout prop changes (unless user has manually toggled)
+$effect(() => {
+    if (!userHasToggledLayout) {
+        const newValue = exposuresDefaultLayout === 'dashboards-as-rows';
+        if (isTransposed !== newValue) {
+            isTransposed = newValue;
+        }
+    }
+});
 
     // Derive entities from nodes (filter out group nodes and apply filters)
     let entities = $derived(
@@ -184,22 +177,6 @@ let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
     }
 
     async function loadExposures() {
-        // #region agent log
-        console.log("Loading exposures data");
-        fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                location: 'frontend/src/lib/components/ExposuresTable.svelte:168',
-                message: 'Loading exposures data',
-                data: {hypothesisId: 'D'},
-                timestamp: Date.now(),
-                sessionId: 'debug-session',
-                runId: 'pre-fix'
-            })
-        }).catch(() => {});
-        // #endregion
-
         // Only fetch if we're in exposures view mode
         if ($viewMode !== 'exposures') return;
 
@@ -209,22 +186,6 @@ let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
             const data = await getExposures();
             exposures = data.exposures;
             entityUsage = data.entityUsage;
-            
-            // #region agent log
-            console.log("Exposures data loaded:", {exposuresCount: exposures.length});
-            fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    location: 'frontend/src/lib/components/ExposuresTable.svelte:176',
-                    message: 'Exposures data loaded',
-                    data: {exposuresCount: exposures.length, hypothesisId: 'D'},
-                    timestamp: Date.now(),
-                    sessionId: 'debug-session',
-                    runId: 'pre-fix'
-                })
-            }).catch(() => {});
-            // #endregion
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load exposures';
             console.error('Error loading exposures:', e);
@@ -245,22 +206,6 @@ let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
 
     // Also fetch on mount if already in exposures mode
     onMount(() => {
-        // #region agent log
-        console.log("ExposuresTable mounted");
-        fetch('http://127.0.0.1:7243/ingest/5005a234-c969-4c96-a71f-2c33a7d43099', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                location: 'frontend/src/lib/components/ExposuresTable.svelte:197',
-                message: 'ExposuresTable mounted',
-                data: {hypothesisId: 'C'},
-                timestamp: Date.now(),
-                sessionId: 'debug-session',
-                runId: 'pre-fix'
-            })
-        }).catch(() => {});
-        // #endregion
-
         if ($viewMode === 'exposures') {
             loadExposures();
         }
@@ -445,7 +390,10 @@ let isTransposed = $state(exposuresDefaultLayout === 'entities-as-rows');
                     <div class="flex items-center gap-2 ml-auto">
                         <!-- Transpose Toggle -->
                         <button
-                            onclick={() => isTransposed = !isTransposed}
+                            onclick={() => {
+                                isTransposed = !isTransposed;
+                                userHasToggledLayout = true;
+                            }}
                             class="px-3 py-1.5 text-xs rounded font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
                             title={isTransposed ? "Switch to entities as rows" : "Switch to dashboards as rows"}
                         >
