@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `lineage.enabled` feature flag (default: false) with nested `lineage.layers` configuration; top-level `lineage_layers` remains supported with deprecation warning. Lineage UI and API routes are now disabled unless explicitly enabled.
 - Added `guidance.entity_wizard.enabled` feature flag (default: true) so the entity creation wizard mirrors the nested feature-flag style; the loader still honors legacy `guidance.entity_wizard_enabled` for compatibility.
 - Renamed guidance block to `entity_creation_guidance` with flat `enabled`; `guidance`, `entity_wizard_enabled`, and `entity_creation_guidance.wizard.enabled` remain supported with deprecation warnings.
+- Improved floating view mode switcher in canvas: restructured from nested buttons to single button with vertical divider bar, increased height by ~30%, and refined styling for better user experience.
 
 ## [0.4.0] - 2025-01-15
 
