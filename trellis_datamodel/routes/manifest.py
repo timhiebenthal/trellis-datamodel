@@ -108,6 +108,8 @@ async def get_config_info():
         },
         "lineage_enabled": cfg.LINEAGE_ENABLED,
         "lineage_layers": cfg.LINEAGE_LAYERS,
+        "exposures_enabled": cfg.EXPOSURES_ENABLED,
+        "exposures_default_layout": cfg.EXPOSURES_DEFAULT_LAYOUT,
     }
 
 

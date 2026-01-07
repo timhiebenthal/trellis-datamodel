@@ -54,6 +54,8 @@
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
     let lineageEnabled = $state(false);
+    let exposuresEnabled = $state(false);
+    let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
         push_warning_enabled: true,
@@ -70,6 +72,9 @@
     $effect(() => {
         if (!lineageEnabled) {
             closeLineageModal();
+        }
+        if (!exposuresEnabled) {
+            $viewMode = $viewMode === 'exposures' ? 'conceptual' : $viewMode;
         }
     });
 
@@ -222,6 +227,8 @@
             } else {
                 configInfo = info;
                 lineageEnabled = info.lineage_enabled ?? false;
+                exposuresEnabled = info.exposures_enabled ?? false;
+                exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
             }
         } catch (e) {
             console.error(e);
@@ -423,6 +430,8 @@
                     guidanceConfig = info.guidance;
                 }
                 lineageEnabled = info?.lineage_enabled ?? false;
+                exposuresEnabled = info?.exposures_enabled ?? false;
+                exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
 
                 // Load Manifest
                 const models = await getManifest();
@@ -1039,19 +1048,21 @@
                 <Icon icon="lucide:layout-dashboard" class="w-3.5 h-3.5" />
                 Canvas
             </button>
-            <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
-                class:bg-white={$viewMode === "exposures"}
-                class:text-primary-600={$viewMode === "exposures"}
-                class:shadow-sm={$viewMode === "exposures"}
-                class:text-gray-500={$viewMode !== "exposures"}
-                class:hover:text-gray-900={$viewMode !== "exposures"}
-                onclick={() => ($viewMode = "exposures")}
-                title="Exposures View"
-            >
-                <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
-                Exposures
-            </button>
+            {#if exposuresEnabled}
+                <button
+                    class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                    class:bg-white={$viewMode === "exposures"}
+                    class:text-primary-600={$viewMode === "exposures"}
+                    class:shadow-sm={$viewMode === "exposures"}
+                    class:text-gray-500={$viewMode !== "exposures"}
+                    class:hover:text-gray-900={$viewMode !== "exposures"}
+                    onclick={() => ($viewMode = "exposures")}
+                    title="Exposures View"
+                >
+                    <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
+                    Exposures
+                </button>
+            {/if}
         </div>
 
         <!-- Actions -->
@@ -1166,7 +1177,7 @@
             onpointerdown={startSidebarResize}
         ></div>
         {#if $viewMode === 'exposures'}
-            <ExposuresTable />
+            <ExposuresTable {exposuresEnabled} {exposuresDefaultLayout} />
         {:else}
             <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} />
         {/if}

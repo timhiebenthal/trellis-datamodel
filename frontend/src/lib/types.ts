@@ -140,6 +140,8 @@ export interface ConfigInfo {
     guidance?: GuidanceConfig;
     lineage_enabled?: boolean;
     lineage_layers?: string[];
+    exposures_enabled?: boolean;
+    exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
 }
 
 export interface FieldDragState {

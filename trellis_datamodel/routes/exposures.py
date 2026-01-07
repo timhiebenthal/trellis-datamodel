@@ -171,6 +171,13 @@ async def get_exposures():
     First tries to read exposures from manifest.json (canonical source after dbt compilation).
     Falls back to reading exposures.yml from various locations if manifest doesn't have exposures.
     """
+    # Check if exposures feature is enabled
+    if not cfg.EXPOSURES_ENABLED:
+        raise HTTPException(
+            status_code=403,
+            detail="Exposures are disabled. Set 'exposures.enabled: true' in trellis.yml to enable."
+        )
+
     # Load manifest and data model
     manifest = _load_manifest()
     data_model = _load_data_model()

@@ -14,6 +14,8 @@ def _prepare_config(monkeypatch):
     monkeypatch.setattr(cfg, "DBT_PROJECT_PATH", "")
     monkeypatch.setattr(cfg, "LINEAGE_ENABLED", False)
     monkeypatch.setattr(cfg, "LINEAGE_LAYERS", [])
+    monkeypatch.setattr(cfg, "EXPOSURES_ENABLED", False)
+    monkeypatch.setattr(cfg, "EXPOSURES_DEFAULT_LAYOUT", "dashboards-as-rows")
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -100,3 +102,59 @@ def test_lineage_prefers_nested_over_legacy(monkeypatch, tmp_path, capsys):
     assert cfg.LINEAGE_ENABLED is False
     assert cfg.LINEAGE_LAYERS == ["nested"]
     assert "deprecated" in captured.out
+
+
+def test_exposures_defaults_to_disabled(monkeypatch, tmp_path, capsys):
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: dbt-core
+        dbt_project_path: .
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+    captured = capsys.readouterr()
+
+    assert cfg.EXPOSURES_ENABLED is False
+    assert cfg.EXPOSURES_DEFAULT_LAYOUT == "dashboards-as-rows"
+    assert "exposures" not in captured.out
+
+
+def test_exposures_nested_config(monkeypatch, tmp_path):
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        exposures:
+          enabled: true
+          default_layout: entities-as-rows
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.EXPOSURES_ENABLED is True
+    assert cfg.EXPOSURES_DEFAULT_LAYOUT == "entities-as-rows"
+
+
+def test_exposures_invalid_layout_fallback(monkeypatch, tmp_path, capsys):
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        exposures:
+          enabled: true
+          default_layout: invalid-layout
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+    captured = capsys.readouterr()
+
+    assert cfg.EXPOSURES_ENABLED is True
+    assert cfg.EXPOSURES_DEFAULT_LAYOUT == "dashboards-as-rows"
+    assert "default_layout" in captured.out and "must be" in captured.out

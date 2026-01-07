@@ -34,3 +34,10 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #  push_warning_enabled: true  # Show push warnings when interacting with dbt
 #  min_description_length: 10  # Minimum characters required for descriptions
 #  disabled_guidance: []  # Helper flows to disable
+
+# Exposures configuration (opt-in). Uncomment to enable Exposures view mode.
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view mode (opt-in)
+#  default_layout: dashboards-as-rows  # Default table orientation: dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
