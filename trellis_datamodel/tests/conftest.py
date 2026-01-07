@@ -6,6 +6,7 @@ import json
 import shutil
 import pytest
 import httpx
+from starlette.testclient import TestClient
 
 
 # Create a persistent temp directory for the entire test session
@@ -52,7 +53,6 @@ def clean_test_files():
             for fname in files:
                 if fname.endswith((".yml", ".yaml")):
                     os.remove(os.path.join(root, fname))
-    
     yield
 
 
@@ -125,25 +125,10 @@ def mock_manifest(mock_manifest_data):
     return manifest_path
 
 
-class _PatchedASGITransport(httpx.ASGITransport):
-    """ASGITransport with sync context manager support for httpx.Client/TestClient."""
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.close()
-        return False
-
-
 @pytest.fixture
 def test_client(mock_manifest):
     """Create a synchronous test client against the ASGI app."""
     from trellis_datamodel.server import app
 
-    transport = _PatchedASGITransport(app=app, raise_app_exceptions=True)
-    client = httpx.Client(transport=transport, base_url="http://testserver")
-    try:
+    with TestClient(app, backend="asyncio") as client:
         yield client
-    finally:
-        client.close()
