@@ -69,11 +69,28 @@
                                 ? info.model_paths_resolved.join(", ")
                                 : "None",
                         },
+                        {
+                            label: "Lineage enabled",
+                            value: info.lineage_enabled ? "True" : "False",
+                            status: info.lineage_enabled,
+                        },
                     ] as row (row.label)}
                         <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 flex flex-col gap-1">
                             <span class="text-xs uppercase tracking-wide text-gray-500 font-semibold">{row.label}</span>
                             <div class="flex items-center gap-2">
-                                <span class="text-sm text-gray-900 break-all">{row.value}</span>
+                                {#if row.status !== undefined}
+                                    <span
+                                        class={`text-sm font-semibold rounded-full px-2 py-1 border ${
+                                            row.status
+                                                ? "text-success-700 bg-success-50 border-success-200"
+                                                : "text-danger-700 bg-danger-50 border-danger-200"
+                                        }`}
+                                    >
+                                        {row.value}
+                                    </span>
+                                {:else}
+                                    <span class="text-sm text-gray-900 break-all">{row.value}</span>
+                                {/if}
                                 {#if row.exists !== undefined}
                                     {#if row.exists}
                                         <span class="text-[10px] font-semibold text-success-700 bg-success-50 border border-success-200 rounded-full px-2 py-0.5">Exists</span>
