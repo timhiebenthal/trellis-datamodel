@@ -1,16 +1,57 @@
 version: 0.1
 entities:
 - id: employee
-  label: employee
+  label: Employee
   description: Employee records
   dbt_model: model.company_dummy.employee_history
   drafted_fields:
   - name: ''
     datatype: text
 - id: department
-  label: department
+  label: Department
   description: Company departments
   dbt_model: model.company_dummy.department
+- id: lead
+  label: Lead
+  description: Sales leads
+  dbt_model: model.company_dummy.lead
+- id: sale
+  label: Sale
+  description: Sale records at order-item grain with enriched order information
+  dbt_model: model.company_dummy.sale
+- id: product
+  label: Product
+  description: Product catalog
+  dbt_model: model.company_dummy.product
+- id: customer
+  label: Customer
+  description: Customer records
+  dbt_model: model.company_dummy.customer
+- id: supplier
+  label: Supplier
+  description: Supplier records
+  dbt_model: model.company_dummy.supplier
+- id: inventory
+  label: Inventory
+  description: Product inventory levels
+  dbt_model: model.company_dummy.inventory
+- id: procurement
+  label: Procurement
+  description: Procurement records at purchase-order-item grain with enriched purchase
+    order information
+  dbt_model: model.company_dummy.procurement
+- id: supplier_invoice
+  label: Supplier Invoice
+  description: Supplier invoices for purchase orders
+  dbt_model: model.company_dummy.supplier_invoice
+- id: customer_invoice
+  label: Customer Invoice
+  description: Customer invoices for sales orders
+  dbt_model: model.company_dummy.customer_invoice
+- id: entity
+  label: Entity
+  description: ''
+  dbt_model: model.company_dummy.calendar
 relationships:
 - source: employee
   target: employee
@@ -34,15 +75,63 @@ relationships:
   type: one_to_many
   source_field: department_id
   target_field: department_id
-- source: department
-  target: employee
+- source: lead
+  target: customer
   label: ''
   type: one_to_many
-  source_field: department_id
-  target_field: department_id
-- source: department
-  target: employee
+  source_field: lead_id
+  target_field: lead_id
+- source: lead
+  target: customer
   label: ''
   type: one_to_many
-  source_field: department_id
-  target_field: department_id
+  source_field: lead_id
+  target_field: lead_id
+- source: customer
+  target: sale
+  label: ''
+  type: one_to_many
+  source_field: customer_id
+  target_field: customer_id
+- source: product
+  target: sale
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: sale
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: inventory
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: inventory
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: product
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: supplier
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: supplier_id
+  target_field: supplier_id

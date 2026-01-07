@@ -6,13 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+tbd
 
-## [0.5.0] - 2026-01-07
+## [0.5.0b2] - 2026-01-07
+
+### Added
+- Added a new "Exposures" view mode that provides a cross-table visualization of entity usage across downstream dbt exposures.
+- Added support for fetching and displaying exposure metadata (labels, types, owners, descriptions) from the backend API.
+- Added automated empty state handling for projects without `exposures.yml` with helpful guidance for users.
+- Added exposures view feature flag (`exposures.enabled`) to optionally disable Exposures view; exposures can be enabled via `trellis.yml` configuration (default: false, opt-in).
+- Added transposed table layout for exposures view with manual toggle button; default layout shows dashboards as rows and entities as columns for improved readability when dashboards outnumber tables or have longer names.
+- Added `exposures.default_layout` configuration option to set initial table orientation; values are `dashboards-as-rows` (default) or `entities-as-rows`.
+- Added layout toggle button in Exposures view to switch between orientations without persistence (resets to default on page reload).
+- Added API guard returning 403 Forbidden when exposures feature is disabled to avoid unnecessary data processing and improve performance for organizations not using exposures.
+- Added support for progressive header density (normal/narrow/angled) to entity column headers when in transposed layout.
+
 ### Changed
 - Added `lineage.enabled` feature flag (default: false) with nested `lineage.layers` configuration; top-level `lineage_layers` remains supported with deprecation warning. Lineage UI and API routes are now disabled unless explicitly enabled.
 - Added `guidance.entity_wizard.enabled` feature flag (default: true) so the entity creation wizard mirrors the nested feature-flag style; the loader still honors legacy `guidance.entity_wizard_enabled` for compatibility.
 - Renamed guidance block to `entity_creation_guidance` with flat `enabled`; `guidance`, `entity_wizard_enabled`, and `entity_creation_guidance.wizard.enabled` remain supported with deprecation warnings.
 - Improved floating view mode switcher in canvas: restructured from nested buttons to single button with vertical divider bar, increased height by ~30%, and refined styling for better user experience.
+- Exposures view is now opt-in (disabled by default) to reduce UI noise for organizations that don't use downstream exposure tracking in dbt.
+- Backend config-info endpoint now exposes `exposures_enabled` and `exposures_default_layout` for frontend consumption.
+
+### Fixed
+- Fixed exposures not loading: added missing `import json` statement that was causing manifest loading to fail silently
+- Fixed exposures.yml file location detection: now checks project root directory (`dbt_concept/exposures.yml`) in addition to `models/exposures.yml`
+- Improved exposure loading to read from manifest.json first (canonical source with resolved model references), then fallback to YAML file
 
 ## [0.4.0] - 2025-01-15
 

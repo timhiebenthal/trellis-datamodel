@@ -53,3 +53,11 @@ entity_creation_guidance:
   min_description_length: 10
   disabled_guidance:
     #- attribute_suggestions  # Don't show attribute suggestions in wizard step 3
+
+
+# Exposures configuration (opt-in).
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+exposures:
+  enabled: true
+  default_layout: "dashboards-as-rows"

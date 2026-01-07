@@ -11,6 +11,7 @@
         nodes,
         edges,
         draggingField,
+        exposureEntityFilter,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -35,6 +36,12 @@ import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningMod
     import { openLineageModal } from "$lib/stores";
 import Icon from "@iconify/svelte";
     import { readable, type Readable } from "svelte/store";
+
+    function openExposuresView(event: MouseEvent) {
+        event.stopPropagation(); // Prevent collapse toggle
+        exposureEntityFilter.set(id);
+        viewMode.set('exposures');
+    }
 
     let { data: rawData, id, selected }: NodeProps = $props();
     // Cast data to EntityData for proper typing - use $derived to maintain reactivity
@@ -89,14 +96,17 @@ import Icon from "@iconify/svelte";
     });
 
     // Reset to primary model when switching to logical view
-    let previousViewMode = $state<'conceptual' | 'logical'>('conceptual');
+    let previousViewMode = $state<'conceptual' | 'logical' | 'exposures'>('conceptual');
     $effect(() => {
         const currentViewMode = $viewMode;
-        // Only reset when switching FROM conceptual TO logical
+        // Only reset when switching FROM conceptual TO logical (ignore exposures mode)
         if (previousViewMode === "conceptual" && currentViewMode === "logical" && allBoundModels.length > 0) {
             activeModelIndex = 0;
         }
-        previousViewMode = currentViewMode;
+        // Only track conceptual/logical modes for this logic
+        if (currentViewMode === "conceptual" || currentViewMode === "logical") {
+            previousViewMode = currentViewMode;
+        }
     });
 
     // Schema editing state for bound models
@@ -1166,11 +1176,27 @@ import Icon from "@iconify/svelte";
                         <Icon icon="lucide:git-branch" class="w-4 h-4" />
                     </button>
                 {/if}
+                <button
+                    onclick={openExposuresView}
+                    aria-label="Show exposures for {data.label}"
+                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    title="Show exposures"
+                >
+                    <Icon icon="mdi:application-export" class="w-4 h-4" />
+                </button>
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"
                     title="Draft mode (not bound to dbt model)"
                 ></div>
+                <button
+                    onclick={openExposuresView}
+                    aria-label="Show exposures for {data.label}"
+                    class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    title="Show exposures"
+                >
+                    <Icon icon="mdi:application-export" class="w-4 h-4" />
+                </button>
             {/if}
             <button
                 onclick={handleDeleteClick}

@@ -140,6 +140,8 @@ export interface ConfigInfo {
     guidance?: GuidanceConfig;
     lineage_enabled?: boolean;
     lineage_layers?: string[];
+    exposures_enabled?: boolean;
+    exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
 }
 
 export interface FieldDragState {
@@ -172,6 +174,21 @@ export interface ModelSchema {
     columns: ModelSchemaColumn[];
     tags?: string[];
     file_path: string;
+}
+
+export interface Exposure {
+    name: string;
+    label?: string;
+    type?: string;
+    description?: string;
+    owner?: { name?: string };
+}
+
+export type EntityUsage = Record<string, string[]>; // entity ID -> exposure names array
+
+export interface ExposuresResponse {
+    exposures: Exposure[];
+    entityUsage: EntityUsage;
 }
 
 export interface LineageNode {

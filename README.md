@@ -174,6 +174,8 @@ Options:
 - `dbt_company_dummy_path`: Helper dbt project used by `trellis generate-company-data`. Run the command to create `./dbt_company_dummy` or update this path to an existing project.
 - `lineage.enabled`: Feature flag for lineage UI + API. Defaults to `false` (opt-in).
 - `lineage.layers`: Ordered list of folder names to organize lineage bands. Prefer this nested structure; legacy `lineage_layers` is deprecated.
+- `exposures.enabled`: Feature flag for Exposures view mode. Defaults to `false` (opt-in). Set to `true` to enable the exposures view and API.
+- `exposures.default_layout`: Default table layout for exposures view. Options: `dashboards-as-rows` (default, dashboards as rows, entities as columns) or `entities-as-rows` (exposures as columns, entities as rows). Users can manually toggle between layouts.
 - `entity_creation_guidance`: Encounter-friendly guidance for the entity wizard (current defaults are shown in `trellis.yml.example`).
 
 **Example `trellis.yml`:**
@@ -189,6 +191,9 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #lineage:
 #  enabled: false  # Set to true to enable lineage UI/endpoints
 #  layers: []
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view (opt-in)
+#  default_layout: dashboards-as-rows  # Options: dashboards-as-rows (default) or entities-as-rows
 #entity_creation_guidance:
 #  enabled: true  # Set false to disable the step-by-step wizard
 #  push_warning_enabled: true

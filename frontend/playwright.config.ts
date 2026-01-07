@@ -35,20 +35,12 @@ export default defineConfig({
     },
 
     /* Configure projects for major browsers */
-    /* Note: Only chromium runs locally to save resources. CI runs all browsers. */
+    /* Note: Only chromium runs (locally and in CI) to keep CI time reasonable. */
     projects: process.env.CI
         ? [
               {
                   name: 'chromium',
                   use: { ...devices['Desktop Chrome'] },
-              },
-              {
-                  name: 'firefox',
-                  use: { ...devices['Desktop Firefox'] },
-              },
-              {
-                  name: 'webkit',
-                  use: { ...devices['Desktop Safari'] },
               },
           ]
         : [

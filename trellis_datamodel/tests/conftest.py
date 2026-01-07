@@ -62,6 +62,8 @@ def clean_test_files():
     # This is needed because some tests (like CLI tests) may reload modules
     cfg.LINEAGE_ENABLED = False
     cfg.LINEAGE_LAYERS = []
+    cfg.EXPOSURES_ENABLED = False
+    cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
 
 
 @pytest.fixture
@@ -161,6 +163,22 @@ def test_client(mock_manifest):
         # Reset to test defaults in case of module reload
         cfg_module.LINEAGE_ENABLED = False
         cfg_module.LINEAGE_LAYERS = []
+        cfg_module.EXPOSURES_ENABLED = False
+        cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
+        
+        # Reload routes modules to ensure they use the updated config
+        # This is needed because CLI tests reload modules, and routes might have old config references
+        routes_modules = [
+            "trellis_datamodel.routes.exposures",
+            "trellis_datamodel.routes.lineage",
+            "trellis_datamodel.routes.manifest",
+        ]
+        for mod_name in routes_modules:
+            if mod_name in sys.modules:
+                importlib.reload(sys.modules[mod_name])
+        # Reload server module last to ensure it picks up reloaded routes
+        if "trellis_datamodel.server" in sys.modules:
+            importlib.reload(sys.modules["trellis_datamodel.server"])
 
     from trellis_datamodel.server import app
 

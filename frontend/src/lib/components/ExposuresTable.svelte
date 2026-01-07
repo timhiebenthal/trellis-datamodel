@@ -1,39 +1,45 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { 
-        nodes, 
-        viewMode, 
-        folderFilter, 
-        tagFilter
+    import {
+        nodes,
+        viewMode,
+        folderFilter,
+        tagFilter,
+        exposureTypeFilter,
+        exposureOwnerFilter,
+        exposureEntityFilter
     } from '$lib/stores';
+    import { getExposures } from '$lib/api';
+    import type { Exposure, EntityUsage, EntityData } from '$lib/types';
     import { normalizeTags } from '$lib/utils';
     import Icon from '@iconify/svelte';
-    import { writable } from 'svelte/store';
-    import type { EntityData } from '$lib/types';
 
-    // Stub types for exposures feature (not yet implemented)
-    type Exposure = {
-        name: string;
-        label?: string;
-        type?: string;
-        description?: string;
-        owner?: { name: string };
-    };
-    type EntityUsage = Record<string, string[]>;
+interface Props {
+    exposuresEnabled: boolean;
+    exposuresDefaultLayout: 'dashboards-as-rows' | 'entities-as-rows';
+}
 
-    // Stub stores for exposures feature (not yet implemented)
-    const exposureTypeFilter = writable<string[]>([]);
-    const exposureOwnerFilter = writable<string[]>([]);
+let { exposuresEnabled = true, exposuresDefaultLayout = 'dashboards-as-rows' }: Props = $props();
 
-    // Stub API function (not yet implemented)
-    async function getExposures(): Promise<{ exposures: Exposure[]; entityUsage: EntityUsage }> {
-        return { exposures: [], entityUsage: {} };
+let exposures = $state<Exposure[]>([]);
+let entityUsage = $state<EntityUsage>({});
+let loading = $state(true);
+let error = $state<string | null>(null);
+let autoFitExposureHeaders = $state(true);
+let tableViewportWidth = $state(0);
+let tableViewportEl = $state<HTMLDivElement | null>(null);
+let isTransposed = $state(exposuresDefaultLayout === 'dashboards-as-rows');
+let userHasToggledLayout = $state(false);
+
+// Sync isTransposed when exposuresDefaultLayout prop changes (unless user has manually toggled)
+$effect(() => {
+    if (!userHasToggledLayout) {
+        const newValue = exposuresDefaultLayout === 'dashboards-as-rows';
+        if (isTransposed !== newValue) {
+            isTransposed = newValue;
+        }
     }
-
-    let exposures = $state<Exposure[]>([]);
-    let entityUsage = $state<EntityUsage>({});
-    let loading = $state(true);
-    let error = $state<string | null>(null);
+});
 
     // Derive entities from nodes (filter out group nodes and apply filters)
     let entities = $derived(
@@ -49,6 +55,13 @@
                 };
             })
             .filter((entity) => {
+                // Filter by specific entity ID (from exposures button)
+                if ($exposureEntityFilter !== null) {
+                    if (entity.id !== $exposureEntityFilter) {
+                        return false;
+                    }
+                }
+
                 // Filter by folder
                 if ($folderFilter.length > 0) {
                     const entityFolder = entity.folder;
@@ -97,6 +110,47 @@
         })
     );
 
+    // Progressive header density (delays horizontal scroll for many dashboards)
+    type HeaderMode = 'normal' | 'narrow' | 'angled';
+    let headerMode = $derived.by<HeaderMode>(() => {
+        if (!autoFitExposureHeaders) return 'normal';
+
+        // Determine what's in the horizontal dimension (columns)
+        const horizontalCount = isTransposed ? entities.length : filteredExposures.length;
+        if (tableViewportWidth <= 0) {
+            // Fallback when we can't measure container size yet (e.g., first paint)
+            if (horizontalCount >= 40) return 'angled';
+            if (horizontalCount >= 20) return 'narrow';
+            return 'normal';
+        }
+
+        // Use measured width to decide when to compact headers.
+        // Roughly subtract space for the sticky entity column + borders/padding.
+        const stickyColPx = 240;
+        const available = Math.max(tableViewportWidth - stickyColPx, 0);
+        const fits = (minWidth: number) => (minWidth > 0 ? Math.floor(available / minWidth) : 0);
+
+        const fitsNormal = fits(150);
+        const fitsNarrow = fits(120);
+
+        if (horizontalCount <= fitsNormal) return 'normal';
+        if (horizontalCount <= fitsNarrow) return 'narrow';
+        return 'angled'; // last resort before relying heavily on horizontal scroll
+    });
+
+    let thClass = $derived(() => {
+        switch (headerMode) {
+            case 'angled':
+                return 'px-2 py-2 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[96px] align-bottom';
+            case 'narrow':
+                return 'px-2 py-2 text-left text-[11px] font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[120px]';
+            default:
+                return 'px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]';
+        }
+    });
+
+    let iconClass = $derived(() => (headerMode === 'normal' ? 'w-4 h-4' : 'w-3.5 h-3.5'));
+
     // Get unique exposure types and owners for filter dropdowns
     let availableTypes = $derived(
         Array.from(new Set(exposures.map(e => e.type).filter(Boolean))).sort()
@@ -123,9 +177,9 @@
     }
 
     async function loadExposures() {
-        // Only fetch if we're in exposures view mode (feature not yet implemented)
-        // @ts-expect-error - exposures view mode not yet implemented
+        // Only fetch if we're in exposures view mode
         if ($viewMode !== 'exposures') return;
+
         loading = true;
         error = null;
         try {
@@ -140,19 +194,35 @@
         }
     }
 
-    // Fetch data when view mode changes to exposures (feature not yet implemented)
+    // Fetch data when view mode changes to exposures
     $effect(() => {
-        // @ts-expect-error - exposures view mode not yet implemented
         if ($viewMode === 'exposures') {
             loadExposures();
+        } else {
+            // Clear entity filter when switching away from exposures view
+            exposureEntityFilter.set(null);
         }
     });
 
     // Also fetch on mount if already in exposures mode
     onMount(() => {
-        // @ts-expect-error - exposures view mode not yet implemented
         if ($viewMode === 'exposures') {
             loadExposures();
+        }
+
+        // Measure table viewport width to auto-fit columns based on screen size.
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver((entries) => {
+                const entry = entries[0];
+                if (!entry) return;
+                tableViewportWidth = Math.round(entry.contentRect.width);
+            });
+
+            if (tableViewportEl) ro.observe(tableViewportEl);
+
+            return () => {
+                ro.disconnect();
+            };
         }
     });
 </script>
@@ -237,7 +307,7 @@
                                 {type}
                                 <button
                                     onclick={() => {
-                                        $exposureTypeFilter = $exposureTypeFilter.filter((t: string) => t !== type);
+                                        $exposureTypeFilter = $exposureTypeFilter.filter(t => t !== type);
                                     }}
                                     class="hover:text-primary-900"
                                 >
@@ -275,7 +345,7 @@
                                 {owner}
                                 <button
                                     onclick={() => {
-                                        $exposureOwnerFilter = $exposureOwnerFilter.filter((o: string) => o !== owner);
+                                        $exposureOwnerFilter = $exposureOwnerFilter.filter(o => o !== owner);
                                     }}
                                     class="hover:text-primary-900"
                                 >
@@ -285,18 +355,62 @@
                         {/each}
                     </div>
 
+                    <!-- Entity Filter Badge -->
+                    {#if $exposureEntityFilter !== null}
+                        {#each entities.filter(e => e.id === $exposureEntityFilter) as entity}
+                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
+                                Entity: {entity.label}
+                                <button
+                                    onclick={() => {
+                                        exposureEntityFilter.set(null);
+                                    }}
+                                    class="hover:text-primary-900"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    {/if}
+
                     <!-- Clear All Filters -->
-                    {#if $exposureTypeFilter.length > 0 || $exposureOwnerFilter.length > 0}
+                    {#if $exposureTypeFilter.length > 0 || $exposureOwnerFilter.length > 0 || $exposureEntityFilter !== null}
                         <button
                             onclick={() => {
                                 $exposureTypeFilter = [];
                                 $exposureOwnerFilter = [];
+                                exposureEntityFilter.set(null);
                             }}
                             class="text-xs text-gray-600 hover:text-gray-800 underline"
                         >
                             Clear exposure filters
                         </button>
                     {/if}
+
+                    <!-- Table Density -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <!-- Transpose Toggle -->
+                        <button
+                            onclick={() => {
+                                isTransposed = !isTransposed;
+                                userHasToggledLayout = true;
+                            }}
+                            class="px-3 py-1.5 text-xs rounded font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                            title={isTransposed ? "Switch to entities as rows" : "Switch to dashboards as rows"}
+                        >
+                            <Icon icon="lucide:rotate-cw" class="w-3.5 h-3.5" />
+                            {isTransposed ? "Entities as rows" : "Dashboards as rows"}
+                        </button>
+
+                        <label class="flex items-center gap-2 text-xs text-gray-600 select-none cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={autoFitExposureHeaders}
+                                onchange={(e) => (autoFitExposureHeaders = (e.target as HTMLInputElement).checked)}
+                                class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            Auto-fit columns
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Entity Filters Info -->
@@ -322,70 +436,153 @@
             </div>
 
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-18rem)]">
+                <div bind:this={tableViewportEl} class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-10rem)]">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200"
-                                >
-                                    Entity
-                                </th>
-                                {#each filteredExposures as exposure}
+                        {#if !isTransposed}
+                            <!-- Normal layout: entities as rows, exposures as columns -->
+                            <thead class="bg-gray-50 sticky top-0 z-10">
+                                <tr>
                                     <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]"
-                                        title={exposure.description || exposure.name}
+                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200"
                                     >
-                                        <div class="flex items-center gap-2">
-                                            <Icon
-                                                icon={getExposureIcon(exposure.type)}
-                                                class="w-4 h-4 text-gray-500"
-                                            />
-                                            <span>{exposure.label || exposure.name}</span>
-                                        </div>
-                                        {#if exposure.owner?.name}
-                                            <div class="text-[10px] font-normal text-gray-500 mt-1">
-                                                Owner: {exposure.owner.name}
-                                            </div>
-                                        {/if}
+                                        Entity
                                     </th>
-                                {/each}
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            {#if entities.length === 0}
-                                <tr>
-                                    <td colspan={Math.max(filteredExposures.length, 1) + 1} class="px-4 py-8 text-center text-sm text-gray-500">
-                                        No entities match the current filters.
-                                    </td>
-                                </tr>
-                            {:else if filteredExposures.length === 0}
-                                <tr>
-                                    <td colspan="2" class="px-4 py-8 text-center text-sm text-gray-500">
-                                        No exposures match the current filters.
-                                    </td>
-                                </tr>
-                            {:else}
-                                {#each entities as entity}
-                                    <tr class="hover:bg-gray-50 transition-colors">
-                                        <td
-                                            class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
+                                    {#each filteredExposures as exposure}
+                                        <th
+                                            class={thClass}
+                                            title={exposure.description || exposure.name}
                                         >
-                                            {entity.label}
+                                            {#if headerMode === 'angled'}
+                                                <div class="h-20 flex items-end">
+                                                    <div class="origin-bottom-right -rotate-45 whitespace-nowrap flex items-center gap-1.5">
+                                                        <Icon
+                                                            icon={getExposureIcon(exposure.type)}
+                                                            class={`${iconClass} text-gray-500`}
+                                                        />
+                                                        <span>{exposure.label || exposure.name}</span>
+                                                    </div>
+                                                </div>
+                                            {:else}
+                                                <div class="flex items-center gap-2">
+                                                    <Icon
+                                                        icon={getExposureIcon(exposure.type)}
+                                                        class={`${iconClass} text-gray-500`}
+                                                    />
+                                                    <span class={headerMode === 'narrow' ? 'truncate max-w-[9rem]' : ''}>
+                                                        {exposure.label || exposure.name}
+                                                    </span>
+                                                </div>
+                                            {/if}
+                                            {#if exposure.owner?.name}
+                                                <div class="text-[10px] font-normal text-gray-500 mt-1">
+                                                    Owner: {exposure.owner.name}
+                                                </div>
+                                            {/if}
+                                        </th>
+                                    {/each}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {#if entities.length === 0}
+                                    <tr>
+                                        <td colspan={Math.max(filteredExposures.length, 1) + 1} class="px-4 py-8 text-center text-sm text-gray-500">
+                                            No entities match the current filters.
                                         </td>
-                                        {#each filteredExposures as exposure}
-                                            <td class="px-4 py-3 text-sm text-center">
-                                                {#if entityUsage[entity.id]?.includes(exposure.name)}
-                                                    <span class="text-green-600 font-semibold">✓</span>
-                                                {:else}
-                                                    <span class="text-gray-300">—</span>
+                                    </tr>
+                                {:else if filteredExposures.length === 0}
+                                    <tr>
+                                        <td colspan="2" class="px-4 py-8 text-center text-sm text-gray-500">
+                                            No exposures match the current filters.
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    {#each entities as entity}
+                                        <tr class="hover:bg-gray-50 transition-colors">
+                                            <td
+                                                class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
+                                            >
+                                                {entity.label}
+                                            </td>
+                                            {#each filteredExposures as exposure}
+                                                <td class="px-4 py-3 text-sm text-center">
+                                                    {#if entityUsage[entity.id]?.includes(exposure.name)}
+                                                        <span class="text-green-600 font-semibold">✓</span>
+                                                    {:else}
+                                                        <span class="text-gray-300">—</span>
+                                                    {/if}
+                                                </td>
+                                            {/each}
+                                        </tr>
+                                    {/each}
+                                {/if}
+                            </tbody>
+                        {:else}
+                            <!-- Transposed layout: exposures as rows, entities as columns -->
+                            <thead class="bg-gray-50 sticky top-0 z-10">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200"
+                                    >
+                                        Dashboard
+                                    </th>
+                                    {#each entities as entity}
+                                        <th
+                                            class={thClass}
+                                            title={entity.label}
+                                        >
+                                            <span class={headerMode === 'narrow' ? 'truncate max-w-[9rem]' : ''}>
+                                                {entity.label}
+                                            </span>
+                                        </th>
+                                    {/each}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {#if filteredExposures.length === 0}
+                                    <tr>
+                                        <td colspan="2" class="px-4 py-8 text-center text-sm text-gray-500">
+                                            No exposures match the current filters.
+                                        </td>
+                                    </tr>
+                                {:else if entities.length === 0}
+                                    <tr>
+                                        <td colspan={Math.max(entities.length, 1) + 1} class="px-4 py-8 text-center text-sm text-gray-500">
+                                            No entities match the current filters.
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    {#each filteredExposures as exposure}
+                                        <tr class="hover:bg-gray-50 transition-colors">
+                                            <td
+                                                class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200"
+                                            >
+                                                <div class="flex items-center gap-2">
+                                                    <Icon
+                                                        icon={getExposureIcon(exposure.type)}
+                                                        class={`${iconClass} text-gray-500`}
+                                                    />
+                                                    <span class="truncate">{exposure.label || exposure.name}</span>
+                                                </div>
+                                                {#if exposure.owner?.name}
+                                                    <div class="text-[10px] font-normal text-gray-500 mt-1">
+                                                        Owner: {exposure.owner.name}
+                                                    </div>
                                                 {/if}
                                             </td>
-                                        {/each}
-                                    </tr>
-                                {/each}
-                            {/if}
-                        </tbody>
+                                            {#each entities as entity}
+                                                <td class="px-4 py-3 text-sm text-center">
+                                                    {#if entityUsage[entity.id]?.includes(exposure.name)}
+                                                        <span class="text-green-600 font-semibold">✓</span>
+                                                    {:else}
+                                                        <span class="text-gray-300">—</span>
+                                                    {/if}
+                                                </td>
+                                            {/each}
+                                        </tr>
+                                    {/each}
+                                {/if}
+                            </tbody>
+                        {/if}
                     </table>
                 </div>
             </div>

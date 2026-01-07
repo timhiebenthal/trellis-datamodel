@@ -54,6 +54,8 @@ if _TEST_DIR:
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
     LINEAGE_ENABLED: bool = False
+    EXPOSURES_ENABLED: bool = False
+    EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 else:
     # Production mode: will be set by load_config()
@@ -70,6 +72,8 @@ else:
     DBT_COMPANY_DUMMY_PATH: str = ""
     LINEAGE_LAYERS: list[str] = []
     LINEAGE_ENABLED: bool = False
+    EXPOSURES_ENABLED: bool = False
+    EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
 
 
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
@@ -104,7 +108,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -299,6 +303,19 @@ def load_config(config_path: Optional[str] = None) -> None:
             # Use defaults if guidance section is missing or invalid
             GUIDANCE_CONFIG = GuidanceConfig()
 
+        # 12. Load exposures configuration
+        EXPOSURES_ENABLED = False
+        EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
+
+        exposures_config = config.get("exposures")
+        if isinstance(exposures_config, dict):
+            EXPOSURES_ENABLED = bool(exposures_config.get("enabled", False))
+            default_layout = exposures_config.get("default_layout", "dashboards-as-rows")
+            if default_layout in ["dashboards-as-rows", "entities-as-rows"]:
+                EXPOSURES_DEFAULT_LAYOUT = default_layout
+            else:
+                print("Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'.")
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
@@ -318,5 +335,8 @@ def print_config() -> None:
     print(f"Lineage enabled: {LINEAGE_ENABLED}")
     if LINEAGE_LAYERS:
         print(f"Lineage layers: {LINEAGE_LAYERS}")
+    print(f"Exposures enabled: {EXPOSURES_ENABLED}")
+    if EXPOSURES_ENABLED:
+        print(f"Exposures default layout: {EXPOSURES_DEFAULT_LAYOUT}")
     if DBT_COMPANY_DUMMY_PATH:
         print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")

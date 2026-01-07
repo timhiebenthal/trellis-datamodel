@@ -30,6 +30,7 @@
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
+    import ExposuresTable from "$lib/components/ExposuresTable.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
     import LineageModal from "$lib/components/LineageModal.svelte";
     import IncompleteEntitiesWarningModal from "$lib/components/IncompleteEntitiesWarningModal.svelte";
@@ -53,6 +54,8 @@
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
     let lineageEnabled = $state(false);
+    let exposuresEnabled = $state(false);
+    let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
         push_warning_enabled: true,
@@ -69,6 +72,9 @@
     $effect(() => {
         if (!lineageEnabled) {
             closeLineageModal();
+        }
+        if (!exposuresEnabled) {
+            $viewMode = $viewMode === 'exposures' ? 'conceptual' : $viewMode;
         }
     });
 
@@ -221,6 +227,8 @@
             } else {
                 configInfo = info;
                 lineageEnabled = info.lineage_enabled ?? false;
+                exposuresEnabled = info.exposures_enabled ?? false;
+                exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
             }
         } catch (e) {
             console.error(e);
@@ -416,12 +424,14 @@
                 const status = await getConfigStatus();
                 $configStatus = status;
 
-                // Load Config Info (includes guidance config)
-                const info = await getConfigInfo();
-                if (info?.guidance) {
-                    guidanceConfig = info.guidance;
-                }
-                lineageEnabled = info?.lineage_enabled ?? false;
+// Load Config Info (includes guidance config)
+        const info = await getConfigInfo();
+        if (info?.guidance) {
+            guidanceConfig = info.guidance;
+        }
+        lineageEnabled = info?.lineage_enabled ?? false;
+        exposuresEnabled = info?.exposures_enabled ?? false;
+        exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
 
                 // Load Manifest
                 const models = await getManifest();
@@ -1021,6 +1031,39 @@
             {/if}
         </div>
 
+        <!-- View Switcher -->
+        <div
+            class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60"
+        >
+            <button
+                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                class:bg-white={$viewMode === "conceptual" || $viewMode === "logical"}
+                class:text-primary-600={$viewMode === "conceptual" || $viewMode === "logical"}
+                class:shadow-sm={$viewMode === "conceptual" || $viewMode === "logical"}
+                class:text-gray-500={$viewMode === "exposures"}
+                class:hover:text-gray-900={$viewMode === "exposures"}
+                onclick={() => ($viewMode = "conceptual")}
+                title="Canvas View"
+            >
+                <Icon icon="lucide:layout-dashboard" class="w-3.5 h-3.5" />
+                Canvas
+            </button>
+            {#if exposuresEnabled}
+                <button
+                    class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                    class:bg-white={$viewMode === "exposures"}
+                    class:text-primary-600={$viewMode === "exposures"}
+                    class:shadow-sm={$viewMode === "exposures"}
+                    class:text-gray-500={$viewMode !== "exposures"}
+                    class:hover:text-gray-900={$viewMode !== "exposures"}
+                    onclick={() => ($viewMode = "exposures")}
+                    title="Exposures View"
+                >
+                    <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
+                    Exposures
+                </button>
+            {/if}
+        </div>
 
         <!-- Actions -->
         <div class="flex items-center gap-3">
@@ -1083,7 +1126,7 @@
                 class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 title="Automatically arrange entities and relationships for optimal readability"
             >
-                <Icon icon="lucide:layout-grid" class="w-4 h-4" />
+                <Icon icon="lucide:wand-2" class="w-4 h-4" />
                 Auto Layout
             </button>
 
@@ -1133,7 +1176,11 @@
             class:active={resizingSidebar}
             onpointerdown={startSidebarResize}
         ></div>
-        <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} />
+        {#if $viewMode === 'exposures'}
+            <ExposuresTable {exposuresEnabled} {exposuresDefaultLayout} />
+        {:else}
+            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} />
+        {/if}
     </main>
 
     <!-- Render global modals outside SvelteFlow viewport (avoid transform/zoom affecting fixed positioning) -->
