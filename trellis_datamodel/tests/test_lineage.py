@@ -15,8 +15,11 @@ def test_lineage_returns_forbidden_when_disabled(test_client, monkeypatch):
     assert "Lineage is disabled" in response.json()["detail"]
 
 
-def test_lineage_succeeds_when_enabled(monkeypatch, test_client):
-    monkeypatch.setattr(cfg, "LINEAGE_ENABLED", True)
+def test_lineage_succeeds_when_enabled(monkeypatch, test_client, mock_manifest):
+    import sys
+    # Patch the actual config module in sys.modules to handle module reloads
+    config_module = sys.modules['trellis_datamodel.config']
+    monkeypatch.setattr(config_module, "LINEAGE_ENABLED", True)
 
     response = test_client.get("/api/lineage/model.project.users")
 

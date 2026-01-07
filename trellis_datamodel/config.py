@@ -53,7 +53,7 @@ if _TEST_DIR:
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
-    LINEAGE_ENABLED: bool = True
+    LINEAGE_ENABLED: bool = False
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 else:
     # Production mode: will be set by load_config()

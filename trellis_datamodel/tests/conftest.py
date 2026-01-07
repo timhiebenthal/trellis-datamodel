@@ -59,7 +59,7 @@ def clean_test_files():
     yield
     # After each test, ensure config is reset to test mode values
     # This is needed because some tests (like CLI tests) may reload modules
-    cfg.LINEAGE_ENABLED = True
+    cfg.LINEAGE_ENABLED = False
     cfg.LINEAGE_LAYERS = []
 
 
@@ -147,7 +147,7 @@ def test_client(mock_manifest):
     if 'trellis_datamodel.config' in sys.modules:
         cfg_module = sys.modules['trellis_datamodel.config']
         # Reset to test defaults in case of module reload
-        cfg_module.LINEAGE_ENABLED = True
+        cfg_module.LINEAGE_ENABLED = False
         cfg_module.LINEAGE_LAYERS = []
 
     from trellis_datamodel.server import app
