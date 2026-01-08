@@ -26,19 +26,6 @@ async def get_bus_matrix(
         - connections: List of dimension-fact connections derived from relationships
     """
     try:
-        # region agent log - Bus Matrix API entry
-        import json
-        log_data = {"location": "bus_matrix.py:29", "message": "Bus Matrix API called", "data": {"dimension_id": dimension_id, "fact_id": fact_id, "tag": tag}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "A,E"}
-        with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-            log_file.write(json.dumps(log_data) + "\n")
-        # endregion
-
-        # region agent log - Check DATA_MODEL_PATH (Hypothesis A)
-        log_data = {"location": "bus_matrix.py:33", "message": "Checking DATA_MODEL_PATH", "data": {"DATA_MODEL_PATH": cfg.DATA_MODEL_PATH, "exists": os.path.exists(cfg.DATA_MODEL_PATH) if cfg.DATA_MODEL_PATH else None}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "A"}
-        with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-            log_file.write(json.dumps(log_data) + "\n")
-        # endregion
-
         if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
             print("Bus Matrix: Data model path not found or doesn't exist")
             return {"dimensions": [], "facts": [], "connections": []}
@@ -50,22 +37,11 @@ async def get_bus_matrix(
         entities = data_model.get("entities", [])
         relationships = data_model.get("relationships", [])
 
-        # region agent log - Loaded entities and relationships (Hypothesis B)
-        log_data = {"location": "bus_matrix.py:43", "message": "Loaded data model", "data": {"num_entities": len(entities), "num_relationships": len(relationships), "first_entity": entities[0] if entities else None, "all_entity_types": [e.get("entity_type") for e in entities]}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "B"}
-        with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-            log_file.write(json.dumps(log_data) + "\n")
-        # endregion
-
         print(f"Bus Matrix: Loaded data model with {len(entities)} entities and {len(relationships)} relationships")
 
-        # region agent log - Entity type filtering (Hypothesis C)
         entity_types = [e.get("entity_type") for e in entities]
         dimensions_before = [e for e in entities if e.get("entity_type") in ["dimension", "unclassified"]]
         facts_before = [e for e in entities if e.get("entity_type") in ["fact", "unclassified"]]
-        log_data = {"location": "bus_matrix.py:46", "message": "Entity type filtering", "data": {"all_entity_types": entity_types, "dimensions_before": len(dimensions_before), "facts_before": len(facts_before)}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "C"}
-        with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-            log_file.write(json.dumps(log_data) + "\n")
-        # endregion
 
         # Filter dimensions and facts - include unclassified entities for now
         dimensions = [e for e in entities if e.get("entity_type") in ["dimension", "unclassified"]]
@@ -73,23 +49,10 @@ async def get_bus_matrix(
         print(f"Bus Matrix: Found {len(dimensions)} dimensions and {len(facts)} facts")
 
         # Apply tag filter if specified
-        # region agent log - Tag filtering (Hypothesis D)
-        if tag:
-            log_data = {"location": "bus_matrix.py:51", "message": "Before tag filter", "data": {"tag": tag, "dimensions_before": len(dimensions), "facts_before": len(facts)}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "D"}
-            with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-                log_file.write(json.dumps(log_data) + "\n")
-        # endregion
-
         if tag:
             dimensions = [d for d in dimensions if tag in (d.get("tags") or [])]
             facts = [f for f in facts if tag in (f.get("tags") or [])]
             print(f"Bus Matrix: After tag filter: {len(dimensions)} dimensions, {len(facts)} facts")
-
-            # region agent log - After tag filter (Hypothesis D)
-            log_data = {"location": "bus_matrix.py:55", "message": "After tag filter", "data": {"dimensions_after": len(dimensions), "facts_after": len(facts)}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "D"}
-            with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-                log_file.write(json.dumps(log_data) + "\n")
-            # endregion
 
         # Apply entity ID filters
         if dimension_id:
@@ -149,12 +112,6 @@ async def get_bus_matrix(
         if len(unique_connections) > 0:
             sample_conns = [f"{c['dimension_id']}-{c['fact_id']}" for c in unique_connections[:2]]
             print(f"Bus Matrix: Sample connections: {sample_conns}...")
-
-        # region agent log - Return data (Final check)
-        log_data = {"location": "bus_matrix.py:113", "message": "Returning Bus Matrix data", "data": {"num_dimensions": len(dimensions), "num_facts": len(facts), "num_connections": len(unique_connections), "sample_dimensions": [{"id": d.get("id"), "entity_type": d.get("entity_type")} for d in dimensions[:2]], "sample_facts": [{"id": f.get("id"), "entity_type": f.get("entity_type")} for f in facts[:2]]}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "FINAL"}
-        with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
-            log_file.write(json.dumps(log_data) + "\n")
-        # endregion
 
         return {
             "dimensions": dimensions,
