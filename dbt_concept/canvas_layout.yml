@@ -1,11 +1,30 @@
 version: 0.1
 entities:
-  players:
+  sales_transactions:
     position:
-      x: 227.52625706578056
-      y: 54.536449566008606
-    width: 483.636474609375
+      x: 120.00529458606314
+      y: 188.24033673708163
+    width: 280
     panel_height: 200
-    collapsed: true
-relationships: {}
-
+    collapsed: false
+  customer:
+    position:
+      x: 523.0663006993241
+      y: -80.3625299396291
+    width: 280
+    panel_height: 200
+    collapsed: false
+  product:
+    position:
+      x: 615.469453977052
+      y: 350.02505857147816
+    width: 280
+    panel_height: 200
+    collapsed: false
+relationships:
+  sales_transactions-product-0:
+    label_dx: 0
+    label_dy: 0
+  sales_transactions-customer-1:
+    label_dx: 0
+    label_dy: 0

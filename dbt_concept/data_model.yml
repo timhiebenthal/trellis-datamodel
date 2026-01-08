@@ -1,13 +1,23 @@
 version: 0.1
 entities:
-- id: players
-  label: players
-  description: ''
-  drafted_fields:
-  - name: player_id
-    datatype: text
-  - name: player_name
-    datatype: text
-  - name: draft_year
-    datatype: int
-relationships: []
+- id: sales_transactions
+  label: Sales Transactions
+  description: selling stuff
+  entity_type: fact
+- id: customer
+  label: Customer
+  description: most important people
+  entity_type: dimension
+- id: product
+  label: Product
+  description: shiny things
+  entity_type: dimension
+relationships:
+- source: sales_transactions
+  target: product
+  label: ''
+  type: one_to_many
+- source: sales_transactions
+  target: customer
+  label: ''
+  type: many_to_one
