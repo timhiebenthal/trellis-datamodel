@@ -39,7 +39,8 @@
         guidanceConfig,
         lineageEnabled = false,
         exposuresEnabled = false,
-    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean } = $props();
+        hasExposuresData = false,
+    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean; hasExposuresData?: boolean } = $props();
 
     const lineageEnabledStore = writable(lineageEnabled);
     setContext("lineageEnabled", lineageEnabledStore);
@@ -47,12 +48,19 @@
     const exposuresEnabledStore = writable(exposuresEnabled);
     setContext("exposuresEnabled", exposuresEnabledStore);
 
+    const hasExposuresDataStore = writable(hasExposuresData);
+    setContext("hasExposuresData", hasExposuresDataStore);
+
     $effect(() => {
         lineageEnabledStore.set(lineageEnabled);
     });
 
     $effect(() => {
         exposuresEnabledStore.set(exposuresEnabled);
+    });
+
+    $effect(() => {
+        hasExposuresDataStore.set(hasExposuresData);
     });
 
     // Wizard state

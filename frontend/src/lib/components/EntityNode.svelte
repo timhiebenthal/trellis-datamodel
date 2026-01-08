@@ -69,6 +69,10 @@ import Icon from "@iconify/svelte";
         getContext<Readable<boolean>>("exposuresEnabled") ?? readable(false);
     let exposuresEnabled = $derived($exposuresEnabledStore);
 
+    const hasExposuresDataStore =
+        getContext<Readable<boolean>>("hasExposuresData") ?? readable(false);
+    let hasExposuresData = $derived($hasExposuresDataStore);
+
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
     let additionalModels = $derived((data.additional_models as string[]) || []);
@@ -1226,7 +1230,7 @@ import Icon from "@iconify/svelte";
                         <Icon icon="lucide:git-branch" class="w-4 h-4" />
                     </button>
                 {/if}
-                {#if exposuresEnabled}
+                {#if exposuresEnabled && hasExposuresData}
                     <button
                         onclick={openExposuresView}
                         aria-label="Show exposures for {data.label}"
@@ -1241,7 +1245,7 @@ import Icon from "@iconify/svelte";
                     class="w-2 h-2 rounded-full bg-amber-500"
                     title="Draft mode (not bound to dbt model)"
                 ></div>
-                {#if exposuresEnabled}
+                {#if exposuresEnabled && hasExposuresData}
                     <button
                         onclick={openExposuresView}
                         aria-label="Show exposures for {data.label}"

@@ -1306,7 +1306,7 @@
         {:else if $viewMode === 'bus_matrix'}
             <BusMatrix />
         {:else}
-            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} {exposuresEnabled} />
+            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} {exposuresEnabled} {hasExposuresData} />
         {/if}
     </main>
 
