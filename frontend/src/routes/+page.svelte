@@ -26,6 +26,7 @@
         getConfigInfo,
         inferRelationships,
         syncDbtTests,
+        getExposures,
     } from "$lib/api";
     import { getParallelOffset, getModelFolder, normalizeTags, aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils";
     import { applyDagreLayout } from "$lib/layout";
@@ -57,6 +58,8 @@
     let lineageEnabled = $state(false);
     let exposuresEnabled = $state(false);
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
+    let busMatrixEnabled = $state(false);
+    let hasExposuresData = $state(false);
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
         push_warning_enabled: true,
@@ -74,7 +77,7 @@
         if (!lineageEnabled) {
             closeLineageModal();
         }
-        if (!exposuresEnabled) {
+        if (!exposuresEnabled || !hasExposuresData) {
             $viewMode = $viewMode === 'exposures' ? 'conceptual' : $viewMode;
         }
     });
@@ -519,6 +522,18 @@
         lineageEnabled = info?.lineage_enabled ?? false;
         exposuresEnabled = info?.exposures_enabled ?? false;
         exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
+        busMatrixEnabled = info?.bus_matrix_enabled ?? false;
+
+                // Check if exposures data exists
+                if (exposuresEnabled) {
+                    try {
+                        const exposuresData = await getExposures();
+                        hasExposuresData = exposuresData.exposures.length > 0;
+                    } catch (e) {
+                        console.error("Failed to check exposures data:", e);
+                        hasExposuresData = false;
+                    }
+                }
 
                 // Load Manifest
                 const models = await getManifest();
@@ -1138,7 +1153,7 @@
                 <Icon icon="lucide:layout-dashboard" class="w-3.5 h-3.5" />
                 Canvas
             </button>
-            {#if exposuresEnabled}
+            {#if exposuresEnabled && hasExposuresData}
                 <button
                     class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
                     class:bg-white={$viewMode === "exposures"}
