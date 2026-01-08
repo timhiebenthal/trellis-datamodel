@@ -48,6 +48,30 @@ export async function getManifest(): Promise<DbtModel[]> {
     }
 }
 
+export async function getBusMatrix(
+    dimensionId?: string,
+    factId?: string,
+    tag?: string
+): Promise<{ dimensions: any[], facts: any[], connections: any[] }> {
+    try {
+        const params = new URLSearchParams();
+        if (dimensionId) params.append('dimension_id', dimensionId);
+        if (factId) params.append('fact_id', factId);
+        if (tag) params.append('tag', tag);
+        
+        const res = await fetch(`${API_BASE}/bus-matrix?${params.toString()}`);
+        if (!res.ok) {
+            if (res.status === 404) return { dimensions: [], facts: [], connections: [] };
+            throw new Error(`Status: ${res.status}`);
+        }
+        const data = await res.json();
+        return data;
+    } catch (e) {
+        console.error("Error fetching BUS Matrix:", e);
+        return { dimensions: [], facts: [], connections: [] };
+    }
+}
+
 export async function getDataModel(): Promise<DataModel> {
     try {
         const res = await fetch(`${API_BASE}/data-model`);

@@ -64,6 +64,7 @@ def clean_test_files():
     cfg.LINEAGE_LAYERS = []
     cfg.EXPOSURES_ENABLED = False
     cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
+    cfg.BUS_MATRIX_ENABLED = True  # Default to enabled
 
 
 @pytest.fixture

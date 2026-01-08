@@ -33,6 +33,7 @@
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import ExposuresTable from "$lib/components/ExposuresTable.svelte";
+    import BusMatrix from "$lib/components/BusMatrix.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
     import LineageModal from "$lib/components/LineageModal.svelte";
     import IncompleteEntitiesWarningModal from "$lib/components/IncompleteEntitiesWarningModal.svelte";
@@ -596,10 +597,12 @@
                             // explicitly via loadSchema().
                             _schemaTags: hasDbtBinding ? [] : entityTags,
                             _manifestTags: hasDbtBinding ? entityTags : [],
+                            entity_type: e.entity_type,
                         },
                         parentId: undefined, // Will be set if grouping is enabled
                     };
                 });
+
 
                 // Create group nodes if grouping is enabled
                 const groupNodes: Node[] = [];
@@ -1145,8 +1148,8 @@
                 class:bg-white={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:text-primary-600={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:shadow-sm={$viewMode === "conceptual" || $viewMode === "logical"}
-                class:text-gray-500={$viewMode === "exposures"}
-                class:hover:text-gray-900={$viewMode === "exposures"}
+                class:text-gray-500={$viewMode === "exposures" || $viewMode === "bus_matrix"}
+                class:hover:text-gray-900={$viewMode === "exposures" || $viewMode === "bus_matrix"}
                 onclick={() => ($viewMode = "conceptual")}
                 title="Canvas View"
             >
@@ -1166,6 +1169,21 @@
                 >
                     <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
                     Exposures
+                </button>
+            {/if}
+            {#if busMatrixEnabled}
+                <button
+                    class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                    class:bg-white={$viewMode === "bus_matrix"}
+                    class:text-primary-600={$viewMode === "bus_matrix"}
+                    class:shadow-sm={$viewMode === "bus_matrix"}
+                    class:text-gray-500={$viewMode !== "bus_matrix"}
+                    class:hover:text-gray-900={$viewMode !== "bus_matrix"}
+                    onclick={() => ($viewMode = "bus_matrix")}
+                    title="BUS Matrix View"
+                >
+                    <Icon icon="mdi:table-large" class="w-3.5 h-3.5" />
+                    BUS Matrix
                 </button>
             {/if}
         </div>
@@ -1285,6 +1303,8 @@
         ></div>
         {#if $viewMode === 'exposures'}
             <ExposuresTable {exposuresEnabled} {exposuresDefaultLayout} />
+        {:else if $viewMode === 'bus_matrix'}
+            <BusMatrix />
         {:else}
             <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} {exposuresEnabled} />
         {/if}

@@ -146,6 +146,7 @@ export interface ConfigInfo {
     lineage_layers?: string[];
     exposures_enabled?: boolean;
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
+    bus_matrix_enabled?: boolean;
 }
 
 export interface FieldDragState {

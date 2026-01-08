@@ -66,6 +66,7 @@ if _TEST_DIR:
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
     MODELING_STYLE: str = "entity_model"
+    BUS_MATRIX_ENABLED: bool = False
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 else:
@@ -86,6 +87,7 @@ else:
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
     MODELING_STYLE: str = "entity_model"
+    BUS_MATRIX_ENABLED: bool = False
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 
 
@@ -121,7 +123,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, DIMENSIONAL_MODELING_CONFIG
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, BUS_MATRIX_ENABLED, DIMENSIONAL_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -335,7 +337,14 @@ def load_config(config_path: Optional[str] = None) -> None:
             print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
             MODELING_STYLE = "entity_model"
 
-        # 14. Load dimensional modeling configuration
+        # 14. Load bus matrix configuration (enabled by default, can be disabled with bus_matrix.enabled: false)
+        BUS_MATRIX_ENABLED = True
+        
+        bus_matrix_config = config.get("bus_matrix")
+        if isinstance(bus_matrix_config, dict):
+            BUS_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
+
+        # 15. Load dimensional modeling configuration
         DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()
         dimensional_config = config.get("dimensional_modeling")
         if isinstance(dimensional_config, dict):
@@ -372,6 +381,7 @@ def print_config() -> None:
     if EXPOSURES_ENABLED:
         print(f"Exposures default layout: {EXPOSURES_DEFAULT_LAYOUT}")
     print(f"Modeling style: {MODELING_STYLE}")
+    print(f"BUS Matrix enabled: {BUS_MATRIX_ENABLED}")
     if DIMENSIONAL_MODELING_CONFIG.enabled:
         print(f"Dimensional modeling enabled: {DIMENSIONAL_MODELING_CONFIG.enabled}")
         print(f"Dimension prefixes: {DIMENSIONAL_MODELING_CONFIG.dimension_prefixes}")

@@ -42,9 +42,30 @@ def _merge_layout_into_model(
     for entity in entities:
         entity_id = entity.get("id")
 
-        # Ensure entity_type is always set (default to "unclassified" if not present)
-        if "entity_type" not in entity or entity.get("entity_type") is None:
-            entity["entity_type"] = "unclassified"
+        # region agent log - Before defaulting entity_type (Hypothesis: _merge_layout is overwriting entity_type)
+        import json
+
+        log_data = {
+            "location": "data_model.py:45",
+            "message": "In _merge_layout_into_model",
+            "data": {
+                "entity_id": entity_id,
+                "entity_type_before_default": entity.get("entity_type"),
+                "has_entity_type_key": "entity_type" in entity,
+            },
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "merge-layout-overwrites-entity-type",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
+
+        # Only merge layout properties (position, width, etc.) - do NOT default entity_type here
+        # Entity type defaults to "unclassified" are handled during POST saves, not during GET merges
+        # This prevents overwriting manually-set entity types during page loads
 
         if entity_id and entity_id in entities_layout:
             layout = entities_layout[entity_id]
@@ -123,12 +144,71 @@ async def get_data_model():
             model_data["relationships"] = []
 
         # Apply entity type inference when dimensional modeling is enabled
+        # region agent log - Before inference (Hypothesis: inference is overwriting manual entity_type)
+        import json
+
+        entity_types_before_inference = [
+            {"id": e.get("id"), "entity_type": e.get("entity_type")}
+            for e in model_data.get("entities", [])
+        ]
+        log_data = {
+            "location": "data_model.py:126",
+            "message": "Before entity_type inference",
+            "data": {"entity_types": entity_types_before_inference},
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "inference-overwrites-manual-type",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
+
         if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             model_data = _apply_entity_type_inference(model_data)
+
+        # region agent log - After inference and before merge (Hypothesis: merge is overwriting entity_type)
+        entity_types_after_inference = [
+            {"id": e.get("id"), "entity_type": e.get("entity_type")}
+            for e in model_data.get("entities", [])
+        ]
+        log_data = {
+            "location": "data_model.py:130",
+            "message": "After entity_type inference",
+            "data": {"entity_types": entity_types_after_inference},
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "inference-overwrites-manual-type",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
 
         # Load and merge layout data
         layout_data = _load_canvas_layout()
         merged_data = _merge_layout_into_model(model_data, layout_data)
+
+        # region agent log - After merge (Hypothesis: merge is overwriting entity_type)
+        entity_types_after_merge = [
+            {"id": e.get("id"), "entity_type": e.get("entity_type")}
+            for e in merged_data.get("entities", [])
+        ]
+        log_data = {
+            "location": "data_model.py:132",
+            "message": "After layout merge",
+            "data": {"entity_types": entity_types_after_merge},
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "inference-overwrites-manual-type",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
 
         return merged_data
     except Exception as e:
@@ -151,6 +231,32 @@ def _split_model_and_layout(
 
     # Split entities
     entities = content.get("entities", [])
+    # region agent log - Entity types in POST request (Hypothesis: Frontend sends correct types)
+    import json
+
+    log_data = {
+        "location": "data_model.py:233",
+        "message": "POST request entities before split",
+        "data": {
+            "entities": [
+                {
+                    "id": e.get("id"),
+                    "entity_type": e.get("entity_type"),
+                    "has_entity_type": "entity_type" in e,
+                }
+                for e in entities
+            ]
+        },
+        "timestamp": 1736366400000,
+        "sessionId": "debug-session",
+        "hypothesisId": "post-entities-check",
+    }
+    with open(
+        "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+    ) as log_file:
+        log_file.write(json.dumps(log_data) + "\n")
+    # endregion
+
     for entity in entities:
         entity_id = entity.get("id")
         if not entity_id:
@@ -247,6 +353,28 @@ def _validate_entity_type(entity_type: str) -> None:
 async def save_data_model(data: DataModelUpdate):
     """Save the data model, splitting model and layout into separate files."""
     try:
+        # region agent log - Check POST request data (Hypothesis: What data is frontend sending)
+        import json
+
+        entities_in_request = data.dict().get("entities", [])
+        entity_types_in_request = [
+            {"id": e.get("id"), "entity_type": e.get("entity_type")}
+            for e in entities_in_request
+        ]
+        log_data = {
+            "location": "data_model.py:319",
+            "message": "POST request received",
+            "data": {"entity_types": entity_types_in_request},
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "post-request-check",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
+
         content = data.dict()  # Pydantic v1 (required by dbt-core==1.10)
 
         # Validate entity_type values in all entities
@@ -259,13 +387,105 @@ async def save_data_model(data: DataModelUpdate):
         # Split into model and layout
         model_data, layout_data = _split_model_and_layout(content)
 
+        # region agent log - model_data after split (Hypothesis: Check if split is corrupting types)
+        import json
+
+        log_data = {
+            "location": "data_model.py:342",
+            "message": "model_data returned from split",
+            "data": {
+                "entity_types": [
+                    {"id": e.get("id"), "entity_type": e.get("entity_type")}
+                    for e in model_data.get("entities", [])
+                ]
+            },
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "split-corruption-check",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
+
+        # region agent log - Check entity types before save (Hypothesis: entity_type being lost during save)
+        entities_in_model = model_data.get("entities", [])
+        entity_types_in_save = [
+            {"id": e.get("id"), "entity_type": e.get("entity_type")}
+            for e in entities_in_model
+        ]
+        import json
+
+        log_data = {
+            "location": "data_model.py:261",
+            "message": "Before saving to file",
+            "data": {"entity_types": entity_types_in_save},
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "save-entity-type-loss",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
+
         # Save model file
         print(f"Saving data model to: {cfg.DATA_MODEL_PATH}")
+
+        # region agent log - After dumping to YAML (Hypothesis: YAML dump is corrupting entity_type)
+        # Dump the YAML and check what it looks like before writing
+        yaml_dumped = yaml.dump(model_data, default_flow_style=False, sort_keys=False)
+        log_data = {
+            "location": "data_model.py:272",
+            "message": "YAML dump before write",
+            "data": {
+                "yaml_preview": (
+                    yaml_dumped[:500] if len(yaml_dumped) > 500 else yaml_dumped
+                ),
+                "yaml_length": len(yaml_dumped),
+            },
+            "timestamp": 1736366400000,
+            "sessionId": "debug-session",
+            "hypothesisId": "yaml-dump-corruption",
+        }
+        with open(
+            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+        ) as log_file:
+            log_file.write(json.dumps(log_data) + "\n")
+        # endregion
         os.makedirs(os.path.dirname(cfg.DATA_MODEL_PATH), exist_ok=True)
         with open(cfg.DATA_MODEL_PATH, "w") as f:
             yaml.dump(model_data, f, default_flow_style=False, sort_keys=False)
             f.flush()
             os.fsync(f.fileno())
+
+        # region agent log - After file write (Hypothesis: Check if file was corrupted during/after write)
+        # Open file immediately to verify content
+        with open(cfg.DATA_MODEL_PATH, "r") as verify_f:
+            verify_content = verify_f.read()
+            log_data = {
+                "location": "data_model.py:441",
+                "message": "File verification after write",
+                "data": {
+                    "file_path": cfg.DATA_MODEL_PATH,
+                    "content_length": len(verify_content),
+                    "sample_preview": (
+                        verify_content[:500]
+                        if len(verify_content) > 500
+                        else verify_content
+                    ),
+                },
+                "timestamp": 1736366400000,
+                "sessionId": "debug-session",
+                "hypothesisId": "verify-write",
+            }
+            with open(
+                "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
+            ) as log_file:
+                log_file.write(json.dumps(log_data) + "\n")
+        # endregion
 
         # Save layout file
         print(f"Saving canvas layout to: {cfg.CANVAS_LAYOUT_PATH}")
