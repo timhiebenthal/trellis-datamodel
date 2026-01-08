@@ -6,7 +6,7 @@ You are creating an implementation plan by breaking down a specification into ac
 
 1. **Read Specification**
 2. **Break Down into Tasks**
-3. **Organize Tasks Logically**
+3. **Organize Tasks Logically (with SPRINTS and STREAMS)**
 4. **Create Tasks File**
 
 ## Step 1: Read Specification
@@ -39,32 +39,111 @@ Consider:
 - **Documentation**: Code comments, README updates
 - **Polish**: Error handling, edge cases, UX improvements
 
-## Step 3: Organize Tasks Logically
+## Step 3: Organize Tasks Logically (with SPRINTS and STREAMS)
+
+Organize tasks into **SPRINTS** and **STREAMS** to enable parallelization across AI agents:
+
+### SPRINTS
+- Sprints are sequential phases that happen one after another
+- Each sprint depends on completion of the previous sprint
+- Common sprint breakdown:
+  - **SPRINT 1**: Setup, infrastructure, foundational components
+  - **SPRINT 2**: Core features, main functionality
+  - **SPRINT 3**: Integration, testing, polish, documentation
+
+### STREAMS
+- Streams run in **parallel** within a sprint
+- Streams should be independent or have minimal cross-dependencies
+- Each stream can be assigned to a different AI agent
+- Example streams:
+  - **Stream A**: Backend API implementation
+  - **Stream B**: Frontend UI components
+  - **Stream C**: Database schema and migrations
+  - **Stream D**: Testing and validation
+
+### Task Organization Template
+
+```markdown
+## SPRINT 1: [Sprint Name]
+
+### Stream A: [Stream Name]
+- [ ] Task A.1
+- [ ] Task A.2
+
+### Stream B: [Stream Name]
+- [ ] Task B.1
+- [ ] Task B.2
+
+## SPRINT 2: [Sprint Name]
+
+### Stream A: [Stream Name]
+- [ ] Task A.3
+- [ ] Task A.4
+
+### Stream C: [Stream Name]
+- [ ] Task C.1
+- [ ] Task C.2
+
+## SPRINT 3: [Sprint Name]
+
+### Stream B: [Stream Name]
+- [ ] Task B.3
+- [ ] Task B.4
+```
+
+### Guidelines for SPRINTS and STREAMS
+
+- **SPRINTS**: Identify clear milestones and dependencies
+  - Start with foundation (SPRINT 1)
+  - Build core features (SPRINT 2)
+  - Integrate and polish (SPRINT 3)
+  - Don't create more sprints than needed (2-4 is typical)
+
+- **STREAMS**: Identify independent work areas
+  - Group related tasks within a stream
+  - Ensure streams have minimal cross-dependencies
+  - Balance work across streams
+  - Each stream should be assignable to one agent
+
+- **Dependencies**: Clearly mark cross-stream dependencies
+  - Use notes like `⚠️ Depends on: SPRINT 1 - Stream A - Task A.2`
+  - Minimize blocking dependencies between parallel streams
+  - When possible, design tasks to be truly parallel
+
+### Parallelization Benefits
+
+This structure enables you to:
+- Assign different streams to multiple AI agents simultaneously
+- Track progress at both sprint (milestone) and stream (work area) levels
+- Identify bottlenecks where streams block each other
+- Scale work up or down based on team capacity
 
 Group related tasks and order them by:
 - **Dependencies**: Tasks that must happen first
 - **Logical flow**: Natural progression of work
 - **Risk**: High-risk items early for early validation
 
-Use markdown task lists with checkboxes:
-```markdown
-- [ ] Task description
-- [ ] Another task
-  - [ ] Subtask if needed
-```
+Use markdown task lists with checkboxes, organized by SPRINTS and STREAMS:
 
-Group tasks under clear headings:
 ```markdown
-## Setup & Configuration
+## SPRINT 1: Foundation & Setup
+
+### Stream A: Infrastructure
 - [ ] Task 1
 - [ ] Task 2
 
-## Core Implementation
+### Stream B: Configuration
 - [ ] Task 3
-- [ ] Task 4
 
-## Testing
+## SPRINT 2: Core Implementation
+
+### Stream A: Infrastructure
+- [ ] Task 4
 - [ ] Task 5
+
+### Stream C: Core Features
+- [ ] Task 6
+- [ ] Task 7
 ```
 
 ## Step 4: Create Tasks File
@@ -82,7 +161,31 @@ Brief reminder of what we're building (reference to spec.md)
 
 ## Tasks
 
-[Your organized task list here]
+[Your SPRINTS and STREAMS organized task list here]
+
+Example structure:
+
+## SPRINT 1: [Sprint Name/Phase]
+
+### Stream A: [Work Area]
+- [ ] Task description
+- [ ] Another task
+  - [ ] Subtask if needed
+
+### Stream B: [Work Area]
+- [ ] Task description
+
+## SPRINT 2: [Sprint Name/Phase]
+
+### Stream A: [Work Area]
+- [ ] Task description ⚠️ Depends on: SPRINT 1 - Stream A - Task X
+
+### Stream C: [Work Area]
+- [ ] Task description
+
+## SPRINT 3: [Sprint Name/Phase]
+
+[... more streams and tasks]
 
 ## Notes
 - Any implementation notes or reminders
@@ -106,4 +209,32 @@ NEXT STEP 👉 Run `/execute` to start implementation.
 - Order tasks to minimize rework
 - Include testing tasks - don't skip them
 - Keep tasks focused - one task, one outcome
+
+### SPRINT and STREAM Guidelines
+
+**SPRINTS:**
+- Define clear sprint objectives/milestones
+- Sprints should be sequential and build on each other
+- Typical: 2-4 sprints per feature (Setup → Core → Integration → Polish)
+- Mark what must be completed before the next sprint begins
+- Consider risk: put high-risk validation work early (SPRINT 1 or 2)
+
+**STREAMS:**
+- Identify truly parallel work streams within each sprint
+- Each stream should be assignable to a single AI agent
+- Minimize cross-stream dependencies
+- Balance workload across streams
+- Use dependency markers: `⚠️ Depends on: SPRINT X - Stream Y - Task Z`
+
+**Parallelization Strategy:**
+- Think about which work areas can be done independently
+- Backend vs. frontend are classic parallel streams
+- Testing can often be its own stream, especially in later sprints
+- Documentation and polish make good parallel streams
+- Infrastructure/setup can often be a stream in SPRINT 1
+
+**Example SPRINT/STREAM Patterns:**
+- **SPRINT 1**: Setup (Stream A: Config, Stream B: Infrastructure)
+- **SPRINT 2**: Core (Stream A: Backend API, Stream B: Frontend UI, Stream C: Data Layer)
+- **SPRINT 3**: Integration (Stream A: Integration Tests, Stream B: E2E Tests, Stream C: Documentation)
 
