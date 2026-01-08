@@ -80,13 +80,8 @@
         });
 
         // Hide/show edges connected to child nodes
-        const edges = $nodes[0]?.__svelte_flow_edges || [];
-        edges = edges.map(e => {
-            if (childIds.has(e.source) || childIds.has(e.target)) {
-                return { ...e, hidden: newCollapsed };
-            }
-            return e;
-        });
+        // NOTE: Edge hiding is handled by the data flow library internally based on node visibility
+        // No manual edge manipulation needed
     }
 
     function handleCollapseKeydown(event: KeyboardEvent) {

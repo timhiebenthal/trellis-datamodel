@@ -45,8 +45,6 @@
             class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
             role="document"
             tabindex="-1"
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
             aria-label="Warning about incomplete entity descriptions"
         >
             <div class="flex items-start gap-3 mb-4">

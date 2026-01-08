@@ -1178,15 +1178,15 @@ import Icon from "@iconify/svelte";
             </span>
             <!-- Entity Type Badge -->
             {#if data.entity_type}
-                <div
-                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
+                <button
+                    type="button"
+                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 bg-transparent cursor-pointer"
                     class:bg-blue-100={data.entity_type === 'fact'}
                     class:bg-green-100={data.entity_type === 'dimension'}
                     class:bg-gray-100={data.entity_type === 'unclassified'}
                     class:text-blue-800={data.entity_type === 'fact'}
                     class:text-green-800={data.entity_type === 'dimension'}
                     class:text-gray-800={data.entity_type === 'unclassified'}
-                    class:cursor-pointer={true}
                     class:opacity-80={true}
                     onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
                     title={data.entity_type === 'fact'
@@ -1199,7 +1199,7 @@ import Icon from "@iconify/svelte";
                         icon={data.entity_type === 'fact' ? 'lucide:bar-chart-3' : data.entity_type === 'dimension' ? 'lucide:list' : 'lucide:circle-dashed'}
                         class="w-3 h-3"
                     />
-                </div>
+                </button>
             {/if}
             <input
                 type="text"

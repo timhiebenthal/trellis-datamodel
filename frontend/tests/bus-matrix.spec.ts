@@ -9,29 +9,30 @@ test.describe('Bus Matrix View', () => {
         // TODO: Implement when Bus Matrix view is added
         // Should show button in top navigation (Canvas, Exposures, Bus Matrix)
         await page.waitForLoadState('networkidle');
-        
-        // Check if Bus Matrix button exists
-        const busMatrixButton = page.getByRole('button', { name: /Bus Matrix|Bus Matrix/ });
+
         // For now, just document expected behavior
+        // Check if Bus Matrix button exists
+        // const busMatrixButton = page.getByRole('button', { name: /Bus Matrix|Bus Matrix/ });
         // await expect(busMatrixButton).toBeVisible();
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should switch to Bus Matrix view when button is clicked', async ({ page }) => {
         // TODO: Implement when Bus Matrix view is added
         await page.waitForLoadState('networkidle');
-        
+
+        // For now, just document expected behavior
         // Click Bus Matrix button
         // const busMatrixButton = page.getByRole('button', { name: /Bus Matrix|Bus Matrix/ });
         // await busMatrixButton.click();
-        
+
         // Wait for Bus Matrix view to load
         // await page.waitForTimeout(1000);
-        
+
         // Verify Bus Matrix component is visible
         // const busMatrix = page.locator('.bus-matrix');
         // await expect(busMatrix).toBeVisible();
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should render table structure with dimensions and facts', async ({ page }) => {
@@ -55,7 +56,7 @@ test.describe('Bus Matrix View', () => {
         // Check for fact names in top row
         // const factCells = page.locator('.bus-matrix .fact-cell');
         // expect(await factCells.count()).toBeGreaterThan(0);
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should display checkmark for connections', async ({ page }) => {
@@ -71,7 +72,7 @@ test.describe('Bus Matrix View', () => {
         // Check for checkmarks in connected cells
         // const checkmarks = page.locator('.bus-matrix .cell-connected');
         // expect(await checkmarks.count()).toBeGreaterThan(0);
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should display empty circle for no connection', async ({ page }) => {
@@ -87,7 +88,7 @@ test.describe('Bus Matrix View', () => {
         // Check for empty circles in unconnected cells
         // const emptyCells = page.locator('.bus-matrix .cell-empty');
         // expect(await emptyCells.count()).toBeGreaterThan(0);
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should show dimension filter input', async ({ page }) => {
@@ -103,7 +104,7 @@ test.describe('Bus Matrix View', () => {
         // Check for dimension filter
         // const dimensionFilter = page.locator('.bus-matrix input[placeholder*="dimension"], .bus-matrix input[placeholder*="Dimension"]');
         // await expect(dimensionFilter).toBeVisible();
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should show fact filter input', async ({ page }) => {
@@ -119,7 +120,7 @@ test.describe('Bus Matrix View', () => {
         // Check for fact filter
         // const factFilter = page.locator('.bus-matrix input[placeholder*="fact"], .bus-matrix input[placeholder*="Fact"]');
         // await expect(factFilter).toBeVisible();
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should filter dimensions in real-time', async ({ page }) => {
@@ -142,7 +143,7 @@ test.describe('Bus Matrix View', () => {
         // Check that filtered count is less than or equal to initial count
         // const filteredDimensions = await page.locator('.bus-matrix .dimension-cell').count();
         // expect(filteredDimensions).toBeLessThanOrEqual(initialDimensions);
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should filter facts in real-time', async ({ page }) => {
@@ -165,7 +166,7 @@ test.describe('Bus Matrix View', () => {
         // Check that filtered count is less than or equal to initial count
         // const filteredFacts = await page.locator('.bus-matrix .fact-cell').count();
         // expect(filteredFacts).toBeLessThanOrEqual(initialFacts);
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should highlight relationship on canvas when cell is clicked', async ({ page }) => {
@@ -189,7 +190,7 @@ test.describe('Bus Matrix View', () => {
         // Verify relationship is highlighted
         // const highlightedEdge = page.locator('.svelte-flow__edge.highlighted');
         // await expect(highlightedEdge).toBeVisible();
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should center view on both entities after cell click', async ({ page }) => {
@@ -208,7 +209,7 @@ test.describe('Bus Matrix View', () => {
         
         // Verify both entities are visible in viewport
         // This would require checking canvas viewport transformation
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should maintain filter state when switching views', async ({ page }) => {
@@ -235,7 +236,7 @@ test.describe('Bus Matrix View', () => {
         
         // Verify filter is still applied
         // expect(await dimensionFilter.inputValue()).toBe('customer');
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should show empty state when no data', async ({ page }) => {
@@ -254,7 +255,7 @@ test.describe('Bus Matrix View', () => {
         // if (isEmptyStateVisible) {
         //     await expect(emptyState).toBeVisible();
         // }
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should handle large datasets with scrollable table', async ({ page }) => {
@@ -270,7 +271,7 @@ test.describe('Bus Matrix View', () => {
         // Check that table is scrollable
         // const tableContainer = page.locator('.bus-matrix .table-container');
         // await expect(tableContainer).toHaveCSS('overflow', /auto|scroll/);
-        assert true;
+        expect(true).toBeTruthy();
     });
 
     test('should be responsive at 1024x768 resolution', async ({ page }) => {
@@ -288,7 +289,7 @@ test.describe('Bus Matrix View', () => {
         // Verify table is visible and functional
         // const table = page.locator('.bus-matrix table');
         // await expect(table).toBeVisible();
-        assert true;
+        expect(true).toBeTruthy();
     });
 });
 

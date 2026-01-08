@@ -476,7 +476,7 @@ $effect(() => {
                                                 class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary-500 hover:w-1.5 transition-all"
                                                 title="Drag to resize column"
                                                 type="button"
-                                            />
+                                            ></button>
                                         </div>
                                     </th>
                                     {#each filteredExposures as exposure}
@@ -564,7 +564,7 @@ $effect(() => {
                                                 class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary-500 hover:w-1.5 transition-all"
                                                 title="Drag to resize column"
                                                 type="button"
-                                            />
+                                            ></button>
                                         </div>
                                     </th>
                                     {#each entities as entity}

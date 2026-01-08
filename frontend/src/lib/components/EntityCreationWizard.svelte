@@ -228,8 +228,6 @@
             class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto"
             role="document"
             tabindex="-1"
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
             aria-label="Entity creation wizard"
         >
             <!-- Header -->
@@ -311,10 +309,10 @@
             {#if currentStep === 2}
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-3">
+                        <span class="block text-sm font-medium text-gray-700 mb-3">
                             Entity Type (Optional)
-                        </label>
-                        <div class="space-y-3">
+                        </span>
+                        <div class="space-y-3" role="radiogroup" aria-label="Entity type selection">
                             <!-- Fact Option -->
                             <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors {formData.entity_type === 'fact' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : ''}">
                                 <input
