@@ -117,6 +117,17 @@ This structure enables you to:
 - Track progress at both sprint (milestone) and stream (work area) levels
 - Identify bottlenecks where streams block each other
 - Scale work up or down based on team capacity
+- Quickly see the overall structure and task distribution via the Summary section
+
+### Summary Section
+
+Always include a **Summary** section at the end of the tasks file (before Notes) that provides:
+- **Sprint Overview Table**: Quick view of all sprints with task counts and status
+- **Stream Overview**: Breakdown of streams within each sprint with task counts
+- **Parallelization Strategy**: Max concurrent agents, critical path, independent streams
+- **Total Effort**: Overall counts (sprints, streams, tasks)
+
+The summary should be kept up-to-date as tasks are completed or reorganized.
 
 Group related tasks and order them by:
 - **Dependencies**: Tasks that must happen first
@@ -187,6 +198,44 @@ Example structure:
 
 [... more streams and tasks]
 
+## Summary
+
+Quick overview of all SPRINTS and STREAMS with task counts:
+
+### Sprint Overview
+| Sprint | Name | Status | Total Tasks | Streams |
+|--------|------|--------|-------------|---------|
+| SPRINT 1 | [Name] | ⬜ Not Started | 12 | 3 |
+| SPRINT 2 | [Name] | ⬜ Not Started | 15 | 4 |
+| SPRINT 3 | [Name] | ⬜ Not Started | 8 | 2 |
+
+### Stream Overview
+
+**SPRINT 1**
+- **Stream A**: [Name] - 5 tasks
+- **Stream B**: [Name] - 4 tasks
+- **Stream C**: [Name] - 3 tasks
+
+**SPRINT 2**
+- **Stream A**: [Name] - 4 tasks ⚠️ Depends on: SPRINT 1 - Stream A
+- **Stream B**: [Name] - 6 tasks
+- **Stream C**: [Name] - 3 tasks ⚠️ Depends on: SPRINT 1 - Stream C
+- **Stream D**: [Name] - 2 tasks
+
+**SPRINT 3**
+- **Stream A**: [Name] - 5 tasks ⚠️ Depends on: SPRINT 2 - Stream A
+- **Stream B**: [Name] - 3 tasks
+
+### Parallelization Strategy
+- **Concurrent Agents**: Up to 4 agents can work in parallel within each sprint
+- **Critical Path**: Stream A (SPRINT 1 → SPRINT 2 → SPRINT 3)
+- **Independent Streams**: Stream B and C can start immediately in SPRINT 2
+
+### Total Effort
+- **Total SPRINTS**: 3
+- **Total STREAMS**: 7 (across all sprints)
+- **Total Tasks**: 35
+
 ## Notes
 - Any implementation notes or reminders
 - Reference to standards: `agent-os/standards/` if needed
@@ -225,6 +274,13 @@ NEXT STEP 👉 Run `/execute` to start implementation.
 - Minimize cross-stream dependencies
 - Balance workload across streams
 - Use dependency markers: `⚠️ Depends on: SPRINT X - Stream Y - Task Z`
+
+**SUMMARY:**
+- Always include a Summary section after all SPRINTS/STREAMS
+- Keep it up-to-date as tasks are added/removed/completed
+- Use tables for quick scanning of sprint/stream structure
+- Highlight dependencies and parallelization opportunities
+- Track sprint status (Not Started / In Progress / Completed)
 
 **Parallelization Strategy:**
 - Think about which work areas can be done independently
