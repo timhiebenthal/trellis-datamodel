@@ -41,6 +41,11 @@ def _merge_layout_into_model(
     entities = model_data.get("entities", [])
     for entity in entities:
         entity_id = entity.get("id")
+        
+        # Ensure entity_type is always set (default to "unclassified" if not present)
+        if "entity_type" not in entity or entity.get("entity_type") is None:
+            entity["entity_type"] = "unclassified"
+        
         if entity_id and entity_id in entities_layout:
             layout = entities_layout[entity_id]
             if "position" in layout:

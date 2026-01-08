@@ -93,12 +93,12 @@
             }
             currentStep = 2;
         } else if (currentStep === 2) {
+            // Entity type selection - can proceed (optional)
+            currentStep = 3;
+        } else if (currentStep === 3) {
             const error = validateDescription(formData.description);
             validationErrors.description = error;
             if (error) return;
-            currentStep = 3;
-        } else if (currentStep === 3) {
-            // Entity type selection is optional, can proceed
             currentStep = 4;
         }
     }
@@ -115,11 +115,11 @@
             validationErrors.label = null;
             currentStep = 2;
         } else if (currentStep === 2) {
-            // Skip description - validate but allow empty
-            validationErrors.description = null;
+            // Skip entity type - keep default unclassified
             currentStep = 3;
         } else if (currentStep === 3) {
-            // Skip entity type - keep default unclassified
+            // Skip description - validate but allow empty
+            validationErrors.description = null;
             currentStep = 4;
         } else if (currentStep === 4) {
             complete();
@@ -199,7 +199,7 @@
     });
 
     $effect(() => {
-        if (currentStep === 2 && formData.description) {
+        if (currentStep === 3 && formData.description) {
             validationErrors.description = validateDescription(formData.description);
         }
     });
@@ -307,8 +307,96 @@
                 </div>
             {/if}
 
-            <!-- Step 2: Description -->
+            <!-- Step 2: Entity Type -->
             {#if currentStep === 2}
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">
+                            Entity Type (Optional)
+                        </label>
+                        <div class="space-y-3">
+                            <!-- Fact Option -->
+                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors {formData.entity_type === 'fact' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : ''}">
+                                <input
+                                    type="radio"
+                                    bind:group={formData.entity_type}
+                                    value="fact"
+                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                />
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <Icon icon="lucide:tag" class="w-5 h-5 text-blue-600" />
+                                        <span class="font-medium text-gray-900">Fact</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        Describing and event or activity within a business process
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Examples: Order Transactions, Account Transfers, Inventory Movements, Website Events
+                                    </p>
+                                </div>
+                            </label>
+
+                            <!-- Dimension Option -->
+                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-colors {formData.entity_type === 'dimension' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : ''}">
+                                <input
+                                    type="radio"
+                                    bind:group={formData.entity_type}
+                                    value="dimension"
+                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                />
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <Icon icon="lucide:tag" class="w-5 h-5 text-green-600" />
+                                        <span class="font-medium text-gray-900">Dimension</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        Describing the "Who?", "When?", "Where?", "Why?", ... of an event or process
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Examples: Customer, Product, Time, Country, Employee
+                                    </p>
+                                </div>
+                            </label>
+
+                            <!-- Unclassified Option -->
+                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors {formData.entity_type === 'unclassified' ? 'bg-gray-50 border-gray-500 ring-2 ring-gray-200' : ''}">
+                                <input
+                                    type="radio"
+                                    bind:group={formData.entity_type}
+                                    value="unclassified"
+                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                />
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <Icon icon="lucide:circle-dashed" class="w-5 h-5 text-gray-500" />
+                                        <span class="font-medium text-gray-900">Unclassified</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        Generic entity that doesn't fit the fact/dimension pattern
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Default option - you can change this later
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Guidance -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <div class="flex items-start gap-2">
+                            <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <p class="text-sm text-blue-800">
+                                Entity type helps with smart positioning and visualization in dimensional modeling. You can always change this later from the entity node.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Step 3: Description -->
+            {#if currentStep === 3}
                 <div class="space-y-4">
                     <div>
                         <label for="entity-description" class="block text-sm font-medium text-gray-700 mb-2">
@@ -378,94 +466,6 @@
                             <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                             <p class="text-sm text-blue-800">
                                 Describe what this entity represents in business terms
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            {/if}
-
-            <!-- Step 3: Entity Type (Optional) -->
-            {#if currentStep === 3}
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-3">
-                            Entity Type (Optional)
-                        </label>
-                        <div class="space-y-3">
-                            <!-- Fact Option -->
-                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors {formData.entity_type === 'fact' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : ''}">
-                                <input
-                                    type="radio"
-                                    bind:group={formData.entity_type}
-                                    value="fact"
-                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                />
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:database" class="w-5 h-5 text-blue-600" />
-                                        <span class="font-medium text-gray-900">Fact</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">
-                                        Transactional data containing measurements, metrics, and foreign keys to dimensions
-                                    </p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Examples: Orders, Sales, Transactions, Events
-                                    </p>
-                                </div>
-                            </label>
-
-                            <!-- Dimension Option -->
-                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-colors {formData.entity_type === 'dimension' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : ''}">
-                                <input
-                                    type="radio"
-                                    bind:group={formData.entity_type}
-                                    value="dimension"
-                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                />
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:box" class="w-5 h-5 text-green-600" />
-                                        <span class="font-medium text-gray-900">Dimension</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">
-                                        Descriptive attributes providing context to facts
-                                    </p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Examples: Customer, Product, Time, Location
-                                    </p>
-                                </div>
-                            </label>
-
-                            <!-- Unclassified Option -->
-                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors {formData.entity_type === 'unclassified' ? 'bg-gray-50 border-gray-500 ring-2 ring-gray-200' : ''}">
-                                <input
-                                    type="radio"
-                                    bind:group={formData.entity_type}
-                                    value="unclassified"
-                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                />
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:circle-dashed" class="w-5 h-5 text-gray-500" />
-                                        <span class="font-medium text-gray-900">Unclassified</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">
-                                        Generic entity that doesn't fit the fact/dimension pattern
-                                    </p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Default option - you can change this later
-                                    </p>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Guidance -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <div class="flex items-start gap-2">
-                            <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <p class="text-sm text-blue-800">
-                                Entity type helps with smart positioning and visualization in dimensional modeling. You can always change this later from the entity node.
                             </p>
                         </div>
                     </div>

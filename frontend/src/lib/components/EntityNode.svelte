@@ -1173,22 +1173,26 @@ import Icon from "@iconify/svelte";
                 {/if}
             </span>
             <!-- Entity Type Badge -->
-            {#if data.entity_type && data.entity_type !== 'unclassified'}
+            {#if data.entity_type}
                 <div
                     class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
                     class:bg-blue-100={data.entity_type === 'fact'}
                     class:bg-green-100={data.entity_type === 'dimension'}
+                    class:bg-gray-100={data.entity_type === 'unclassified'}
                     class:text-blue-700={data.entity_type === 'fact'}
                     class:text-green-700={data.entity_type === 'dimension'}
+                    class:text-gray-700={data.entity_type === 'unclassified'}
                     class:cursor-pointer={true}
                     class:opacity-80={true}
                     onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
                     title={data.entity_type === 'fact'
                         ? 'Fact: Transaction table containing measures and keys (click to change)'
-                        : 'Dimension: Descriptive table with attributes (click to change)'}
+                        : data.entity_type === 'dimension'
+                        ? 'Dimension: Descriptive table with attributes (click to change)'
+                        : 'Unclassified: Generic entity (click to change)'}
                 >
                     <Icon
-                        icon={data.entity_type === 'fact' ? 'lucide:database' : 'lucide:box'}
+                        icon="lucide:tag"
                         class="w-3 h-3"
                     />
                     <span class="uppercase">{data.entity_type}</span>
@@ -1285,7 +1289,7 @@ import Icon from "@iconify/svelte";
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:database" class="w-4 h-4 text-blue-600" />
+                <Icon icon="lucide:tag" class="w-4 h-4 text-blue-600" />
                 <span>Set as Fact</span>
             </button>
             <button
@@ -1293,7 +1297,7 @@ import Icon from "@iconify/svelte";
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-green-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:box" class="w-4 h-4 text-green-600" />
+                <Icon icon="lucide:tag" class="w-4 h-4 text-green-600" />
                 <span>Set as Dimension</span>
             </button>
             <button
@@ -1301,7 +1305,7 @@ import Icon from "@iconify/svelte";
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:circle-dashed" class="w-4 h-4 text-gray-500" />
+                <Icon icon="lucide:tag" class="w-4 h-4 text-gray-500" />
                 <span>Set as Unclassified</span>
             </button>
         </div>
