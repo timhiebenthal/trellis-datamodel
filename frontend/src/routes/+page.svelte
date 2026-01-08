@@ -803,6 +803,7 @@
                             ? displayTags
                             : undefined;
 
+                    const entity_type = ((n.data as any)?.entity_type) || "unclassified";
                     return {
                         id: n.id,
                         label: ((n.data.label as string) || "").trim() || "Entity",
@@ -816,6 +817,8 @@
                         collapsed: (n.data?.collapsed as boolean) ?? false,
                         // Persist display tags only; schema writes rely on _schemaTags.
                         tags: tagsToPersist,
+                        // Include entity_type with default "unclassified" if not set
+                        entity_type: entity_type,
                     };
                 }),
             relationships: currentEdges.flatMap((e) => {

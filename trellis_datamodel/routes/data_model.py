@@ -41,11 +41,11 @@ def _merge_layout_into_model(
     entities = model_data.get("entities", [])
     for entity in entities:
         entity_id = entity.get("id")
-        
+
         # Ensure entity_type is always set (default to "unclassified" if not present)
         if "entity_type" not in entity or entity.get("entity_type") is None:
             entity["entity_type"] = "unclassified"
-        
+
         if entity_id and entity_id in entities_layout:
             layout = entities_layout[entity_id]
             if "position" in layout:
@@ -99,7 +99,9 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
         if "entity_type" not in entity or entity.get("entity_type") is None:
             if entity_id in inferred_types:
                 entity["entity_type"] = inferred_types[entity_id]
-                print(f"Inferred entity_type '{inferred_types[entity_id]}' for entity '{entity_id}'")
+                print(
+                    f"Inferred entity_type '{inferred_types[entity_id]}' for entity '{entity_id}'"
+                )
 
     return model_data
 
@@ -237,7 +239,7 @@ def _validate_entity_type(entity_type: str) -> None:
     if entity_type and entity_type not in valid_types:
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid entity_type '{entity_type}'. Must be one of: {', '.join(sorted(valid_types))}"
+            detail=f"Invalid entity_type '{entity_type}'. Must be one of: {', '.join(sorted(valid_types))}",
         )
 
 

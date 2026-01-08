@@ -325,7 +325,7 @@
                                 />
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:tag" class="w-5 h-5 text-blue-600" />
+                                        <Icon icon="lucide:bar-chart-3" class="w-5 h-5 text-blue-600" />
                                         <span class="font-medium text-gray-900">Fact</span>
                                     </div>
                                     <p class="text-sm text-gray-600 mt-1">
@@ -347,7 +347,7 @@
                                 />
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:tag" class="w-5 h-5 text-green-600" />
+                                        <Icon icon="lucide:list" class="w-5 h-5 text-green-600" />
                                         <span class="font-medium text-gray-900">Dimension</span>
                                     </div>
                                     <p class="text-sm text-gray-600 mt-1">

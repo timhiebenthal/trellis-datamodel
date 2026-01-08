@@ -1179,9 +1179,9 @@ import Icon from "@iconify/svelte";
                     class:bg-blue-100={data.entity_type === 'fact'}
                     class:bg-green-100={data.entity_type === 'dimension'}
                     class:bg-gray-100={data.entity_type === 'unclassified'}
-                    class:text-blue-700={data.entity_type === 'fact'}
-                    class:text-green-700={data.entity_type === 'dimension'}
-                    class:text-gray-700={data.entity_type === 'unclassified'}
+                    class:text-blue-800={data.entity_type === 'fact'}
+                    class:text-green-800={data.entity_type === 'dimension'}
+                    class:text-gray-800={data.entity_type === 'unclassified'}
                     class:cursor-pointer={true}
                     class:opacity-80={true}
                     onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
@@ -1192,7 +1192,7 @@ import Icon from "@iconify/svelte";
                         : 'Unclassified: Generic entity (click to change)'}
                 >
                     <Icon
-                        icon="lucide:tag"
+                        icon={data.entity_type === 'fact' ? 'lucide:bar-chart-3' : data.entity_type === 'dimension' ? 'lucide:list' : 'lucide:circle-dashed'}
                         class="w-3 h-3"
                     />
                     <span class="uppercase">{data.entity_type}</span>
@@ -1289,7 +1289,7 @@ import Icon from "@iconify/svelte";
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:tag" class="w-4 h-4 text-blue-600" />
+                <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
                 <span>Set as Fact</span>
             </button>
             <button
@@ -1297,7 +1297,7 @@ import Icon from "@iconify/svelte";
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-green-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:tag" class="w-4 h-4 text-green-600" />
+                <Icon icon="lucide:list" class="w-4 h-4 text-green-600" />
                 <span>Set as Dimension</span>
             </button>
             <button
@@ -1305,7 +1305,7 @@ import Icon from "@iconify/svelte";
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:tag" class="w-4 h-4 text-gray-500" />
+                <Icon icon="lucide:circle-dashed" class="w-4 h-4 text-gray-500" />
                 <span>Set as Unclassified</span>
             </button>
         </div>
