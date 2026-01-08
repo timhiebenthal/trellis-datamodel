@@ -1195,7 +1195,6 @@ import Icon from "@iconify/svelte";
                         icon={data.entity_type === 'fact' ? 'lucide:bar-chart-3' : data.entity_type === 'dimension' ? 'lucide:list' : 'lucide:circle-dashed'}
                         class="w-3 h-3"
                     />
-                    <span class="uppercase">{data.entity_type}</span>
                 </div>
             {/if}
             <input
@@ -1290,7 +1289,7 @@ import Icon from "@iconify/svelte";
                 role="menuitem"
             >
                 <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
-                <span>Set as Fact</span>
+                <span class="text-gray-700">Set as Fact</span>
             </button>
             <button
                 onclick={() => setEntityType('dimension')}
@@ -1298,7 +1297,7 @@ import Icon from "@iconify/svelte";
                 role="menuitem"
             >
                 <Icon icon="lucide:list" class="w-4 h-4 text-green-600" />
-                <span>Set as Dimension</span>
+                <span class="text-gray-700">Set as Dimension</span>
             </button>
             <button
                 onclick={() => setEntityType('unclassified')}
@@ -1306,7 +1305,7 @@ import Icon from "@iconify/svelte";
                 role="menuitem"
             >
                 <Icon icon="lucide:circle-dashed" class="w-4 h-4 text-gray-500" />
-                <span>Set as Unclassified</span>
+                <span class="text-gray-700">Set as Unclassified</span>
             </button>
         </div>
     {/if}
