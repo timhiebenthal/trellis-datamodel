@@ -1,4 +1,4 @@
-"""Routes for BUS Matrix operations."""
+"""Routes for Bus Matrix operations."""
 
 from fastapi import APIRouter, HTTPException, Query
 import os
@@ -17,7 +17,7 @@ async def get_bus_matrix(
     tag: str | None = Query(default=None, description="Filter by tag (entities must have this tag)")
 ):
     """
-    Return BUS Matrix data showing dimension-fact connections.
+    Return Bus Matrix data showing dimension-fact connections.
 
     Returns:
         Dictionary containing dimensions, facts, and their connections.
@@ -28,7 +28,7 @@ async def get_bus_matrix(
     try:
         # region agent log - Bus Matrix API entry
         import json
-        log_data = {"location": "bus_matrix.py:29", "message": "BUS Matrix API called", "data": {"dimension_id": dimension_id, "fact_id": fact_id, "tag": tag}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "A,E"}
+        log_data = {"location": "bus_matrix.py:29", "message": "Bus Matrix API called", "data": {"dimension_id": dimension_id, "fact_id": fact_id, "tag": tag}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "A,E"}
         with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
             log_file.write(json.dumps(log_data) + "\n")
         # endregion
@@ -40,7 +40,7 @@ async def get_bus_matrix(
         # endregion
 
         if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
-            print("BUS Matrix: Data model path not found or doesn't exist")
+            print("Bus Matrix: Data model path not found or doesn't exist")
             return {"dimensions": [], "facts": [], "connections": []}
 
         import yaml
@@ -56,7 +56,7 @@ async def get_bus_matrix(
             log_file.write(json.dumps(log_data) + "\n")
         # endregion
 
-        print(f"BUS Matrix: Loaded data model with {len(entities)} entities and {len(relationships)} relationships")
+        print(f"Bus Matrix: Loaded data model with {len(entities)} entities and {len(relationships)} relationships")
 
         # region agent log - Entity type filtering (Hypothesis C)
         entity_types = [e.get("entity_type") for e in entities]
@@ -70,7 +70,7 @@ async def get_bus_matrix(
         # Filter dimensions and facts - include unclassified entities for now
         dimensions = [e for e in entities if e.get("entity_type") in ["dimension", "unclassified"]]
         facts = [e for e in entities if e.get("entity_type") in ["fact", "unclassified"]]
-        print(f"BUS Matrix: Found {len(dimensions)} dimensions and {len(facts)} facts")
+        print(f"Bus Matrix: Found {len(dimensions)} dimensions and {len(facts)} facts")
 
         # Apply tag filter if specified
         # region agent log - Tag filtering (Hypothesis D)
@@ -83,7 +83,7 @@ async def get_bus_matrix(
         if tag:
             dimensions = [d for d in dimensions if tag in (d.get("tags") or [])]
             facts = [f for f in facts if tag in (f.get("tags") or [])]
-            print(f"BUS Matrix: After tag filter: {len(dimensions)} dimensions, {len(facts)} facts")
+            print(f"Bus Matrix: After tag filter: {len(dimensions)} dimensions, {len(facts)} facts")
 
             # region agent log - After tag filter (Hypothesis D)
             log_data = {"location": "bus_matrix.py:55", "message": "After tag filter", "data": {"dimensions_after": len(dimensions), "facts_after": len(facts)}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "D"}
@@ -96,7 +96,7 @@ async def get_bus_matrix(
             dimensions = [d for d in dimensions if d.get("id") == dimension_id]
         if fact_id:
             facts = [f for f in facts if f.get("id") == fact_id]
-        print(f"BUS Matrix: After ID filters: {len(dimensions)} dimensions, {len(facts)} facts")
+        print(f"Bus Matrix: After ID filters: {len(dimensions)} dimensions, {len(facts)} facts")
 
         # Build connections from relationships
         # A connection exists when a dimension has a relationship to a fact
@@ -104,7 +104,7 @@ async def get_bus_matrix(
         dimension_ids = {d.get("id") for d in dimensions}
         fact_ids = {f.get("id") for f in facts}
 
-        print(f"BUS Matrix: Building connections - dimension IDs: {list(dimension_ids)[:3]}..., fact IDs: {list(fact_ids)[:3]}...")
+        print(f"Bus Matrix: Building connections - dimension IDs: {list(dimension_ids)[:3]}..., fact IDs: {list(fact_ids)[:3]}...")
 
         for rel in relationships:
             source = rel.get("source")
@@ -117,13 +117,13 @@ async def get_bus_matrix(
                     "dimension_id": source,
                     "fact_id": target
                 })
-                print(f"BUS Matrix: Found connection - dimension {source} -> fact {target}")
+                print(f"Bus Matrix: Found connection - dimension {source} -> fact {target}")
             elif source in fact_ids and target in dimension_ids:
                 connections.append({
                     "dimension_id": target,
                     "fact_id": source
                 })
-                print(f"BUS Matrix: Found connection - dimension {target} -> fact {source}")
+                print(f"Bus Matrix: Found connection - dimension {target} -> fact {source}")
 
         # Remove duplicate connections (same dimension-fact pair)
         seen = set()
@@ -134,7 +134,7 @@ async def get_bus_matrix(
                 seen.add(key)
                 unique_connections.append(conn)
 
-        print(f"BUS Matrix: Found {len(unique_connections)} unique connections")
+        print(f"Bus Matrix: Found {len(unique_connections)} unique connections")
 
         # Sort alphabetically for consistent display
         dimensions.sort(key=lambda x: x.get("id", ""))
@@ -143,15 +143,15 @@ async def get_bus_matrix(
 
         # Log sample data for debugging
         if len(dimensions) > 0:
-            print(f"BUS Matrix: Sample dimensions: {[d.get('id') for d in dimensions[:2]]}...")
+            print(f"Bus Matrix: Sample dimensions: {[d.get('id') for d in dimensions[:2]]}...")
         if len(facts) > 0:
-            print(f"BUS Matrix: Sample facts: {[f.get('id') for f in facts[:2]]}...")
+            print(f"Bus Matrix: Sample facts: {[f.get('id') for f in facts[:2]]}...")
         if len(unique_connections) > 0:
             sample_conns = [f"{c['dimension_id']}-{c['fact_id']}" for c in unique_connections[:2]]
-            print(f"BUS Matrix: Sample connections: {sample_conns}...")
+            print(f"Bus Matrix: Sample connections: {sample_conns}...")
 
         # region agent log - Return data (Final check)
-        log_data = {"location": "bus_matrix.py:113", "message": "Returning BUS Matrix data", "data": {"num_dimensions": len(dimensions), "num_facts": len(facts), "num_connections": len(unique_connections), "sample_dimensions": [{"id": d.get("id"), "entity_type": d.get("entity_type")} for d in dimensions[:2]], "sample_facts": [{"id": f.get("id"), "entity_type": f.get("entity_type")} for f in facts[:2]]}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "FINAL"}
+        log_data = {"location": "bus_matrix.py:113", "message": "Returning Bus Matrix data", "data": {"num_dimensions": len(dimensions), "num_facts": len(facts), "num_connections": len(unique_connections), "sample_dimensions": [{"id": d.get("id"), "entity_type": d.get("entity_type")} for d in dimensions[:2]], "sample_facts": [{"id": f.get("id"), "entity_type": f.get("entity_type")} for f in facts[:2]]}, "timestamp": 1736366400000, "sessionId": "debug-session", "hypothesisId": "FINAL"}
         with open("/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a") as log_file:
             log_file.write(json.dumps(log_data) + "\n")
         # endregion
@@ -166,6 +166,6 @@ async def get_bus_matrix(
         import traceback
         traceback.print_exc()
         raise HTTPException(
-            status_code=500, detail=f"Error building BUS Matrix: {str(e)}"
+            status_code=500, detail=f"Error building Bus Matrix: {str(e)}"
         )
 

@@ -1180,10 +1180,10 @@
                     class:text-gray-500={$viewMode !== "bus_matrix"}
                     class:hover:text-gray-900={$viewMode !== "bus_matrix"}
                     onclick={() => ($viewMode = "bus_matrix")}
-                    title="BUS Matrix View"
+                    title="Bus Matrix View"
                 >
                     <Icon icon="mdi:table-large" class="w-3.5 h-3.5" />
-                    BUS Matrix
+                    Bus Matrix
                 </button>
             {/if}
         </div>

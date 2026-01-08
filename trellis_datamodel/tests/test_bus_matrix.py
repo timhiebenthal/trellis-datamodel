@@ -1,17 +1,17 @@
-"""Tests for BUS Matrix endpoint."""
+"""Tests for Bus Matrix endpoint."""
 
 import pytest
 
 # TODO: Implement tests when config loading issues are resolved
-# The BUS Matrix endpoint works but test setup has issues with config module reloading
+# The Bus Matrix endpoint works but test setup has issues with config module reloading
 # For now, these are placeholder tests that verify the code structure
 
 
 class TestBusMatrixEndpoint:
-    """Test BUS Matrix API endpoint."""
+    """Test Bus Matrix API endpoint."""
 
     def test_basic_data_retrieval(self):
-        """Test basic BUS Matrix data retrieval (no filters)."""
+        """Test basic Bus Matrix data retrieval (no filters)."""
         # Should return structure: { dimensions: [], facts: [], connections: [] }
         assert True
 

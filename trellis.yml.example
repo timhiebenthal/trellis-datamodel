@@ -46,7 +46,7 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 # Use this feature if you want to enable Kimball dimensional modeling features such as:
 # - Entity classification (fact vs dimension)
 # - Smart default positioning for star/snowflake schemas
-# - Kimball BUS Matrix view mode
+# - Kimball Bus Matrix view mode
 # Default is entity_model for backward compatibility.
 #modeling_style: entity_model  # Options: dimensional_model or entity_model
 

@@ -67,7 +67,7 @@ export async function getBusMatrix(
         const data = await res.json();
         return data;
     } catch (e) {
-        console.error("Error fetching BUS Matrix:", e);
+        console.error("Error fetching Bus Matrix:", e);
         return { dimensions: [], facts: [], connections: [] };
     }
 }

@@ -43,7 +43,7 @@ Trellis includes native support for Kimball dimensional modeling, making it easi
 - Reduces manual layout effort for star/snowflake schemas
 - Can be re-applied anytime with "Auto-Layout" button
 
-**Kimball BUS Matrix View**
+**Kimball Bus Matrix View**
 - Visual matrix showing dimensions (rows) and facts (columns)
 - Checkmarks (✓) indicate dimension-fact connections
 - Filter by dimension name, fact name, or tags
@@ -80,8 +80,8 @@ dimensional_modeling:
 2. Entity type icons appear on nodes (database for fact, box for dimension)
 3. Override incorrect classifications via context menu: right-click → "Set as Fact/Dimension"
 
-**BUS Matrix Workflow:**
-1. Click "BUS Matrix" icon in navigation bar
+**Bus Matrix Workflow:**
+1. Click "Bus Matrix" icon in navigation bar
 2. View dimensions (rows) and facts (columns)
 3. Checkmarks show connections between entities
 4. Filter to focus on specific dimensions, facts, or tags

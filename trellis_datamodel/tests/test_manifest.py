@@ -38,7 +38,7 @@ class TestGetConfigInfo:
         import sys
         # Patch the actual config module in sys.modules to handle module reloads
         config_module = sys.modules['trellis_datamodel.config']
-        monkeypatch.setattr(config_module, "BUS_MATRIX_ENABLED", True)
+        monkeypatch.setattr(config_module, "Bus_MATRIX_ENABLED", True)
 
         response = test_client.get("/api/config-info")
 
