@@ -49,6 +49,7 @@ import Icon from "@iconify/svelte";
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
+    let showEntityTypeMenu = $state(false);
     let showUndescribedAttributesWarning = $state(false);
     let undescribedAttributeNames = $state<string[]>([]);
     let warningResolve: ((value: boolean) => void) | null = null;
@@ -703,6 +704,26 @@ import Icon from "@iconify/svelte";
         showDeleteModal = false;
     }
 
+    // Entity type menu functionality
+    function toggleEntityTypeMenu() {
+        showEntityTypeMenu = !showEntityTypeMenu;
+    }
+
+    function closeEntityTypeMenu() {
+        showEntityTypeMenu = false;
+    }
+
+    async function setEntityType(newType: "fact" | "dimension" | "unclassified") {
+        try {
+            // Update node data locally
+            updateNodeData(id, { entity_type: newType });
+            closeEntityTypeMenu();
+        } catch (error) {
+            console.error("Failed to update entity type:", error);
+            alert("Failed to update entity type. Please try again.");
+        }
+    }
+
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
     let tagInput = $state("");
@@ -1151,6 +1172,28 @@ import Icon from "@iconify/svelte";
                     <Icon icon="lucide:chevron-down" class="w-4 h-4" />
                 {/if}
             </span>
+            <!-- Entity Type Badge -->
+            {#if data.entity_type && data.entity_type !== 'unclassified'}
+                <div
+                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
+                    class:bg-blue-100={data.entity_type === 'fact'}
+                    class:bg-green-100={data.entity_type === 'dimension'}
+                    class:text-blue-700={data.entity_type === 'fact'}
+                    class:text-green-700={data.entity_type === 'dimension'}
+                    class:cursor-pointer="true"
+                    class:opacity-80="true"
+                    onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
+                    title={data.entity_type === 'fact'
+                        ? 'Fact: Transaction table containing measures and keys (click to change)'
+                        : 'Dimension: Descriptive table with attributes (click to change)'}
+                >
+                    <Icon
+                        icon={data.entity_type === 'fact' ? 'lucide:database' : 'lucide:box'}
+                        class="w-3 h-3"
+                    />
+                    <span class="uppercase">{data.entity_type}</span>
+                </div>
+            {/if}
             <input
                 type="text"
                 value={data.label}
@@ -1216,6 +1259,53 @@ import Icon from "@iconify/svelte";
             </button>
         </div>
     </div>
+
+    <!-- Entity Type Dropdown Menu -->
+    {#if showEntityTypeMenu}
+        <div
+            class="absolute z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px] text-sm transition-all duration-200 ease-in-out"
+            style="top: 45px; right: 10px;"
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
+            onfocusout={() => {
+                // Allow focus to move to menu items before closing
+                queueMicrotask(() => {
+                    const focused = document.activeElement;
+                    const container = focused?.closest('[role="menu"]');
+                    if (!container) {
+                        closeEntityTypeMenu();
+                    }
+                });
+            }}
+            role="menu"
+            tabindex="-1"
+        >
+            <button
+                onclick={() => setEntityType('fact')}
+                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-50 text-left transition-colors"
+                role="menuitem"
+            >
+                <Icon icon="lucide:database" class="w-4 h-4 text-blue-600" />
+                <span>Set as Fact</span>
+            </button>
+            <button
+                onclick={() => setEntityType('dimension')}
+                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-green-50 text-left transition-colors"
+                role="menuitem"
+            >
+                <Icon icon="lucide:box" class="w-4 h-4 text-green-600" />
+                <span>Set as Dimension</span>
+            </button>
+            <button
+                onclick={() => setEntityType('unclassified')}
+                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left transition-colors"
+                role="menuitem"
+            >
+                <Icon icon="lucide:circle-dashed" class="w-4 h-4 text-gray-500" />
+                <span>Set as Unclassified</span>
+            </button>
+        </div>
+    {/if}
 
     <!-- Body -->
     {#if !isCollapsed}

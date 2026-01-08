@@ -6,6 +6,7 @@ export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
 export const dbtModels = writable<DbtModel[]>([]);
 export const viewMode = writable<'conceptual' | 'logical' | 'exposures'>('conceptual');
+export const modelingStyle = writable<'dimensional_model' | 'entity_model'>('entity_model');
 export const configStatus = writable<any>(null);
 
 // Filter and grouping stores

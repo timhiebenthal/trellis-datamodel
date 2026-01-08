@@ -25,8 +25,17 @@ class GuidanceConfig:
     disabled_guidance: list[str] = field(default_factory=list)
 
 
-# Global guidance configuration (set by load_config)
+@dataclass
+class DimensionalModelingConfig:
+    """Configuration for dimensional modeling features."""
+    enabled: bool = False
+    dimension_prefixes: list[str] = field(default_factory=lambda: ["dim_", "d_"])
+    fact_prefixes: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
+
+
+# Global configuration objects (set by load_config)
 GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
+DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 
 if _TEST_DIR:
     # Test mode: use temp directory paths
@@ -56,7 +65,9 @@ if _TEST_DIR:
     LINEAGE_ENABLED: bool = False
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
+    MODELING_STYLE: str = "entity_model"
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
+    DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 else:
     # Production mode: will be set by load_config()
     CONFIG_PATH: str = ""
@@ -74,6 +85,8 @@ else:
     LINEAGE_ENABLED: bool = False
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
+    MODELING_STYLE: str = "entity_model"
+    DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 
 
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
@@ -108,7 +121,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, DIMENSIONAL_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
     if _TEST_DIR:
@@ -316,6 +329,26 @@ def load_config(config_path: Optional[str] = None) -> None:
             else:
                 print("Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'.")
 
+        # 13. Load modeling style configuration
+        MODELING_STYLE = config.get("modeling_style", "entity_model")
+        if MODELING_STYLE not in ["dimensional_model", "entity_model"]:
+            print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
+            MODELING_STYLE = "entity_model"
+
+        # 14. Load dimensional modeling configuration
+        DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()
+        dimensional_config = config.get("dimensional_modeling")
+        if isinstance(dimensional_config, dict):
+            DIMENSIONAL_MODELING_CONFIG.enabled = MODELING_STYLE == "dimensional_model"
+            inference_patterns = dimensional_config.get("inference_patterns")
+            if isinstance(inference_patterns, dict):
+                dimension_prefixes = inference_patterns.get("dimension_prefixes")
+                if isinstance(dimension_prefixes, list):
+                    DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = dimension_prefixes
+                fact_prefixes = inference_patterns.get("fact_prefixes")
+                if isinstance(fact_prefixes, list):
+                    DIMENSIONAL_MODELING_CONFIG.fact_prefixes = fact_prefixes
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
@@ -338,5 +371,10 @@ def print_config() -> None:
     print(f"Exposures enabled: {EXPOSURES_ENABLED}")
     if EXPOSURES_ENABLED:
         print(f"Exposures default layout: {EXPOSURES_DEFAULT_LAYOUT}")
+    print(f"Modeling style: {MODELING_STYLE}")
+    if DIMENSIONAL_MODELING_CONFIG.enabled:
+        print(f"Dimensional modeling enabled: {DIMENSIONAL_MODELING_CONFIG.enabled}")
+        print(f"Dimension prefixes: {DIMENSIONAL_MODELING_CONFIG.dimension_prefixes}")
+        print(f"Fact prefixes: {DIMENSIONAL_MODELING_CONFIG.fact_prefixes}")
     if DBT_COMPANY_DUMMY_PATH:
         print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")

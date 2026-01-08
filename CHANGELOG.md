@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- Added native support for Kimball dimensional modeling with entity classification (fact/dimension/unclassified) and smart default positioning for star/snowflake schemas.
+- Added `modeling_style` configuration option to `trellis.yml` with values `dimensional_model` and `entity_model` (default for backward compatibility).
+- Added configurable inference patterns for automatic entity type classification from dbt model naming: `dimensional_modeling.inference_patterns` with `dimension_prefixes` and `fact_prefixes`.
+- Added Kimball BUS Matrix view mode displaying dimensions as rows and facts as columns with checkmarks for connections.
+- Added BUS Matrix filter controls for dimensions, facts, and tags with real-time filtering.
+- Added entity type indicators (icons/badges) on entity nodes with color coding: blue for fact, green for dimension, gray for unclassified.
+- Added smart default positioning logic: facts placed in canvas center, dimensions in outer ring when `modeling_style` is `dimensional_model`.
+- Added "Auto-Layout" button to toolbar to reposition entities according to fact/dimension rules.
+- Added entity type selection step to Entity Creation Wizard with radio buttons and descriptions.
+- Added context menu options to change entity type (Set as Fact/Set as Dimension/Set as Unclassified).
+- Added entity type badge click handler with dropdown menu for quick type changes.
+- Added BUS Matrix navigation button to main navigation bar alongside Canvas and Exposures views.
+- Added BUS Matrix icon badge to entity nodes linking to pre-filtered matrix view for that entity.
+- Added tooltips for entity type badges explaining each type's meaning.
+
+### Changed
+- Extended Entity TypedDict in backend with optional `entity_type` field ("fact", "dimension", "unclassified").
+- Extended frontend Entity interface with `entity_type` field.
+- Updated `/data-model` GET endpoint to include `entity_type` in entity data.
+- Updated `/data-model` POST endpoint to persist `entity_type` changes.
+- Added `/bus-matrix` GET endpoint returning dimensions, facts, and connections with optional filtering by domain, tag, fact_id, or dimension_id.
+- Entity type inference only activates when `modeling_style` is `dimensional_model`.
+- Existing entity positions from `canvas_layout.yml` are preserved during smart positioning.
+- Manual positioning overrides are respected (not overwritten by auto-layout unless explicitly requested).
+
+### Fixed
+- Added validation for `entity_type` field values against allowed enum (fact/dimension/unclassified).
+- Added error handling for invalid entity_type submissions with user-friendly error messages.
+- Added graceful handling for BUS Matrix endpoint errors (missing relationships, empty data model, invalid query parameters).
+- Added smooth CSS transitions for entity position changes to prevent jarring UI jumps.
+- Added debouncing to BUS Matrix filter inputs for improved performance with large datasets.
+
 tbd
 
 ## [0.5.0] - 2026-01-07

@@ -17,6 +17,7 @@
     let formData = $state({
         label: "New Entity",
         description: "",
+        entity_type: "unclassified" as "fact" | "dimension" | "unclassified",
     });
     let validationErrors = $state({
         label: null as string | null,
@@ -95,12 +96,10 @@
             const error = validateDescription(formData.description);
             validationErrors.description = error;
             if (error) return;
-            // Check if step 3 should be shown
-            if (config.disabled_guidance.includes("attribute_suggestions")) {
-                complete();
-            } else {
-                currentStep = 3;
-            }
+            currentStep = 3;
+        } else if (currentStep === 3) {
+            // Entity type selection is optional, can proceed
+            currentStep = 4;
         }
     }
 
@@ -118,12 +117,11 @@
         } else if (currentStep === 2) {
             // Skip description - validate but allow empty
             validationErrors.description = null;
-            if (config.disabled_guidance.includes("attribute_suggestions")) {
-                complete();
-            } else {
-                currentStep = 3;
-            }
+            currentStep = 3;
         } else if (currentStep === 3) {
+            // Skip entity type - keep default unclassified
+            currentStep = 4;
+        } else if (currentStep === 4) {
             complete();
         }
     }
@@ -149,6 +147,7 @@
         onComplete({
             label: formattedLabel,
             description: formData.description.trim(),
+            entity_type: formData.entity_type,
         });
         reset();
     }
@@ -158,6 +157,7 @@
         formData = {
             label: "New Entity",
             description: "",
+            entity_type: "unclassified",
         };
         validationErrors = {
             label: null,
@@ -172,7 +172,7 @@
         } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             // Ctrl/Cmd+Enter to submit
             event.preventDefault();
-            if (currentStep < 3) {
+            if (currentStep < 4) {
                 nextStep();
             } else {
                 complete();
@@ -250,13 +250,13 @@
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-medium text-gray-700">
-                        Step {currentStep} of 3
+                        Step {currentStep} of 4
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
                         class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                        style="width: {(currentStep / 3) * 100}%"
+                        style="width: {(currentStep / 4) * 100}%"
                     ></div>
                 </div>
             </div>
@@ -384,7 +384,95 @@
                 </div>
             {/if}
 
-            <!-- Step 3: Attributes (Optional) -->
+            <!-- Step 3: Entity Type (Optional) -->
+            {#if currentStep === 3}
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">
+                            Entity Type (Optional)
+                        </label>
+                        <div class="space-y-3">
+                            <!-- Fact Option -->
+                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors {formData.entity_type === 'fact' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : ''}">
+                                <input
+                                    type="radio"
+                                    bind:group={formData.entity_type}
+                                    value="fact"
+                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                />
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <Icon icon="lucide:database" class="w-5 h-5 text-blue-600" />
+                                        <span class="font-medium text-gray-900">Fact</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        Transactional data containing measurements, metrics, and foreign keys to dimensions
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Examples: Orders, Sales, Transactions, Events
+                                    </p>
+                                </div>
+                            </label>
+
+                            <!-- Dimension Option -->
+                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-colors {formData.entity_type === 'dimension' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : ''}">
+                                <input
+                                    type="radio"
+                                    bind:group={formData.entity_type}
+                                    value="dimension"
+                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                />
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <Icon icon="lucide:box" class="w-5 h-5 text-green-600" />
+                                        <span class="font-medium text-gray-900">Dimension</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        Descriptive attributes providing context to facts
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Examples: Customer, Product, Time, Location
+                                    </p>
+                                </div>
+                            </label>
+
+                            <!-- Unclassified Option -->
+                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors {formData.entity_type === 'unclassified' ? 'bg-gray-50 border-gray-500 ring-2 ring-gray-200' : ''}">
+                                <input
+                                    type="radio"
+                                    bind:group={formData.entity_type}
+                                    value="unclassified"
+                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                />
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <Icon icon="lucide:circle-dashed" class="w-5 h-5 text-gray-500" />
+                                        <span class="font-medium text-gray-900">Unclassified</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        Generic entity that doesn't fit the fact/dimension pattern
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Default option - you can change this later
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Guidance -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <div class="flex items-start gap-2">
+                            <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <p class="text-sm text-blue-800">
+                                Entity type helps with smart positioning and visualization in dimensional modeling. You can always change this later from the entity node.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Step 4: Attributes (Optional) -->
             {#if currentStep === 3}
                 <div class="space-y-4">
                     <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
@@ -425,7 +513,7 @@
                     {/if}
                 </div>
                 <div class="flex gap-3">
-                    {#if currentStep < 3}
+                    {#if currentStep < 4}
                         <button
                             onclick={skipStep}
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"

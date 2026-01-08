@@ -15,7 +15,7 @@
         type Edge,
     } from "@xyflow/svelte";
     import { setContext } from "svelte";
-    import { nodes, edges, viewMode } from "$lib/stores";
+    import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
@@ -152,16 +152,28 @@
             10,
         );
 
+        // Calculate smart position based on entity type and modeling style
+        let position: { x: number; y: number };
+
+        if ($modelingStyle === "dimensional_model" && data.entity_type) {
+            // Smart positioning for dimensional modeling
+            position = calculateSmartPosition(data.entity_type);
+        } else {
+            // Default random positioning
+            position = {
+                x: 100 + Math.random() * 200,
+                y: 100 + Math.random() * 200,
+            };
+        }
+
         const newNode: Node = {
             id,
             type: "entity",
-            position: {
-                x: 100 + Math.random() * 200,
-                y: 100 + Math.random() * 200,
-            },
+            position,
             data: {
                 label,
                 description: data.description || "",
+                entity_type: data.entity_type || "unclassified",
                 width: 280,
                 panelHeight: 200,
                 collapsed: false,
@@ -169,6 +181,44 @@
             zIndex: maxZIndex + 1, // Place on top of all other nodes
         };
         $nodes = [...$nodes, newNode];
+    }
+
+    function calculateSmartPosition(entityType: "fact" | "dimension" | "unclassified"): { x: number; y: number } {
+        // Calculate canvas center (average of all existing entity positions, or default center)
+        const entityNodes = $nodes.filter((n) => n.type === "entity");
+        let centerX = 500;
+        let centerY = 400;
+
+        if (entityNodes.length > 0) {
+            const xPositions = entityNodes.map((n) => n.position.x);
+            const yPositions = entityNodes.map((n) => n.position.y);
+            centerX = (Math.min(...xPositions) + Math.max(...xPositions)) / 2;
+            centerY = (Math.min(...yPositions) + Math.max(...yPositions)) / 2;
+        }
+
+        if (entityType === "fact") {
+            // Place in center area with random offset
+            const offsetX = (Math.random() - 0.5) * 400; // -200 to +200
+            const offsetY = (Math.random() - 0.5) * 400;
+            return {
+                x: centerX + offsetX,
+                y: centerY + offsetY,
+            };
+        } else if (entityType === "dimension") {
+            // Place in outer ring around center
+            const radius = 500 + Math.random() * 300; // 500-800px from center
+            const angle = Math.random() * 2 * Math.PI; // Random angle around circle
+            return {
+                x: centerX + Math.cos(angle) * radius,
+                y: centerY + Math.sin(angle) * radius,
+            };
+        } else {
+            // Unclassified - use default positioning
+            return {
+                x: 100 + Math.random() * 200,
+                y: 100 + Math.random() * 200,
+            };
+        }
     }
 
     function handleWizardComplete(data: EntityWizardData) {

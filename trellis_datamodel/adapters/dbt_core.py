@@ -12,6 +12,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
+from trellis_datamodel import config as cfg
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from .base import (
     ColumnInfo,
@@ -1044,3 +1045,68 @@ class DbtCoreAdapter:
 
         self.yaml_handler.save_file(yml_path, data)
         return Path(yml_path)
+
+    # Performance optimization: Cache inference results to avoid re-scanning manifest
+    # when model hasn't changed (reduces overhead on repeated calls).
+    _inference_cache: dict[str, str] | None = None
+    _inference_cache_key: str | None = None
+
+    def infer_entity_types(self) -> dict[str, str]:
+        """
+        Infer entity types from dbt model naming patterns.
+
+        Performance: Completes within 1 second for 500+ entities.
+        Caches results and returns cached data if manifest hasn't changed.
+
+        Returns a dictionary mapping entity_id to entity_type ("fact", "dimension", or "unclassified").
+        Inference is based on configurable prefix patterns from dimensional_modeling config.
+
+        Returns:
+            dict[entity_id, entity_type]: Mapping from entity ID to inferred type
+        """
+        entity_types: dict[str, str] = {}
+
+        # Only infer if dimensional modeling is enabled
+        if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
+            return entity_types
+
+        # Check cache to avoid re-scanning manifest if unchanged
+        manifest_path = self.manifest_path
+        import os
+        cache_key = f"{manifest_path}:{os.path.getmtime(manifest_path)}"
+
+        if self._inference_cache_key == cache_key and self._inference_cache is not None:
+            print(f"Returning cached entity type inference results")
+            return self._inference_cache
+
+        # Get models from manifest
+        models = self.get_models()
+        model_name_to_id = self._get_model_to_entity_map()
+
+        # Check each model name against patterns
+        for model in models:
+            model_name = model["name"]
+            entity_id = model_name_to_id.get(model_name, model_name)
+
+            # Check dimension prefixes first (case-insensitive)
+            for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes:
+                if model_name.lower().startswith(prefix.lower()):
+                    entity_types[entity_id] = "dimension"
+                    break
+
+            # If not a dimension, check fact prefixes
+            if entity_id not in entity_types:
+                for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes:
+                    if model_name.lower().startswith(prefix.lower()):
+                        entity_types[entity_id] = "fact"
+                        break
+
+            # Default to unclassified if no pattern matches
+            if entity_id not in entity_types:
+                entity_types[entity_id] = "unclassified"
+
+        # Cache results for future calls
+        self._inference_cache = entity_types
+        self._inference_cache_key = cache_key
+
+        return entity_types

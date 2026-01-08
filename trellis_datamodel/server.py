@@ -20,6 +20,7 @@ from trellis_datamodel.routes import (
     schema_router,
     exposures_router,
     lineage_router,
+    bus_matrix_router,
 )
 
 
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(schema_router)
     app.include_router(exposures_router)
     app.include_router(lineage_router)
+    app.include_router(bus_matrix_router)
 
     # Mount static files AFTER API routes
     # Important: app.mount() creates a sub-application, so we mount AFTER registering API routes
