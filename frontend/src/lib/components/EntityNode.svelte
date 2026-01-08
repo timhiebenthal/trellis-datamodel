@@ -1180,8 +1180,8 @@ import Icon from "@iconify/svelte";
                     class:bg-green-100={data.entity_type === 'dimension'}
                     class:text-blue-700={data.entity_type === 'fact'}
                     class:text-green-700={data.entity_type === 'dimension'}
-                    class:cursor-pointer="true"
-                    class:opacity-80="true"
+                    class:cursor-pointer={true}
+                    class:opacity-80={true}
                     onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
                     title={data.entity_type === 'fact'
                         ? 'Fact: Transaction table containing measures and keys (click to change)'
