@@ -337,12 +337,19 @@ def load_config(config_path: Optional[str] = None) -> None:
             print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
             MODELING_STYLE = "entity_model"
 
-        # 14. Load bus matrix configuration (enabled by default, can be disabled with bus_matrix.enabled: false)
-        Bus_MATRIX_ENABLED = True
-        
-        bus_matrix_config = config.get("bus_matrix")
-        if isinstance(bus_matrix_config, dict):
-            Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
+        # 14. Load bus matrix configuration (disabled for explicit entity_model, enabled otherwise)
+        # Bus matrix is specific to dimensional modeling (Kimball methodology)
+        # If modeling_style is explicitly set to "entity_model" in config, disable Bus Matrix
+        # Otherwise, enable it by default (for backward compatibility and dimensional_model)
+        modeling_style_in_config = "modeling_style" in config
+        if modeling_style_in_config and MODELING_STYLE == "entity_model":
+            Bus_MATRIX_ENABLED = False
+        else:
+            # Enable for dimensional_model or when not explicitly set
+            Bus_MATRIX_ENABLED = True
+            bus_matrix_config = config.get("bus_matrix")
+            if isinstance(bus_matrix_config, dict):
+                Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
 
         # 15. Load dimensional modeling configuration
         DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()
