@@ -49,6 +49,7 @@ import Icon from "@iconify/svelte";
 
     const { updateNodeData, getNodes } = useSvelteFlow();
     let showDeleteModal = $state(false);
+    let showEntityTypeMenu = $state(false);
     let showUndescribedAttributesWarning = $state(false);
     let undescribedAttributeNames = $state<string[]>([]);
     let warningResolve: ((value: boolean) => void) | null = null;
@@ -67,6 +68,10 @@ import Icon from "@iconify/svelte";
     const exposuresEnabledStore =
         getContext<Readable<boolean>>("exposuresEnabled") ?? readable(false);
     let exposuresEnabled = $derived($exposuresEnabledStore);
+
+    const hasExposuresDataStore =
+        getContext<Readable<boolean>>("hasExposuresData") ?? readable(false);
+    let hasExposuresData = $derived($hasExposuresDataStore);
 
     // Reactive binding check
     let boundModelName = $derived(data.dbt_model as string | undefined);
@@ -703,6 +708,26 @@ import Icon from "@iconify/svelte";
         showDeleteModal = false;
     }
 
+    // Entity type menu functionality
+    function toggleEntityTypeMenu() {
+        showEntityTypeMenu = !showEntityTypeMenu;
+    }
+
+    function closeEntityTypeMenu() {
+        showEntityTypeMenu = false;
+    }
+
+    async function setEntityType(newType: "fact" | "dimension" | "unclassified") {
+        try {
+            // Update node data locally
+            updateNodeData(id, { entity_type: newType });
+            closeEntityTypeMenu();
+        } catch (error) {
+            console.error("Failed to update entity type:", error);
+            alert("Failed to update entity type. Please try again.");
+        }
+    }
+
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
     let tagInput = $state("");
@@ -1151,6 +1176,31 @@ import Icon from "@iconify/svelte";
                     <Icon icon="lucide:chevron-down" class="w-4 h-4" />
                 {/if}
             </span>
+            <!-- Entity Type Badge -->
+            {#if data.entity_type}
+                <button
+                    type="button"
+                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 cursor-pointer"
+                    class:bg-blue-100={data.entity_type === 'fact'}
+                    class:bg-green-100={data.entity_type === 'dimension'}
+                    class:bg-gray-100={data.entity_type === 'unclassified'}
+                    class:text-blue-800={data.entity_type === 'fact'}
+                    class:text-green-800={data.entity_type === 'dimension'}
+                    class:text-gray-800={data.entity_type === 'unclassified'}
+                    class:opacity-80={true}
+                    onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
+                    title={data.entity_type === 'fact'
+                        ? 'Fact: Transaction table containing measures and keys (click to change)'
+                        : data.entity_type === 'dimension'
+                        ? 'Dimension: Descriptive table with attributes (click to change)'
+                        : 'Unclassified: Generic entity (click to change)'}
+                >
+                    <Icon
+                        icon={data.entity_type === 'fact' ? 'lucide:bar-chart-3' : data.entity_type === 'dimension' ? 'lucide:list' : 'lucide:circle-dashed'}
+                        class="w-3 h-3"
+                    />
+                </button>
+            {/if}
             <input
                 type="text"
                 value={data.label}
@@ -1180,7 +1230,7 @@ import Icon from "@iconify/svelte";
                         <Icon icon="lucide:git-branch" class="w-4 h-4" />
                     </button>
                 {/if}
-                {#if exposuresEnabled}
+                {#if exposuresEnabled && hasExposuresData}
                     <button
                         onclick={openExposuresView}
                         aria-label="Show exposures for {data.label}"
@@ -1195,7 +1245,7 @@ import Icon from "@iconify/svelte";
                     class="w-2 h-2 rounded-full bg-amber-500"
                     title="Draft mode (not bound to dbt model)"
                 ></div>
-                {#if exposuresEnabled}
+                {#if exposuresEnabled && hasExposuresData}
                     <button
                         onclick={openExposuresView}
                         aria-label="Show exposures for {data.label}"
@@ -1216,6 +1266,53 @@ import Icon from "@iconify/svelte";
             </button>
         </div>
     </div>
+
+    <!-- Entity Type Dropdown Menu -->
+    {#if showEntityTypeMenu}
+        <div
+            class="absolute z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px] text-sm transition-all duration-200 ease-in-out"
+            style="top: 45px; right: 10px;"
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
+            onfocusout={() => {
+                // Allow focus to move to menu items before closing
+                queueMicrotask(() => {
+                    const focused = document.activeElement;
+                    const container = focused?.closest('[role="menu"]');
+                    if (!container) {
+                        closeEntityTypeMenu();
+                    }
+                });
+            }}
+            role="menu"
+            tabindex="-1"
+        >
+            <button
+                onclick={() => setEntityType('fact')}
+                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-50 text-left transition-colors"
+                role="menuitem"
+            >
+                <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
+                <span class="text-gray-700">Set as Fact</span>
+            </button>
+            <button
+                onclick={() => setEntityType('dimension')}
+                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-green-50 text-left transition-colors"
+                role="menuitem"
+            >
+                <Icon icon="lucide:list" class="w-4 h-4 text-green-600" />
+                <span class="text-gray-700">Set as Dimension</span>
+            </button>
+            <button
+                onclick={() => setEntityType('unclassified')}
+                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left transition-colors"
+                role="menuitem"
+            >
+                <Icon icon="lucide:circle-dashed" class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">Set as Unclassified</span>
+            </button>
+        </div>
+    {/if}
 
     <!-- Body -->
     {#if !isCollapsed}
@@ -1349,7 +1446,7 @@ import Icon from "@iconify/svelte";
                                 onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                 onblur={handleTagInputBlur}
                                 placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                                 onclick={(e) => e.stopPropagation()}
                             />
                         {/if}
@@ -1610,7 +1707,7 @@ import Icon from "@iconify/svelte";
                                     onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                     onblur={handleTagInputBlur}
                                     placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                    class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                                     onclick={(e) => e.stopPropagation()}
                                 />
                             {/if}
@@ -1831,7 +1928,7 @@ import Icon from "@iconify/svelte";
                                 onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                 onblur={handleTagInputBlur}
                                 placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                                 onclick={(e) => e.stopPropagation()}
                             />
                         {/if}

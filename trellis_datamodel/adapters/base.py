@@ -50,6 +50,19 @@ class ModelSchema(TypedDict, total=False):
     file_path: str
 
 
+class Entity(TypedDict, total=False):
+    """Entity definition in the data model."""
+
+    id: str
+    label: str
+    description: Optional[str]
+    dbt_model: Optional[str]
+    additional_models: Optional[list[str]]
+    drafted_fields: Optional[list[dict[str, Any]]]
+    tags: Optional[list[str]]
+    entity_type: Optional[str]  # "fact", "dimension", or "unclassified"
+
+
 class Relationship(TypedDict, total=False):
     """Relationship inferred from framework metadata."""
 

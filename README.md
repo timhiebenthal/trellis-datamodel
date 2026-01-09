@@ -21,9 +21,85 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 - Organize entities based on subdirectories and tags from your pyhsical implementation.
 - Write description or tags back to your dbt-project
 
-**Two Ways of getting started** 
-- Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  
+**Two Ways of getting started**
+- Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML
 - Brownfield: document your existing data model by loading existing dbt models and utilize relationship tests to infer links
+
+## Dimensional Modeling Support
+
+Trellis includes native support for Kimball dimensional modeling, making it easier to design, visualize, and document star and snowflake schemas.
+
+### Features
+
+**Entity Classification**
+- Classify entities as **fact** (transaction tables), **dimension** (descriptive tables), or **unclassified**
+- Manual classification during entity creation or via context menu
+- Automatic inference from dbt model naming patterns (e.g., `dim_customer` → dimension, `fct_orders` → fact)
+- Configurable inference patterns in `trellis.yml`
+
+**Smart Default Positioning**
+- Facts are automatically placed in the center area of the canvas
+- Dimensions are placed in an outer ring around facts
+- Reduces manual layout effort for star/snowflake schemas
+- Can be re-applied anytime with "Auto-Layout" button
+
+**Kimball Bus Matrix View**
+- Visual matrix showing dimensions (rows) and facts (columns)
+- Checkmarks (✓) indicate dimension-fact connections
+- Filter by dimension name, fact name, or tags
+- Click cells to highlight relationships on the canvas
+- Dedicated view mode accessible from navigation bar
+
+### Configuration
+
+Enable dimensional modeling features in `trellis.yml`:
+
+```yaml
+modeling_style: dimensional_model  # Options: dimensional_model or entity_model (default)
+
+dimensional_modeling:
+  inference_patterns:
+    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables
+    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables
+```
+
+- `modeling_style: dimensional_model` enables all dimensional modeling features
+- `modeling_style: entity_model` (default) preserves current generic behavior
+- Inference patterns customize how entities are auto-classified from dbt model names
+
+### Entity Classification Workflow
+
+**Creating New Entities:**
+1. Click "Create Entity" button
+2. Fill in entity name and description
+3. Select entity type: Fact, Dimension, or Unclassified
+4. Entity is placed on canvas according to type (facts center, dimensions outer ring)
+
+**Loading Existing dbt Models:**
+1. System automatically infers entity types from naming patterns
+2. Entity type icons appear on nodes (database for fact, box for dimension)
+3. Override incorrect classifications via context menu: right-click → "Set as Fact/Dimension"
+
+**Bus Matrix Workflow:**
+1. Click "Bus Matrix" icon in navigation bar
+2. View dimensions (rows) and facts (columns)
+3. Checkmarks show connections between entities
+4. Filter to focus on specific dimensions, facts, or tags
+5. Click checkmark to highlight relationship on canvas
+
+### Use Cases
+
+**When to Use Dimensional Modeling:**
+- Designing data warehouses with star/snowflake schemas
+- Following Kimball methodology
+- Working with fact and dimension tables
+- Documenting data models for BI stakeholders
+
+**When to Use Entity Model:**
+- Generic data modeling (not strictly dimensional)
+- Mixed schema patterns
+- Legacy projects with inconsistent naming
+- Exploratory modeling
 
 ## Tutorial & Guide
 

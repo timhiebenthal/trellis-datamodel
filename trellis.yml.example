@@ -41,3 +41,36 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #exposures:
 #  enabled: false  # Set to true to enable Exposures view mode (opt-in)
 #  default_layout: dashboards-as-rows  # Default table orientation: dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
+
+# Dimensional modeling configuration (opt-in).
+# Use this feature if you want to enable Kimball dimensional modeling features such as:
+# - Entity classification (fact vs dimension)
+# - Smart default positioning for star/snowflake schemas
+# - Kimball Bus Matrix view mode
+# Default is entity_model for backward compatibility.
+#modeling_style: entity_model  # Options: dimensional_model or entity_model
+
+# Dimensional modeling inference patterns (used when modeling_style is dimensional_model).
+# Customize these patterns to match your dbt model naming conventions.
+#
+# When your dbt project loads, entities are automatically classified based on model names:
+# - Models matching dimension_prefix → classified as "dimension" (green icon)
+# - Models matching fact_prefix → classified as "fact" (blue icon)
+# - Unmatched models → classified as "unclassified" (gray icon)
+#
+# You can override any classification by clicking the entity type badge on entity nodes.
+# This inference only runs on initial load; manual changes are always preserved.
+#
+# Common naming conventions:
+# - Dimensions: dim_, d_, dim, dimension (e.g., dim_customer, d_employee)
+# - Facts: fct_, fact_, f (e.g., fct_orders, fact_sales, f_transactions)
+#
+# You can specify prefixes as either a string (single prefix) or a list (multiple prefixes, first is used):
+#   dimension_prefix: "d_"           # Single prefix as string
+#   dimension_prefix: ["dim_", "d_"]  # Multiple prefixes as list (first is used)
+#   fact_prefix: "f_"                # Single prefix as string
+#   fact_prefix: ["fct_", "fact_"]   # Multiple prefixes as list (first is used)
+#dimensional_modeling:
+#  inference_patterns:
+#    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables (string or list)
+#    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables (string or list)

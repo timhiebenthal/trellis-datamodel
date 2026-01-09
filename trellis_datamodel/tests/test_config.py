@@ -158,3 +158,162 @@ def test_exposures_invalid_layout_fallback(monkeypatch, tmp_path, capsys):
     assert cfg.EXPOSURES_ENABLED is True
     assert cfg.EXPOSURES_DEFAULT_LAYOUT == "dashboards-as-rows"
     assert "default_layout" in captured.out and "must be" in captured.out
+
+
+def test_bus_matrix_disabled_by_default_entity_model(monkeypatch, tmp_path):
+    """Bus Matrix off by default when modeling_style is entity_model (or unset)."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.MODELING_STYLE == "entity_model"
+    assert cfg.Bus_MATRIX_ENABLED is False
+
+
+def test_bus_matrix_enabled_with_dimensional_model(monkeypatch, tmp_path):
+    """Bus Matrix auto-on when modeling_style is dimensional_model."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.MODELING_STYLE == "dimensional_model"
+    assert cfg.Bus_MATRIX_ENABLED is True
+
+
+def test_bus_matrix_can_disable_in_dimensional_model(monkeypatch, tmp_path):
+    """Explicit bus_matrix.enabled: false can disable in dimensional mode."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        bus_matrix:
+          enabled: false
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.MODELING_STYLE == "dimensional_model"
+    assert cfg.Bus_MATRIX_ENABLED is False
+
+
+def test_bus_matrix_ignore_enable_when_entity_model(monkeypatch, tmp_path):
+    """bus_matrix.enabled: true is ignored when modeling_style is entity_model."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: entity_model
+        bus_matrix:
+          enabled: true
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.MODELING_STYLE == "entity_model"
+    assert cfg.Bus_MATRIX_ENABLED is False
+
+
+def test_inference_patterns_string_format(monkeypatch, tmp_path):
+    """Test that inference patterns support string format (converted to list)."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        dimensional_modeling:
+          inference_patterns:
+            dimension_prefix: "d_"
+            fact_prefix: "f_"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["f_"]
+
+
+def test_inference_patterns_list_format(monkeypatch, tmp_path):
+    """Test that inference patterns preserve list format."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        dimensional_modeling:
+          inference_patterns:
+            dimension_prefix: ["dim_", "d_"]
+            fact_prefix: ["fct_", "fact_"]
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim_", "d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]
+
+
+def test_inference_patterns_mixed_string_list(monkeypatch, tmp_path):
+    """Test that mixing string and list formats works."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        dimensional_modeling:
+          inference_patterns:
+            dimension_prefix: "d_"
+            fact_prefix: ["fct_", "fact_"]
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]
+
+
+def test_inference_patterns_defaults_when_missing(monkeypatch, tmp_path):
+    """Test that defaults are used when inference_patterns is missing."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim_", "d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]

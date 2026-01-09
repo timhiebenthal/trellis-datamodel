@@ -34,6 +34,18 @@ class TestGetConfigInfo:
         assert data["lineage_enabled"] is True
         assert data["lineage_layers"] == ["one", "two"]
 
+    def test_includes_bus_matrix_field(self, test_client, monkeypatch):
+        import sys
+        # Patch the actual config module in sys.modules to handle module reloads
+        config_module = sys.modules['trellis_datamodel.config']
+        monkeypatch.setattr(config_module, "Bus_MATRIX_ENABLED", True)
+
+        response = test_client.get("/api/config-info")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["bus_matrix_enabled"] is True
+
 
 class TestGetManifest:
     """Tests for GET /api/manifest endpoint."""

@@ -15,7 +15,7 @@
         type Edge,
     } from "@xyflow/svelte";
     import { setContext } from "svelte";
-    import { nodes, edges, viewMode } from "$lib/stores";
+    import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
@@ -39,7 +39,8 @@
         guidanceConfig,
         lineageEnabled = false,
         exposuresEnabled = false,
-    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean } = $props();
+        hasExposuresData = false,
+    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean; hasExposuresData?: boolean } = $props();
 
     const lineageEnabledStore = writable(lineageEnabled);
     setContext("lineageEnabled", lineageEnabledStore);
@@ -47,12 +48,19 @@
     const exposuresEnabledStore = writable(exposuresEnabled);
     setContext("exposuresEnabled", exposuresEnabledStore);
 
+    const hasExposuresDataStore = writable(hasExposuresData);
+    setContext("hasExposuresData", hasExposuresDataStore);
+
     $effect(() => {
         lineageEnabledStore.set(lineageEnabled);
     });
 
     $effect(() => {
         exposuresEnabledStore.set(exposuresEnabled);
+    });
+
+    $effect(() => {
+        hasExposuresDataStore.set(hasExposuresData);
     });
 
     // Wizard state
@@ -152,16 +160,28 @@
             10,
         );
 
+        // Calculate smart position based on entity type and modeling style
+        let position: { x: number; y: number };
+
+        if ($modelingStyle === "dimensional_model" && data.entity_type) {
+            // Smart positioning for dimensional modeling
+            position = calculateSmartPosition(data.entity_type);
+        } else {
+            // Default random positioning
+            position = {
+                x: 100 + Math.random() * 200,
+                y: 100 + Math.random() * 200,
+            };
+        }
+
         const newNode: Node = {
             id,
             type: "entity",
-            position: {
-                x: 100 + Math.random() * 200,
-                y: 100 + Math.random() * 200,
-            },
+            position,
             data: {
                 label,
                 description: data.description || "",
+                entity_type: data.entity_type || "unclassified",
                 width: 280,
                 panelHeight: 200,
                 collapsed: false,
@@ -169,6 +189,44 @@
             zIndex: maxZIndex + 1, // Place on top of all other nodes
         };
         $nodes = [...$nodes, newNode];
+    }
+
+    function calculateSmartPosition(entityType: "fact" | "dimension" | "unclassified"): { x: number; y: number } {
+        // Calculate canvas center (average of all existing entity positions, or default center)
+        const entityNodes = $nodes.filter((n) => n.type === "entity");
+        let centerX = 500;
+        let centerY = 400;
+
+        if (entityNodes.length > 0) {
+            const xPositions = entityNodes.map((n) => n.position.x);
+            const yPositions = entityNodes.map((n) => n.position.y);
+            centerX = (Math.min(...xPositions) + Math.max(...xPositions)) / 2;
+            centerY = (Math.min(...yPositions) + Math.max(...yPositions)) / 2;
+        }
+
+        if (entityType === "fact") {
+            // Place in center area with random offset
+            const offsetX = (Math.random() - 0.5) * 400; // -200 to +200
+            const offsetY = (Math.random() - 0.5) * 400;
+            return {
+                x: centerX + offsetX,
+                y: centerY + offsetY,
+            };
+        } else if (entityType === "dimension") {
+            // Place in outer ring around center
+            const radius = 500 + Math.random() * 300; // 500-800px from center
+            const angle = Math.random() * 2 * Math.PI; // Random angle around circle
+            return {
+                x: centerX + Math.cos(angle) * radius,
+                y: centerY + Math.sin(angle) * radius,
+            };
+        } else {
+            // Unclassified - use default positioning
+            return {
+                x: 100 + Math.random() * 200,
+                y: 100 + Math.random() * 200,
+            };
+        }
     }
 
     function handleWizardComplete(data: EntityWizardData) {
@@ -238,7 +296,7 @@
         for (const group of groups) {
             // Skip groups that have been manually resized
             if (group.data?.manuallyResized) continue;
-            
+
             const children = $nodes.filter(
                 (n) => n.parentId === group.id && !n.hidden,
             );
@@ -399,46 +457,46 @@
                 </div>
             </div>
         {/if}
-
-        <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
-        {#if $viewMode === "conceptual" || $viewMode === "logical"}
-            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
-                <button
-                    class="flex bg-white rounded-full border-[3px] border-primary-600 shadow-lg relative overflow-hidden transition-all duration-200"
-                    style="box-shadow: 0 0 8px rgba(13, 148, 136, 0.4), 0 0 16px rgba(13, 148, 136, 0.25);"
-                >
-                    <!-- Conceptual Option -->
-                    <div
-                        class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 cursor-pointer"
-                        class:text-primary-600={$viewMode === "conceptual"}
-                        class:text-gray-500={$viewMode !== "conceptual"}
-                        class:hover:text-gray-900={$viewMode !== "conceptual"}
-                        onclick={() => ($viewMode = "conceptual")}
-                        title="Conceptual View"
-                    >
-                        <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
-                        Conceptual
-                    </div>
-
-                    <!-- Vertical Divider -->
-                    <div class="w-[1px] bg-gray-200"></div>
-
-                    <!-- Logical Option -->
-                    <div
-                        class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 cursor-pointer"
-                        class:text-primary-600={$viewMode === "logical"}
-                        class:text-gray-500={$viewMode !== "logical"}
-                        class:hover:text-gray-900={$viewMode !== "logical"}
-                        onclick={() => ($viewMode = "logical")}
-                        title="Logical View"
-                    >
-                        <Icon icon="lucide:database" class="w-3.5 h-3.5" />
-                        Logical
-                    </div>
-                </button>
-            </div>
-        {/if}
     </SvelteFlow>
+
+    <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
+    {#if $viewMode === "conceptual" || $viewMode === "logical"}
+        <div
+            class="absolute bottom-14 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto inline-flex items-center bg-white rounded-full border border-primary-500 shadow-md relative overflow-hidden transition-all duration-150 px-1 w-auto"
+            style="box-shadow: 0 0 6px rgba(13, 148, 136, 0.25);"
+        >
+            <!-- Conceptual Option -->
+            <button
+                type="button"
+                class="px-3 py-2 text-sm font-semibold flex items-center gap-2 transition-all duration-150 border-0 bg-transparent cursor-pointer"
+                class:text-primary-600={$viewMode === "conceptual"}
+                class:text-gray-500={$viewMode !== "conceptual"}
+                class:hover:text-gray-900={$viewMode !== "conceptual"}
+                onclick={() => ($viewMode = "conceptual")}
+                title="Conceptual View"
+            >
+                <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
+                Conceptual
+            </button>
+
+            <!-- Vertical Divider -->
+            <div class="w-[1px] h-7 bg-gray-200"></div>
+
+            <!-- Logical Option -->
+            <button
+                type="button"
+                class="px-3 py-2 text-sm font-semibold flex items-center gap-2 transition-all duration-150 border-0 bg-transparent cursor-pointer"
+                class:text-primary-600={$viewMode === "logical"}
+                class:text-gray-500={$viewMode !== "logical"}
+                class:hover:text-gray-900={$viewMode !== "logical"}
+                onclick={() => ($viewMode = "logical")}
+                title="Logical View"
+            >
+                <Icon icon="lucide:database" class="w-3.5 h-3.5" />
+                Logical
+            </button>
+        </div>
+    {/if}
 
     <!-- Entity Creation Wizard -->
     <EntityCreationWizard

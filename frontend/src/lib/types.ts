@@ -47,6 +47,7 @@ export interface EntityData {
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
+    entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
     _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
@@ -68,6 +69,7 @@ export interface Entity {
     panel_height?: number;
     collapsed?: boolean;
     tags?: string[];
+    entity_type?: "fact" | "dimension" | "unclassified";
 }
 
 /**
@@ -95,6 +97,7 @@ export interface DataModel {
     version: number;
     entities: Entity[];
     relationships: Relationship[];
+    domains?: Domain[];
 }
 
 export interface ConfigStatus {
@@ -119,6 +122,7 @@ export interface GuidanceConfig {
 export interface EntityWizardData {
     label: string;
     description: string;
+    entity_type?: "fact" | "dimension" | "unclassified";
 }
 
 export interface ConfigInfo {
@@ -142,6 +146,8 @@ export interface ConfigInfo {
     lineage_layers?: string[];
     exposures_enabled?: boolean;
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
+    bus_matrix_enabled?: boolean;
+    modeling_style?: 'dimensional_model' | 'entity_model';
 }
 
 export interface FieldDragState {
@@ -218,4 +224,11 @@ export interface LineageResponse {
     nodes: LineageNode[];
     edges: LineageEdge[];
     metadata: LineageMetadata;
+}
+
+export interface Domain {
+    id: string;
+    label: string;
+    color: string;
+    entities: string[];
 }
