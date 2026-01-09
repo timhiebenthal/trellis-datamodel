@@ -26,6 +26,12 @@ async def get_bus_matrix(
         - connections: List of dimension-fact connections derived from relationships
     """
     try:
+        # Bus Matrix is only available in dimensional modeling mode
+        if cfg.MODELING_STYLE != "dimensional_model" or not cfg.Bus_MATRIX_ENABLED:
+            raise HTTPException(
+                status_code=404, detail="Bus Matrix is disabled for entity_model"
+            )
+
         if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
             print("Bus Matrix: Data model path not found or doesn't exist")
             return {"dimensions": [], "facts": [], "connections": []}

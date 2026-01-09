@@ -160,8 +160,8 @@ def test_exposures_invalid_layout_fallback(monkeypatch, tmp_path, capsys):
     assert "default_layout" in captured.out and "must be" in captured.out
 
 
-def test_bus_matrix_enabled_by_default(monkeypatch, tmp_path):
-    """Test that Bus Matrix is enabled by default (no config section)."""
+def test_bus_matrix_disabled_by_default_entity_model(monkeypatch, tmp_path):
+    """Bus Matrix off by default when modeling_style is entity_model (or unset)."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -172,46 +172,29 @@ def test_bus_matrix_enabled_by_default(monkeypatch, tmp_path):
 
     cfg.load_config(str(config_path))
 
-    # With no bus_matrix section and modeling_style not set, should be enabled by default
-    assert cfg.Bus_MATRIX_ENABLED is True
-
-
-def test_bus_matrix_disabled_with_explicit_false(monkeypatch, tmp_path):
-    """Test that Bus Matrix can be disabled with explicit bus_matrix.enabled: false."""
-    _prepare_config(monkeypatch)
-    config_path = _write_config(
-        tmp_path,
-        """
-        dbt_project_path: .
-        bus_matrix:
-          enabled: false
-        """,
-    )
-
-    cfg.load_config(str(config_path))
-
+    assert cfg.MODELING_STYLE == "entity_model"
     assert cfg.Bus_MATRIX_ENABLED is False
 
 
-def test_bus_matrix_enabled_with_explicit_true(monkeypatch, tmp_path):
-    """Test that Bus Matrix can be enabled with explicit bus_matrix.enabled: true."""
+def test_bus_matrix_enabled_with_dimensional_model(monkeypatch, tmp_path):
+    """Bus Matrix auto-on when modeling_style is dimensional_model."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
         """
         dbt_project_path: .
-        bus_matrix:
-          enabled: true
+        modeling_style: dimensional_model
         """,
     )
 
     cfg.load_config(str(config_path))
 
+    assert cfg.MODELING_STYLE == "dimensional_model"
     assert cfg.Bus_MATRIX_ENABLED is True
 
 
-def test_bus_matrix_disabled_with_entity_model(monkeypatch, tmp_path):
-    """Test that Bus Matrix can still be disabled with explicit bus_matrix.enabled: false even with dimensional_model."""
+def test_bus_matrix_can_disable_in_dimensional_model(monkeypatch, tmp_path):
+    """Explicit bus_matrix.enabled: false can disable in dimensional mode."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -225,20 +208,24 @@ def test_bus_matrix_disabled_with_entity_model(monkeypatch, tmp_path):
 
     cfg.load_config(str(config_path))
 
+    assert cfg.MODELING_STYLE == "dimensional_model"
     assert cfg.Bus_MATRIX_ENABLED is False
 
 
-def test_bus_matrix_disabled_with_entity_model(monkeypatch, tmp_path):
-    """Test that Bus Matrix is disabled when modeling_style is entity_model."""
+def test_bus_matrix_ignore_enable_when_entity_model(monkeypatch, tmp_path):
+    """bus_matrix.enabled: true is ignored when modeling_style is entity_model."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
         """
         dbt_project_path: .
         modeling_style: entity_model
+        bus_matrix:
+          enabled: true
         """,
     )
 
     cfg.load_config(str(config_path))
 
+    assert cfg.MODELING_STYLE == "entity_model"
     assert cfg.Bus_MATRIX_ENABLED is False

@@ -344,25 +344,21 @@ def load_config(config_path: Optional[str] = None) -> None:
             print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
             MODELING_STYLE = "entity_model"
 
-        # 14. Load bus matrix configuration (disabled for explicit entity_model, enabled otherwise)
-        # Bus matrix is specific to dimensional modeling (Kimball methodology)
-        # If modeling_style is explicitly set to "entity_model" in config, disable Bus Matrix
-        # Otherwise, enable it by default (for backward compatibility and dimensional_model)
-        modeling_style_in_config = "modeling_style" in config
-        if modeling_style_in_config and MODELING_STYLE == "entity_model":
-            Bus_MATRIX_ENABLED = False
-        else:
-            # Enable for dimensional_model or when not explicitly set
-            Bus_MATRIX_ENABLED = True
-            bus_matrix_config = config.get("bus_matrix")
-            if isinstance(bus_matrix_config, dict):
-                Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
+        # 14. Load bus matrix configuration (driven by modeling_style)
+        # Bus Matrix is on for dimensional_model, off for entity_model.
+        # Allow explicit override only when dimensional_model is selected.
+        Bus_MATRIX_ENABLED = MODELING_STYLE == "dimensional_model"
+        bus_matrix_config = config.get("bus_matrix")
+        if isinstance(bus_matrix_config, dict) and MODELING_STYLE == "dimensional_model":
+            # Honor explicit override in dimensional mode
+            Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
 
         # 15. Load dimensional modeling configuration
         DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()
+        # Enable inference based solely on modeling_style; overrides still applied below
+        DIMENSIONAL_MODELING_CONFIG.enabled = MODELING_STYLE == "dimensional_model"
         dimensional_config = config.get("dimensional_modeling")
         if isinstance(dimensional_config, dict):
-            DIMENSIONAL_MODELING_CONFIG.enabled = MODELING_STYLE == "dimensional_model"
             inference_patterns = dimensional_config.get("inference_patterns")
             if isinstance(inference_patterns, dict):
                 dimension_prefixes = inference_patterns.get("dimension_prefixes")
