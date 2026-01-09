@@ -229,3 +229,91 @@ def test_bus_matrix_ignore_enable_when_entity_model(monkeypatch, tmp_path):
 
     assert cfg.MODELING_STYLE == "entity_model"
     assert cfg.Bus_MATRIX_ENABLED is False
+
+
+def test_inference_patterns_string_format(monkeypatch, tmp_path):
+    """Test that inference patterns support string format (converted to list)."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        dimensional_modeling:
+          inference_patterns:
+            dimension_prefixes: "d_"
+            fact_prefixes: "f_"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["f_"]
+
+
+def test_inference_patterns_list_format(monkeypatch, tmp_path):
+    """Test that inference patterns preserve list format."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        dimensional_modeling:
+          inference_patterns:
+            dimension_prefixes: ["dim_", "d_"]
+            fact_prefixes: ["fct_", "fact_"]
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["dim_", "d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["fct_", "fact_"]
+
+
+def test_inference_patterns_mixed_string_list(monkeypatch, tmp_path):
+    """Test that mixing string and list formats works."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        dimensional_modeling:
+          inference_patterns:
+            dimension_prefixes: "d_"
+            fact_prefixes: ["fct_", "fact_"]
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["fct_", "fact_"]
+
+
+def test_inference_patterns_defaults_when_missing(monkeypatch, tmp_path):
+    """Test that defaults are used when inference_patterns is missing."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["dim_", "d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["fct_", "fact_"]

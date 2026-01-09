@@ -362,11 +362,19 @@ def load_config(config_path: Optional[str] = None) -> None:
             inference_patterns = dimensional_config.get("inference_patterns")
             if isinstance(inference_patterns, dict):
                 dimension_prefixes = inference_patterns.get("dimension_prefixes")
-                if isinstance(dimension_prefixes, list):
-                    DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = dimension_prefixes
+                if dimension_prefixes:
+                    # Support both string and list formats
+                    if isinstance(dimension_prefixes, str):
+                        DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = [dimension_prefixes]
+                    elif isinstance(dimension_prefixes, list):
+                        DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = dimension_prefixes
                 fact_prefixes = inference_patterns.get("fact_prefixes")
-                if isinstance(fact_prefixes, list):
-                    DIMENSIONAL_MODELING_CONFIG.fact_prefixes = fact_prefixes
+                if fact_prefixes:
+                    # Support both string and list formats
+                    if isinstance(fact_prefixes, str):
+                        DIMENSIONAL_MODELING_CONFIG.fact_prefixes = [fact_prefixes]
+                    elif isinstance(fact_prefixes, list):
+                        DIMENSIONAL_MODELING_CONFIG.fact_prefixes = fact_prefixes
 
     except Exception as e:
         print(f"Error loading config: {e}")

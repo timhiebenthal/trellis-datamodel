@@ -64,7 +64,13 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 # Common naming conventions:
 # - Dimensions: dim_, d_, dim, dimension (e.g., dim_customer, d_employee)
 # - Facts: fct_, fact_, f (e.g., fct_orders, fact_sales, f_transactions)
+#
+# You can specify prefixes as either a string (single prefix) or a list (multiple prefixes, first is used):
+#   dimension_prefixes: "d_"           # Single prefix as string
+#   dimension_prefixes: ["dim_", "d_"]  # Multiple prefixes as list (first is used)
+#   fact_prefixes: "f_"                # Single prefix as string
+#   fact_prefixes: ["fct_", "fact_"]   # Multiple prefixes as list (first is used)
 #dimensional_modeling:
 #  inference_patterns:
-#    dimension_prefixes: ["dim_", "d_"]  # Prefixes for dimension tables
-#    fact_prefixes: ["fct_", "fact_"]  # Prefixes for fact tables
+#    dimension_prefixes: ["dim_", "d_"]  # Prefixes for dimension tables (string or list)
+#    fact_prefixes: ["fct_", "fact_"]  # Prefixes for fact tables (string or list)
