@@ -234,6 +234,7 @@
                 lineageEnabled = info.lineage_enabled ?? false;
                 exposuresEnabled = info.exposures_enabled ?? false;
                 exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
+                $modelingStyle = info.modeling_style ?? 'entity_model';
             }
         } catch (e) {
             console.error(e);
@@ -524,6 +525,7 @@
         exposuresEnabled = info?.exposures_enabled ?? false;
         exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
         busMatrixEnabled = info?.bus_matrix_enabled ?? false;
+        $modelingStyle = info?.modeling_style ?? 'entity_model';
 
                 // Check if exposures data exists
                 if (exposuresEnabled) {

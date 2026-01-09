@@ -95,8 +95,9 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
     """
     Find config file in order of priority:
     1. CLI override (--config)
-    2. trellis.yml in current directory
-    3. config.yml in current directory (fallback)
+    2. TRELLIS_CONFIG_PATH environment variable
+    3. trellis.yml in current directory
+    4. config.yml in current directory (fallback)
 
     Returns:
         Path to config file or None if not found
@@ -105,6 +106,11 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
         if os.path.exists(config_override):
             return os.path.abspath(config_override)
         return None
+
+    # Check for TRELLIS_CONFIG_PATH environment variable (used in tests)
+    env_config = os.environ.get("TRELLIS_CONFIG_PATH")
+    if env_config and os.path.exists(env_config):
+        return os.path.abspath(env_config)
 
     cwd = os.getcwd()
 
@@ -126,7 +132,8 @@ def load_config(config_path: Optional[str] = None) -> None:
     global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, DIMENSIONAL_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
-    if _TEST_DIR:
+    # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
+    if _TEST_DIR and not os.environ.get("TRELLIS_CONFIG_PATH"):
         return
 
     # Find config file

@@ -147,6 +147,7 @@ export interface ConfigInfo {
     exposures_enabled?: boolean;
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
     bus_matrix_enabled?: boolean;
+    modeling_style?: 'dimensional_model' | 'entity_model';
 }
 
 export interface FieldDragState {

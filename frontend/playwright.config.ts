@@ -8,6 +8,10 @@ const __dirname = path.dirname(__filename);
 // Path to test data file (isolated from production data)
 const TEST_DATA_MODEL_PATH = path.resolve(__dirname, 'tests/test_data_model.yml');
 
+// Path to test config file (created by global-setup.ts)
+const TEST_CONFIG_DIR = path.resolve(__dirname, 'tests/.trellis-test');
+const TEST_CONFIG_PATH = path.join(TEST_CONFIG_DIR, 'trellis.yml');
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -54,7 +58,7 @@ export default defineConfig({
     webServer: [
         {
             // Backend with test data file
-            command: `cd ${path.resolve(__dirname, '..')} && PYTHONPATH=. DATAMODEL_TEST_DIR=${path.dirname(TEST_DATA_MODEL_PATH)} DATAMODEL_DATA_MODEL_PATH=${TEST_DATA_MODEL_PATH} uv run python -m trellis_datamodel.cli run --port 8000 --no-browser`,
+            command: `cd ${path.resolve(__dirname, '..')} && PYTHONPATH=. DATAMODEL_DATA_MODEL_PATH=${TEST_DATA_MODEL_PATH} TRELLIS_CONFIG_PATH=${TEST_CONFIG_PATH} uv run python -m trellis_datamodel.cli run --port 8000 --no-browser`,
             url: 'http://localhost:8000/health',
             reuseExistingServer: !process.env.CI,
             timeout: 30000,
