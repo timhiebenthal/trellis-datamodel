@@ -332,18 +332,17 @@ def load_config(config_path: Optional[str] = None) -> None:
                 print("Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'.")
 
         # 13. Load modeling style configuration
-        MODELING_STYLE = config.get("modeling_style", "dimensional_model")
+        MODELING_STYLE = config.get("modeling_style", "entity_model")
         if MODELING_STYLE not in ["dimensional_model", "entity_model"]:
-            print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'dimensional_model'.")
-            MODELING_STYLE = "dimensional_model"
+            print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
+            MODELING_STYLE = "entity_model"
 
-        # 14. Load bus matrix configuration (enabled for dimensional_model, disabled for entity_model by default)
-        # Can be explicitly overridden with bus_matrix.enabled
-        Bus_MATRIX_ENABLED = MODELING_STYLE == "dimensional_model"
+        # 14. Load bus matrix configuration (enabled by default, can be disabled with bus_matrix.enabled: false)
+        Bus_MATRIX_ENABLED = True
         
         bus_matrix_config = config.get("bus_matrix")
         if isinstance(bus_matrix_config, dict):
-            Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", Bus_MATRIX_ENABLED))
+            Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
 
         # 15. Load dimensional modeling configuration
         DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()

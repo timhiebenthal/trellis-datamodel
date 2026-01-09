@@ -1180,7 +1180,7 @@ import Icon from "@iconify/svelte";
             {#if data.entity_type}
                 <button
                     type="button"
-                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 bg-transparent cursor-pointer"
+                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 cursor-pointer"
                     class:bg-blue-100={data.entity_type === 'fact'}
                     class:bg-green-100={data.entity_type === 'dimension'}
                     class:bg-gray-100={data.entity_type === 'unclassified'}
