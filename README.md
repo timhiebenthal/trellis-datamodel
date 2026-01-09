@@ -59,8 +59,8 @@ modeling_style: dimensional_model  # Options: dimensional_model or entity_model 
 
 dimensional_modeling:
   inference_patterns:
-    dimension_prefixes: ["dim_", "d_"]  # Prefixes for dimension tables
-    fact_prefixes: ["fct_", "fact_"]  # Prefixes for fact tables
+    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables
+    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables
 ```
 
 - `modeling_style: dimensional_model` enables all dimensional modeling features

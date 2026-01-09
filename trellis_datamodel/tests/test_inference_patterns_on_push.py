@@ -14,8 +14,8 @@ class TestInferencePatternsOnPush:
     def setup_config(self):
         """Ensure dimensional modeling config is loaded."""
         cfg.DIMENSIONAL_MODELING_CONFIG.enabled = True
-        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = ["dim_", "d_"]
-        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes = ["fct_", "fact_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = ["dim_", "d_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fct_", "fact_"]
         yield
         cfg.DIMENSIONAL_MODELING_CONFIG.enabled = False
 
@@ -138,8 +138,8 @@ class TestInferencePatternsOnPush:
 
     def test_custom_prefixes_from_config(self, tmp_path):
         """Test that custom prefixes from config are respected."""
-        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = ["d"]
-        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes = ["f"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = ["d"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["f"]
         
         adapter = DbtCoreAdapter(
             manifest_path=str(tmp_path / "manifest.json"),
@@ -166,8 +166,8 @@ class TestInferencePatternsOnPush:
 
     def test_first_prefix_from_list_used(self, tmp_path):
         """Test that first prefix from the list is used."""
-        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = ["dim_", "d_"]
-        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes = ["fct_", "fact_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = ["dim_", "d_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fct_", "fact_"]
         
         adapter = DbtCoreAdapter(
             manifest_path=str(tmp_path / "manifest.json"),

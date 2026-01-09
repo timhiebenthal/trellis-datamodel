@@ -241,17 +241,17 @@ def test_inference_patterns_string_format(monkeypatch, tmp_path):
         modeling_style: dimensional_model
         dimensional_modeling:
           inference_patterns:
-            dimension_prefixes: "d_"
-            fact_prefixes: "f_"
+            dimension_prefix: "d_"
+            fact_prefix: "f_"
         """,
     )
 
     cfg.load_config(str(config_path))
 
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["d_"]
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["f_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["f_"]
 
 
 def test_inference_patterns_list_format(monkeypatch, tmp_path):
@@ -264,17 +264,17 @@ def test_inference_patterns_list_format(monkeypatch, tmp_path):
         modeling_style: dimensional_model
         dimensional_modeling:
           inference_patterns:
-            dimension_prefixes: ["dim_", "d_"]
-            fact_prefixes: ["fct_", "fact_"]
+            dimension_prefix: ["dim_", "d_"]
+            fact_prefix: ["fct_", "fact_"]
         """,
     )
 
     cfg.load_config(str(config_path))
 
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["dim_", "d_"]
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["fct_", "fact_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim_", "d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]
 
 
 def test_inference_patterns_mixed_string_list(monkeypatch, tmp_path):
@@ -287,17 +287,17 @@ def test_inference_patterns_mixed_string_list(monkeypatch, tmp_path):
         modeling_style: dimensional_model
         dimensional_modeling:
           inference_patterns:
-            dimension_prefixes: "d_"
-            fact_prefixes: ["fct_", "fact_"]
+            dimension_prefix: "d_"
+            fact_prefix: ["fct_", "fact_"]
         """,
     )
 
     cfg.load_config(str(config_path))
 
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["d_"]
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["fct_", "fact_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]
 
 
 def test_inference_patterns_defaults_when_missing(monkeypatch, tmp_path):
@@ -313,7 +313,7 @@ def test_inference_patterns_defaults_when_missing(monkeypatch, tmp_path):
 
     cfg.load_config(str(config_path))
 
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes == ["dim_", "d_"]
-    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes, list)
-    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes == ["fct_", "fact_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim_", "d_"]
+    assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]

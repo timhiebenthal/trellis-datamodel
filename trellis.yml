@@ -64,3 +64,8 @@ entity_creation_guidance:
 exposures:
   enabled: true
   default_layout: "dashboards-as-rows"
+
+dimensional_modeling:
+ inference_patterns:
+   dimension_prefix: "dim_"  # Prefixes for dimension tables
+   fact_prefix: "fct_"  # Prefixes for fact tables

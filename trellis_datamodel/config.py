@@ -29,8 +29,8 @@ class GuidanceConfig:
 class DimensionalModelingConfig:
     """Configuration for dimensional modeling features."""
     enabled: bool = False
-    dimension_prefixes: list[str] = field(default_factory=lambda: ["dim_", "d_"])
-    fact_prefixes: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
+    dimension_prefix: list[str] = field(default_factory=lambda: ["dim_", "d_"])
+    fact_prefix: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
 
 
 # Global configuration objects (set by load_config)
@@ -361,20 +361,20 @@ def load_config(config_path: Optional[str] = None) -> None:
         if isinstance(dimensional_config, dict):
             inference_patterns = dimensional_config.get("inference_patterns")
             if isinstance(inference_patterns, dict):
-                dimension_prefixes = inference_patterns.get("dimension_prefixes")
-                if dimension_prefixes:
+                dimension_prefix = inference_patterns.get("dimension_prefix")
+                if dimension_prefix:
                     # Support both string and list formats
-                    if isinstance(dimension_prefixes, str):
-                        DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = [dimension_prefixes]
-                    elif isinstance(dimension_prefixes, list):
-                        DIMENSIONAL_MODELING_CONFIG.dimension_prefixes = dimension_prefixes
-                fact_prefixes = inference_patterns.get("fact_prefixes")
-                if fact_prefixes:
+                    if isinstance(dimension_prefix, str):
+                        DIMENSIONAL_MODELING_CONFIG.dimension_prefix = [dimension_prefix]
+                    elif isinstance(dimension_prefix, list):
+                        DIMENSIONAL_MODELING_CONFIG.dimension_prefix = dimension_prefix
+                fact_prefix = inference_patterns.get("fact_prefix")
+                if fact_prefix:
                     # Support both string and list formats
-                    if isinstance(fact_prefixes, str):
-                        DIMENSIONAL_MODELING_CONFIG.fact_prefixes = [fact_prefixes]
-                    elif isinstance(fact_prefixes, list):
-                        DIMENSIONAL_MODELING_CONFIG.fact_prefixes = fact_prefixes
+                    if isinstance(fact_prefix, str):
+                        DIMENSIONAL_MODELING_CONFIG.fact_prefix = [fact_prefix]
+                    elif isinstance(fact_prefix, list):
+                        DIMENSIONAL_MODELING_CONFIG.fact_prefix = fact_prefix
 
     except Exception as e:
         print(f"Error loading config: {e}")
@@ -402,7 +402,7 @@ def print_config() -> None:
     print(f"Bus Matrix enabled: {Bus_MATRIX_ENABLED}")
     if DIMENSIONAL_MODELING_CONFIG.enabled:
         print(f"Dimensional modeling enabled: {DIMENSIONAL_MODELING_CONFIG.enabled}")
-        print(f"Dimension prefixes: {DIMENSIONAL_MODELING_CONFIG.dimension_prefixes}")
-        print(f"Fact prefixes: {DIMENSIONAL_MODELING_CONFIG.fact_prefixes}")
+        print(f"Dimension prefixes: {DIMENSIONAL_MODELING_CONFIG.dimension_prefix}")
+        print(f"Fact prefixes: {DIMENSIONAL_MODELING_CONFIG.fact_prefix}")
     if DBT_COMPANY_DUMMY_PATH:
         print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")

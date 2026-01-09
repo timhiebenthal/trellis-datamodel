@@ -134,17 +134,17 @@ class DbtCoreAdapter:
             return entity_id
         
         # Apply prefix based on entity type
-        if entity_type == "dimension" and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes:
-            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes[0]
+        if entity_type == "dimension" and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix[0]
             # Check if entity_id already has a prefix
-            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes:
+            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
                 if entity_id.lower().startswith(existing_prefix.lower()):
                     return entity_id  # Already has a prefix
             return f"{prefix}{entity_id}"
-        elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes:
-            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes[0]
+        elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix[0]
             # Check if entity_id already has a prefix
-            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes:
+            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
                 if entity_id.lower().startswith(existing_prefix.lower()):
                     return entity_id  # Already has a prefix
             return f"{prefix}{entity_id}"
@@ -1115,14 +1115,14 @@ class DbtCoreAdapter:
             entity_id = model_name_to_id.get(model_name, model_name)
 
             # Check dimension prefixes first (case-insensitive)
-            for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefixes:
+            for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
                 if model_name.lower().startswith(prefix.lower()):
                     entity_types[entity_id] = "dimension"
                     break
 
             # If not a dimension, check fact prefixes
             if entity_id not in entity_types:
-                for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefixes:
+                for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
                     if model_name.lower().startswith(prefix.lower()):
                         entity_types[entity_id] = "fact"
                         break

@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0b1]
 
 ### Added
 - Added native support for Kimball dimensional modeling with entity classification (fact/dimension/unclassified) and smart default positioning for star/snowflake schemas.
 - Added `modeling_style` configuration option to `trellis.yml` with values `dimensional_model` and `entity_model` (default for backward compatibility).
-- Added configurable inference patterns for automatic entity type classification from dbt model naming: `dimensional_modeling.inference_patterns` with `dimension_prefixes` and `fact_prefixes`.
+- Added configurable inference patterns for automatic entity type classification from dbt model naming: `dimensional_modeling.inference_patterns` with `dimension_prefix` and `fact_prefix`.
 - Added Kimball Bus Matrix view mode displaying dimensions as rows and facts as columns with checkmarks for connections.
 - Added Bus Matrix filter controls for dimensions, facts, and tags with real-time filtering.
 - Added entity type indicators (icons/badges) on entity nodes with color coding: blue for fact, green for dimension, gray for unclassified.
