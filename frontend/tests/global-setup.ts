@@ -16,6 +16,8 @@ async function globalSetup() {
     }
 
     const TEST_CONFIG_PATH = path.join(CONFIG_DIR, 'trellis.yml');
+
+    // Write test config file
     const TEST_CONFIG = `framework: dbt-core
 dbt_project_path: ${path.resolve(__dirname, '..', 'dbt_concept')}
 data_model_path: ${TEST_DATA_MODEL_PATH}
@@ -29,13 +31,11 @@ bus_matrix:
 # exposures:
 #   enabled: true
 `;
-    
-    // Write test config file
+
     fs.writeFileSync(TEST_CONFIG_PATH, TEST_CONFIG);
-    
+
     // Set environment variable for backend to use test config
     process.env['TRELLIS_CONFIG_PATH'] = TEST_CONFIG_PATH;
 }
 
 export default globalSetup;
-

@@ -162,7 +162,7 @@ def test_client(mock_manifest):
     if "trellis_datamodel.config" in sys.modules:
         cfg_module = sys.modules["trellis_datamodel.config"]
         # Reset to test defaults in case of module reload
-        cfg_module.LINEAGE_ENABLED = False
+        # cfg_module.LINEAGE_ENABLED = False  # Let it stay True from test config
         cfg_module.LINEAGE_LAYERS = []
         cfg_module.EXPOSURES_ENABLED = False
         cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"

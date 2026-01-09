@@ -133,7 +133,7 @@ def load_config(config_path: Optional[str] = None) -> None:
 
     # Skip loading config file in test mode (paths already set via environment)
     # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
-    if _TEST_DIR and not os.environ.get("TRELLIS_CONFIG_PATH"):
+    if os.environ.get("DATAMODEL_TEST_DIR") and not os.environ.get("TRELLIS_CONFIG_PATH"):
         return
 
     # Find config file
