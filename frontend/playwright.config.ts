@@ -58,7 +58,7 @@ export default defineConfig({
     webServer: [
         {
             // Backend with test data file
-            command: `cd ${path.resolve(__dirname, '..')} && PYTHONPATH=. DATAMODEL_DATA_MODEL_PATH=${TEST_DATA_MODEL_PATH} TRELLIS_CONFIG_PATH=${TEST_CONFIG_PATH} uv run python -m trellis_datamodel.cli run --port 8000 --no-browser`,
+            command: `cd ${path.resolve(__dirname, '..')} && PYTHONPATH=. TRELLIS_CONFIG_PATH=${TEST_CONFIG_PATH} uv run python -m trellis_datamodel.cli run --port 8000 --no-browser`,
             url: 'http://localhost:8000/health',
             reuseExistingServer: !process.env.CI,
             timeout: 30000,
