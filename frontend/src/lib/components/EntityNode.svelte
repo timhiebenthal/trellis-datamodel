@@ -1446,7 +1446,7 @@ import Icon from "@iconify/svelte";
                                 onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                 onblur={handleTagInputBlur}
                                 placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                                 onclick={(e) => e.stopPropagation()}
                             />
                         {/if}
@@ -1707,7 +1707,7 @@ import Icon from "@iconify/svelte";
                                     onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                     onblur={handleTagInputBlur}
                                     placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                    class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                                     onclick={(e) => e.stopPropagation()}
                                 />
                             {/if}
@@ -1928,7 +1928,7 @@ import Icon from "@iconify/svelte";
                                 onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
                                 onblur={handleTagInputBlur}
                                 placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                                 onclick={(e) => e.stopPropagation()}
                             />
                         {/if}
