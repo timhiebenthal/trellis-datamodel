@@ -19,7 +19,7 @@ async function globalSetup() {
 
     // Write test config file
     const TEST_CONFIG = `framework: dbt-core
-dbt_project_path: ${path.resolve(__dirname, '..', 'dbt_concept')}
+dbt_project_path: ${path.resolve(__dirname, '..', '..', 'dbt_concept')}
 data_model_path: ${TEST_DATA_MODEL_PATH}
 modeling_style: dimensional_model
 lineage:
