@@ -461,12 +461,14 @@
 
     <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
     {#if $viewMode === "conceptual" || $viewMode === "logical"}
-        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto flex bg-white rounded-full border-[3px] border-primary-600 shadow-lg relative overflow-hidden transition-all duration-200"
-            style="box-shadow: 0 0 8px rgba(13, 148, 136, 0.4), 0 0 16px rgba(13, 148, 136, 0.25);">
+        <div
+            class="absolute bottom-14 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto inline-flex items-center bg-white rounded-full border border-primary-500 shadow-md relative overflow-hidden transition-all duration-150 px-1 w-auto"
+            style="box-shadow: 0 0 6px rgba(13, 148, 136, 0.25);"
+        >
             <!-- Conceptual Option -->
             <button
                 type="button"
-                class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 border-0 bg-transparent cursor-pointer"
+                class="px-3 py-2 text-sm font-semibold flex items-center gap-2 transition-all duration-150 border-0 bg-transparent cursor-pointer"
                 class:text-primary-600={$viewMode === "conceptual"}
                 class:text-gray-500={$viewMode !== "conceptual"}
                 class:hover:text-gray-900={$viewMode !== "conceptual"}
@@ -478,12 +480,12 @@
             </button>
 
             <!-- Vertical Divider -->
-            <div class="w-[1px] bg-gray-200"></div>
+            <div class="w-[1px] h-7 bg-gray-200"></div>
 
             <!-- Logical Option -->
             <button
                 type="button"
-                class="px-4 py-[8px] text-sm font-medium flex items-center gap-2 transition-all duration-200 border-0 bg-transparent cursor-pointer"
+                class="px-3 py-2 text-sm font-semibold flex items-center gap-2 transition-all duration-150 border-0 bg-transparent cursor-pointer"
                 class:text-primary-600={$viewMode === "logical"}
                 class:text-gray-500={$viewMode !== "logical"}
                 class:hover:text-gray-900={$viewMode !== "logical"}
