@@ -395,7 +395,7 @@ describe('TagEditor Component', () => {
 
     describe('Batch Mode', () => {
         it('shows batch-specific placeholder in batch mode', () => {
-            const tags = [];
+            const tags: string[] = [];
             const { container } = render(TagEditor, {
                 props: {
                     tags,
@@ -418,7 +418,7 @@ describe('TagEditor Component', () => {
         });
 
         it('shows regular placeholder when not in batch mode', () => {
-            const tags = [];
+            const tags: string[] = [];
             const { container } = render(TagEditor, {
                 props: {
                     tags,
