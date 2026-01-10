@@ -1,70 +1,73 @@
 /**
  * Edge calculation utilities for CustomEdge component
- * Extracted for testability and reusability
+ * Extracts complex calculations for better testability and maintainability
  */
 
-import type { Point } from '$lib/edge-utils';
 import type { Side } from '$lib/edge-utils';
 
-/**
- * Context for edge calculations
- */
+export interface Point {
+  x: number;
+  y: number;
+}
+
 export interface EdgeCalculationContext {
   parallelIndex: number;
   totalParallel: number;
+  sourceSide: Side;
+  targetSide: Side;
+  sourcePoint: Point;
+  targetPoint: Point;
   isSelfEdge: boolean;
+  storedOffsetX: number;
+  storedOffsetY: number;
+  dragOffsetX: number;
+  dragOffsetY: number;
 }
 
-/**
- * Calculation constants
- */
+// Constants extracted from CustomEdge component
 export const EDGE_CALCULATION_CONSTANTS = {
-  /** Spacing between parallel edges in pixels */
-  PARALLEL_EDGE_SPACING: 50,
-  
-  /** Radius for self-loop curves */
-  LOOP_RADIUS: 60,
-  
-  /** Padding to offset markers from node border */
-  MARKER_PADDING: 8,
-  
-  /** Extra padding for label positioning on self-loops */
-  LOOP_LABEL_OFFSET: 20
+  PARALLEL_EDGE_SPACING: 50, // pixels between parallel edges
+  LOOP_RADIUS: 60, // stable loop radius for self-loops
+  MARKER_PADDING: 8, // padding to offset markers from node border
+  LOOP_LABEL_OFFSET: 20 // extra padding for label readability on self-loops
 } as const;
 
+// Re-export MARKER_PADDING for convenience
+export const MARKER_PADDING = EDGE_CALCULATION_CONSTANTS.MARKER_PADDING;
+
 /**
- * Calculate base offset for parallel edges - spreads them out horizontally/vertically
- * @param context Edge calculation context containing parallel edge info
- * @returns Offset value to apply perpendicular to edge direction
+ * Calculate base offset for parallel edges
+ * Spreads parallel edges out horizontally to prevent overlap
+ * Accepts either (context) or (parallelIndex, totalParallel)
  */
-export function calculateBaseOffset(context: EdgeCalculationContext): number {
-  const { parallelIndex, totalParallel } = context;
-  
+export function calculateBaseOffset(
+  param1: EdgeCalculationContext | number,
+  param2?: number
+): number {
+  let parallelIndex: number;
+  let totalParallel: number;
+
+  if (typeof param1 === 'object' && 'parallelIndex' in param1) {
+    // Signature: calculateBaseOffset(context)
+    parallelIndex = param1.parallelIndex;
+    totalParallel = param1.totalParallel;
+  } else {
+    // Signature: calculateBaseOffset(parallelIndex, totalParallel)
+    parallelIndex = param1 as number;
+    totalParallel = param2 ?? 1;
+  }
+
   if (totalParallel <= 1) return 0;
-  
-  const spacing = EDGE_CALCULATION_CONSTANTS.PARALLEL_EDGE_SPACING;
-  const totalWidth = (totalParallel - 1) * spacing;
-  return (parallelIndex * spacing) - (totalWidth / 2);
+  const totalWidth = (totalParallel - 1) * EDGE_CALCULATION_CONSTANTS.PARALLEL_EDGE_SPACING;
+  return (parallelIndex * EDGE_CALCULATION_CONSTANTS.PARALLEL_EDGE_SPACING) - (totalWidth / 2);
 }
 
 /**
- * Calculate label position at the middle of the edge
- * @param connectionInfo Connection info with source/target points and sides
- * @param baseOffset Offset for parallel edges
- * @param isSelfEdge Whether this is a self-loop edge
- * @param storedOffsetX User-dragged X offset
- * @param storedOffsetY User-dragged Y offset
- * @param dragOffsetX Current drag offset X
- * @param dragOffsetY Current drag offset Y
- * @returns Label position {x, y}
+ * Calculate label position based on edge configuration
+ * Handles both regular edges and self-loops
  */
 export function calculateLabelPosition(
-  connectionInfo: {
-    sourceSide: Side;
-    targetSide: Side;
-    sourcePoint: Point;
-    targetPoint: Point;
-  },
+  connectionInfo: { sourceSide: Side; targetSide: Side; sourcePoint: Point; targetPoint: Point },
   baseOffset: number,
   isSelfEdge: boolean,
   storedOffsetX: number,
@@ -72,14 +75,13 @@ export function calculateLabelPosition(
   dragOffsetX: number,
   dragOffsetY: number
 ): Point {
-  const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
+  const { sourceSide, sourcePoint, targetPoint } = connectionInfo;
 
   // Special handling for self-loops: position label outside the loop curve
   if (isSelfEdge) {
     const midY = (sourcePoint.y + targetPoint.y) / 2 + baseOffset;
-    const loopRadius = EDGE_CALCULATION_CONSTANTS.LOOP_RADIUS;
-    const labelOffset = loopRadius + EDGE_CALCULATION_CONSTANTS.LOOP_LABEL_OFFSET;
-    const midX = sourcePoint.x + labelOffset + storedOffsetX + dragOffsetX;
+    // Position label to the right of the node edge, offset by loop radius + padding
+    const midX = sourcePoint.x + EDGE_CALCULATION_CONSTANTS.LOOP_RADIUS + EDGE_CALCULATION_CONSTANTS.LOOP_LABEL_OFFSET + storedOffsetX + dragOffsetX;
     return { x: midX, y: midY + storedOffsetY + dragOffsetY };
   }
 
@@ -104,16 +106,29 @@ export function calculateLabelPosition(
 }
 
 /**
+ * Calculate label position using EdgeCalculationContext
+ * Convenience wrapper for easier component integration
+ */
+export function calculateLabelPositionWithContext(context: EdgeCalculationContext): Point {
+  return calculateLabelPosition(
+    {
+      sourceSide: context.sourceSide,
+      targetSide: context.targetSide,
+      sourcePoint: context.sourcePoint,
+      targetPoint: context.targetPoint
+    },
+    calculateBaseOffset(context.parallelIndex, context.totalParallel),
+    context.isSelfEdge,
+    context.storedOffsetX,
+    context.storedOffsetY,
+    context.dragOffsetX,
+    context.dragOffsetY
+  );
+}
+
+/**
  * Build edge path string for SVG
- * @param sourcePoint Source connection point
- * @param targetPoint Target connection point
- * @param sourceSide Side of source node
- * @param targetSide Side of target node
- * @param baseOffset Offset for parallel edges
- * @param isSelfEdge Whether this is a self-loop edge
- * @param labelOffsetX User-dragged X offset for label positioning
- * @param labelOffsetY User-dragged Y offset for label positioning
- * @returns SVG path string
+ * Handles both orthogonal paths and self-loops
  */
 export function buildEdgePath(
   sourcePoint: Point,
@@ -125,84 +140,31 @@ export function buildEdgePath(
   labelOffsetX: number,
   labelOffsetY: number
 ): string {
+  let sX = sourcePoint.x;
+  let sY = sourcePoint.y;
+  let tX = targetPoint.x;
+  let tY = targetPoint.y;
+
   if (isSelfEdge) {
-    return buildSelfLoopPath(sourcePoint, targetPoint, sourceSide, baseOffset);
-  }
-  return buildOrthogonalPath(
-    sourcePoint,
-    targetPoint,
-    sourceSide,
-    targetSide,
-    baseOffset,
-    labelOffsetX,
-    labelOffsetY
-  );
-}
+    // Apply parallel edge offset perpendicular to exit direction
+    if (sourceSide === 'left' || sourceSide === 'right') {
+      sY += baseOffset;
+      tY += baseOffset;
+    } else {
+      sX += baseOffset;
+      tX += baseOffset;
+    }
 
-/**
- * Build a self-loop path that exits and re-enters the same node
- * @param sourcePoint Source connection point
- * @param targetPoint Target connection point
- * @param side Side of the node for the loop
- * @param baseOffset Offset for parallel edges
- * @returns SVG path string for self-loop
- */
-function buildSelfLoopPath(
-  sourcePoint: Point,
-  targetPoint: Point,
-  side: Side,
-  baseOffset: number
-): string {
-  let sX = sourcePoint.x;
-  let sY = sourcePoint.y;
-  let tX = targetPoint.x;
-  let tY = targetPoint.y;
+    const horizontalOffset =
+      sourceSide === 'left' || sourceSide === 'right'
+        ? EDGE_CALCULATION_CONSTANTS.LOOP_RADIUS * (sourceSide === 'left' ? -1 : 1)
+        : 0;
 
-  const loopRadius = EDGE_CALCULATION_CONSTANTS.LOOP_RADIUS;
-
-  // Apply parallel edge offset perpendicular to exit direction
-  if (side === 'left' || side === 'right') {
-    sY += baseOffset;
-    tY += baseOffset;
-  } else {
-    sX += baseOffset;
-    tX += baseOffset;
+    // Use a cubic curve to create a smooth loop on side of node
+    return `M ${sX} ${sY} C ${sX + horizontalOffset} ${sY}, ${tX + horizontalOffset} ${tY}, ${tX} ${tY}`;
   }
 
-  const horizontalOffset =
-    side === 'left' || side === 'right'
-      ? loopRadius * (side === 'left' ? -1 : 1)
-      : 0;
-
-  // Use a cubic curve to create a smooth loop on the side of the node
-  return `M ${sX} ${sY} C ${sX + horizontalOffset} ${sY}, ${tX + horizontalOffset} ${tY}, ${tX} ${tY}`;
-}
-
-/**
- * Build orthogonal SVG path between two connection points
- * @param sourcePoint Source connection point
- * @param targetPoint Target connection point
- * @param sourceSide Side of source node
- * @param targetSide Side of target node
- * @param baseOffset Offset for parallel edges
- * @param labelOffsetX User-dragged X offset for label positioning
- * @param labelOffsetY User-dragged Y offset for label positioning
- * @returns SVG path string for orthogonal path
- */
-function buildOrthogonalPath(
-  sourcePoint: Point,
-  targetPoint: Point,
-  sourceSide: Side,
-  targetSide: Side,
-  baseOffset: number,
-  labelOffsetX: number,
-  labelOffsetY: number
-): string {
-  let sX = sourcePoint.x;
-  let sY = sourcePoint.y;
-  let tX = targetPoint.x;
-  let tY = targetPoint.y;
-
+  // Build orthogonal path for regular edges
   // Apply parallel edge offset perpendicular to exit direction
   if (sourceSide === 'left' || sourceSide === 'right') {
     sY += baseOffset;
@@ -230,4 +192,21 @@ function buildOrthogonalPath(
     const midY = (sY + tY) / 2 + labelOffsetY;
     return `M ${sX} ${sY} L ${sX} ${midY} L ${tX} ${midY} L ${tX} ${tY}`;
   }
+}
+
+/**
+ * Build edge path using EdgeCalculationContext
+ * Convenience wrapper for easier component integration
+ */
+export function buildEdgePathWithContext(context: EdgeCalculationContext): string {
+  return buildEdgePath(
+    context.sourcePoint,
+    context.targetPoint,
+    context.sourceSide,
+    context.targetSide,
+    calculateBaseOffset(context.parallelIndex, context.totalParallel),
+    context.isSelfEdge,
+    context.storedOffsetX + context.dragOffsetX,
+    context.storedOffsetY + context.dragOffsetY
+  );
 }

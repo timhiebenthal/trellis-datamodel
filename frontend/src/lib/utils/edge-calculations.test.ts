@@ -30,7 +30,15 @@ describe('calculateBaseOffset', () => {
     const context: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 1,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     
     expect(calculateBaseOffset(context)).toBe(0);
@@ -40,7 +48,15 @@ describe('calculateBaseOffset', () => {
     const context: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 2,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     
     // totalWidth = (2 - 1) * 50 = 50
@@ -52,7 +68,15 @@ describe('calculateBaseOffset', () => {
     const context: EdgeCalculationContext = {
       parallelIndex: 1,
       totalParallel: 2,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     
     // totalWidth = (2 - 1) * 50 = 50
@@ -64,17 +88,41 @@ describe('calculateBaseOffset', () => {
     const context1: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 3,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const context2: EdgeCalculationContext = {
       parallelIndex: 1,
       totalParallel: 3,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const context3: EdgeCalculationContext = {
       parallelIndex: 2,
       totalParallel: 3,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     
     // totalWidth = (3 - 1) * 50 = 100
@@ -88,12 +136,28 @@ describe('calculateBaseOffset', () => {
     const context1: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 4,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const context2: EdgeCalculationContext = {
       parallelIndex: 3,
       totalParallel: 4,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 0, y: 0 },
+      targetPoint: { x: 0, y: 0 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     
     // totalWidth = (4 - 1) * 50 = 150
@@ -189,7 +253,11 @@ describe('calculateLabelPosition', () => {
     const pos = calculateLabelPosition(
       connectionInfo,
       20, // baseOffset
-      false, false, 0, 0, 0
+      false, // isSelfEdge
+      0, // storedOffsetX
+      0, // storedOffsetY
+      0, // dragOffsetX
+      0 // dragOffsetY
     );
     
     // Y should be offset by 20
@@ -208,7 +276,11 @@ describe('calculateLabelPosition', () => {
     const pos = calculateLabelPosition(
       connectionInfo,
       20, // baseOffset
-      false, false, 0, 0, 0
+      false, // isSelfEdge
+      0, // storedOffsetX
+      0, // storedOffsetY
+      0, // dragOffsetX
+      0 // dragOffsetY
     );
     
     // X should be offset by 20
@@ -320,7 +392,11 @@ describe('calculateLabelPosition', () => {
     const pos = calculateLabelPosition(
       connectionInfo,
       20, // baseOffset
-      true, false, 0, 0, 0
+      true, // isSelfEdge
+      0, // storedOffsetX
+      0, // storedOffsetY
+      0, // dragOffsetX
+      0 // dragOffsetY
     );
     
     // Y should be offset by baseOffset
@@ -534,7 +610,15 @@ describe('edge calculations integration', () => {
     const context: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 1,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 100, y: 50 },
+      targetPoint: { x: 200, y: 50 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const connectionInfo = {
       sourceSide: 'right' as const,
@@ -570,7 +654,15 @@ describe('edge calculations integration', () => {
     const context1: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 3,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 100, y: 50 },
+      targetPoint: { x: 200, y: 50 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const connectionInfo = {
       sourceSide: 'right' as const,
@@ -598,7 +690,15 @@ describe('edge calculations integration', () => {
     const context: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 1,
-      isSelfEdge: true
+      isSelfEdge: true,
+      sourceSide: 'right',
+      targetSide: 'right',
+      sourcePoint: { x: 100, y: 50 },
+      targetPoint: { x: 100, y: 90 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const connectionInfo = {
       sourceSide: 'right' as const,
@@ -634,7 +734,15 @@ describe('edge calculations integration', () => {
     const context: EdgeCalculationContext = {
       parallelIndex: 0,
       totalParallel: 1,
-      isSelfEdge: false
+      isSelfEdge: false,
+      sourceSide: 'right',
+      targetSide: 'left',
+      sourcePoint: { x: 100, y: 50 },
+      targetPoint: { x: 200, y: 50 },
+      storedOffsetX: 0,
+      storedOffsetY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0
     };
     const connectionInfo = {
       sourceSide: 'right' as const,
