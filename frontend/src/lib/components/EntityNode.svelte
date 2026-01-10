@@ -16,8 +16,6 @@
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
         inferRelationships,
-        getModelSchema,
-        updateModelSchema,
         getLineage,
     } from "$lib/api";
     import {
@@ -31,11 +29,12 @@
         toTitleCase,
     } from "$lib/utils";
     import { getContext } from "svelte";
-import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
-import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
+    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
+    import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import { openLineageModal } from "$lib/stores";
-import Icon from "@iconify/svelte";
+    import Icon from "@iconify/svelte";
     import { readable, type Readable } from "svelte/store";
+    import { SchemaManager, type SchemaState } from "$lib/services/schema-manager";
 
     function openExposuresView(event: MouseEvent) {
         event.stopPropagation(); // Prevent collapse toggle
@@ -118,20 +117,40 @@ import Icon from "@iconify/svelte";
         }
     });
 
-    // Schema editing state for bound models
-    let editableColumns = $state<ModelSchemaColumn[]>([]);
-    let schemaLoading = $state(false);
-    let schemaSaving = $state(false);
-    let schemaError = $state<string | null>(null);
-    let hasUnsavedChanges = $state(false);
+    // Schema management using SchemaManager service
+    let schemaManager: SchemaManager | null = null;
+    let schemaState: SchemaState = $state({
+        editableColumns: [],
+        isLoading: false,
+        isSaving: false,
+        error: null,
+        hasUnsavedChanges: false,
+        schema: null,
+        schemaTags: [],
+        manifestTags: [],
+        displayTags: [],
+    });
+
+    // Initialize SchemaManager when component mounts
+    $effect(() => {
+        if (!schemaManager) {
+            schemaManager = new SchemaManager((newState) => {
+                schemaState = newState;
+            });
+        }
+    });
 
     // Fetch schema when active model changes
     $effect(() => {
-        if (activeModelId && modelDetails) {
-            loadSchema();
-        } else {
-            editableColumns = [];
-            hasUnsavedChanges = false;
+        if (activeModelId && modelDetails && schemaManager) {
+            schemaManager.loadSchema(
+                modelDetails.name,
+                modelDetails.version,
+                modelDetails.tags,
+                modelDetails.columns,
+            );
+        } else if (schemaManager) {
+            schemaManager.reset();
         }
     });
 
@@ -264,10 +283,10 @@ import Icon from "@iconify/svelte";
     }
 
     async function saveSchema() {
-        if (!modelDetails) return;
+        if (!schemaManager || !modelDetails) return;
 
         // Check for attributes without descriptions
-        const undescribedAttributes = editableColumns
+        const undescribedAttributes = schemaState.editableColumns
             .filter((col) => col.name && (!col.description || col.description.trim().length === 0))
             .map((col) => col.name);
 
@@ -278,31 +297,19 @@ import Icon from "@iconify/svelte";
             }
         }
 
-        schemaSaving = true;
-        schemaError = null;
-
         try {
-            // Only save schema tags (explicit), not manifest tags (which may be inherited)
-            // User-added tags are added to _schemaTags when addTag is called
-            const tagsToSave = normalizeTags(data._schemaTags);
-            
-            await updateModelSchema(
-                modelDetails.name,
-                editableColumns.map((col) => ({
-                    name: col.name,
-                    data_type: col.data_type,
-                    description: col.description,
-                })),
-                data.description,
-                tagsToSave,
-                modelDetails.version ?? undefined,
-            );
-            hasUnsavedChanges = false;
-        } catch (e: any) {
-            console.error("Error saving schema:", e);
-            schemaError = e.message || "Failed to save schema";
-        } finally {
-            schemaSaving = false;
+            await schemaManager.saveSchema(data.description);
+            // Update node data with schema tags from SchemaManager
+            if (activeModelIndex === 0) {
+                updateNodeData(id, {
+                    tags: schemaState.displayTags,
+                    _schemaTags: schemaState.schemaTags,
+                    _manifestTags: schemaState.manifestTags,
+                });
+            }
+        } catch (e) {
+            // Error is already handled by SchemaManager
+            console.error('Schema save failed:', e);
         }
     }
 
@@ -310,27 +317,18 @@ import Icon from "@iconify/svelte";
         index: number,
         updates: Partial<ModelSchemaColumn>,
     ) {
-        editableColumns = editableColumns.map((col, i) =>
-            i === index ? { ...col, ...updates } : col,
-        );
-        hasUnsavedChanges = true;
+        if (!schemaManager) return;
+        schemaManager.updateEditableColumn(index, updates);
     }
 
     function addEditableColumn() {
-        editableColumns = [
-            ...editableColumns,
-            {
-                name: "",
-                data_type: "text",
-                description: "",
-            },
-        ];
-        hasUnsavedChanges = true;
+        if (!schemaManager) return;
+        schemaManager.addEditableColumn();
     }
 
     function deleteEditableColumn(index: number) {
-        editableColumns = editableColumns.filter((_, i) => i !== index);
-        hasUnsavedChanges = true;
+        if (!schemaManager) return;
+        schemaManager.deleteEditableColumn(index);
     }
 
     function addAdditionalModel(modelId: string) {
