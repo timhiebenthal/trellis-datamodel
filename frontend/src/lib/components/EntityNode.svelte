@@ -256,31 +256,7 @@
             schemaLoading = false;
         }
     }
-
     // Show warning modal and wait for user decision
-    function showUndescribedAttributesWarningModal(attributeNames: string[]): Promise<boolean> {
-        return new Promise((resolve) => {
-            undescribedAttributeNames = attributeNames;
-            warningResolve = resolve;
-            showUndescribedAttributesWarning = true;
-        });
-    }
-
-    function handleWarningConfirm() {
-        showUndescribedAttributesWarning = false;
-        if (warningResolve) {
-            warningResolve(true);
-            warningResolve = null;
-        }
-    }
-
-    function handleWarningCancel() {
-        showUndescribedAttributesWarning = false;
-        if (warningResolve) {
-            warningResolve(false);
-            warningResolve = null;
-        }
-    }
 
     async function saveSchema() {
         if (!schemaManager || !modelDetails) return;
@@ -728,143 +704,25 @@
 
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
-    let tagInput = $state("");
-    let showTagInput = $state(false);
 
-    function getCurrentTags(nodeId: string): string[] {
-        const node = $nodes.find((n) => n.id === nodeId);
-        return normalizeTags(node?.data?.tags);
-    }
-
-    function addTag(tag: string) {
-        const trimmed = tag.trim();
-        if (!trimmed) return;
-
-        const currentTags = getCurrentTags(id);
-        if (currentTags.includes(trimmed)) return;
-
-        // When user adds a tag, add it to both display tags and schema tags
-        const currentSchemaTags = normalizeTags(data._schemaTags);
-        updateNodeData(id, { 
-            tags: [...currentTags, trimmed],
-            _schemaTags: [...currentSchemaTags, trimmed]
-        });
-        if (isBound) {
-            hasUnsavedChanges = true;
-        }
-        tagInput = "";
-    }
-
-    function removeTag(tag: string) {
-        const newTags = entityTags.filter((t) => t !== tag);
-        // Also remove from schema tags if present
-        const currentSchemaTags = normalizeTags(data._schemaTags);
-        const newSchemaTags = currentSchemaTags.filter((t) => t !== tag);
+    function handleTagsUpdate(newTags: string[]) {
+        const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
         
-        updateNodeData(id, { 
-            tags: newTags,
-            _schemaTags: newSchemaTags
-        });
-        if (isBound) {
-            hasUnsavedChanges = true;
-        }
-    }
-
-    function handleTagInputKeydown(e: KeyboardEvent) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (tagInput.trim()) {
-                addTag(tagInput);
-            }
-        } else if (e.key === "Escape") {
-            tagInput = "";
-            showTagInput = false;
-        } else if (e.key === ",") {
-            e.preventDefault();
-            const parts = tagInput.split(",");
-            parts.forEach((part) => {
-                if (part.trim()) {
-                    addTag(part.trim());
-                }
-            });
-            tagInput = "";
-        }
-    }
-
-    function handleTagInputBlur() {
-        if (tagInput.trim()) {
-            if (isBatchEditing) {
-                addTagToBatch(tagInput);
-            } else {
-                addTag(tagInput);
-            }
-        }
-        showTagInput = false;
-    }
-
-    function addTagToBatch(tag: string) {
-        const trimmed = tag.trim();
-        if (!trimmed) return;
-        
-        const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
-            const currentTags = getCurrentTags(nodeId);
-            if (!currentTags.includes(trimmed)) {
-                const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
-                updateNodeData(nodeId, { 
-                    tags: [...currentTags, trimmed],
-                    _schemaTags: [...currentSchemaTags, trimmed]
-                });
-                // If this is the current node and it's bound, mark as having unsaved changes
-                if (nodeId === id && isBound) {
-                    hasUnsavedChanges = true;
-                }
-            }
-        });
-        tagInput = "";
-    }
-
-    function removeTagFromBatch(tag: string) {
-        const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
-        allSelectedIds.forEach((nodeId) => {
-            const node = $nodes.find((n) => n.id === nodeId);
-            if (node && node.type === "entity") {
-                const currentTags = normalizeTags(node.data?.tags);
-                const newTags = currentTags.filter((t) => t !== tag);
-                const currentSchemaTags = normalizeTags(node.data?._schemaTags);
-                const newSchemaTags = currentSchemaTags.filter((t) => t !== tag);
-                updateNodeData(nodeId, { 
-                    tags: newTags,
-                    _schemaTags: newSchemaTags
-                });
-                // If this is the current node and it's bound, mark as having unsaved changes
-                if (nodeId === id && isBound) {
-                    hasUnsavedChanges = true;
-                }
-            }
-        });
-    }
-
-    function handleBatchTagInputKeydown(e: KeyboardEvent) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (tagInput.trim()) {
-                addTagToBatch(tagInput);
-            }
-        } else if (e.key === "Escape") {
-            tagInput = "";
-            showTagInput = false;
-        } else if (e.key === ",") {
-            e.preventDefault();
-            const parts = tagInput.split(",");
-            parts.forEach((part) => {
-                if (part.trim()) {
-                    addTagToBatch(part.trim());
-                }
+            const currentTags = normalizeTags(node?.data?.tags);
+            const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
+            
+            updateNodeData(nodeId, {
+                tags: newTags,
+                _schemaTags: newTags
             });
-            tagInput = "";
-        }
+            
+            // If this is the current node and it's bound, mark as having unsaved changes
+            if (nodeId === id && isBound) {
+                hasUnsavedChanges = true;
+            }
+        });
     }
 
     // Field drafting functionality
@@ -1665,51 +1523,13 @@
                                 <span
                                     class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
                                     >Tags</span
-                                >
-                                {#each entityTags as tag}
-                                    <span
-                                        class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
-                                    >
-                                        {tag}
-                                        <button
-                                            onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
-                                            class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
-                                            title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
-                                        >
-                                            <Icon icon="lucide:x" class="w-2.5 h-2.5" />
-                                        </button>
-                                    </span>
-                                {/each}
-                                {#if !showTagInput}
-                                    <button
-                                        onclick={() => {
-                                            showTagInput = true;
-                                            setTimeout(() => {
-                                                const input = document.getElementById(`tag-input-unbound-${id}`) as HTMLInputElement;
-                                                input?.focus();
-                                            }, 0);
-                                        }}
-                                        class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
-                                        title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
-                                    >
-                                        <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
-                                        Add
-                                    </button>
-                                {/if}
+                                <TagEditor
+                                    tags={entityTags}
+                                    canEdit={true}
+                                    isBatchMode={isBatchEditing}
+                                    onUpdate={(newTags) => handleTagsUpdate(newTags)}
+                                ></TagEditor>
                             </div>
-                            {#if showTagInput}
-                                <input
-                                    id="tag-input-unbound-{id}"
-                                    type="text"
-                                    bind:value={tagInput}
-                                    onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
-                                    onblur={handleTagInputBlur}
-                                    placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                    class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                    onclick={(e) => e.stopPropagation()}
-                                />
-                            {/if}
-                        </div>
 
                         <div
                             class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
@@ -1885,51 +1705,14 @@
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span
                                 class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                >Tags</span
-                            >
-                            {#each entityTags as tag}
-                                <span
-                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
-                                >
-                                    {tag}
-                                    <button
-                                        onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
-                                        class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
-                                        title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
-                                    >
-                                        <Icon icon="lucide:x" class="w-2.5 h-2.5" />
-                                    </button>
-                                </span>
-                            {/each}
-                            {#if !showTagInput}
-                                <button
-                                    onclick={() => {
-                                        showTagInput = true;
-                                        setTimeout(() => {
-                                            const input = document.getElementById(`tag-input-conceptual-${id}`) as HTMLInputElement;
-                                            input?.focus();
-                                        }, 0);
-                                    }}
-                                    class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
-                                    title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
-                                >
-                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
-                                    Add
-                                </button>
-                            {/if}
+                                >Tags</span>
+                            <TagEditor
+                                tags={entityTags}
+                                canEdit={true}
+                                isBatchMode={isBatchEditing}
+                                onUpdate={(newTags) => handleTagsUpdate(newTags)}
+                            ></TagEditor>
                         </div>
-                        {#if showTagInput}
-                            <input
-                                id="tag-input-conceptual-{id}"
-                                type="text"
-                                bind:value={tagInput}
-                                onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
-                                onblur={handleTagInputBlur}
-                                placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                onclick={(e) => e.stopPropagation()}
-                            />
-                        {/if}
                     </div>
                     {#if isBound}
                         <div class="mt-2 space-y-1.5">
