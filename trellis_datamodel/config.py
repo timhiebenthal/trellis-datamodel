@@ -228,15 +228,19 @@ def _load_lineage_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
 
     legacy_present = "lineage_layers" in config
     if lineage_config and legacy_present:
-        logger.warning(
+        msg = (
             "'lineage_layers' at top level is deprecated and ignored when 'lineage' "
             "section is present. Use 'lineage.enabled' and 'lineage.layers' instead."
         )
+        print(msg)
+        logger.warning(msg)
     elif not lineage_config and legacy_present:
-        logger.warning(
+        msg = (
             "'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' "
             "and 'lineage.layers' instead."
         )
+        print(msg)
+        logger.warning(msg)
         legacy_layers = config["lineage_layers"]
         if isinstance(legacy_layers, list):
             layers = legacy_layers
@@ -291,10 +295,12 @@ def _load_exposures_config(config: dict[str, Any]) -> tuple[bool, str]:
         if layout in ["dashboards-as-rows", "entities-as-rows"]:
             default_layout = layout
         else:
-            logger.warning(
+            msg = (
                 "'exposures.default_layout' must be 'dashboards-as-rows' or "
                 "'entities-as-rows'. Using default 'dashboards-as-rows'."
             )
+            print(msg)
+            logger.warning(msg)
 
     return enabled, default_layout
 

@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
+from trellis_datamodel.exceptions import ConfigurationError, FileOperationError, ValidationError
 
 
 def validate_dbt_project_path() -> str:

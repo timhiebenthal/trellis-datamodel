@@ -369,49 +369,7 @@ class DbtCoreAdapter:
 
     def get_models(self) -> list[ModelInfo]:
         """Parse dbt manifest and catalog to return available models."""
-        # region agent log
-        import json
-
-        log_path = "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log"
-        log_entry = json.dumps(
-            {
-                "id": "log_adapter_get_models_entry_A",
-                "timestamp": 0,
-                "location": "dbt_core.py:367",
-                "message": "Adapter get_models called",
-                "data": {
-                    "manifest_path": self.manifest_path,
-                    "manifest_exists": (
-                        os.path.exists(self.manifest_path)
-                        if self.manifest_path
-                        else False
-                    ),
-                    "model_paths": self.model_paths,
-                    "hypothesisId": "A,D",
-                },
-                "sessionId": "debug-session",
-                "runId": "run1",
-            }
-        )
-        with open(log_path, "a") as f:
-            f.write(log_entry + "\n")
-        # endregion
         if not os.path.exists(self.manifest_path):
-            # region agent log
-            log_entry = json.dumps(
-                {
-                    "id": "log_adapter_manifest_not_found_A",
-                    "timestamp": 0,
-                    "location": "dbt_core.py:379",
-                    "message": "Manifest file not found",
-                    "data": {"manifest_path": self.manifest_path, "hypothesisId": "A"},
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                }
-            )
-            with open(log_path, "a") as f:
-                f.write(log_entry + "\n")
-            # endregion
             raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
 
         manifest = self._load_manifest()
