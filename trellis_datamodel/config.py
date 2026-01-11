@@ -7,10 +7,10 @@ This will override all paths to use that directory.
 """
 
 import os
-import yaml
-from pathlib import Path
-from typing import Optional
 from dataclasses import dataclass, field
+from typing import Any, Optional
+
+import yaml
 
 # Check for test mode - allows overriding config via environment
 _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
@@ -91,6 +91,258 @@ else:
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 
 
+def _load_yaml_config(path: str) -> dict[str, Any]:
+    """Load YAML config, returning an empty dict on error."""
+    try:
+        with open(path, "r") as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        return {}
+
+
+def _resolve_config_path(config_path: Optional[str]) -> Optional[str]:
+    """Pick explicit path or search for a config file."""
+    if config_path:
+        return config_path
+    return find_config_file()
+
+
+def _resolve_base_path(config_path: str) -> str:
+    """Base directory for relative paths."""
+    return os.path.dirname(config_path)
+
+
+def _resolve_path(base_dir: str, candidate: str) -> str:
+    """Resolve candidate path relative to base when not absolute."""
+    if os.path.isabs(candidate):
+        return candidate
+    return os.path.abspath(os.path.join(base_dir, candidate))
+
+
+def _resolve_project_path(config_path: str, config: dict[str, Any]) -> str:
+    """Resolve dbt_project_path with config directory fallback."""
+    project_path = config.get("dbt_project_path")
+    if not project_path:
+        return ""
+    base_dir = _resolve_base_path(config_path)
+    return _resolve_path(base_dir, project_path)
+
+
+def _resolve_manifest_path(
+    config_path: str, project_path: str, config: dict[str, Any]
+) -> str:
+    """Resolve manifest path relative to dbt project when available."""
+    manifest_path = config.get("dbt_manifest_path")
+    if not manifest_path:
+        return ""
+    base_dir = project_path or _resolve_base_path(config_path)
+    return _resolve_path(base_dir, manifest_path)
+
+
+def _resolve_catalog_path(
+    config_path: str, project_path: str, config: dict[str, Any]
+) -> str:
+    """Resolve catalog path relative to dbt project when available."""
+    catalog_path = config.get("dbt_catalog_path")
+    if not catalog_path:
+        return ""
+    base_dir = project_path or _resolve_base_path(config_path)
+    return _resolve_path(base_dir, catalog_path)
+
+
+def _resolve_data_model_path(
+    config_path: str, project_path: str, config: dict[str, Any], existing: str
+) -> str:
+    """Resolve data_model_file unless overridden by environment."""
+    if "DATAMODEL_DATA_MODEL_PATH" in os.environ:
+        return existing
+
+    data_model_file = config.get("data_model_file")
+    if not data_model_file:
+        return existing
+
+    base_dir = project_path or _resolve_base_path(config_path)
+    return _resolve_path(base_dir, data_model_file)
+
+
+def _resolve_canvas_layout_path(
+    config_path: str, project_path: str, data_model_path: str, config: dict[str, Any]
+) -> str:
+    """Resolve canvas layout path with sensible defaults near data_model.yml."""
+    layout_file = config.get("canvas_layout_file")
+    if layout_file:
+        base_dir = project_path or _resolve_base_path(config_path)
+        return _resolve_path(base_dir, layout_file)
+
+    if data_model_path:
+        data_model_dir = os.path.dirname(data_model_path)
+        return os.path.abspath(os.path.join(data_model_dir, "canvas_layout.yml"))
+
+    return os.path.abspath(
+        os.path.join(_resolve_base_path(config_path), "canvas_layout.yml")
+    )
+
+
+def _resolve_frontend_build_dir(config_path: str, config: dict[str, Any]) -> str:
+    """Resolve frontend build directory with env override."""
+    env_dir = os.environ.get("DATAMODEL_FRONTEND_BUILD_DIR")
+    if env_dir:
+        return env_dir
+
+    configured_dir = config.get("frontend_build_dir")
+    if configured_dir:
+        return _resolve_path(_resolve_base_path(config_path), configured_dir)
+
+    return os.path.abspath(
+        os.path.join(_resolve_base_path(config_path), "frontend", "build")
+    )
+
+
+def _resolve_company_dummy_path(config_path: str, config: dict[str, Any]) -> str:
+    """Resolve optional dbt_company_dummy_path."""
+    dummy_path = config.get("dbt_company_dummy_path")
+    if not dummy_path:
+        return ""
+    return _resolve_path(_resolve_base_path(config_path), dummy_path)
+
+
+def _load_lineage_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Load lineage settings with legacy support."""
+    enabled = False
+    layers: list[str] = []
+
+    lineage_config = config.get("lineage")
+    if isinstance(lineage_config, dict):
+        enabled = bool(lineage_config.get("enabled", False))
+        lineage_layers = lineage_config.get("layers", [])
+        if isinstance(lineage_layers, list):
+            layers = lineage_layers
+        elif lineage_layers is not None:
+            print("Warning: 'lineage.layers' must be a list. Ignoring provided value.")
+
+    legacy_present = "lineage_layers" in config
+    if lineage_config and legacy_present:
+        print(
+            "Warning: 'lineage_layers' at top level is deprecated and ignored when 'lineage' section is present. "
+            "Use 'lineage.enabled' and 'lineage.layers' instead."
+        )
+    elif not lineage_config and legacy_present:
+        print(
+            "Warning: 'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' and 'lineage.layers' instead."
+        )
+        legacy_layers = config["lineage_layers"]
+        if isinstance(legacy_layers, list):
+            layers = legacy_layers
+        else:
+            print("Warning: 'lineage_layers' must be a list. Ignoring provided value.")
+
+    return enabled, layers
+
+
+def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
+    """Load entity creation guidance settings with legacy fallback."""
+    guidance_section = config.get("entity_creation_guidance")
+    legacy_guidance_section = config.get("guidance")
+    if guidance_section is None and legacy_guidance_section is not None:
+        print(
+            "Warning: 'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
+        )
+        guidance_section = legacy_guidance_section
+
+    if isinstance(guidance_section, dict):
+        entity_wizard_enabled = guidance_section.get("enabled")
+        if entity_wizard_enabled is None:
+            entity_wizard_enabled = guidance_section.get("entity_wizard_enabled", True)
+        wizard_section = guidance_section.get("wizard") or guidance_section.get(
+            "entity_wizard"
+        )
+        if isinstance(wizard_section, dict):
+            entity_wizard_enabled = wizard_section.get(
+                "enabled", entity_wizard_enabled
+            )
+        return GuidanceConfig(
+            entity_wizard_enabled=bool(entity_wizard_enabled),
+            push_warning_enabled=guidance_section.get("push_warning_enabled", True),
+            min_description_length=guidance_section.get("min_description_length", 10),
+            disabled_guidance=guidance_section.get("disabled_guidance", [])
+            if isinstance(guidance_section.get("disabled_guidance"), list)
+            else [],
+        )
+
+    return GuidanceConfig()
+
+
+def _load_exposures_config(config: dict[str, Any]) -> tuple[bool, str]:
+    """Load exposures configuration with validation."""
+    enabled = False
+    default_layout = "dashboards-as-rows"
+
+    exposures_config = config.get("exposures")
+    if isinstance(exposures_config, dict):
+        enabled = bool(exposures_config.get("enabled", False))
+        layout = exposures_config.get("default_layout", default_layout)
+        if layout in ["dashboards-as-rows", "entities-as-rows"]:
+            default_layout = layout
+        else:
+            print(
+                "Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'."
+            )
+
+    return enabled, default_layout
+
+
+def _load_modeling_style(config: dict[str, Any]) -> str:
+    """Load modeling style with validation."""
+    modeling_style = config.get("modeling_style", "entity_model")
+    if modeling_style not in ["dimensional_model", "entity_model"]:
+        print(
+            "Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'."
+        )
+        return "entity_model"
+    return modeling_style
+
+
+def _resolve_bus_matrix_enabled(
+    modeling_style: str, bus_matrix_config: Any
+) -> bool:
+    """Derive Bus Matrix enablement from modeling style and optional override."""
+    enabled = modeling_style == "dimensional_model"
+    if isinstance(bus_matrix_config, dict) and modeling_style == "dimensional_model":
+        enabled = bool(bus_matrix_config.get("enabled", True))
+    return enabled
+
+
+def _load_dimensional_modeling_config(
+    modeling_style: str, config: dict[str, Any]
+) -> DimensionalModelingConfig:
+    """Load dimensional modeling config, enabling inference based on modeling_style."""
+    dimensional_config = DimensionalModelingConfig()
+    dimensional_config.enabled = modeling_style == "dimensional_model"
+
+    config_section = config.get("dimensional_modeling")
+    if not isinstance(config_section, dict):
+        return dimensional_config
+
+    inference_patterns = config_section.get("inference_patterns")
+    if not isinstance(inference_patterns, dict):
+        return dimensional_config
+
+    dimension_prefix = inference_patterns.get("dimension_prefix")
+    if isinstance(dimension_prefix, str):
+        dimensional_config.dimension_prefix = [dimension_prefix]
+    elif isinstance(dimension_prefix, list):
+        dimensional_config.dimension_prefix = dimension_prefix
+
+    fact_prefix = inference_patterns.get("fact_prefix")
+    if isinstance(fact_prefix, str):
+        dimensional_config.fact_prefix = [fact_prefix]
+    elif isinstance(fact_prefix, list):
+        dimensional_config.fact_prefix = fact_prefix
+
+    return dimensional_config
+
+
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
     """
     Find config file in order of priority:
@@ -136,248 +388,68 @@ def load_config(config_path: Optional[str] = None) -> None:
     if os.environ.get("DATAMODEL_TEST_DIR") and not os.environ.get("TRELLIS_CONFIG_PATH"):
         return
 
-    # Find config file
-    if config_path:
-        CONFIG_PATH = config_path
-    else:
-        found_config = find_config_file()
-        if not found_config:
-            # No config found - use defaults
-            CONFIG_PATH = ""
-            return
-        CONFIG_PATH = found_config
+    CONFIG_PATH = _resolve_config_path(config_path) or ""
+    if not CONFIG_PATH:
+        return
 
     if not os.path.exists(CONFIG_PATH):
         return
 
-    try:
-        with open(CONFIG_PATH, "r") as f:
-            config = yaml.safe_load(f) or {}
+    config = _load_yaml_config(CONFIG_PATH)
 
-        # 0. Get framework (defaults to dbt-core)
-        FRAMEWORK = config.get("framework", "dbt-core")
+    # 0. Framework
+    FRAMEWORK = config.get("framework", "dbt-core")
 
-        # 1. Get dbt_project_path (Required for resolving other paths)
-        if "dbt_project_path" in config:
-            p = config["dbt_project_path"]
-            if not os.path.isabs(p):
-                # Resolve relative to config file location
-                DBT_PROJECT_PATH = os.path.abspath(
-                    os.path.join(os.path.dirname(CONFIG_PATH), p)
-                )
-            else:
-                DBT_PROJECT_PATH = p
-        else:
-            DBT_PROJECT_PATH = ""
+    # 1. Project path (required for other resolutions)
+    DBT_PROJECT_PATH = _resolve_project_path(CONFIG_PATH, config)
 
-        # 2. Resolve Manifest
-        if "dbt_manifest_path" in config:
-            p = config["dbt_manifest_path"]
-            if not os.path.isabs(p) and DBT_PROJECT_PATH:
-                MANIFEST_PATH = os.path.abspath(os.path.join(DBT_PROJECT_PATH, p))
-            elif os.path.isabs(p):
-                MANIFEST_PATH = p
-            else:
-                MANIFEST_PATH = os.path.abspath(
-                    os.path.join(os.path.dirname(CONFIG_PATH), p)
-                )
+    # 2. Manifest and catalog
+    MANIFEST_PATH = _resolve_manifest_path(CONFIG_PATH, DBT_PROJECT_PATH, config)
+    CATALOG_PATH = _resolve_catalog_path(CONFIG_PATH, DBT_PROJECT_PATH, config)
 
-        # 3. Resolve Catalog
-        if "dbt_catalog_path" in config:
-            p = config["dbt_catalog_path"]
-            if not os.path.isabs(p) and DBT_PROJECT_PATH:
-                CATALOG_PATH = os.path.abspath(os.path.join(DBT_PROJECT_PATH, p))
-            elif os.path.isabs(p):
-                CATALOG_PATH = p
-            else:
-                CATALOG_PATH = os.path.abspath(
-                    os.path.join(os.path.dirname(CONFIG_PATH), p)
-                )
+    # 3. Data model path (env can override)
+    DATA_MODEL_PATH = _resolve_data_model_path(
+        CONFIG_PATH, DBT_PROJECT_PATH, config, DATA_MODEL_PATH
+    )
 
-        # 4. Resolve Data Model (env var takes precedence)
-        if (
-            "DATAMODEL_DATA_MODEL_PATH" not in os.environ
-            and "data_model_file" in config
-        ):
-            p = config["data_model_file"]
-            if not os.path.isabs(p):
-                base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
-                DATA_MODEL_PATH = os.path.abspath(os.path.join(base_path, p))
-            else:
-                DATA_MODEL_PATH = p
+    # 4. Model path filters
+    if "dbt_model_paths" in config:
+        DBT_MODEL_PATHS = config["dbt_model_paths"]
 
-        # 5. Model path filters
-        if "dbt_model_paths" in config:
-            DBT_MODEL_PATHS = config["dbt_model_paths"]
+    # 5. Canvas layout path
+    CANVAS_LAYOUT_PATH = _resolve_canvas_layout_path(
+        CONFIG_PATH, DBT_PROJECT_PATH, DATA_MODEL_PATH, config
+    )
 
-        # 6. Resolve Canvas Layout (defaults to canvas_layout.yml next to data model)
-        if "canvas_layout_file" in config:
-            p = config["canvas_layout_file"]
-            if not os.path.isabs(p):
-                base_path = DBT_PROJECT_PATH or os.path.dirname(CONFIG_PATH)
-                CANVAS_LAYOUT_PATH = os.path.abspath(os.path.join(base_path, p))
-            else:
-                CANVAS_LAYOUT_PATH = p
-        else:
-            # Default: canvas_layout.yml next to data_model.yml
-            if DATA_MODEL_PATH:
-                data_model_dir = os.path.dirname(DATA_MODEL_PATH)
-                CANVAS_LAYOUT_PATH = os.path.abspath(
-                    os.path.join(data_model_dir, "canvas_layout.yml")
-                )
-            else:
-                CANVAS_LAYOUT_PATH = os.path.abspath(
-                    os.path.join(os.path.dirname(CONFIG_PATH), "canvas_layout.yml")
-                )
+    # 6. Canvas layout version control
+    if "canvas_layout_version_control" in config:
+        CANVAS_LAYOUT_VERSION_CONTROL = config["canvas_layout_version_control"]
 
-        # 7. Canvas layout version control setting
-        if "canvas_layout_version_control" in config:
-            CANVAS_LAYOUT_VERSION_CONTROL = config["canvas_layout_version_control"]
+    # 7. Frontend build directory
+    FRONTEND_BUILD_DIR = _resolve_frontend_build_dir(CONFIG_PATH, config)
 
-        # 8. Frontend build directory
-        fe_env = os.environ.get("DATAMODEL_FRONTEND_BUILD_DIR")
-        if fe_env:
-            FRONTEND_BUILD_DIR = fe_env
-        elif "frontend_build_dir" in config:
-            p = config["frontend_build_dir"]
-            if not os.path.isabs(p):
-                FRONTEND_BUILD_DIR = os.path.abspath(
-                    os.path.join(os.path.dirname(CONFIG_PATH), p)
-                )
-            else:
-                FRONTEND_BUILD_DIR = p
-        else:
-            # Default: frontend/build next to config file (repo root)
-            FRONTEND_BUILD_DIR = os.path.abspath(
-                os.path.join(os.path.dirname(CONFIG_PATH), "frontend", "build")
-            )
+    # 8. dbt company dummy path (optional)
+    DBT_COMPANY_DUMMY_PATH = _resolve_company_dummy_path(CONFIG_PATH, config)
 
-        # 9. Resolve dbt company dummy path (only if explicitly configured)
-        # If not configured, leave empty so CLI can use smart fallback logic
-        if "dbt_company_dummy_path" in config:
-            p = config["dbt_company_dummy_path"]
-            if not os.path.isabs(p):
-                DBT_COMPANY_DUMMY_PATH = os.path.abspath(
-                    os.path.join(os.path.dirname(CONFIG_PATH), p)
-                )
-            else:
-                DBT_COMPANY_DUMMY_PATH = p
-        # Note: No default set here - CLI handles fallback to cwd/dbt_company_dummy
+    # 9. Lineage configuration
+    LINEAGE_ENABLED, LINEAGE_LAYERS = _load_lineage_config(config)
 
-        # 10. Load lineage configuration (nested structure, with legacy fallback)
-        LINEAGE_ENABLED = False
-        LINEAGE_LAYERS = []
+    # 10. Guidance configuration
+    GUIDANCE_CONFIG = _load_guidance_config(config)
 
-        lineage_config = config.get("lineage")
-        if isinstance(lineage_config, dict):
-            LINEAGE_ENABLED = bool(lineage_config.get("enabled", False))
-            lineage_layers = lineage_config.get("layers", [])
-            if isinstance(lineage_layers, list):
-                LINEAGE_LAYERS = lineage_layers
-            elif lineage_layers is not None:
-                print("Warning: 'lineage.layers' must be a list. Ignoring provided value.")
+    # 11. Exposures configuration
+    EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT = _load_exposures_config(config)
 
-        legacy_lineage_present = "lineage_layers" in config
-        if lineage_config and legacy_lineage_present:
-            print(
-                "Warning: 'lineage_layers' at top level is deprecated and ignored when 'lineage' section is present. "
-                "Use 'lineage.enabled' and 'lineage.layers' instead."
-            )
-        elif not lineage_config and legacy_lineage_present:
-            print(
-                "Warning: 'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' and 'lineage.layers' instead."
-            )
-            legacy_layers = config["lineage_layers"]
-            if isinstance(legacy_layers, list):
-                LINEAGE_LAYERS = legacy_layers
-            else:
-                print("Warning: 'lineage_layers' must be a list. Ignoring provided value.")
+    # 12. Modeling style and bus matrix
+    MODELING_STYLE = _load_modeling_style(config)
+    Bus_MATRIX_ENABLED = _resolve_bus_matrix_enabled(
+        MODELING_STYLE, config.get("bus_matrix")
+    )
 
-        # 11. Load guidance configuration (new: entity_creation_guidance, legacy: guidance)
-        guidance_section = config.get("entity_creation_guidance")
-        legacy_guidance_section = config.get("guidance")
-        if guidance_section is None and legacy_guidance_section is not None:
-            print(
-                "Warning: 'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
-            )
-            guidance_section = legacy_guidance_section
-
-        if isinstance(guidance_section, dict):
-            entity_wizard_enabled = guidance_section.get("enabled")
-            if entity_wizard_enabled is None:
-                entity_wizard_enabled = guidance_section.get("entity_wizard_enabled", True)
-            wizard_section = guidance_section.get("wizard") or guidance_section.get(
-                "entity_wizard"
-            )
-            if isinstance(wizard_section, dict):
-                entity_wizard_enabled = wizard_section.get(
-                    "enabled", entity_wizard_enabled
-                )
-            GUIDANCE_CONFIG = GuidanceConfig(
-                entity_wizard_enabled=bool(entity_wizard_enabled),
-                push_warning_enabled=guidance_section.get("push_warning_enabled", True),
-                min_description_length=guidance_section.get("min_description_length", 10),
-                disabled_guidance=guidance_section.get("disabled_guidance", [])
-                if isinstance(guidance_section.get("disabled_guidance"), list)
-                else [],
-            )
-        else:
-            # Use defaults if guidance section is missing or invalid
-            GUIDANCE_CONFIG = GuidanceConfig()
-
-        # 12. Load exposures configuration
-        EXPOSURES_ENABLED = False
-        EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
-
-        exposures_config = config.get("exposures")
-        if isinstance(exposures_config, dict):
-            EXPOSURES_ENABLED = bool(exposures_config.get("enabled", False))
-            default_layout = exposures_config.get("default_layout", "dashboards-as-rows")
-            if default_layout in ["dashboards-as-rows", "entities-as-rows"]:
-                EXPOSURES_DEFAULT_LAYOUT = default_layout
-            else:
-                print("Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'.")
-
-        # 13. Load modeling style configuration
-        MODELING_STYLE = config.get("modeling_style", "entity_model")
-        if MODELING_STYLE not in ["dimensional_model", "entity_model"]:
-            print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
-            MODELING_STYLE = "entity_model"
-
-        # 14. Load bus matrix configuration (driven by modeling_style)
-        # Bus Matrix is on for dimensional_model, off for entity_model.
-        # Allow explicit override only when dimensional_model is selected.
-        Bus_MATRIX_ENABLED = MODELING_STYLE == "dimensional_model"
-        bus_matrix_config = config.get("bus_matrix")
-        if isinstance(bus_matrix_config, dict) and MODELING_STYLE == "dimensional_model":
-            # Honor explicit override in dimensional mode
-            Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
-
-        # 15. Load dimensional modeling configuration
-        DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()
-        # Enable inference based solely on modeling_style; overrides still applied below
-        DIMENSIONAL_MODELING_CONFIG.enabled = MODELING_STYLE == "dimensional_model"
-        dimensional_config = config.get("dimensional_modeling")
-        if isinstance(dimensional_config, dict):
-            inference_patterns = dimensional_config.get("inference_patterns")
-            if isinstance(inference_patterns, dict):
-                dimension_prefix = inference_patterns.get("dimension_prefix")
-                if dimension_prefix:
-                    # Support both string and list formats
-                    if isinstance(dimension_prefix, str):
-                        DIMENSIONAL_MODELING_CONFIG.dimension_prefix = [dimension_prefix]
-                    elif isinstance(dimension_prefix, list):
-                        DIMENSIONAL_MODELING_CONFIG.dimension_prefix = dimension_prefix
-                fact_prefix = inference_patterns.get("fact_prefix")
-                if fact_prefix:
-                    # Support both string and list formats
-                    if isinstance(fact_prefix, str):
-                        DIMENSIONAL_MODELING_CONFIG.fact_prefix = [fact_prefix]
-                    elif isinstance(fact_prefix, list):
-                        DIMENSIONAL_MODELING_CONFIG.fact_prefix = fact_prefix
-
-    except Exception as e:
-        print(f"Error loading config: {e}")
+    # 13. Dimensional modeling configuration
+    DIMENSIONAL_MODELING_CONFIG = _load_dimensional_modeling_config(
+        MODELING_STYLE, config
+    )
 
 
 def print_config() -> None:
