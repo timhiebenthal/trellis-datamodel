@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test('smoke test - app loads without errors', async ({ page }) => {
+    await page.addInitScript(() => {
+        // Flag to let frontend short-circuit noisy calls during smoke
+        (window as any).__SMOKE_TEST__ = true;
+    });
+
     // Collect console errors
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {

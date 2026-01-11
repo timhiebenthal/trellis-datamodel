@@ -11,8 +11,8 @@ import { saveDataModel as apiSaveDataModel } from '$lib/api';
 
 describe('AutoSaveService', () => {
     let service: AutoSaveService;
-    let onSavingChangeMock: ReturnType<typeof vi.fn>;
-    let fetchMock: ReturnType<typeof vi.fn>;
+    let onSavingChangeMock: ReturnType<typeof vi.fn<(isSaving: boolean) => void>>;
+    let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -21,13 +21,13 @@ describe('AutoSaveService', () => {
         process.env.VITE_API_BASE = 'http://localhost:8089';
 
         // Mock global fetch for flushSync tests
-        fetchMock = vi.fn().mockResolvedValue({
+        fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
             ok: true,
             json: () => Promise.resolve({}),
         } as Response);
-        global.fetch = fetchMock;
+        global.fetch = fetchMock as unknown as typeof fetch;
 
-        onSavingChangeMock = vi.fn();
+        onSavingChangeMock = vi.fn<(isSaving: boolean) => void>();
         service = new AutoSaveService(400, onSavingChangeMock);
     });
 

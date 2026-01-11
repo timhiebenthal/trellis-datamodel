@@ -1,21 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SchemaManager, type SchemaState } from './schema-manager';
+import type { ModelSchema } from '$lib/types';
 
 // Mock API functions
 vi.mock('$lib/api', () => ({
     getModelSchema: vi.fn(),
-    updateModelSchema: vi.fn().mockResolvedValue(undefined),
+    updateModelSchema: vi.fn().mockResolvedValue({
+        status: 'ok',
+        message: 'saved',
+        file_path: 'models/model1.sql',
+    }),
 }));
 
 import { getModelSchema, updateModelSchema } from '$lib/api';
 
 describe('SchemaManager', () => {
     let manager: SchemaManager;
-    let onStateChangeMock: ReturnType<typeof vi.fn>;
+    let onStateChangeMock: ReturnType<typeof vi.fn<(state: SchemaState) => void>>;
+    const asModelSchema = (partial: Partial<ModelSchema>): ModelSchema => ({
+        model_name: 'model1',
+        description: partial.description ?? '',
+        file_path: partial.file_path ?? 'models/model1.sql',
+        columns: [],
+        tags: [],
+        ...partial,
+    });
 
     beforeEach(() => {
         vi.clearAllMocks();
-        onStateChangeMock = vi.fn();
+        onStateChangeMock = vi.fn<(state: SchemaState) => void>();
         manager = new SchemaManager(onStateChangeMock);
     });
 
@@ -88,10 +101,9 @@ describe('SchemaManager', () => {
 
     describe('loadSchema', () => {
         it('should set loading state on start', async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({ columns: [], tags: [] }),
+            );
 
             await manager.loadSchema('model1', null);
 
@@ -101,13 +113,13 @@ describe('SchemaManager', () => {
         });
 
         it('should load schema successfully', async () => {
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [
                     { name: 'field1', data_type: 'text', description: 'Desc 1' },
                     { name: 'field2', data_type: 'integer', description: 'Desc 2' },
                 ],
                 tags: ['schema-tag-1', 'schema-tag-2'],
-            };
+            });
 
             vi.mocked(getModelSchema).mockResolvedValue(mockSchema);
 
@@ -122,10 +134,10 @@ describe('SchemaManager', () => {
         });
 
         it('should handle manifest tags', async () => {
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [],
                 tags: ['schema-tag'],
-            };
+            });
 
             vi.mocked(getModelSchema).mockResolvedValue(mockSchema);
 
@@ -137,10 +149,9 @@ describe('SchemaManager', () => {
         });
 
         it('should set hasUnsavedChanges to false on successful load', async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({ columns: [], tags: [] }),
+            );
 
             await manager.loadSchema('model1', null);
 
@@ -148,10 +159,10 @@ describe('SchemaManager', () => {
         });
 
         it('should use fallback columns when schema has no columns', async () => {
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [],
                 tags: [],
-            };
+            });
 
             const fallbackColumns = [
                 { name: 'fallback1', type: 'text' },
@@ -189,10 +200,9 @@ describe('SchemaManager', () => {
         });
 
         it('should handle version parameter', async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({ columns: [], tags: [] }),
+            );
 
             await manager.loadSchema('model1', 2);
 
@@ -200,10 +210,9 @@ describe('SchemaManager', () => {
         });
 
         it('should use null version when not provided', async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({ columns: [], tags: [] }),
+            );
 
             await manager.loadSchema('model1', undefined);
 
@@ -211,10 +220,10 @@ describe('SchemaManager', () => {
         });
 
         it('should merge schema and manifest tags for display', async () => {
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [],
                 tags: ['schema-tag'],
-            };
+            });
 
             vi.mocked(getModelSchema).mockResolvedValue(mockSchema);
 
@@ -226,10 +235,10 @@ describe('SchemaManager', () => {
         });
 
         it('should normalize tags', async () => {
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [],
                 tags: ['  tag1  ', 'tag2', ''], // Includes whitespace and empty string
-            };
+            });
 
             vi.mocked(getModelSchema).mockResolvedValue(mockSchema);
 
@@ -250,10 +259,10 @@ describe('SchemaManager', () => {
 
         it('should handle save errors', async () => {
             vi.mocked(updateModelSchema).mockRejectedValueOnce(new Error('Save failed'));
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [{ name: 'field1', data_type: 'text', description: 'Desc' }],
                 tags: [],
-            };
+            });
 
             vi.mocked(getModelSchema).mockResolvedValue(mockSchema);
 
@@ -267,10 +276,10 @@ describe('SchemaManager', () => {
         });
 
         it('should set hasUnsavedChanges to false on success', async () => {
-            const mockSchema = {
+            const mockSchema = asModelSchema({
                 columns: [],
                 tags: [],
-            };
+            });
 
             vi.mocked(getModelSchema).mockResolvedValue(mockSchema);
 
@@ -282,7 +291,11 @@ describe('SchemaManager', () => {
 
             expect(manager.hasUnsavedChanges()).toBe(true);
 
-            vi.mocked(updateModelSchema).mockResolvedValue(undefined);
+            vi.mocked(updateModelSchema).mockResolvedValue({
+                status: 'ok',
+                message: 'saved',
+                file_path: 'models/model1.sql',
+            });
 
             await manager.saveSchema();
 
@@ -293,13 +306,15 @@ describe('SchemaManager', () => {
 
     describe('updateEditableColumn', () => {
         beforeEach(async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [
-                    { name: 'field1', data_type: 'text', description: 'Desc 1' },
-                    { name: 'field2', data_type: 'integer', description: 'Desc 2' },
-                ],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({
+                    columns: [
+                        { name: 'field1', data_type: 'text', description: 'Desc 1' },
+                        { name: 'field2', data_type: 'integer', description: 'Desc 2' },
+                    ],
+                    tags: [],
+                }),
+            );
 
             await manager.loadSchema('model1', null);
             vi.clearAllMocks();
@@ -335,10 +350,12 @@ describe('SchemaManager', () => {
 
     describe('addEditableColumn', () => {
         beforeEach(async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [{ name: 'field1', data_type: 'text', description: 'Desc' }],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({
+                    columns: [{ name: 'field1', data_type: 'text', description: 'Desc' }],
+                    tags: [],
+                }),
+            );
 
             await manager.loadSchema('model1', null);
             vi.clearAllMocks();
@@ -366,14 +383,16 @@ describe('SchemaManager', () => {
 
     describe('deleteEditableColumn', () => {
         beforeEach(async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [
-                    { name: 'field1', data_type: 'text', description: 'Desc 1' },
-                    { name: 'field2', data_type: 'integer', description: 'Desc 2' },
-                    { name: 'field3', data_type: 'boolean', description: 'Desc 3' },
-                ],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({
+                    columns: [
+                        { name: 'field1', data_type: 'text', description: 'Desc 1' },
+                        { name: 'field2', data_type: 'integer', description: 'Desc 2' },
+                        { name: 'field3', data_type: 'boolean', description: 'Desc 3' },
+                    ],
+                    tags: [],
+                }),
+            );
 
             await manager.loadSchema('model1', null);
             vi.clearAllMocks();
@@ -400,10 +419,12 @@ describe('SchemaManager', () => {
 
     describe('updateSchemaTags', () => {
         beforeEach(async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [],
-                tags: ['schema-tag-1'],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({
+                    columns: [],
+                    tags: ['schema-tag-1'],
+                }),
+            );
 
             await manager.loadSchema('model1', null, ['manifest-tag-1', 'manifest-tag-2']);
             vi.clearAllMocks();
@@ -458,10 +479,12 @@ describe('SchemaManager', () => {
 
     describe('reset', () => {
         beforeEach(async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [{ name: 'field1', data_type: 'text', description: 'Desc' }],
-                tags: ['tag1'],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({
+                    columns: [{ name: 'field1', data_type: 'text', description: 'Desc' }],
+                    tags: ['tag1'],
+                }),
+            );
 
             await manager.loadSchema('model1', null, ['manifest-tag']);
             vi.clearAllMocks();
@@ -504,10 +527,9 @@ describe('SchemaManager', () => {
 
     describe('state change callback', () => {
         it('should call callback on every state change', async () => {
-            vi.mocked(getModelSchema).mockResolvedValue({
-                columns: [],
-                tags: [],
-            });
+            vi.mocked(getModelSchema).mockResolvedValue(
+                asModelSchema({ columns: [], tags: [] }),
+            );
 
             await manager.loadSchema('model1', null);
             manager.updateEditableColumn(0, { name: 'changed' });
