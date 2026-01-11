@@ -40,18 +40,36 @@
     import UndescribedAttributesWarningModal from "$lib/components/UndescribedAttributesWarningModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, DbtModel, GuidanceConfig, EntityData, DraftedField } from "$lib/types";
-    import Icon from "@iconify/svelte";
+    import Icon from "$lib/components/Icon.svelte";
     import logoHref from "$lib/assets/trellis_squared.svg?url";
     import { lineageModal, closeLineageModal } from "$lib/stores";
+    import { AutoSaveService } from "$lib/services/auto-save";
+    import { 
+        getIncompleteEntities, 
+        getEntitiesWithUndescribedAttributes,
+        shouldShowValidationModal,
+        getValidationSummary
+    } from "$lib/services/entity-validation";
 
     const API_BASE = getApiBase();
     let loading = $state(true);
-    let saving = $state(false);
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
-    let lastSavedState = "";
-    let lastSyncedState = "";
-    let needsSync = $derived(lastSavedState !== "" && lastSavedState !== lastSyncedState);
+    
+    // AutoSave service instance
+    let autoSaveService: AutoSaveService | null = null;
+    let lastSyncedState = $state("");
+    let needsSync = $state(false);
+    let saving = $state(false);
+
+    // Update derived values once autoSaveService is initialized
+    $effect(() => {
+        if (autoSaveService) {
+            lastSyncedState = autoSaveService.getLastSavedState();
+            needsSync = lastSyncedState !== "" && autoSaveService.hasUnsavedChanges($nodes, $edges);
+            saving = autoSaveService.isSavingActive();
+        }
+    });
     let showConfigInfoModal = $state(false);
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
@@ -83,48 +101,29 @@
         }
     });
 
-    // Helper function to get incomplete entities
-    function getIncompleteEntities(nodes: Node[]): Node[] {
-        return nodes
-            .filter((n) => n.type === "entity")
-            .filter((n) => {
-                const data = n.data as unknown as EntityData;
-                return !data.description || data.description.trim().length === 0;
-            });
+    // Show warning modal for incomplete entities and wait for user decision
+    function showIncompleteEntitiesWarning(incompleteEntities: Node[]): Promise<boolean> {
+        return new Promise((resolve) => {
+            incompleteEntitiesForWarning = incompleteEntities;
+            warningModalResolve = resolve;
+            warningModalOpen = true;
+        });
     }
 
-    // Helper function to get entities with undescribed attributes
-    function getEntitiesWithUndescribedAttributes(nodes: Node[]): Array<{ entityLabel: string; entityId: string; attributeNames: string[] }> {
-        const result: Array<{ entityLabel: string; entityId: string; attributeNames: string[] }> = [];
-        
-        for (const node of nodes) {
-            if (node.type !== "entity") continue;
-            
-            const data = node.data as unknown as EntityData;
-            const undescribedAttributes: string[] = [];
-            
-            // Check unbound entities (drafted_fields)
-            if (data.drafted_fields && Array.isArray(data.drafted_fields)) {
-                for (const field of data.drafted_fields) {
-                    if (field.name && (!field.description || field.description.trim().length === 0)) {
-                        undescribedAttributes.push(field.name);
-                    }
-                }
-            }
-            
-            // Note: For bound entities, we'd need to fetch schemas which could be slow
-            // For now, we only check unbound entities (drafted_fields)
-            
-            if (undescribedAttributes.length > 0) {
-                result.push({
-                    entityLabel: data.label || node.id,
-                    entityId: node.id,
-                    attributeNames: undescribedAttributes,
-                });
-            }
+    function handleWarningConfirm() {
+        warningModalOpen = false;
+        if (warningModalResolve) {
+            warningModalResolve(true);
+            warningModalResolve = null;
         }
-        
-        return result;
+    }
+
+    function handleWarningCancel() {
+        warningModalOpen = false;
+        if (warningModalResolve) {
+            warningModalResolve(false);
+            warningModalResolve = null;
+        }
     }
 
     // Show warning modal for undescribed attributes and wait for user decision
@@ -152,54 +151,29 @@
         }
     }
 
-    // Show warning modal and wait for user decision
-    function showIncompleteEntitiesWarning(incompleteEntities: Node[]): Promise<boolean> {
-        return new Promise((resolve) => {
-            incompleteEntitiesForWarning = incompleteEntities;
-            warningModalResolve = resolve;
-            warningModalOpen = true;
-        });
-    }
-
-    function handleWarningConfirm() {
-        warningModalOpen = false;
-        if (warningModalResolve) {
-            warningModalResolve(true);
-            warningModalResolve = null;
-        }
-    }
-
-    function handleWarningCancel() {
-        warningModalOpen = false;
-        if (warningModalResolve) {
-            warningModalResolve(false);
-            warningModalResolve = null;
-        }
-    }
-
     async function handleSyncDbt() {
         syncing = true;
         syncMessage = null;
         try {
-            // Check for incomplete entities
+            // Check for validation issues using EntityValidation service
             const incompleteEntities = getIncompleteEntities($nodes);
-
-            if (incompleteEntities.length > 0 && guidanceConfig.push_warning_enabled) {
-                const proceed = await showIncompleteEntitiesWarning(incompleteEntities);
-                if (!proceed) {
-                    syncing = false;
-                    return;
-                }
-            }
-
-            // Check for entities with undescribed attributes
             const entitiesWithUndescribed = getEntitiesWithUndescribedAttributes($nodes);
 
-            if (entitiesWithUndescribed.length > 0 && guidanceConfig.push_warning_enabled) {
-                const proceed = await showUndescribedAttributesWarning(entitiesWithUndescribed);
-                if (!proceed) {
-                    syncing = false;
-                    return;
+            // Check if validation modal should be shown
+            if (guidanceConfig.push_warning_enabled && shouldShowValidationModal($nodes, true, true)) {
+                if (incompleteEntities.length > 0) {
+                    const proceed = await showIncompleteEntitiesWarning(incompleteEntities);
+                    if (!proceed) {
+                        syncing = false;
+                        return;
+                    }
+                }
+                if (entitiesWithUndescribed.length > 0) {
+                    const proceed = await showUndescribedAttributesWarning(entitiesWithUndescribed);
+                    if (!proceed) {
+                        syncing = false;
+                        return;
+                    }
                 }
             }
 
@@ -207,7 +181,9 @@
             const result = await syncDbtTests();
             syncMessage = `✓ ${result.message}`;
             // Mark current state as synced
-            lastSyncedState = lastSavedState;
+            if (autoSaveService) {
+                lastSyncedState = autoSaveService.getLastSavedState();
+            }
             setTimeout(() => {
                 syncMessage = null;
             }, 3000);
@@ -473,8 +449,8 @@
         applyExpandCollapseState(allExpanded);
         // Persist to localStorage
         localStorage.setItem(STORAGE_KEY, String(allExpanded));
-        // Save immediately so reloads reflect latest state
-        saveNow();
+        // Save immediately using AutoSave service
+        autoSaveService?.saveNow($nodes, $edges);
     }
     let sidebarWidth = $state(280);
     let resizingSidebar = $state(false);
@@ -510,8 +486,8 @@
 
     onMount(() => {
         (async () => {
-            console.log(`[${Date.now()}] Page mounted, loading data...`);
             try {
+                console.log(`[${Date.now()}] Page onMount starting...`);
                 // Check Config Status
                 const status = await getConfigStatus();
                 $configStatus = status;
@@ -753,12 +729,14 @@
                     }
                 }
 
-                lastSavedState = JSON.stringify({
-                    nodes: $nodes,
-                    edges: $edges,
-                });
+                // Initialize AutoSave service with loaded state
+                if (!autoSaveService) {
+                    autoSaveService = new AutoSaveService(400);
+                    autoSaveService.clearLastSavedState();
+                    autoSaveService.saveNow($nodes, $edges);
+                }
                 // Initialize as synced since we just loaded from disk
-                lastSyncedState = lastSavedState;
+                lastSyncedState = autoSaveService.getLastSavedState();
                 initHistory();
             } catch (e) {
                 console.error("Initialization error:", e);
@@ -785,7 +763,7 @@
             }
         }
         const handleBeforeUnload = () => {
-            flushPendingSaveSync();
+            autoSaveService?.flushSync($nodes, $edges);
         };
 
         window.addEventListener("keydown", handleKeydown);
@@ -796,219 +774,27 @@
         };
     });
 
-    // Auto-save logic
-    const SAVE_DEBOUNCE_MS = 400;
-    let pendingSaveTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    function buildDataModelFromState(
-        currentNodes: Node[],
-        currentEdges: Edge[],
-    ) {
-        return {
-            version: 0.1,
-            entities: currentNodes
-                .filter((n) => n.type === "entity")
-                .map((n) => {
-                    const displayTags = normalizeTags(n.data?.tags);
-                    const schemaTags = normalizeTags((n.data as any)?._schemaTags);
-                    const isBound = Boolean(n.data?.dbt_model);
-
-                    // For bound models, persist only explicit schema tags (user-defined).
-                    // Inherited/manifest tags live in _manifestTags and should not be written back.
-                    const tagsToPersist = isBound
-                        ? schemaTags.length > 0
-                            ? schemaTags
-                            : undefined
-                        : displayTags.length > 0
-                            ? displayTags
-                            : undefined;
-
-                    const entity_type = ((n.data as any)?.entity_type) || "unclassified";
-                    return {
-                        id: n.id,
-                        label: ((n.data.label as string) || "").trim() || "Entity",
-                        description: n.data.description as string | undefined,
-                        dbt_model: n.data.dbt_model as string | undefined,
-                        additional_models: n.data?.additional_models as string[] | undefined,
-                        drafted_fields: n.data?.drafted_fields as any[] | undefined,
-                        position: n.position,
-                        width: n.data?.width as number | undefined,
-                        panel_height: n.data?.panelHeight as number | undefined,
-                        collapsed: (n.data?.collapsed as boolean) ?? false,
-                        // Persist display tags only; schema writes rely on _schemaTags.
-                        tags: tagsToPersist,
-                        // Include entity_type with default "unclassified" if not set
-                        entity_type: entity_type,
-                    };
-                }),
-            relationships: currentEdges.flatMap((e) => {
-                // If edge has multiple model relationships, expand them
-                const models = (e.data?.models as any[]) || [];
-                if (models.length > 0) {
-                    // Create one relationship per model
-                    return models.map((m) => ({
-                        source: e.source,
-                        target: e.target,
-                        label: (e.data?.label as string) || "",
-                        type:
-                            (e.data?.type as
-                                | "one_to_many"
-                                | "many_to_one"
-                                | "one_to_one"
-                                | "many_to_many") || "one_to_many",
-                        source_field: m.source_field as string | undefined,
-                        target_field: m.target_field as string | undefined,
-                        source_model_name: m.source_model_name as string | undefined,
-                        source_model_version: m.source_model_version as number | null | undefined,
-                        target_model_name: m.target_model_name as string | undefined,
-                        target_model_version: m.target_model_version as number | null | undefined,
-                        label_dx: e.data?.label_dx as number | undefined,
-                        label_dy: e.data?.label_dy as number | undefined,
-                    }));
-                } else {
-                    // Fallback: single relationship from edge-level data
-                    return [{
-                        source: e.source,
-                        target: e.target,
-                        label: (e.data?.label as string) || "",
-                        type:
-                            (e.data?.type as
-                                | "one_to_many"
-                                | "many_to_one"
-                                | "one_to_one"
-                                | "many_to_many") || "one_to_many",
-                        source_field: e.data?.source_field as string | undefined,
-                        target_field: e.data?.target_field as string | undefined,
-                        label_dx: e.data?.label_dx as number | undefined,
-                        label_dy: e.data?.label_dy as number | undefined,
-                    }];
-                }
-            }),
-        };
-    }
-
-    async function persistDataModel(
-        nodesSnapshot: Node[],
-        edgesSnapshot: Edge[],
-        stateString: string,
-    ) {
-        try {
-            const dataModel = buildDataModelFromState(nodesSnapshot, edgesSnapshot);
-            await saveDataModel(dataModel);
-            lastSavedState = stateString;
-        } catch (e) {
-            console.error("Save failed", e);
-        } finally {
-            saving = false;
-            pendingSaveTimeout = null;
-        }
-    }
-
-    function saveNow() {
-        if (loading) return;
-
-        if (pendingSaveTimeout) {
-            clearTimeout(pendingSaveTimeout);
-            pendingSaveTimeout = null;
-        }
-
-        const currentNodes = $nodes;
-        const currentEdges = $edges;
-        const state = JSON.stringify({
-            nodes: currentNodes,
-            edges: currentEdges,
-        });
-
-        saving = true;
-        void persistDataModel(
-            structuredClone(currentNodes),
-            structuredClone(currentEdges),
-            state,
-        );
-    }
-
-    function flushPendingSaveSync() {
-        if (loading) return;
-        const nodesSnapshot = $nodes;
-        const edgesSnapshot = $edges;
-        const state = JSON.stringify({
-            nodes: nodesSnapshot,
-            edges: edgesSnapshot,
-        });
-        if (state === lastSavedState) return;
-
-        const payload = JSON.stringify(
-            buildDataModelFromState(nodesSnapshot, edgesSnapshot),
-        );
-        const url = `${API_BASE}/data-model`;
-
-        try {
-            if (
-                typeof navigator !== "undefined" &&
-                typeof navigator.sendBeacon === "function"
-            ) {
-                const blob = new Blob([payload], { type: "application/json" });
-                const sent = navigator.sendBeacon(url, blob);
-                if (sent) {
-                    lastSavedState = state;
-                    saving = false;
-                    return;
-                }
-            }
-        } catch (err) {
-            console.error("Beacon save failed", err);
-        }
-
-        // Fallback best-effort save using keepalive fetch
-        try {
-            fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: payload,
-                keepalive: true,
-            })
-                .then(() => {
-                    lastSavedState = state;
-                    saving = false;
-                })
-                .catch((err) => console.error("Fallback save failed", err));
-        } catch (err) {
-            console.error("Immediate save failed", err);
-        }
-        pendingSaveTimeout = null;
-    }
-
+    // Integrate AutoSave service
     $effect(() => {
         if (loading) return;
-
-        // Track dependencies
-        const currentNodes = $nodes;
-        const currentEdges = $edges;
-
-        console.log("State changed:", {
-            nodes: currentNodes.length,
-            edges: currentEdges.length,
-        });
-
-        const state = JSON.stringify({
-            nodes: currentNodes,
-            edges: currentEdges,
-        });
-        if (state === lastSavedState) return;
-
-        // Push to undo history
-        pushHistory();
-
-        if (pendingSaveTimeout) {
-            clearTimeout(pendingSaveTimeout);
+        
+        // Create AutoSave service on first load
+        if (!autoSaveService) {
+            autoSaveService = new AutoSaveService(400, (isSaving) => {
+                // The `saving` derived state handles this
+            });
+            return;
         }
-
-        saving = true;
-        const nodesSnapshot = structuredClone(currentNodes);
-        const edgesSnapshot = structuredClone(currentEdges);
-        pendingSaveTimeout = setTimeout(() => {
-            void persistDataModel(nodesSnapshot, edgesSnapshot, state);
-        }, SAVE_DEBOUNCE_MS);
+        
+        // Use untrack to avoid creating a dependency on the effect itself
+        const currentNodes = untrack(() => $nodes);
+        const currentEdges = untrack(() => $edges);
+        
+        // Save changes via AutoSave service
+        autoSaveService.save(currentNodes, currentEdges);
+        
+        // Push to undo history (only when actual changes occur)
+        pushHistory();
     });
 
     // Apply filters to node visibility
