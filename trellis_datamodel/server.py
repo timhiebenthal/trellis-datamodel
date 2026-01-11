@@ -9,9 +9,17 @@ from importlib.resources import files
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from trellis_datamodel import config as cfg
+from trellis_datamodel.exceptions import (
+    DomainError,
+    NotFoundError,
+    ValidationError,
+    ConfigurationError,
+    FileOperationError,
+    FeatureDisabledError,
+)
 from trellis_datamodel.routes import (
     bus_matrix_router,
     data_model_router,
@@ -77,6 +85,58 @@ def _mount_static_routes(app: FastAPI, static_dir_path: str) -> None:
         raise HTTPException(status_code=404, detail="Not found")
 
 
+def _register_exception_handlers(app: FastAPI) -> None:
+    """Register exception handlers for domain exceptions."""
+
+    @app.exception_handler(NotFoundError)
+    async def not_found_handler(request: Request, exc: NotFoundError):
+        """Handle NotFoundError -> 404."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": exc.message, "error": "not_found"},
+        )
+
+    @app.exception_handler(ValidationError)
+    async def validation_handler(request: Request, exc: ValidationError):
+        """Handle ValidationError -> 422."""
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.message, "error": "validation_error"},
+        )
+
+    @app.exception_handler(FeatureDisabledError)
+    async def feature_disabled_handler(request: Request, exc: FeatureDisabledError):
+        """Handle FeatureDisabledError -> 403."""
+        return JSONResponse(
+            status_code=403,
+            content={"detail": exc.message, "error": "feature_disabled"},
+        )
+
+    @app.exception_handler(ConfigurationError)
+    async def configuration_handler(request: Request, exc: ConfigurationError):
+        """Handle ConfigurationError -> 400."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "error": "configuration_error"},
+        )
+
+    @app.exception_handler(FileOperationError)
+    async def file_operation_handler(request: Request, exc: FileOperationError):
+        """Handle FileOperationError -> 500."""
+        return JSONResponse(
+            status_code=500,
+            content={"detail": exc.message, "error": "file_operation_error"},
+        )
+
+    @app.exception_handler(DomainError)
+    async def domain_error_handler(request: Request, exc: DomainError):
+        """Handle generic DomainError -> 500."""
+        return JSONResponse(
+            status_code=500,
+            content={"detail": exc.message, "error": "domain_error"},
+        )
+
+
 def _register_routers(app: FastAPI) -> None:
     """Register API routers before mounting static files."""
     app.include_router(manifest_router)
@@ -92,6 +152,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Trellis Data", version="0.1.0")
 
     _configure_cors(app)
+    _register_exception_handlers(app)
 
     # Health check endpoint
     @app.get("/health")

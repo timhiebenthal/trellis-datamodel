@@ -1,13 +1,12 @@
 """Routes for manifest and catalog operations."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 import os
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.config import (
-    find_config_file,
-)
+from trellis_datamodel.config import find_config_file
 from trellis_datamodel.adapters import get_adapter
+from trellis_datamodel.services.manifest import get_models
 
 router = APIRouter(prefix="/api", tags=["manifest"])
 
@@ -118,11 +117,5 @@ async def get_config_info():
 @router.get("/manifest")
 async def get_manifest():
     """Return parsed models from the transformation framework."""
-    try:
-        adapter = get_adapter()
-        models = adapter.get_models()
-        return {"models": models}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading manifest: {str(e)}")
+    models = get_models()
+    return {"models": models}

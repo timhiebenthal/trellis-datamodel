@@ -6,6 +6,7 @@ import os
 from typing import Dict, Any, List, Tuple
 
 from trellis_datamodel import config as cfg
+from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.schemas import DataModelUpdate
 from trellis_datamodel.adapters import get_adapter
 
@@ -234,13 +235,14 @@ def _validate_entity_type(entity_type: str) -> None:
     """
     Validate that entity_type is one of the allowed values.
 
-    Raises HTTPException if invalid.
+    Raises ValidationError if invalid.
     """
+    from trellis_datamodel.exceptions import ValidationError
+
     valid_types = {"fact", "dimension", "unclassified"}
     if entity_type and entity_type not in valid_types:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid entity_type '{entity_type}'. Must be one of: {', '.join(sorted(valid_types))}",
+        raise ValidationError(
+            f"Invalid entity_type '{entity_type}'. Must be one of: {', '.join(sorted(valid_types))}"
         )
 
 
@@ -278,6 +280,9 @@ async def save_data_model(data: DataModelUpdate):
             os.fsync(f.fileno())
 
         return {"status": "success"}
+    except ValidationError:
+        # Let ValidationError propagate to exception handler
+        raise
     except Exception as e:
         import traceback
 
