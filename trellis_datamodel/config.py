@@ -6,11 +6,14 @@ For testing, set environment variable DATAMODEL_TEST_DIR to a temp directory pat
 This will override all paths to use that directory.
 """
 
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 # Check for test mode - allows overriding config via environment
 _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
@@ -97,7 +100,7 @@ def _load_yaml_config(path: str) -> dict[str, Any]:
         with open(path, "r") as f:
             return yaml.safe_load(f) or {}
     except Exception as e:
-        print(f"Error loading config: {e}")
+        logger.warning("Error loading config file %s: %s", path, e)
         return {}
 
 
@@ -219,23 +222,26 @@ def _load_lineage_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
         if isinstance(lineage_layers, list):
             layers = lineage_layers
         elif lineage_layers is not None:
-            print("Warning: 'lineage.layers' must be a list. Ignoring provided value.")
+            logger.warning(
+                "'lineage.layers' must be a list. Ignoring provided value."
+            )
 
     legacy_present = "lineage_layers" in config
     if lineage_config and legacy_present:
-        print(
-            "Warning: 'lineage_layers' at top level is deprecated and ignored when 'lineage' section is present. "
-            "Use 'lineage.enabled' and 'lineage.layers' instead."
+        logger.warning(
+            "'lineage_layers' at top level is deprecated and ignored when 'lineage' "
+            "section is present. Use 'lineage.enabled' and 'lineage.layers' instead."
         )
     elif not lineage_config and legacy_present:
-        print(
-            "Warning: 'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' and 'lineage.layers' instead."
+        logger.warning(
+            "'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' "
+            "and 'lineage.layers' instead."
         )
         legacy_layers = config["lineage_layers"]
         if isinstance(legacy_layers, list):
             layers = legacy_layers
         else:
-            print("Warning: 'lineage_layers' must be a list. Ignoring provided value.")
+            logger.warning("'lineage_layers' must be a list. Ignoring provided value.")
 
     return enabled, layers
 
@@ -245,8 +251,8 @@ def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
     guidance_section = config.get("entity_creation_guidance")
     legacy_guidance_section = config.get("guidance")
     if guidance_section is None and legacy_guidance_section is not None:
-        print(
-            "Warning: 'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
+        logger.warning(
+            "'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
         )
         guidance_section = legacy_guidance_section
 
@@ -285,8 +291,9 @@ def _load_exposures_config(config: dict[str, Any]) -> tuple[bool, str]:
         if layout in ["dashboards-as-rows", "entities-as-rows"]:
             default_layout = layout
         else:
-            print(
-                "Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'."
+            logger.warning(
+                "'exposures.default_layout' must be 'dashboards-as-rows' or "
+                "'entities-as-rows'. Using default 'dashboards-as-rows'."
             )
 
     return enabled, default_layout
@@ -296,8 +303,9 @@ def _load_modeling_style(config: dict[str, Any]) -> str:
     """Load modeling style with validation."""
     modeling_style = config.get("modeling_style", "entity_model")
     if modeling_style not in ["dimensional_model", "entity_model"]:
-        print(
-            "Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'."
+        logger.warning(
+            "'modeling_style' must be 'dimensional_model' or 'entity_model'. "
+            "Using default 'entity_model'."
         )
         return "entity_model"
     return modeling_style
@@ -454,27 +462,33 @@ def load_config(config_path: Optional[str] = None) -> None:
 
 def print_config() -> None:
     """Print current configuration for debugging."""
-    print(f"Using Config: {CONFIG_PATH}")
-    print(f"Framework: {FRAMEWORK}")
-    print(f"Project Path: {DBT_PROJECT_PATH}")
-    print(f"Frontend build dir: {FRONTEND_BUILD_DIR}")
-    print(f"Looking for manifest at: {MANIFEST_PATH}")
-    print(f"Looking for catalog at: {CATALOG_PATH}")
-    print(f"Looking for data model at: {DATA_MODEL_PATH}")
-    print(f"Looking for canvas layout at: {CANVAS_LAYOUT_PATH}")
-    print(f"Canvas layout version control: {CANVAS_LAYOUT_VERSION_CONTROL}")
-    print(f"Filtering models by paths: {DBT_MODEL_PATHS}")
-    print(f"Lineage enabled: {LINEAGE_ENABLED}")
+    logger.info("Using Config: %s", CONFIG_PATH)
+    logger.info("Framework: %s", FRAMEWORK)
+    logger.info("Project Path: %s", DBT_PROJECT_PATH)
+    logger.info("Frontend build dir: %s", FRONTEND_BUILD_DIR)
+    logger.info("Looking for manifest at: %s", MANIFEST_PATH)
+    logger.info("Looking for catalog at: %s", CATALOG_PATH)
+    logger.info("Looking for data model at: %s", DATA_MODEL_PATH)
+    logger.info("Looking for canvas layout at: %s", CANVAS_LAYOUT_PATH)
+    logger.info(
+        "Canvas layout version control: %s", CANVAS_LAYOUT_VERSION_CONTROL
+    )
+    logger.info("Filtering models by paths: %s", DBT_MODEL_PATHS)
+    logger.info("Lineage enabled: %s", LINEAGE_ENABLED)
     if LINEAGE_LAYERS:
-        print(f"Lineage layers: {LINEAGE_LAYERS}")
-    print(f"Exposures enabled: {EXPOSURES_ENABLED}")
+        logger.info("Lineage layers: %s", LINEAGE_LAYERS)
+    logger.info("Exposures enabled: %s", EXPOSURES_ENABLED)
     if EXPOSURES_ENABLED:
-        print(f"Exposures default layout: {EXPOSURES_DEFAULT_LAYOUT}")
-    print(f"Modeling style: {MODELING_STYLE}")
-    print(f"Bus Matrix enabled: {Bus_MATRIX_ENABLED}")
+        logger.info("Exposures default layout: %s", EXPOSURES_DEFAULT_LAYOUT)
+    logger.info("Modeling style: %s", MODELING_STYLE)
+    logger.info("Bus Matrix enabled: %s", Bus_MATRIX_ENABLED)
     if DIMENSIONAL_MODELING_CONFIG.enabled:
-        print(f"Dimensional modeling enabled: {DIMENSIONAL_MODELING_CONFIG.enabled}")
-        print(f"Dimension prefixes: {DIMENSIONAL_MODELING_CONFIG.dimension_prefix}")
-        print(f"Fact prefixes: {DIMENSIONAL_MODELING_CONFIG.fact_prefix}")
+        logger.info(
+            "Dimensional modeling enabled: %s", DIMENSIONAL_MODELING_CONFIG.enabled
+        )
+        logger.info(
+            "Dimension prefixes: %s", DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+        )
+        logger.info("Fact prefixes: %s", DIMENSIONAL_MODELING_CONFIG.fact_prefix)
     if DBT_COMPANY_DUMMY_PATH:
-        print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")
+        logger.info("dbt company dummy path: %s", DBT_COMPANY_DUMMY_PATH)
