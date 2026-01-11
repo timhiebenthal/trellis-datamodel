@@ -1,13 +1,16 @@
 # Configuration for data model UI
 
+# modeling_style: entity_model  # Options: dimensional_model or entity_model
+modeling_style: dimensional_model
+
 # Transformation framework: dbt-core, dbt-fusion, sqlmesh, bruin, pydantic
 # (currently only dbt-core is implemented)
 framework: dbt-core
 
 # Path to the dbt project directory (relative to this config file or absolute)
-# dbt_project_path: "./dbt_concept"
+dbt_project_path: "./dbt_concept"
 # dbt_project_path: "./dbt_built"
-dbt_project_path: "./dbt_company_dummy"
+# dbt_project_path: "./dbt_company_dummy"
 
 # Path to the dbt manifest.json (relative to dbt_project_path or absolute)
 dbt_manifest_path: "target/manifest.json"
@@ -48,7 +51,7 @@ lineage:
 # Entity creation guidance (preferred block)
 # Controls the entity creation wizard and push-to-dbt warnings
 entity_creation_guidance:
-  enabled: false  # Set false to disable the step-by-step wizard (default: true)
+  enabled: true  # Set false to disable the step-by-step wizard (default: true)
   push_warning_enabled: true
   min_description_length: 10
   disabled_guidance:
@@ -61,3 +64,8 @@ entity_creation_guidance:
 exposures:
   enabled: true
   default_layout: "dashboards-as-rows"
+
+dimensional_modeling:
+ inference_patterns:
+   dimension_prefix: "dim_"  # Prefixes for dimension tables
+   fact_prefix: "fct_"  # Prefixes for fact tables

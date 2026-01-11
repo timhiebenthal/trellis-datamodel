@@ -25,8 +25,17 @@ class GuidanceConfig:
     disabled_guidance: list[str] = field(default_factory=list)
 
 
-# Global guidance configuration (set by load_config)
+@dataclass
+class DimensionalModelingConfig:
+    """Configuration for dimensional modeling features."""
+    enabled: bool = False
+    dimension_prefix: list[str] = field(default_factory=lambda: ["dim_", "d_"])
+    fact_prefix: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
+
+
+# Global configuration objects (set by load_config)
 GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
+DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 
 if _TEST_DIR:
     # Test mode: use temp directory paths
@@ -56,7 +65,10 @@ if _TEST_DIR:
     LINEAGE_ENABLED: bool = False
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
+    MODELING_STYLE: str = "entity_model"
+    Bus_MATRIX_ENABLED: bool = False
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
+    DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 else:
     # Production mode: will be set by load_config()
     CONFIG_PATH: str = ""
@@ -74,14 +86,18 @@ else:
     LINEAGE_ENABLED: bool = False
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
+    MODELING_STYLE: str = "entity_model"
+    Bus_MATRIX_ENABLED: bool = False
+    DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 
 
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
     """
     Find config file in order of priority:
     1. CLI override (--config)
-    2. trellis.yml in current directory
-    3. config.yml in current directory (fallback)
+    2. TRELLIS_CONFIG_PATH environment variable
+    3. trellis.yml in current directory
+    4. config.yml in current directory (fallback)
 
     Returns:
         Path to config file or None if not found
@@ -90,6 +106,11 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
         if os.path.exists(config_override):
             return os.path.abspath(config_override)
         return None
+
+    # Check for TRELLIS_CONFIG_PATH environment variable (used in tests)
+    env_config = os.environ.get("TRELLIS_CONFIG_PATH")
+    if env_config and os.path.exists(env_config):
+        return os.path.abspath(env_config)
 
     cwd = os.getcwd()
 
@@ -108,10 +129,11 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, DIMENSIONAL_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
-    if _TEST_DIR:
+    # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
+    if os.environ.get("DATAMODEL_TEST_DIR") and not os.environ.get("TRELLIS_CONFIG_PATH"):
         return
 
     # Find config file
@@ -316,6 +338,44 @@ def load_config(config_path: Optional[str] = None) -> None:
             else:
                 print("Warning: 'exposures.default_layout' must be 'dashboards-as-rows' or 'entities-as-rows'. Using default 'dashboards-as-rows'.")
 
+        # 13. Load modeling style configuration
+        MODELING_STYLE = config.get("modeling_style", "entity_model")
+        if MODELING_STYLE not in ["dimensional_model", "entity_model"]:
+            print(f"Warning: 'modeling_style' must be 'dimensional_model' or 'entity_model'. Using default 'entity_model'.")
+            MODELING_STYLE = "entity_model"
+
+        # 14. Load bus matrix configuration (driven by modeling_style)
+        # Bus Matrix is on for dimensional_model, off for entity_model.
+        # Allow explicit override only when dimensional_model is selected.
+        Bus_MATRIX_ENABLED = MODELING_STYLE == "dimensional_model"
+        bus_matrix_config = config.get("bus_matrix")
+        if isinstance(bus_matrix_config, dict) and MODELING_STYLE == "dimensional_model":
+            # Honor explicit override in dimensional mode
+            Bus_MATRIX_ENABLED = bool(bus_matrix_config.get("enabled", True))
+
+        # 15. Load dimensional modeling configuration
+        DIMENSIONAL_MODELING_CONFIG = DimensionalModelingConfig()
+        # Enable inference based solely on modeling_style; overrides still applied below
+        DIMENSIONAL_MODELING_CONFIG.enabled = MODELING_STYLE == "dimensional_model"
+        dimensional_config = config.get("dimensional_modeling")
+        if isinstance(dimensional_config, dict):
+            inference_patterns = dimensional_config.get("inference_patterns")
+            if isinstance(inference_patterns, dict):
+                dimension_prefix = inference_patterns.get("dimension_prefix")
+                if dimension_prefix:
+                    # Support both string and list formats
+                    if isinstance(dimension_prefix, str):
+                        DIMENSIONAL_MODELING_CONFIG.dimension_prefix = [dimension_prefix]
+                    elif isinstance(dimension_prefix, list):
+                        DIMENSIONAL_MODELING_CONFIG.dimension_prefix = dimension_prefix
+                fact_prefix = inference_patterns.get("fact_prefix")
+                if fact_prefix:
+                    # Support both string and list formats
+                    if isinstance(fact_prefix, str):
+                        DIMENSIONAL_MODELING_CONFIG.fact_prefix = [fact_prefix]
+                    elif isinstance(fact_prefix, list):
+                        DIMENSIONAL_MODELING_CONFIG.fact_prefix = fact_prefix
+
     except Exception as e:
         print(f"Error loading config: {e}")
 
@@ -338,5 +398,11 @@ def print_config() -> None:
     print(f"Exposures enabled: {EXPOSURES_ENABLED}")
     if EXPOSURES_ENABLED:
         print(f"Exposures default layout: {EXPOSURES_DEFAULT_LAYOUT}")
+    print(f"Modeling style: {MODELING_STYLE}")
+    print(f"Bus Matrix enabled: {Bus_MATRIX_ENABLED}")
+    if DIMENSIONAL_MODELING_CONFIG.enabled:
+        print(f"Dimensional modeling enabled: {DIMENSIONAL_MODELING_CONFIG.enabled}")
+        print(f"Dimension prefixes: {DIMENSIONAL_MODELING_CONFIG.dimension_prefix}")
+        print(f"Fact prefixes: {DIMENSIONAL_MODELING_CONFIG.fact_prefix}")
     if DBT_COMPANY_DUMMY_PATH:
         print(f"dbt company dummy path: {DBT_COMPANY_DUMMY_PATH}")

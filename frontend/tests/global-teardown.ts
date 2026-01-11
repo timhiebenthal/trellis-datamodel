@@ -7,9 +7,10 @@ const __dirname = path.dirname(__filename);
 const TEST_DATA_MODEL_PATH = path.resolve(__dirname, 'test_data_model.yml');
 
 async function globalTeardown() {
-    // Clean up test data file after all tests
-    if (fs.existsSync(TEST_DATA_MODEL_PATH)) {
-        fs.writeFileSync(TEST_DATA_MODEL_PATH, 'version: 0.1\nentities: []\nrelationships: []\n');
+    // Clean up temporary test config directory after all tests
+    const CONFIG_DIR = path.resolve(__dirname, '.trellis-test');
+    if (fs.existsSync(CONFIG_DIR)) {
+        fs.rmSync(CONFIG_DIR, { recursive: true, force: true });
     }
 }
 

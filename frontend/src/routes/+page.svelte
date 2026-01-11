@@ -15,6 +15,7 @@
         folderFilter,
         tagFilter,
         groupByFolder,
+        modelingStyle,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -25,12 +26,14 @@
         getConfigInfo,
         inferRelationships,
         syncDbtTests,
+        getExposures,
     } from "$lib/api";
     import { getParallelOffset, getModelFolder, normalizeTags, aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
     import ExposuresTable from "$lib/components/ExposuresTable.svelte";
+    import BusMatrix from "$lib/components/BusMatrix.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
     import LineageModal from "$lib/components/LineageModal.svelte";
     import IncompleteEntitiesWarningModal from "$lib/components/IncompleteEntitiesWarningModal.svelte";
@@ -56,6 +59,8 @@
     let lineageEnabled = $state(false);
     let exposuresEnabled = $state(false);
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
+    let busMatrixEnabled = $state(false);
+    let hasExposuresData = $state(false);
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
         push_warning_enabled: true,
@@ -73,7 +78,7 @@
         if (!lineageEnabled) {
             closeLineageModal();
         }
-        if (!exposuresEnabled) {
+        if (!exposuresEnabled || !hasExposuresData) {
             $viewMode = $viewMode === 'exposures' ? 'conceptual' : $viewMode;
         }
     });
@@ -229,6 +234,7 @@
                 lineageEnabled = info.lineage_enabled ?? false;
                 exposuresEnabled = info.exposures_enabled ?? false;
                 exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
+                $modelingStyle = info.modeling_style ?? 'entity_model';
             }
         } catch (e) {
             console.error(e);
@@ -328,13 +334,99 @@
 
     async function handleAutoLayout() {
         if (loading) return;
-        
+
         const entityNodes = $nodes.filter((n) => n.type === "entity");
         if (entityNodes.length === 0) return;
 
-        const layoutedNodes = await applyDagreLayout($nodes, $edges);
-        $nodes = layoutedNodes;
+        // If dimensional modeling is enabled, use smart positioning
+        if ($modelingStyle === "dimensional_model") {
+            await applySmartPositioning(entityNodes);
+        } else {
+            // Use dagre layout for entity modeling
+            const layoutedNodes = await applyDagreLayout($nodes, $edges);
+            $nodes = layoutedNodes;
+        }
         // fitView prop on Canvas will automatically adjust the view
+    }
+
+    async function applySmartPositioning(entityNodes: Node[]) {
+        // Calculate canvas center (average of all entity positions, or default)
+        const allEntityNodes = $nodes.filter((n) => n.type === "entity");
+        let centerX = 500;
+        let centerY = 400;
+
+        if (allEntityNodes.length > 0) {
+            const xPositions = allEntityNodes.map((n) => n.position.x);
+            const yPositions = allEntityNodes.map((n) => n.position.y);
+            centerX = (Math.min(...xPositions) + Math.max(...xPositions)) / 2;
+            centerY = (Math.min(...yPositions) + Math.max(...yPositions)) / 2;
+        }
+
+        // Separate facts and dimensions
+        const facts = entityNodes.filter(
+            (n) => (n.data as any)?.entity_type === "fact"
+        );
+        const dimensions = entityNodes.filter(
+            (n) => (n.data as any)?.entity_type === "dimension"
+        );
+        const unclassified = entityNodes.filter(
+            (n) => (n.data as any)?.entity_type !== "fact" && (n.data as any)?.entity_type !== "dimension"
+        );
+
+        // Position facts in center area
+        const updatedFacts = facts.map((fact, i) => {
+            // Distribute facts in a grid pattern near center
+            const gridSize = Math.ceil(Math.sqrt(facts.length));
+            const row = Math.floor(i / gridSize);
+            const col = i % gridSize;
+            const offset = 200;
+            return {
+                ...fact,
+                position: {
+                    x: centerX + (col - gridSize / 2) * offset,
+                    y: centerY + (row - gridSize / 2) * offset,
+                },
+            };
+        });
+
+        // Position dimensions in outer ring
+        const updatedDimensions = dimensions.map((dim, i) => {
+            const radius = 500;
+            const angle = (2 * Math.PI * i) / dimensions.length; // Distribute evenly
+            return {
+                ...dim,
+                position: {
+                    x: centerX + Math.cos(angle) * radius,
+                    y: centerY + Math.sin(angle) * radius,
+                },
+            };
+        });
+
+        // Position unclassified entities randomly around center
+        const updatedUnclassified = unclassified.map((entity) => ({
+            ...entity,
+            position: {
+                x: centerX + (Math.random() - 0.5) * 600,
+                y: centerY + (Math.random() - 0.5) * 600,
+            },
+        }));
+
+        // Update nodes with new positions
+        const nodeIdMap = new Map($nodes.map((n) => [n.id, n]));
+        const updatedNodes = $nodes.map((n) => {
+            const factNode = updatedFacts.find((fn) => fn.id === n.id);
+            if (factNode) return factNode;
+
+            const dimensionNode = updatedDimensions.find((dn) => dn.id === n.id);
+            if (dimensionNode) return dimensionNode;
+
+            const unclassifiedNode = updatedUnclassified.find((un) => un.id === n.id);
+            if (unclassifiedNode) return unclassifiedNode;
+
+            return n;
+        });
+
+        $nodes = updatedNodes;
     }
 
     // Expand/Collapse all entities toggle
@@ -432,6 +524,19 @@
         lineageEnabled = info?.lineage_enabled ?? false;
         exposuresEnabled = info?.exposures_enabled ?? false;
         exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
+        busMatrixEnabled = info?.bus_matrix_enabled ?? false;
+        $modelingStyle = info?.modeling_style ?? 'entity_model';
+
+                // Check if exposures data exists
+                if (exposuresEnabled) {
+                    try {
+                        const exposuresData = await getExposures();
+                        hasExposuresData = exposuresData.exposures.length > 0;
+                    } catch (e) {
+                        console.error("Failed to check exposures data:", e);
+                        hasExposuresData = false;
+                    }
+                }
 
                 // Load Manifest
                 const models = await getManifest();
@@ -494,10 +599,12 @@
                             // explicitly via loadSchema().
                             _schemaTags: hasDbtBinding ? [] : entityTags,
                             _manifestTags: hasDbtBinding ? entityTags : [],
+                            entity_type: e.entity_type,
                         },
                         parentId: undefined, // Will be set if grouping is enabled
                     };
                 });
+
 
                 // Create group nodes if grouping is enabled
                 const groupNodes: Node[] = [];
@@ -716,6 +823,7 @@
                             ? displayTags
                             : undefined;
 
+                    const entity_type = ((n.data as any)?.entity_type) || "unclassified";
                     return {
                         id: n.id,
                         label: ((n.data.label as string) || "").trim() || "Entity",
@@ -729,6 +837,8 @@
                         collapsed: (n.data?.collapsed as boolean) ?? false,
                         // Persist display tags only; schema writes rely on _schemaTags.
                         tags: tagsToPersist,
+                        // Include entity_type with default "unclassified" if not set
+                        entity_type: entity_type,
                     };
                 }),
             relationships: currentEdges.flatMap((e) => {
@@ -1040,15 +1150,15 @@
                 class:bg-white={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:text-primary-600={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:shadow-sm={$viewMode === "conceptual" || $viewMode === "logical"}
-                class:text-gray-500={$viewMode === "exposures"}
-                class:hover:text-gray-900={$viewMode === "exposures"}
+                class:text-gray-500={$viewMode === "exposures" || $viewMode === "bus_matrix"}
+                class:hover:text-gray-900={$viewMode === "exposures" || $viewMode === "bus_matrix"}
                 onclick={() => ($viewMode = "conceptual")}
                 title="Canvas View"
             >
                 <Icon icon="lucide:layout-dashboard" class="w-3.5 h-3.5" />
                 Canvas
             </button>
-            {#if exposuresEnabled}
+            {#if exposuresEnabled && hasExposuresData}
                 <button
                     class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
                     class:bg-white={$viewMode === "exposures"}
@@ -1061,6 +1171,21 @@
                 >
                     <Icon icon="mdi:application-export" class="w-3.5 h-3.5" />
                     Exposures
+                </button>
+            {/if}
+            {#if busMatrixEnabled}
+                <button
+                    class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                    class:bg-white={$viewMode === "bus_matrix"}
+                    class:text-primary-600={$viewMode === "bus_matrix"}
+                    class:shadow-sm={$viewMode === "bus_matrix"}
+                    class:text-gray-500={$viewMode !== "bus_matrix"}
+                    class:hover:text-gray-900={$viewMode !== "bus_matrix"}
+                    onclick={() => ($viewMode = "bus_matrix")}
+                    title="Bus Matrix View"
+                >
+                    <Icon icon="mdi:table-large" class="w-3.5 h-3.5" />
+                    Bus Matrix
                 </button>
             {/if}
         </div>
@@ -1120,15 +1245,17 @@
                 {allExpanded ? "Collapse All" : "Expand All"}
             </button>
 
-            <button
-                onclick={handleAutoLayout}
-                disabled={loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
-                title="Automatically arrange entities and relationships for optimal readability"
-            >
-                <Icon icon="lucide:wand-2" class="w-4 h-4" />
-                Auto Layout
-            </button>
+            {#if $modelingStyle === "dimensional_model"}
+                <button
+                    onclick={handleAutoLayout}
+                    disabled={loading}
+                    class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                    title="Arrange entities by fact/dimension positioning"
+                >
+                    <Icon icon="lucide:wand-2" class="w-4 h-4" />
+                    Auto Layout
+                </button>
+            {/if}
 
             <button
                 onclick={handleInferFromDbt}
@@ -1178,8 +1305,10 @@
         ></div>
         {#if $viewMode === 'exposures'}
             <ExposuresTable {exposuresEnabled} {exposuresDefaultLayout} />
+        {:else if $viewMode === 'bus_matrix'}
+            <BusMatrix />
         {:else}
-            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} {exposuresEnabled} />
+            <Canvas guidanceConfig={guidanceConfig} {lineageEnabled} {exposuresEnabled} {hasExposuresData} />
         {/if}
     </main>
 
