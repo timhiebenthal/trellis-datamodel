@@ -16,9 +16,8 @@
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
         inferRelationships,
-        getModelSchema,
-        updateModelSchema,
         getLineage,
+        getModelSchema,
     } from "$lib/api";
     import {
         getParallelOffset,
@@ -31,11 +30,13 @@
         toTitleCase,
     } from "$lib/utils";
     import { getContext } from "svelte";
-import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
-import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
+    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
+    import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
+    import TagEditor from "./TagEditor.svelte";
     import { openLineageModal } from "$lib/stores";
-import Icon from "@iconify/svelte";
+    import Icon from "@iconify/svelte";
     import { readable, type Readable } from "svelte/store";
+    import { SchemaManager, type SchemaState } from "$lib/services/schema-manager";
 
     function openExposuresView(event: MouseEvent) {
         event.stopPropagation(); // Prevent collapse toggle
@@ -118,20 +119,40 @@ import Icon from "@iconify/svelte";
         }
     });
 
-    // Schema editing state for bound models
-    let editableColumns = $state<ModelSchemaColumn[]>([]);
-    let schemaLoading = $state(false);
-    let schemaSaving = $state(false);
-    let schemaError = $state<string | null>(null);
-    let hasUnsavedChanges = $state(false);
+    // Schema management using SchemaManager service
+    let schemaManager: SchemaManager | null = null;
+    let schemaState: SchemaState = $state({
+        editableColumns: [],
+        isLoading: false,
+        isSaving: false,
+        error: null,
+        hasUnsavedChanges: false,
+        schema: null,
+        schemaTags: [],
+        manifestTags: [],
+        displayTags: [],
+    });
+
+    // Initialize SchemaManager when component mounts
+    $effect(() => {
+        if (!schemaManager) {
+            schemaManager = new SchemaManager((newState) => {
+                schemaState = newState;
+            });
+        }
+    });
 
     // Fetch schema when active model changes
     $effect(() => {
-        if (activeModelId && modelDetails) {
-            loadSchema();
-        } else {
-            editableColumns = [];
-            hasUnsavedChanges = false;
+        if (activeModelId && modelDetails && schemaManager) {
+            schemaManager.loadSchema(
+                modelDetails.name,
+                modelDetails.version,
+                modelDetails.tags,
+                modelDetails.columns,
+            );
+        } else if (schemaManager) {
+            schemaManager.reset();
         }
     });
 
@@ -150,7 +171,7 @@ import Icon from "@iconify/svelte";
     // Preserve edge selection when switching models (defensive measure)
     let previousModelIndex = $state(0);
     let lastKnownSelectedEdges = $state<Set<string>>(new Set());
-    
+
     // Continuously track selected edges
     $effect(() => {
         const selectedIds = new Set($edges.filter(e => e.selected).map(e => e.id));
@@ -158,7 +179,7 @@ import Icon from "@iconify/svelte";
             lastKnownSelectedEdges = selectedIds;
         }
     });
-    
+
     // Restore selection when model index changes
     $effect(() => {
         const currentModelIndex = activeModelIndex;
@@ -174,100 +195,37 @@ import Icon from "@iconify/svelte";
         previousModelIndex = currentModelIndex;
     });
 
-    async function loadSchema() {
-        if (!modelDetails) return;
-
-        schemaLoading = true;
-        schemaError = null;
-
-        try {
-            const schema = await getModelSchema(
-                modelDetails.name,
-                modelDetails.version ?? undefined,
-            );
-            const hasSchemaColumns =
-                Array.isArray(schema?.columns) && schema.columns.length > 0;
-
-            if (hasSchemaColumns) {
-                // Use columns from schema (includes descriptions)
-                editableColumns = schema.columns.map(
-                    (col: ModelSchemaColumn) => ({
-                        name: col.name,
-                        data_type: col.data_type || "text",
-                        description: col.description || "",
-                    }),
-                );
-            } else {
-                // Fallback to manifest columns if schema not found
-                editableColumns = modelDetails.columns.map((col) => ({
-                    name: col.name,
-                    data_type: col.type || "text",
-                    description: "",
-                }));
-            }
-
-            // Only sync tags from dbt schema for the primary model
-            if (activeModelIndex === 0) {
-                // Track tag sources separately to prevent inherited tag propagation
-                const schemaTags = normalizeTags(schema?.tags);
-                const manifestTags = normalizeTags(modelDetails.tags);
-                
-                // Combine for display: schema tags (explicit) + manifest tags (may include inherited)
-                // But track them separately so we only save schema tags
-                const displayTags = [...new Set([...schemaTags, ...manifestTags])];
-
-                updateNodeData(id, { 
-                    tags: displayTags,
-                    _schemaTags: schemaTags,
-                    _manifestTags: manifestTags
-                });
-            }
-
-            hasUnsavedChanges = false;
-        } catch (e) {
-            console.error("Error loading schema:", e);
-            schemaError = "Failed to load schema";
-            // Fallback to manifest columns
-            editableColumns = modelDetails.columns.map((col) => ({
-                name: col.name,
-                data_type: col.type || "text",
-                description: "",
-            }));
-        } finally {
-            schemaLoading = false;
-        }
-    }
-
     // Show warning modal and wait for user decision
-    function showUndescribedAttributesWarningModal(attributeNames: string[]): Promise<boolean> {
-        return new Promise((resolve) => {
-            undescribedAttributeNames = attributeNames;
+    async function showUndescribedAttributesWarningModal(undescribedAttributes: string[]): Promise<boolean> {
+        undescribedAttributeNames = undescribedAttributes;
+        showUndescribedAttributesWarning = true;
+
+        return new Promise<boolean>((resolve) => {
             warningResolve = resolve;
-            showUndescribedAttributesWarning = true;
         });
     }
 
     function handleWarningConfirm() {
-        showUndescribedAttributesWarning = false;
         if (warningResolve) {
             warningResolve(true);
             warningResolve = null;
         }
+        showUndescribedAttributesWarning = false;
     }
 
     function handleWarningCancel() {
-        showUndescribedAttributesWarning = false;
         if (warningResolve) {
             warningResolve(false);
             warningResolve = null;
         }
+        showUndescribedAttributesWarning = false;
     }
 
     async function saveSchema() {
-        if (!modelDetails) return;
+        if (!schemaManager || !modelDetails) return;
 
         // Check for attributes without descriptions
-        const undescribedAttributes = editableColumns
+        const undescribedAttributes = schemaState.editableColumns
             .filter((col) => col.name && (!col.description || col.description.trim().length === 0))
             .map((col) => col.name);
 
@@ -278,31 +236,19 @@ import Icon from "@iconify/svelte";
             }
         }
 
-        schemaSaving = true;
-        schemaError = null;
-
         try {
-            // Only save schema tags (explicit), not manifest tags (which may be inherited)
-            // User-added tags are added to _schemaTags when addTag is called
-            const tagsToSave = normalizeTags(data._schemaTags);
-            
-            await updateModelSchema(
-                modelDetails.name,
-                editableColumns.map((col) => ({
-                    name: col.name,
-                    data_type: col.data_type,
-                    description: col.description,
-                })),
-                data.description,
-                tagsToSave,
-                modelDetails.version ?? undefined,
-            );
-            hasUnsavedChanges = false;
-        } catch (e: any) {
-            console.error("Error saving schema:", e);
-            schemaError = e.message || "Failed to save schema";
-        } finally {
-            schemaSaving = false;
+            await schemaManager.saveSchema(data.description);
+            // Update node data with schema tags from SchemaManager
+            if (activeModelIndex === 0) {
+                updateNodeData(id, {
+                    tags: schemaState.displayTags,
+                    _schemaTags: schemaState.schemaTags,
+                    _manifestTags: schemaState.manifestTags,
+                });
+            }
+        } catch (e) {
+            // Error is already handled by SchemaManager
+            console.error('Schema save failed:', e);
         }
     }
 
@@ -310,27 +256,18 @@ import Icon from "@iconify/svelte";
         index: number,
         updates: Partial<ModelSchemaColumn>,
     ) {
-        editableColumns = editableColumns.map((col, i) =>
-            i === index ? { ...col, ...updates } : col,
-        );
-        hasUnsavedChanges = true;
+        if (!schemaManager) return;
+        schemaManager.updateEditableColumn(index, updates);
     }
 
     function addEditableColumn() {
-        editableColumns = [
-            ...editableColumns,
-            {
-                name: "",
-                data_type: "text",
-                description: "",
-            },
-        ];
-        hasUnsavedChanges = true;
+        if (!schemaManager) return;
+        schemaManager.addEditableColumn();
     }
 
     function deleteEditableColumn(index: number) {
-        editableColumns = editableColumns.filter((_, i) => i !== index);
-        hasUnsavedChanges = true;
+        if (!schemaManager) return;
+        schemaManager.deleteEditableColumn(index);
     }
 
     function addAdditionalModel(modelId: string) {
@@ -730,143 +667,30 @@ import Icon from "@iconify/svelte";
 
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
-    let tagInput = $state("");
-    let showTagInput = $state(false);
 
-    function getCurrentTags(nodeId: string): string[] {
-        const node = $nodes.find((n) => n.id === nodeId);
-        return normalizeTags(node?.data?.tags);
-    }
+    function handleTagsUpdate(newTags: string[]) {
+        const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
 
-    function addTag(tag: string) {
-        const trimmed = tag.trim();
-        if (!trimmed) return;
-
-        const currentTags = getCurrentTags(id);
-        if (currentTags.includes(trimmed)) return;
-
-        // When user adds a tag, add it to both display tags and schema tags
-        const currentSchemaTags = normalizeTags(data._schemaTags);
-        updateNodeData(id, { 
-            tags: [...currentTags, trimmed],
-            _schemaTags: [...currentSchemaTags, trimmed]
-        });
-        if (isBound) {
-            hasUnsavedChanges = true;
-        }
-        tagInput = "";
-    }
-
-    function removeTag(tag: string) {
-        const newTags = entityTags.filter((t) => t !== tag);
-        // Also remove from schema tags if present
-        const currentSchemaTags = normalizeTags(data._schemaTags);
-        const newSchemaTags = currentSchemaTags.filter((t) => t !== tag);
-        
-        updateNodeData(id, { 
-            tags: newTags,
-            _schemaTags: newSchemaTags
-        });
-        if (isBound) {
-            hasUnsavedChanges = true;
-        }
-    }
-
-    function handleTagInputKeydown(e: KeyboardEvent) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (tagInput.trim()) {
-                addTag(tagInput);
-            }
-        } else if (e.key === "Escape") {
-            tagInput = "";
-            showTagInput = false;
-        } else if (e.key === ",") {
-            e.preventDefault();
-            const parts = tagInput.split(",");
-            parts.forEach((part) => {
-                if (part.trim()) {
-                    addTag(part.trim());
-                }
-            });
-            tagInput = "";
-        }
-    }
-
-    function handleTagInputBlur() {
-        if (tagInput.trim()) {
-            if (isBatchEditing) {
-                addTagToBatch(tagInput);
-            } else {
-                addTag(tagInput);
-            }
-        }
-        showTagInput = false;
-    }
-
-    function addTagToBatch(tag: string) {
-        const trimmed = tag.trim();
-        if (!trimmed) return;
-        
-        const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
-            const currentTags = getCurrentTags(nodeId);
-            if (!currentTags.includes(trimmed)) {
-                const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
-                updateNodeData(nodeId, { 
-                    tags: [...currentTags, trimmed],
-                    _schemaTags: [...currentSchemaTags, trimmed]
-                });
-                // If this is the current node and it's bound, mark as having unsaved changes
-                if (nodeId === id && isBound) {
-                    hasUnsavedChanges = true;
-                }
-            }
-        });
-        tagInput = "";
-    }
+            const currentTags = normalizeTags(node?.data?.tags);
+            const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
 
-    function removeTagFromBatch(tag: string) {
-        const allSelectedIds = [id, ...selectedEntityNodes.map((n) => n.id)];
-        allSelectedIds.forEach((nodeId) => {
-            const node = $nodes.find((n) => n.id === nodeId);
-            if (node && node.type === "entity") {
-                const currentTags = normalizeTags(node.data?.tags);
-                const newTags = currentTags.filter((t) => t !== tag);
-                const currentSchemaTags = normalizeTags(node.data?._schemaTags);
-                const newSchemaTags = currentSchemaTags.filter((t) => t !== tag);
-                updateNodeData(nodeId, { 
+            // For the current node and bound models, use SchemaManager
+            if (nodeId === id && isBound && schemaManager) {
+                schemaManager.updateSchemaTags(newTags);
+                updateNodeData(nodeId, {
                     tags: newTags,
-                    _schemaTags: newSchemaTags
+                    _schemaTags: newTags
                 });
-                // If this is the current node and it's bound, mark as having unsaved changes
-                if (nodeId === id && isBound) {
-                    hasUnsavedChanges = true;
-                }
+            } else {
+                // For unbound nodes or batch editing, just update node data directly
+                updateNodeData(nodeId, {
+                    tags: newTags,
+                    _schemaTags: newTags
+                });
             }
         });
-    }
-
-    function handleBatchTagInputKeydown(e: KeyboardEvent) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (tagInput.trim()) {
-                addTagToBatch(tagInput);
-            }
-        } else if (e.key === "Escape") {
-            tagInput = "";
-            showTagInput = false;
-        } else if (e.key === ",") {
-            e.preventDefault();
-            const parts = tagInput.split(",");
-            parts.forEach((part) => {
-                if (part.trim()) {
-                    addTagToBatch(part.trim());
-                }
-            });
-            tagInput = "";
-        }
     }
 
     // Field drafting functionality
@@ -1405,54 +1229,17 @@ import Icon from "@iconify/svelte";
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span
                                 class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                >Tags</span
-                            >
-                            {#each entityTags as tag}
-                                <span
-                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
-                                >
-                                    {tag}
-                                    <button
-                                        onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
-                                        class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
-                                        title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
-                                    >
-                                        <Icon icon="lucide:x" class="w-2.5 h-2.5" />
-                                    </button>
-                                </span>
-                            {/each}
-                            {#if !showTagInput}
-                                <button
-                                    onclick={() => {
-                                        showTagInput = true;
-                                        setTimeout(() => {
-                                            const input = document.getElementById(`tag-input-${id}`) as HTMLInputElement;
-                                            input?.focus();
-                                        }, 0);
-                                    }}
-                                    class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
-                                    title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
-                                >
-                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
-                                    Add
-                                </button>
-                            {/if}
+                            >Tags</span>
+                            <TagEditor
+                                tags={entityTags}
+                                canEdit={true}
+                                isBatchMode={isBatchEditing}
+                                onUpdate={(newTags) => handleTagsUpdate(newTags)}
+                            ></TagEditor>
                         </div>
-                        {#if showTagInput}
-                            <input
-                                id="tag-input-{id}"
-                                type="text"
-                                bind:value={tagInput}
-                                onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
-                                onblur={handleTagInputBlur}
-                                placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                onclick={(e) => e.stopPropagation()}
-                            />
-                        {/if}
                     </div>
 
-                    {#if schemaLoading}
+                    {#if schemaState.isLoading}
                         <div
                             class="text-center text-gray-400 py-4 text-[10px] italic"
                         >
@@ -1463,8 +1250,8 @@ import Icon from "@iconify/svelte";
                             class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
                         >
-                            {#if editableColumns.length > 0}
-                                {#each editableColumns as col, index}
+                            {#if schemaState.editableColumns.length > 0}
+                                {#each schemaState.editableColumns as col, index}
                                     <div
                                         class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
                                         class:bg-blue-50={$draggingField?.nodeId !==
@@ -1594,33 +1381,33 @@ import Icon from "@iconify/svelte";
                             <Icon icon="lucide:plus" class="w-3 h-3" /> Add Column
                         </button>
 
-                        {#if schemaError}
+                        {#if schemaState.error}
                             <div
                                 class="mt-2 p-2 bg-danger-50 border border-danger-200 rounded text-danger-800 text-[10px]"
                             >
-                                {schemaError}
+                                {schemaState.error}
                             </div>
                         {/if}
 
                         <div class="flex gap-2 mt-2">
                             <button
                                 onclick={saveSchema}
-                                disabled={!hasUnsavedChanges || schemaSaving}
+                                disabled={!schemaState.hasUnsavedChanges || schemaState.isSaving}
                                 class="flex-1 text-[10px] font-medium p-1.5 rounded border transition-colors flex items-center justify-center gap-1"
-                                class:text-primary-600={hasUnsavedChanges &&
-                                    !schemaSaving}
-                                class:hover:bg-primary-50={hasUnsavedChanges &&
-                                    !schemaSaving}
-                                class:border-primary-200={hasUnsavedChanges &&
-                                    !schemaSaving}
-                                class:text-gray-400={!hasUnsavedChanges ||
-                                    schemaSaving}
-                                class:border-gray-200={!hasUnsavedChanges ||
-                                    schemaSaving}
-                                class:cursor-not-allowed={!hasUnsavedChanges ||
-                                    schemaSaving}
+                                class:text-primary-600={schemaState.hasUnsavedChanges &&
+                                    !schemaState.isSaving}
+                                class:hover:bg-primary-50={schemaState.hasUnsavedChanges &&
+                                    !schemaState.isSaving}
+                                class:border-primary-200={schemaState.hasUnsavedChanges &&
+                                    !schemaState.isSaving}
+                                class:text-gray-400={!schemaState.hasUnsavedChanges ||
+                                    schemaState.isSaving}
+                                class:border-gray-200={!schemaState.hasUnsavedChanges ||
+                                    schemaState.isSaving}
+                                class:cursor-not-allowed={!schemaState.hasUnsavedChanges ||
+                                    schemaState.isSaving}
                             >
-                                {#if schemaSaving}
+                                {#if schemaState.isSaving}
                                     <Icon
                                         icon="lucide:loader-2"
                                         class="w-3 h-3 animate-spin"
@@ -1666,51 +1453,14 @@ import Icon from "@iconify/svelte";
                             <div class="flex items-center gap-2 flex-wrap mb-1">
                                 <span
                                     class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                    >Tags</span
-                                >
-                                {#each entityTags as tag}
-                                    <span
-                                        class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
-                                    >
-                                        {tag}
-                                        <button
-                                            onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
-                                            class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
-                                            title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
-                                        >
-                                            <Icon icon="lucide:x" class="w-2.5 h-2.5" />
-                                        </button>
-                                    </span>
-                                {/each}
-                                {#if !showTagInput}
-                                    <button
-                                        onclick={() => {
-                                            showTagInput = true;
-                                            setTimeout(() => {
-                                                const input = document.getElementById(`tag-input-unbound-${id}`) as HTMLInputElement;
-                                                input?.focus();
-                                            }, 0);
-                                        }}
-                                        class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
-                                        title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
-                                    >
-                                        <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
-                                        Add
-                                    </button>
-                                {/if}
+                                >Tags</span>
+                                <TagEditor
+                                    tags={entityTags}
+                                    canEdit={true}
+                                    isBatchMode={isBatchEditing}
+                                    onUpdate={(newTags) => handleTagsUpdate(newTags)}
+                                ></TagEditor>
                             </div>
-                            {#if showTagInput}
-                                <input
-                                    id="tag-input-unbound-{id}"
-                                    type="text"
-                                    bind:value={tagInput}
-                                    onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
-                                    onblur={handleTagInputBlur}
-                                    placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                    class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                    onclick={(e) => e.stopPropagation()}
-                                />
-                            {/if}
                         </div>
 
                         <div
@@ -1887,51 +1637,14 @@ import Icon from "@iconify/svelte";
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span
                                 class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                >Tags</span
-                            >
-                            {#each entityTags as tag}
-                                <span
-                                    class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] border border-blue-100 flex items-center gap-1 group"
-                                >
-                                    {tag}
-                                    <button
-                                        onclick={() => isBatchEditing ? removeTagFromBatch(tag) : removeTag(tag)}
-                                        class="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
-                                        title={isBatchEditing ? "Remove tag from all selected" : "Remove tag"}
-                                    >
-                                        <Icon icon="lucide:x" class="w-2.5 h-2.5" />
-                                    </button>
-                                </span>
-                            {/each}
-                            {#if !showTagInput}
-                                <button
-                                    onclick={() => {
-                                        showTagInput = true;
-                                        setTimeout(() => {
-                                            const input = document.getElementById(`tag-input-conceptual-${id}`) as HTMLInputElement;
-                                            input?.focus();
-                                        }, 0);
-                                    }}
-                                    class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded text-[10px] border border-blue-200 transition-colors flex items-center gap-1"
-                                    title={isBatchEditing ? "Add tag to all selected" : "Add tag"}
-                                >
-                                    <Icon icon="lucide:plus" class="w-2.5 h-2.5" />
-                                    Add
-                                </button>
-                            {/if}
+                                >Tags</span>
+                            <TagEditor
+                                tags={entityTags}
+                                canEdit={true}
+                                isBatchMode={isBatchEditing}
+                                onUpdate={(newTags) => handleTagsUpdate(newTags)}
+                            ></TagEditor>
                         </div>
-                        {#if showTagInput}
-                            <input
-                                id="tag-input-conceptual-{id}"
-                                type="text"
-                                bind:value={tagInput}
-                                onkeydown={isBatchEditing ? handleBatchTagInputKeydown : handleTagInputKeydown}
-                                onblur={handleTagInputBlur}
-                                placeholder={isBatchEditing ? "Enter tag for all selected (comma or Enter)" : "Enter tag (comma or Enter to add)"}
-                                class="w-full px-1.5 py-0.5 text-[10px] text-gray-800 bg-white border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                onclick={(e) => e.stopPropagation()}
-                            />
-                        {/if}
                     </div>
                     {#if isBound}
                         <div class="mt-2 space-y-1.5">

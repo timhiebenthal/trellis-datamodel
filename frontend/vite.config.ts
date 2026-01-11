@@ -18,7 +18,13 @@ export default defineConfig({
             },
         },
     },
+    // Ensure we always resolve browser-ready builds (Svelte defaults to server-first if unset)
+    resolve: {
+        conditions: ['browser'],
+    },
     test: {
-        include: ['src/**/*.{test,spec}.{js,ts}']
+        include: ['src/**/*.{test,spec}.{js,ts}'],
+        environment: 'jsdom',
+        setupFiles: ['./tests/vitest-setup.ts'],
     }
 });

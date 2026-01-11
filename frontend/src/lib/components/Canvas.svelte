@@ -17,11 +17,12 @@
     import { setContext } from "svelte";
     import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
+    import { DimensionalModelPositioner, GroupSizeCalculator } from "$lib/services/position-calculator";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
-    import Icon from "@iconify/svelte";
+    import Icon from "$lib/components/Icon.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
     import { writable } from "svelte/store";
 
@@ -66,6 +67,10 @@
     // Wizard state
     let wizardOpen = $state(false);
     let wizardData = $state<EntityWizardData | null>(null);
+
+    // Position calculator services
+    const positioner = new DimensionalModelPositioner();
+    const groupSizeCalculator = new GroupSizeCalculator();
 
     function onConnect(connection: Connection) {
         const connectionKey = `${connection.source}-${connection.target}`;
@@ -192,41 +197,8 @@
     }
 
     function calculateSmartPosition(entityType: "fact" | "dimension" | "unclassified"): { x: number; y: number } {
-        // Calculate canvas center (average of all existing entity positions, or default center)
-        const entityNodes = $nodes.filter((n) => n.type === "entity");
-        let centerX = 500;
-        let centerY = 400;
-
-        if (entityNodes.length > 0) {
-            const xPositions = entityNodes.map((n) => n.position.x);
-            const yPositions = entityNodes.map((n) => n.position.y);
-            centerX = (Math.min(...xPositions) + Math.max(...xPositions)) / 2;
-            centerY = (Math.min(...yPositions) + Math.max(...yPositions)) / 2;
-        }
-
-        if (entityType === "fact") {
-            // Place in center area with random offset
-            const offsetX = (Math.random() - 0.5) * 400; // -200 to +200
-            const offsetY = (Math.random() - 0.5) * 400;
-            return {
-                x: centerX + offsetX,
-                y: centerY + offsetY,
-            };
-        } else if (entityType === "dimension") {
-            // Place in outer ring around center
-            const radius = 500 + Math.random() * 300; // 500-800px from center
-            const angle = Math.random() * 2 * Math.PI; // Random angle around circle
-            return {
-                x: centerX + Math.cos(angle) * radius,
-                y: centerY + Math.sin(angle) * radius,
-            };
-        } else {
-            // Unclassified - use default positioning
-            return {
-                x: 100 + Math.random() * 200,
-                y: 100 + Math.random() * 200,
-            };
-        }
+        // Use positioner service for smart positioning
+        return positioner.calculateSmartPosition(entityType, $nodes);
     }
 
     function handleWizardComplete(data: EntityWizardData) {
@@ -282,97 +254,15 @@
 
     // Auto-resize groups to fit children
     function updateGroupSizes() {
-        // Skip updates during drag to prevent interruption
-        // Check both manual state and store state
-        if (isDragging || $nodes.some((n) => n.dragging)) return;
-
-        const groups = $nodes.filter(
-            (n) => n.type === "group" && !n.data.collapsed,
+        // Use group size calculator service
+        const result = groupSizeCalculator.calculateGroupSizes(
+            $nodes,
+            $viewMode as "conceptual" | "logical",
+            isDragging,
         );
-        if (groups.length === 0) return;
 
-        const updates = new Map<string, { width: number; height: number }>();
-
-        for (const group of groups) {
-            // Skip groups that have been manually resized
-            if (group.data?.manuallyResized) continue;
-
-            const children = $nodes.filter(
-                (n) => n.parentId === group.id && !n.hidden,
-            );
-            if (children.length === 0) continue;
-
-            let maxX = 0;
-            let maxY = 0;
-
-            for (const child of children) {
-                // Use measured dimensions if available and valid
-                // Fallback to data dimensions or defaults
-                const measuredWidth = child.measured?.width;
-                const measuredHeight = child.measured?.height;
-
-                const width =
-                    measuredWidth && measuredWidth > 0
-                        ? measuredWidth
-                        : ((child.data?.width as number) ?? 320);
-
-                // For height, if measured is small (e.g. collapsed state) but data says it should be expanded,
-                // we might want to trust data? But measured is usually truth.
-                // However, if just expanded, measured might be old.
-                // We'll trust measured if it's substantial, otherwise check data.
-                let height = measuredHeight ?? 0;
-
-                // If height is missing or suspiciously small (<50) and it's not collapsed, estimate
-                if ((!height || height < 50) && !child.data?.collapsed) {
-                    let estimatedHeight = (child.data?.panelHeight as number)
-                        ? (child.data.panelHeight as number) + 80 // Header + padding
-                        : 300;
-
-                    // Add extra height for logical view metadata if bound
-                    if ($viewMode === "logical" && child.data?.dbt_model) {
-                        estimatedHeight += 100; // Schema/table + materialization badges + tags
-                    }
-
-                    height = estimatedHeight;
-                } else if (!height) {
-                    height = 200;
-                }
-
-                const right = child.position.x + width;
-                const bottom = child.position.y + height;
-
-                if (right > maxX) maxX = right;
-                if (bottom > maxY) maxY = bottom;
-            }
-
-            // Add padding
-            const padding = 40; // Increased padding
-            const newWidth = Math.max(maxX + padding, 300); // Min width 300
-            const newHeight = Math.max(maxY + padding, 200); // Min height 200
-
-            const currentWidth = (group.data.width as number) ?? 0;
-            const currentHeight = (group.data.height as number) ?? 0;
-
-            // Only update if difference is significant
-            if (
-                Math.abs(newWidth - currentWidth) > 5 ||
-                Math.abs(newHeight - currentHeight) > 5
-            ) {
-                updates.set(group.id, { width: newWidth, height: newHeight });
-            }
-        }
-
-        if (updates.size > 0) {
-            $nodes = $nodes.map((n) => {
-                if (updates.has(n.id)) {
-                    const u = updates.get(n.id)!;
-                    return {
-                        ...n,
-                        data: { ...n.data, width: u.width, height: u.height },
-                    };
-                }
-                return n;
-            });
+        if (result.needsUpdate) {
+            $nodes = groupSizeCalculator.applyGroupSizes($nodes, result.sizes);
         }
     }
 

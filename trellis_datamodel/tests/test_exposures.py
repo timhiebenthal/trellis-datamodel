@@ -6,7 +6,7 @@ import textwrap
 from pathlib import Path
 
 import trellis_datamodel.config as cfg
-from trellis_datamodel.routes.exposures import _load_manifest, _load_data_model
+from trellis_datamodel.services.exposures import get_exposures
 
 
 def _prepare_config(monkeypatch):

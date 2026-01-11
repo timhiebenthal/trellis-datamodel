@@ -124,17 +124,20 @@ class DbtCoreAdapter:
                 # Use the model name part (the element before the vN suffix)
                 return parts[-2]
             return parts[-1]
-        
+
         # For unbound entities, apply inference patterns
         entity_id = entity.get("id") or ""
         entity_type = entity.get("entity_type", "unclassified")
-        
+
         # Only apply prefixes when dimensional modeling is enabled
         if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             return entity_id
-        
+
         # Apply prefix based on entity type
-        if entity_type == "dimension" and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+        if (
+            entity_type == "dimension"
+            and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+        ):
             prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix[0]
             # Check if entity_id already has a prefix
             for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
@@ -148,7 +151,7 @@ class DbtCoreAdapter:
                 if entity_id.lower().startswith(existing_prefix.lower()):
                     return entity_id  # Already has a prefix
             return f"{prefix}{entity_id}"
-        
+
         # Default: return entity_id without prefix
         return entity_id
 
@@ -584,7 +587,7 @@ class DbtCoreAdapter:
 
     def infer_relationships(self, include_unbound: bool = False) -> list[Relationship]:
         """Scan dbt yml files and infer entity relationships from relationship tests.
-        
+
         When include_unbound=True, returns ALL relationships found in dbt yml files
         using raw model names. The frontend is responsible for mapping model names
         to entity IDs based on current canvas state (which may not be saved yet).
@@ -642,17 +645,27 @@ class DbtCoreAdapter:
                                     raw_columns = ver.get("columns", []) or []
                                     expanded_columns: list[dict] = []
                                     for col in raw_columns:
-                                        if isinstance(col, dict) and col.get("include") == "all":
-                                            expanded_columns.extend(copy.deepcopy(previous_columns))
+                                        if (
+                                            isinstance(col, dict)
+                                            and col.get("include") == "all"
+                                        ):
+                                            expanded_columns.extend(
+                                                copy.deepcopy(previous_columns)
+                                            )
                                         else:
                                             expanded_columns.append(col)
 
                                     # If no columns are explicitly provided, fall back to previous set
                                     if not expanded_columns and previous_columns:
-                                        expanded_columns = copy.deepcopy(previous_columns)
+                                        expanded_columns = copy.deepcopy(
+                                            previous_columns
+                                        )
 
                                     versioned_columns.append(
-                                        (ver.get("v") or ver.get("version"), expanded_columns)
+                                        (
+                                            ver.get("v") or ver.get("version"),
+                                            expanded_columns,
+                                        )
                                     )
                                     previous_columns = copy.deepcopy(expanded_columns)
                             else:
@@ -697,18 +710,20 @@ class DbtCoreAdapter:
                                         if not to_ref or not target_field:
                                             continue
 
-                                        target_base, target_version_str = self._parse_ref(
-                                            to_ref
+                                        target_base, target_version_str = (
+                                            self._parse_ref(to_ref)
                                         )
-                                        
+
                                         # Convert version string to int if present
                                         target_version_int = None
                                         if target_version_str:
                                             try:
-                                                target_version_int = int(target_version_str)
+                                                target_version_int = int(
+                                                    target_version_str
+                                                )
                                             except ValueError:
                                                 pass
-                                        
+
                                         # Convert model_version to int if present
                                         source_version_int = None
                                         if model_version is not None:
@@ -716,19 +731,22 @@ class DbtCoreAdapter:
                                                 source_version_int = int(model_version)
                                             except (ValueError, TypeError):
                                                 pass
-                                        
+
                                         # When include_unbound, use raw model name
                                         if include_unbound:
                                             target_entity_id = target_base
                                         else:
                                             target_entity_id = self._resolve_entity_id(
-                                                model_to_entity, target_base, target_version_str
+                                                model_to_entity,
+                                                target_base,
+                                                target_version_str,
                                             )
 
                                             # Skip relationships where either side is not bound
                                             if (
                                                 entity_id not in bound_entities
-                                                or target_entity_id not in bound_entities
+                                                or target_entity_id
+                                                not in bound_entities
                                             ):
                                                 continue
 
@@ -787,7 +805,7 @@ class DbtCoreAdapter:
         # Group relationships by entity (the one with the FK)
         # FK is always on the "many" side of the relationship
         fk_by_entity: dict[str, list[dict]] = {}
-        
+
         # Track all fields that appear in ANY relationship in the data model
         # This helps us identify which relationship tests are managed by us vs manually added
         all_relationship_fields_by_entity: dict[str, set[str]] = {}
@@ -805,7 +823,12 @@ class DbtCoreAdapter:
             # Determine which side has the "many" cardinality (where FK should be)
             # Relationship types ending in "_to_many" or starting with "many_to_" have FK on target/source respectively
             # For one_to_one, FK is typically on source (FK holder → referenced table per spec)
-            if rel_type in ("one_to_many", "one_to_zero_or_many", "zero_or_one_to_many", "zero_or_many_to_many"):
+            if rel_type in (
+                "one_to_many",
+                "one_to_zero_or_many",
+                "zero_or_one_to_many",
+                "zero_or_many_to_many",
+            ):
                 # FK on target (target is the "many" side)
                 fk_entity = target_id
                 fk_field = target_field
@@ -837,10 +860,14 @@ class DbtCoreAdapter:
                     "ref_field": ref_field,
                 }
             )
-            
+
             # Track which fields are involved in relationships
-            all_relationship_fields_by_entity.setdefault(source_id, set()).add(source_field)
-            all_relationship_fields_by_entity.setdefault(target_id, set()).add(target_field)
+            all_relationship_fields_by_entity.setdefault(source_id, set()).add(
+                source_field
+            )
+            all_relationship_fields_by_entity.setdefault(target_id, set()).add(
+                target_field
+            )
 
         models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
@@ -897,10 +924,12 @@ class DbtCoreAdapter:
             # Build a map of which fields should have which relationship tests
             fk_list = fk_by_entity.get(entity_id, [])
             fk_fields = {fk_info["fk_field"] for fk_info in fk_list}
-            
+
             # Get all fields that appear in relationships for this entity
-            relationship_fields = all_relationship_fields_by_entity.get(entity_id, set())
-            
+            relationship_fields = all_relationship_fields_by_entity.get(
+                entity_id, set()
+            )
+
             # Clean up: Remove relationship tests from fields that:
             # 1. Are in a relationship in the data model (relationship_fields)
             # 2. But are NOT currently FKs (not in fk_fields)
@@ -909,11 +938,15 @@ class DbtCoreAdapter:
             if "columns" in model_entry:
                 for col in model_entry.get("columns", []):
                     col_name = col.get("name")
-                    if col_name and col_name in relationship_fields and col_name not in fk_fields:
+                    if (
+                        col_name
+                        and col_name in relationship_fields
+                        and col_name not in fk_fields
+                    ):
                         # This field was in a relationship but is no longer an FK
                         # Remove its relationship test
                         self.yaml_handler.remove_relationship_test(col)
-            
+
             # Now add/update relationship tests for current FKs
             for fk_info in fk_list:
                 fk_field = fk_info["fk_field"]
@@ -1099,6 +1132,7 @@ class DbtCoreAdapter:
         # Check cache to avoid re-scanning manifest if unchanged
         manifest_path = self.manifest_path
         import os
+
         cache_key = f"{manifest_path}:{os.path.getmtime(manifest_path)}"
 
         if self._inference_cache_key == cache_key and self._inference_cache is not None:

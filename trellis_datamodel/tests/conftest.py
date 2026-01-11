@@ -65,6 +65,7 @@ def clean_test_files():
     cfg.EXPOSURES_ENABLED = False
     cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
     cfg.Bus_MATRIX_ENABLED = True  # Default to enabled
+    cfg.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
 
 
 @pytest.fixture
@@ -161,14 +162,17 @@ def test_client(mock_manifest):
     # Ensure we're using the current config module
     if "trellis_datamodel.config" in sys.modules:
         cfg_module = sys.modules["trellis_datamodel.config"]
+
         # Reset to test defaults in case of module reload
-        # cfg_module.LINEAGE_ENABLED = False  # Let it stay True from test config
+        cfg_module.LINEAGE_ENABLED = False
         cfg_module.LINEAGE_LAYERS = []
         cfg_module.EXPOSURES_ENABLED = False
         cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
-        
+        cfg_module.Bus_MATRIX_ENABLED = True
+        # Ensure MANIFEST_PATH is set to the test directory manifest (mock_manifest creates it)
+        cfg_module.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
+
         # Reload routes modules to ensure they use the updated config
-        # This is needed because CLI tests reload modules, and routes might have old config references
         routes_modules = [
             "trellis_datamodel.routes.exposures",
             "trellis_datamodel.routes.lineage",

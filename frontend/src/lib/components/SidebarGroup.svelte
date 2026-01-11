@@ -3,6 +3,7 @@
     import SidebarGroup from "./SidebarGroup.svelte"; 
     import Icon from "@iconify/svelte";
     import { folderFilter, nodes } from "$lib/stores";
+    import { extractRelativePath, toggleFolderFilter } from "$lib/utils/folder-utils";
 
     let { node, onDragStart, mainFolderPrefix = "" } = $props<{
         node: TreeNode;
@@ -12,16 +13,25 @@
     
     let collapsed = $state(false);
     
-    // Check if the current model is bound to any entity
-    let isModelBound = $derived(
-        node.model ? $nodes.some((n) => {
-            if (n.type !== 'entity') return false;
-            const data = n.data as unknown as EntityData;
-            const primaryMatch = data.dbt_model === node.model!.unique_id;
-            const additionalMatch = (data.additional_models || []).includes(node.model!.unique_id);
-            return primaryMatch || additionalMatch;
-        }) : false
-    );
+    // Check if current model is bound to any entity - use $state to avoid derived recalculations
+    let isModelBound = $state(false);
+    
+    // Update isModelBound when nodes changes
+    $effect(() => {
+        const currentNodes = $nodes;
+        if (node.model) {
+            isModelBound = currentNodes.some((n) => {
+                if (n.type !== 'entity') return false;
+                const data = n.data as unknown as EntityData;
+                const primaryMatch = data.dbt_model === node.model!.unique_id;
+                const additionalMatch = (data.additional_models || []).includes(node.model!.unique_id);
+                return primaryMatch || additionalMatch;
+            });
+        }
+    });
+    
+    // Extract of relative folder path for filtering
+    let filterPath = $derived(extractRelativePath(node.path));
     
     function toggle(event: MouseEvent) {
         // Only toggle on chevron/folder icon click, not on the whole button
@@ -33,17 +43,9 @@
 
     function handleFolderClick(event: MouseEvent) {
         const target = event.target as HTMLElement;
-        if (!target.closest('.toggle-icon')) {
-            // Clicked on folder name, set filter
-            const folderPath = node.path.replace(/^[^/]+\//, ''); // Remove first segment
-            if (folderPath && folderPath !== node.path) {
-                const prev = $folderFilter as unknown;
-                const prevArr = Array.isArray(prev) ? (prev as string[]) : [];
-                const next = prevArr.includes(folderPath)
-                    ? prevArr.filter((f) => f !== folderPath)
-                    : [...prevArr, folderPath];
-                $folderFilter = next;
-            }
+        if (!target.closest('.toggle-icon') && filterPath) {
+            // Clicked on folder name, toggle filter
+            $folderFilter = toggleFolderFilter($folderFilter, filterPath);
         }
     }
 </script>

@@ -13,11 +13,16 @@
     getNodeCenter,
     calculateConnectionInfo,
     getSideRotation,
-    buildOrthogonalPath,
-    buildSelfLoopPath,
     calculateMarkerPosition,
     type Side
   } from '$lib/edge-utils';
+  import {
+    calculateBaseOffset,
+    calculateLabelPositionWithContext,
+    buildEdgePathWithContext,
+    MARKER_PADDING,
+    type EdgeCalculationContext
+  } from '$lib/utils/edge-calculations';
 
   let { 
     id,
@@ -52,12 +57,7 @@
   });
 
   // Calculate base offset for parallel edges - spread them out horizontally
-  const baseOffset = $derived.by(() => {
-    if (totalParallel <= 1) return 0;
-    const spacing = 50; // pixels between parallel edges
-    const totalWidth = (totalParallel - 1) * spacing;
-    return (parallelIndex * spacing) - (totalWidth / 2);
-  });
+  const baseOffset = $derived.by(() => calculateBaseOffset(parallelIndex, totalParallel));
 
   // Get stored label offset (user-dragged position)
   let storedOffsetX = $derived((data?.label_dx as number) || 0);
@@ -81,63 +81,39 @@
 
   // Build the edge path
   const edgePath = $derived.by(() => {
-    const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
-    let path: string;
-    if (isSelfEdge) {
-      path = buildSelfLoopPath(
-        sourcePoint,
-        targetPoint,
-        sourceSide,
-        baseOffset,
-        60 // stable loop radius; label offset handled separately
-      );
-    } else {
-      path = buildOrthogonalPath(
-        sourcePoint,
-        targetPoint,
-        sourceSide,
-        targetSide,
-        baseOffset,
-        storedOffsetX + dragOffsetX,
-        storedOffsetY + dragOffsetY
-      );
-    }
-    return path;
+    const context: EdgeCalculationContext = {
+      parallelIndex,
+      totalParallel,
+      sourceSide: connectionInfo.sourceSide,
+      targetSide: connectionInfo.targetSide,
+      sourcePoint: connectionInfo.sourcePoint,
+      targetPoint: connectionInfo.targetPoint,
+      isSelfEdge,
+      storedOffsetX,
+      storedOffsetY,
+      dragOffsetX,
+      dragOffsetY
+    };
+    return buildEdgePathWithContext(context);
   });
 
 
   // Label position at the middle of the edge
   const edgeLabelPos = $derived.by(() => {
-    const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
-
-    // Special handling for self-loops: position label outside the loop curve
-    if (isSelfEdge) {
-      const midY = (sourcePoint.y + targetPoint.y) / 2 + baseOffset;
-      // Position label to the right of the node edge, offset by loop radius + padding
-      const loopRadius = 60;
-      const labelOffset = loopRadius + 20; // Extra padding for readability
-      const midX = sourcePoint.x + labelOffset + storedOffsetX + dragOffsetX;
-      return { x: midX, y: midY + storedOffsetY + dragOffsetY };
-    }
-
-    let sX = sourcePoint.x;
-    let sY = sourcePoint.y;
-    let tX = targetPoint.x;
-    let tY = targetPoint.y;
-
-    if (sourceSide === 'left' || sourceSide === 'right') {
-      sY += baseOffset;
-      tY += baseOffset;
-      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
-      const midY = (sY + tY) / 2;
-      return { x: midX, y: midY };
-    } else {
-      sX += baseOffset;
-      tX += baseOffset;
-      const midX = (sX + tX) / 2;
-      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
-      return { x: midX, y: midY };
-    }
+    const context: EdgeCalculationContext = {
+      parallelIndex,
+      totalParallel,
+      sourceSide: connectionInfo.sourceSide,
+      targetSide: connectionInfo.targetSide,
+      sourcePoint: connectionInfo.sourcePoint,
+      targetPoint: connectionInfo.targetPoint,
+      isSelfEdge,
+      storedOffsetX,
+      storedOffsetY,
+      dragOffsetX,
+      dragOffsetY
+    };
+    return calculateLabelPositionWithContext(context);
   });
 
   // Use raw data.label for input value, default to empty
@@ -490,8 +466,7 @@
   // Crow's foot marker positions and rotations based on connection sides
   const markerColor = $derived(selected ? '#26A69A' : '#64748b');
 
-  // Padding to offset markers slightly away from node border
-  const MARKER_PADDING = 8;
+  // Constants imported from edge-calculations
 
   const sourceMarkerTransform = $derived.by(() => {
     const { sourceSide, sourcePoint } = connectionInfo;
