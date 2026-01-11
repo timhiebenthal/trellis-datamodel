@@ -204,6 +204,7 @@ export class DimensionalModelPositioner {
     ): Position {
         const center = this.calculateCenter(nodes);
 
+
         switch (entityType) {
             case "fact":
                 return this.calculateFactPosition(center);
@@ -283,6 +284,7 @@ export class GroupSizeCalculator {
             if (viewMode === "logical" && child.data?.dbt_model) {
                 estimatedHeight += this.config.logicalViewAdditionalHeight;
             }
+
 
             return estimatedHeight;
         }

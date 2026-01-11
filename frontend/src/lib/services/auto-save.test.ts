@@ -63,18 +63,20 @@ describe('AutoSaveService', () => {
         ];
         const mockEdges: Edge[] = [];
 
-        it('should schedule debounced save', () => {
+        it('should schedule debounced save', async () => {
             service.save(mockNodes, mockEdges);
 
-            // Should not save immediately
+            // Should mark as saving immediately, but not persist yet
             expect(apiSaveDataModel).not.toHaveBeenCalled();
-            expect(onSavingChangeMock).not.toHaveBeenCalled();
+            expect(onSavingChangeMock).toHaveBeenCalledWith(true);
 
             // Advance timer past debounce delay
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync();
 
             // Should trigger save after debounce
             expect(apiSaveDataModel).toHaveBeenCalled();
+            expect(onSavingChangeMock).toHaveBeenCalledWith(false);
         });
 
         it('should cancel previous pending save', () => {
@@ -99,9 +101,10 @@ describe('AutoSaveService', () => {
             expect(apiSaveDataModel).not.toHaveBeenCalled();
         });
 
-        it('should update saving state callback', () => {
+        it('should update saving state callback', async () => {
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync();
 
             expect(onSavingChangeMock).toHaveBeenCalledWith(true);
             expect(onSavingChangeMock).toHaveBeenCalledWith(false);
@@ -193,11 +196,13 @@ describe('AutoSaveService', () => {
 
         it('should cancel pending save', async () => {
             service.save(mockNodes, mockEdges);
+            await Promise.resolve(); // Let the timeout be scheduled
             vi.clearAllMocks();
 
             await service.flushSync(mockNodes, mockEdges);
 
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync();
             expect(apiSaveDataModel).not.toHaveBeenCalled();
         });
 
@@ -209,6 +214,7 @@ describe('AutoSaveService', () => {
         it('should do nothing if state has not changed', async () => {
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync(); // Wait for save to complete
             vi.clearAllMocks();
 
             await service.flushSync(mockNodes, mockEdges);
@@ -228,19 +234,31 @@ describe('AutoSaveService', () => {
         });
 
         it('should throw on fetch error', async () => {
+            const differentNodes: Node[] = [
+                { id: 'node-fetch-error', type: 'entity', position: { x: 100, y: 100 }, data: { label: 'Error Node' } },
+            ];
             const error = new TypeError('Network error');
+            
+            // Ensure state is fresh
+            service.clearLastSavedState();
             vi.mocked(fetchMock).mockRejectedValueOnce(error);
 
-            await expect(service.flushSync(mockNodes, mockEdges)).rejects.toThrow('Network error');
+            await expect(service.flushSync(differentNodes, mockEdges)).rejects.toThrow('Network error');
         });
 
         it('should throw on HTTP error', async () => {
+            const differentNodes: Node[] = [
+                { id: 'node-http-error', type: 'entity', position: { x: 200, y: 200 }, data: { label: 'HTTP Error Node' } },
+            ];
+            
+            // Ensure state is fresh
+            service.clearLastSavedState();
             vi.mocked(fetchMock).mockResolvedValueOnce({
                 ok: false,
                 status: 500,
             } as Response);
 
-            await expect(service.flushSync(mockNodes, mockEdges)).rejects.toThrow('HTTP error! status: 500');
+            await expect(service.flushSync(differentNodes, mockEdges)).rejects.toThrow('HTTP error! status: 500');
         });
     });
 
@@ -326,7 +344,7 @@ describe('AutoSaveService', () => {
             expect(service.isSavingActive()).toBe(false);
         });
 
-        it('should return true during save', () => {
+        it('should return true during save', async () => {
             const mockNodes: Node[] = [
                 { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },
             ];
@@ -337,6 +355,7 @@ describe('AutoSaveService', () => {
             expect(service.isSavingActive()).toBe(true);
 
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync(); // Flush promises
             // State resets after save completes
             expect(service.isSavingActive()).toBe(false);
         });
@@ -347,7 +366,7 @@ describe('AutoSaveService', () => {
             expect(service.getLastSavedState()).toBe('');
         });
 
-        it('should return state after save', () => {
+        it('should return state after save', async () => {
             const mockNodes: Node[] = [
                 { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },
             ];
@@ -355,6 +374,7 @@ describe('AutoSaveService', () => {
 
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync(); // Flush promises
 
             const savedState = service.getLastSavedState();
             expect(savedState).toContain('node1');
@@ -362,7 +382,7 @@ describe('AutoSaveService', () => {
     });
 
     describe('clearLastSavedState', () => {
-        it('should clear saved state', () => {
+        it('should clear saved state', async () => {
             const mockNodes: Node[] = [
                 { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },
             ];
@@ -370,6 +390,7 @@ describe('AutoSaveService', () => {
 
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync(); // Flush promises
 
             expect(service.getLastSavedState()).toContain('node1');
 
@@ -527,7 +548,7 @@ describe('AutoSaveService', () => {
     });
 
     describe('error handling', () => {
-        it('should handle save errors gracefully', () => {
+        it('should handle save errors gracefully', async () => {
             const error = new Error('Save failed');
             vi.mocked(apiSaveDataModel).mockRejectedValueOnce(error);
 
@@ -538,12 +559,13 @@ describe('AutoSaveService', () => {
 
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync(); // Flush promises (including rejection)
 
             // Should not crash and should update state
             expect(onSavingChangeMock).toHaveBeenCalled();
         });
 
-        it('should set isSaving to false after successful save', () => {
+        it('should set isSaving to false after successful save', async () => {
             const mockNodes: Node[] = [
                 { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },
             ];
@@ -553,6 +575,7 @@ describe('AutoSaveService', () => {
 
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync(); // Flush promises
 
             // Should set saving to false after successful save
             expect(service.isSavingActive()).toBe(false);

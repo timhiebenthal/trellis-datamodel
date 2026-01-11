@@ -220,6 +220,7 @@ export class SchemaManager {
             throw new Error('No model loaded - call loadSchema first');
         }
 
+
         this.updateState({ isSaving: true, error: null });
 
         try {

@@ -260,9 +260,9 @@ describe('SchemaManager', () => {
             await manager.loadSchema('model1', null);
             vi.clearAllMocks();
 
-            await manager.saveSchema();
+            await expect(manager.saveSchema()).rejects.toThrow('Save failed');
 
-            // Should not crash and should update state
+            // Should update state with error
             expect(onStateChangeMock).toHaveBeenCalled();
         });
 
@@ -485,8 +485,8 @@ describe('SchemaManager', () => {
 
         it('should clear model name and version', async () => {
             await manager.loadSchema('model1', null);
-
-            expect(await manager.loadSchema('model1', null)).resolves.not.toThrow();
+            
+            manager.reset();
 
             // Trying to save should fail because no model is loaded
             await expect(manager.saveSchema()).rejects.toThrow('No model loaded');

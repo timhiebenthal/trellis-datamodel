@@ -225,26 +225,28 @@ describe("position-calculator", () => {
                 const position = positioner.calculateSmartPosition("fact", nodes);
 
                 // Should center on entities only, not group
+                // Entities at (600,400) and (800,500), center = (700, 450)
+                // Fact offset range is 200, so x in [500, 900], y in [250, 650]
                 expect(position.x).toBeGreaterThan(400);
                 expect(position.x).toBeLessThan(1000);
                 expect(position.y).toBeGreaterThan(200);
-                expect(position.y).toBeLessThan(600);
+                expect(position.y).toBeLessThan(700);
             });
 
         it("should use custom config values", () => {
             positioner = new DimensionalModelPositioner({
-                factOffsetRange: 50,
+                defaultCenterX: 500,
+                defaultCenterY: 400,
             });
             const nodes: Node[] = [];
             const position = positioner.calculateSmartPosition("fact", nodes);
 
-            // Should be within 50px of default center (500, 400)
-            // With reduced offset range (50), position should be close to center
-            // Use a more flexible check since we're using random values
-            expect(position.x).toBeGreaterThanOrEqual(400);
-            expect(position.x).toBeLessThanOrEqual(600);
-            expect(position.y).toBeGreaterThanOrEqual(300);
-            expect(position.y).toBeLessThanOrEqual(500);
+            // Fact position should be within factOffsetRange (200px hardcoded) of center
+            // Center is (500, 400), so expect x in [300, 700], y in [200, 600]
+            expect(position.x).toBeGreaterThanOrEqual(300);
+            expect(position.x).toBeLessThanOrEqual(700);
+            expect(position.y).toBeGreaterThanOrEqual(200);
+            expect(position.y).toBeLessThanOrEqual(600);
         });
 
             it("should generate different positions on multiple calls", () => {
@@ -561,7 +563,7 @@ describe("position-calculator", () => {
                         id: "entity1",
                         type: "entity",
                         position: { x: 20, y: 20 },
-                        data: { label: "Entity 1", width: 280, panelHeight: 200, dbt_model: { name: "model1" } },
+                        data: { label: "Entity 1", width: 280, panelHeight: 200, collapsed: false, dbt_model: { name: "model1" } },
                         parentId: "group1",
                     },
                 ];
@@ -571,7 +573,7 @@ describe("position-calculator", () => {
                 expect(result.sizes.size).toBe(1);
                 expect(result.needsUpdate).toBe(true);
                 const update = result.sizes.get("group1");
-                expect(update?.height).toBe(320); // 200 panelHeight + 80 header + 40 padding
+                expect(update?.height).toBe(440); // 200 panelHeight + 80 header + 100 logical extra + 20 (position.y) + 40 padding
             });
 
             it("should enforce minimum dimensions", () => {

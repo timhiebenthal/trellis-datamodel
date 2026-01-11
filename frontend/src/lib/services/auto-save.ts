@@ -13,6 +13,10 @@ export class AutoSaveService {
     private debounceMs: number;
     private pendingSaveTimeout: ReturnType<typeof setTimeout> | null = null;
     private lastSavedState: string = '';
+    // State that has been queued but not yet started.
+    private queuedState: string | null = null;
+    // State currently being persisted.
+    private inFlightState: string | null = null;
     private isSaving: boolean = false;
     private onSavingChange?: (isSaving: boolean) => void;
 
@@ -40,8 +44,12 @@ export class AutoSaveService {
             edges: currentEdges,
         });
 
-        // Skip if state hasn't changed
-        if (state === this.lastSavedState) {
+        // Skip if state hasn't changed or is already queued/in-flight
+        if (
+            state === this.lastSavedState ||
+            state === this.queuedState ||
+            state === this.inFlightState
+        ) {
             return;
         }
 
@@ -54,7 +62,11 @@ export class AutoSaveService {
         // Set up new debounced save
         const nodesSnapshot = structuredClone(currentNodes);
         const edgesSnapshot = structuredClone(currentEdges);
+        this.queuedState = state;
+        this.setSaving(true);
         this.pendingSaveTimeout = setTimeout(() => {
+            this.inFlightState = this.queuedState ?? state;
+            this.queuedState = null;
             void this.persistDataModel(nodesSnapshot, edgesSnapshot, state);
         }, this.debounceMs);
     }
@@ -78,6 +90,8 @@ export class AutoSaveService {
             edges: currentEdges,
         });
 
+        this.queuedState = null;
+        this.inFlightState = state;
         this.setSaving(true);
         void this.persistDataModel(structuredClone(currentNodes), structuredClone(currentEdges), state);
     }
@@ -96,16 +110,23 @@ export class AutoSaveService {
             edges: currentEdges,
         });
 
-        if (state === this.lastSavedState) {
-            return;
-        }
-
-        // Cancel pending save if exists
+        // Cancel pending save if exists (do this first, before early return)
         if (this.pendingSaveTimeout) {
             clearTimeout(this.pendingSaveTimeout);
             this.pendingSaveTimeout = null;
         }
 
+        if (
+            state === this.lastSavedState ||
+            state === this.queuedState ||
+            state === this.inFlightState
+        ) {
+            return;
+        }
+
+        this.queuedState = state;
+        this.inFlightState = state;
+        this.setSaving(true);
         const payload = JSON.stringify(
             this.buildDataModelFromState(currentNodes, currentEdges),
         );
@@ -123,8 +144,14 @@ export class AutoSaveService {
             }
 
             this.lastSavedState = state;
+            this.inFlightState = null;
+            this.queuedState = null;
+            this.setSaving(false);
         } catch (e) {
             console.error('Sync save failed', e);
+            this.inFlightState = null;
+            this.queuedState = null;
+            this.setSaving(false);
             throw e;
         }
     }
@@ -142,7 +169,8 @@ export class AutoSaveService {
             edges: currentEdges,
         });
 
-        return this.lastSavedState !== '' && this.lastSavedState !== state;
+        const baseline = this.inFlightState ?? this.lastSavedState;
+        return baseline !== '' && baseline !== state;
     }
 
     /**
@@ -160,7 +188,7 @@ export class AutoSaveService {
      * @returns True if a save is in progress
      */
     isSavingActive(): boolean {
-        return this.isSaving;
+        return this.isSaving || this.pendingSaveTimeout !== null || this.inFlightState !== null;
     }
 
     /**
@@ -289,12 +317,18 @@ export class AutoSaveService {
             const dataModel = this.buildDataModelFromState(nodesSnapshot, edgesSnapshot);
             await apiSaveDataModel(dataModel);
             this.lastSavedState = stateString;
+            this.inFlightState = null;
+            this.queuedState = null;
         } catch (e) {
             console.error('Save failed', e);
-            throw e;
+            this.inFlightState = null;
+            this.queuedState = null;
+            // Don't throw - this is called from void context (debounced/fire-and-forget)
+            // Errors are logged and state is cleaned up
         } finally {
             this.setSaving(false);
             this.pendingSaveTimeout = null;
+            this.inFlightState = null;
         }
     }
 
@@ -309,4 +343,5 @@ export class AutoSaveService {
             this.onSavingChange(saving);
         }
     }
+
 }
