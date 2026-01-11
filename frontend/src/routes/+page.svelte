@@ -786,9 +786,9 @@
             return;
         }
         
-        // Use untrack to avoid creating a dependency on the effect itself
-        const currentNodes = untrack(() => $nodes);
-        const currentEdges = untrack(() => $edges);
+        // Track node/edge changes so autosave and history run whenever they update
+        const currentNodes = $nodes;
+        const currentEdges = $edges;
         
         // Save changes via AutoSave service
         autoSaveService.save(currentNodes, currentEdges);
