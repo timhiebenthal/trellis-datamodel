@@ -65,6 +65,7 @@ def clean_test_files():
     cfg.EXPOSURES_ENABLED = False
     cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
     cfg.Bus_MATRIX_ENABLED = True  # Default to enabled
+    cfg.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
 
 
 @pytest.fixture
@@ -168,6 +169,8 @@ def test_client(mock_manifest):
         cfg_module.EXPOSURES_ENABLED = False
         cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
         cfg_module.Bus_MATRIX_ENABLED = True
+        # Ensure MANIFEST_PATH is set to the test directory manifest (mock_manifest creates it)
+        cfg_module.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
 
         # Reload routes modules to ensure they use the updated config
         routes_modules = [
