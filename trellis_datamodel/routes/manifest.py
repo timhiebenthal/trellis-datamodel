@@ -21,8 +21,52 @@ def _resolve_config_path() -> str | None:
 @router.get("/config-status")
 async def get_config_status():
     """Return configuration status for the frontend."""
+    # region agent log
+    import json
+
+    log_path = "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log"
+    log_entry = json.dumps(
+        {
+            "id": "log_config_status_entry_A",
+            "timestamp": 0,
+            "location": "manifest.py:21",
+            "message": "Config status endpoint called",
+            "data": {
+                "MANIFEST_PATH": cfg.MANIFEST_PATH,
+                "DBT_PROJECT_PATH": cfg.DBT_PROJECT_PATH,
+                "CATALOG_PATH": cfg.CATALOG_PATH,
+                "hypothesisId": "A,C",
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+        }
+    )
+    with open(log_path, "a") as f:
+        f.write(log_entry + "\n")
+    # endregion
+
     found_config = _resolve_config_path()
     config_present = found_config is not None
+
+    # region agent log
+    log_entry = json.dumps(
+        {
+            "id": "log_config_status_resolved_A",
+            "timestamp": 0,
+            "location": "manifest.py:29",
+            "message": "Config path resolved",
+            "data": {
+                "found_config": found_config,
+                "config_present": config_present,
+                "hypothesisId": "A",
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+        }
+    )
+    with open(log_path, "a") as f:
+        f.write(log_entry + "\n")
+    # endregion
 
     # Determine expected config filename for display
     if config_present:
@@ -117,5 +161,28 @@ async def get_config_info():
 @router.get("/manifest")
 async def get_manifest():
     """Return parsed models from the transformation framework."""
+    # region agent log
+    import json
+
+    log_path = "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log"
+    log_entry = json.dumps(
+        {
+            "id": "log_get_manifest_entry_D",
+            "timestamp": 0,
+            "location": "manifest.py:117",
+            "message": "Get manifest endpoint called",
+            "data": {
+                "MANIFEST_PATH": cfg.MANIFEST_PATH,
+                "DBT_MODEL_PATHS": cfg.DBT_MODEL_PATHS,
+                "hypothesisId": "A,D",
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+        }
+    )
+    with open(log_path, "a") as f:
+        f.write(log_entry + "\n")
+    # endregion
+
     models = get_models()
     return {"models": models}

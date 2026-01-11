@@ -45,12 +45,80 @@ def get_models() -> list[dict[str, Any]]:
         >>> models[0]["name"]
         'users'
     """
+    # region agent log
+    import json
+    from trellis_datamodel import config as cfg
+
+    log_path = "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log"
+    log_entry = json.dumps(
+        {
+            "id": "log_get_models_entry_A",
+            "timestamp": 0,
+            "location": "services/manifest.py:48",
+            "message": "get_models called",
+            "data": {"MANIFEST_PATH": cfg.MANIFEST_PATH, "hypothesisId": "A,D"},
+            "sessionId": "debug-session",
+            "runId": "run1",
+        }
+    )
+    with open(log_path, "a") as f:
+        f.write(log_entry + "\n")
+    # endregion
     try:
         validate_manifest_path()
         adapter = get_adapter()
         models = adapter.get_models()
+        # region agent log
+        log_entry = json.dumps(
+            {
+                "id": "log_get_models_success_A",
+                "timestamp": 0,
+                "location": "services/manifest.py:55",
+                "message": "get_models succeeded",
+                "data": {"model_count": len(models), "hypothesisId": "A,D"},
+                "sessionId": "debug-session",
+                "runId": "run1",
+            }
+        )
+        with open(log_path, "a") as f:
+            f.write(log_entry + "\n")
+        # endregion
         return models
     except FileNotFoundError as e:
+        # region agent log
+        log_entry = json.dumps(
+            {
+                "id": "log_get_models_file_not_found_A",
+                "timestamp": 0,
+                "location": "services/manifest.py:56",
+                "message": "FileNotFoundError in get_models",
+                "data": {"error": str(e), "hypothesisId": "A"},
+                "sessionId": "debug-session",
+                "runId": "run1",
+            }
+        )
+        with open(log_path, "a") as f:
+            f.write(log_entry + "\n")
+        # endregion
         raise FileOperationError(f"Manifest not found: {str(e)}") from e
     except Exception as e:
+        # region agent log
+        log_entry = json.dumps(
+            {
+                "id": "log_get_models_exception_A",
+                "timestamp": 0,
+                "location": "services/manifest.py:59",
+                "message": "Exception in get_models",
+                "data": {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "hypothesisId": "A",
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+            }
+        )
+        with open(log_path, "a") as f:
+            f.write(log_entry + "\n")
+        # endregion
         raise FileOperationError(f"Error reading manifest: {str(e)}") from e

@@ -158,15 +158,82 @@ def test_client(mock_manifest):
     import importlib
     import sys
 
+    # region agent log
+    import json
+    import os
+
+    log_path = "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log"
+    log_entry = json.dumps(
+        {
+            "id": "log_test_client_fixture_B",
+            "timestamp": 0,
+            "location": "conftest.py:150",
+            "message": "test_client fixture start",
+            "data": {
+                "mock_manifest": mock_manifest,
+                "DATAMODEL_TEST_DIR": os.environ.get("DATAMODEL_TEST_DIR"),
+                "hypothesisId": "B",
+            },
+            "sessionId": "debug-session",
+            "runId": "run1",
+        }
+    )
+    with open(log_path, "a") as f:
+        f.write(log_entry + "\n")
+    # endregion
+
     # Ensure we're using the current config module
     if "trellis_datamodel.config" in sys.modules:
         cfg_module = sys.modules["trellis_datamodel.config"]
+
+        # region agent log
+        log_entry = json.dumps(
+            {
+                "id": "log_test_client_config_before_B",
+                "timestamp": 0,
+                "location": "conftest.py:162",
+                "message": "Config before reset",
+                "data": {
+                    "LINEAGE_ENABLED": cfg_module.LINEAGE_ENABLED,
+                    "MANIFEST_PATH": cfg_module.MANIFEST_PATH,
+                    "DBT_MODEL_PATHS": cfg_module.DBT_MODEL_PATHS,
+                    "hypothesisId": "B",
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+            }
+        )
+        with open(log_path, "a") as f:
+            f.write(log_entry + "\n")
+        # endregion
+
         # Reset to test defaults in case of module reload
         # cfg_module.LINEAGE_ENABLED = False  # Let it stay True from test config
         cfg_module.LINEAGE_LAYERS = []
         cfg_module.EXPOSURES_ENABLED = False
         cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
-        
+
+        # region agent log
+        log_entry = json.dumps(
+            {
+                "id": "log_test_client_config_after_B",
+                "timestamp": 0,
+                "location": "conftest.py:172",
+                "message": "Config after reset",
+                "data": {
+                    "LINEAGE_ENABLED": cfg_module.LINEAGE_ENABLED,
+                    "MANIFEST_PATH": cfg_module.MANIFEST_PATH,
+                    "DBT_MODEL_PATHS": cfg_module.DBT_MODEL_PATHS,
+                    "hypothesisId": "B",
+                },
+                "sessionId": "debug-session",
+                "runId": "run1",
+            }
+        )
+        with open(log_path, "a") as f:
+            f.write(log_entry + "\n")
+        # endregion
+
         # Reload routes modules to ensure they use the updated config
         # This is needed because CLI tests reload modules, and routes might have old config references
         routes_modules = [
