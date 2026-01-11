@@ -47,8 +47,15 @@ def get_bus_matrix(
     if cfg.MODELING_STYLE != "dimensional_model" or not cfg.Bus_MATRIX_ENABLED:
         raise ConfigurationError("Bus Matrix is disabled for entity_model")
 
-    if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
-        return {"dimensions": [], "facts": [], "connections": []}
+    if not cfg.DATA_MODEL_PATH:
+        raise ConfigurationError(
+            "data_model_file is not configured. Set it in trellis.yml to use the Bus Matrix."
+        )
+    if not os.path.exists(cfg.DATA_MODEL_PATH):
+        raise FileOperationError(
+            f"Data model file not found at {cfg.DATA_MODEL_PATH}. "
+            "Run 'trellis init' or point data_model_file to an existing data_model.yml."
+        )
 
     try:
         with open(cfg.DATA_MODEL_PATH, "r") as f:
