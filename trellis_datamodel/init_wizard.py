@@ -127,7 +127,14 @@ def prompt_modeling_style() -> str:
     Returns:
         str: The modeling style ("entity_model" or "dimensional_model")
     """
-    typer.echo("\nWhich Data Modeling style do you want to use?:")
+    typer.echo()
+    typer.echo(
+        typer.style(
+            "Which Data Modeling style do you want to use?",
+            fg=typer.colors.CYAN,
+            bold=True,
+        )
+    )
     typer.echo("  1. entity_model - Traditional ERD-style modeling")
     typer.echo("  2. dimensional_model - Kimball dimensional modeling (fact/dimension)")
 
@@ -213,68 +220,11 @@ def prompt_dbt_model_paths() -> Optional[list]:
         show_default=True,
     )
 
-    # #region agent log
-    import json
-
-    log_data = {
-        "sessionId": "debug-session",
-        "runId": "run1",
-        "hypothesisId": "A",
-        "location": f"{__file__}:200",
-        "message": "prompt_dbt_model_paths user response",
-        "data": {
-            "response": response,
-            "response_lower": response.lower() if response else None,
-        },
-        "timestamp": 1733456789000,
-    }
-    with open(
-        "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-    ) as f:
-        f.write(json.dumps(log_data) + "\n")
-    # #endregion
-
     if response.lower() == "all" or not response.strip():
-        # #region agent log
-        import json
-
-        log_data = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": "A",
-            "location": f"{__file__}:207",
-            "message": "Returning None for 'all' selection",
-            "data": {"return_value": None},
-            "timestamp": 1733456789000,
-        }
-        with open(
-            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-        ) as f:
-            f.write(json.dumps(log_data) + "\n")
-        # #endregion
         return None  # Empty list
 
     # Parse comma-separated paths
     paths = [p.strip() for p in response.split(",") if p.strip()]
-
-    # #region agent log
-    import json
-
-    log_data = {
-        "sessionId": "debug-session",
-        "runId": "run1",
-        "hypothesisId": "A",
-        "location": f"{__file__}:211",
-        "message": "Returning parsed paths",
-        "data": {"paths": paths},
-        "timestamp": 1733456789000,
-    }
-    with open(
-        "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-    ) as f:
-        f.write(json.dumps(log_data) + "\n")
-    # #endregion
-
     return paths
 
 
@@ -517,30 +467,6 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     # Parse original template
     config = yaml.load(DEFAULT_CONFIG_TEMPLATE)
 
-    # #region agent log
-    import json
-
-    log_data = {
-        "sessionId": "debug-session",
-        "runId": "run1",
-        "hypothesisId": "C",
-        "location": f"{__file__}:442",
-        "message": "Parsed template, checking dbt_model_paths",
-        "data": {
-            "dbt_model_paths": (
-                str(config.get("dbt_model_paths"))
-                if "dbt_model_paths" in config
-                else "NOT_FOUND"
-            )
-        },
-        "timestamp": 1733456789000,
-    }
-    with open(
-        "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-    ) as f:
-        f.write(json.dumps(log_data) + "\n")
-    # #endregion
-
     # Apply non-default values from answers
     # Only set values that differ from template defaults
 
@@ -558,84 +484,12 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
 
     # dbt model paths - only set if not empty/None
     # Need to delete old commented version first to preserve formatting
-    # #region agent log
-    import json
-
-    log_data = {
-        "sessionId": "debug-session",
-        "runId": "run1",
-        "hypothesisId": "B",
-        "location": f"{__file__}:461",
-        "message": "Checking dbt_model_paths in answers",
-        "data": {
-            "in_answers": "dbt_model_paths" in answers,
-            "value": answers.get("dbt_model_paths"),
-        },
-        "timestamp": 1733456789000,
-    }
-    with open(
-        "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-    ) as f:
-        f.write(json.dumps(log_data) + "\n")
-    # #endregion
     if "dbt_model_paths" in answers and answers["dbt_model_paths"] is not None:
         # Delete old value with its comments
         if "dbt_model_paths" in config:
-            # #region agent log
-            import json
-
-            log_data = {
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "D",
-                "location": f"{__file__}:464",
-                "message": "Deleting dbt_model_paths key",
-                "data": {"key_exists": True},
-                "timestamp": 1733456789000,
-            }
-            with open(
-                "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-            ) as f:
-                f.write(json.dumps(log_data) + "\n")
-            # #endregion
             del config["dbt_model_paths"]
         # Add new clean value
         config["dbt_model_paths"] = answers["dbt_model_paths"]
-        # #region agent log
-        import json
-
-        log_data = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": "B",
-            "location": f"{__file__}:466",
-            "message": "Set new dbt_model_paths value",
-            "data": {"value": answers["dbt_model_paths"]},
-            "timestamp": 1733456789000,
-        }
-        with open(
-            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-        ) as f:
-            f.write(json.dumps(log_data) + "\n")
-        # #endregion
-    else:
-        # #region agent log
-        import json
-
-        log_data = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": "A",
-            "location": f"{__file__}:467",
-            "message": "Skipping dbt_model_paths - keeping template default",
-            "data": {"reason": "not in answers or is None"},
-            "timestamp": 1733456789000,
-        }
-        with open(
-            "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-        ) as f:
-            f.write(json.dumps(log_data) + "\n")
-        # #endregion
 
     # Entity creation guidance - configure if enabled or any sub-field specified
     if "entity_creation_guidance_enabled" in answers:
@@ -666,30 +520,6 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
 
     # Generate YAML output
     from io import StringIO
-
-    # #region agent log
-    import json
-
-    log_data = {
-        "sessionId": "debug-session",
-        "runId": "run1",
-        "hypothesisId": "C",
-        "location": f"{__file__}:498",
-        "message": "About to dump YAML",
-        "data": {
-            "dbt_model_paths": (
-                str(config.get("dbt_model_paths"))
-                if "dbt_model_paths" in config
-                else "NOT_FOUND"
-            )
-        },
-        "timestamp": 1733456789000,
-    }
-    with open(
-        "/home/tim_ubuntu/git_repos/trellis-datamodel/.cursor/debug.log", "a"
-    ) as f:
-        f.write(json.dumps(log_data) + "\n")
-    # #endregion
 
     output = StringIO()
     yaml.dump(config, output)
