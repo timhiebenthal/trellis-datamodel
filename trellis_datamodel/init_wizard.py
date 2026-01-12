@@ -16,7 +16,7 @@ from ruamel.yaml.comments import CommentedMap
 
 # Original template with comments (copied here to avoid circular import)
 DEFAULT_CONFIG_TEMPLATE = """\
-# Trellis configuration for data model UI
+# trellis configuration for data model UI
 
 # Transformation framework currently supported.
 framework: dbt-core
@@ -127,7 +127,7 @@ def prompt_framework() -> str:
 
     Note:
         Currently only dbt-core is supported. This option is shown for
-        transparency about what framework Trellis uses.
+        transparency about what framework trellis uses.
     """
     typer.echo()
     typer.echo(
@@ -234,7 +234,7 @@ def prompt_dbt_model_paths() -> Optional[list]:
         Optional[list]: List of paths or None (empty list) for "all"
 
     Note:
-        Specifying paths filters which models Trellis includes in the data
+        Specifying paths filters which models trellis includes in the data
         model. Leave empty (type 'all') to include all models in your dbt
         project.
     """
@@ -529,16 +529,18 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
                 del config["dimensional_modeling"]
 
             # Create new active dimensional_modeling section with inference patterns
-            config["dimensional_modeling"] = CommentedMap({
-                "inference_patterns": {
-                    "dimension_prefix": ["dim_", "d_"],
-                    "fact_prefix": ["fct_", "fact_"],
+            config["dimensional_modeling"] = CommentedMap(
+                {
+                    "inference_patterns": {
+                        "dimension_prefix": ["dim_", "d_"],
+                        "fact_prefix": ["fct_", "fact_"],
+                    }
                 }
-            })
+            )
             # Add inline comment for clarity
             config["dimensional_modeling"].yaml_set_comment_before_after_key(
                 "inference_patterns",
-                before=" # Customize these patterns to match your dbt model naming conventions"
+                before=" # Customize these patterns to match your dbt model naming conventions",
             )
 
     # DBT project path - only set if not "."
@@ -609,7 +611,7 @@ def run_init_wizard(config_file_location: Path) -> Dict[str, Any]:
         answers: Dict[str, Any] = {}
 
         typer.echo()
-        typer.echo(typer.style("Welcome to Trellis!", bold=True, fg=typer.colors.GREEN))
+        typer.echo(typer.style("Welcome to trellis!", bold=True, fg=typer.colors.GREEN))
         typer.echo("Let's configure your trellis.yml file.\n")
 
         # Prompt for all configuration options
