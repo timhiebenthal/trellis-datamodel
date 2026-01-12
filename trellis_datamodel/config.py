@@ -188,14 +188,15 @@ def _resolve_canvas_layout_path(
 
 
 def _resolve_frontend_build_dir(config_path: str, config: dict[str, Any]) -> str:
-    """Resolve frontend build directory with env override."""
+    """
+    Resolve frontend build directory.
+
+    Environment variable DATAMODEL_FRONTEND_BUILD_DIR can override the default.
+    Defaults to ./frontend/build relative to the config file base path.
+    """
     env_dir = os.environ.get("DATAMODEL_FRONTEND_BUILD_DIR")
     if env_dir:
         return env_dir
-
-    configured_dir = config.get("frontend_build_dir")
-    if configured_dir:
-        return _resolve_path(_resolve_base_path(config_path), configured_dir)
 
     return os.path.abspath(
         os.path.join(_resolve_base_path(config_path), "frontend", "build")

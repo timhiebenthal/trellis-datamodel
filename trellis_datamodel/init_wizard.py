@@ -230,7 +230,7 @@ def prompt_dbt_model_paths() -> Optional[list]:
 
 def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]:
     """
-    Auto-detect dbt project path by searching for dbt_project.yml files.
+    Auto-detect dbt project directory by searching for dbt_project.yml files.
 
     Searches in current directory and subdirectories up to depth 2.
     If multiple files found, returns the closest one (shallowest depth).
@@ -239,7 +239,7 @@ def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]
         current_dir: Directory to search from (defaults to current working directory)
 
     Returns:
-        Optional[str]: Detected dbt_project.yml path relative to current_dir, or None
+        Optional[str]: Detected dbt project directory path relative to current_dir, or None
     """
     if current_dir is None:
         current_dir = Path.cwd()
@@ -273,8 +273,14 @@ def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]
     closest = found_files[0]
     rel_path = Path(closest).relative_to(current_dir)
 
+    # Return parent directory (dbt project folder), not the file itself
+    dbt_project_dir = rel_path.parent
+    # Use "." if the file is in the current directory
+    if str(dbt_project_dir) == ".":
+        return "."
+
     # Return as string with forward slashes
-    return str(rel_path).replace("\\", "/")
+    return str(dbt_project_dir).replace("\\", "/")
 
 
 def validate_dbt_project_path(

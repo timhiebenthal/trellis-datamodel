@@ -246,7 +246,6 @@ Options:
 - `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
 - `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
 - `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
-- `frontend_build_dir`: Path to the compiled frontend build that `trellis run` serves (defaults to `./frontend/build`).
 - `dbt_company_dummy_path`: Helper dbt project used by `trellis generate-company-data`. Run the command to create `./dbt_company_dummy` or update this path to an existing project.
 - `lineage.enabled`: Feature flag for lineage UI + API. Defaults to `false` (opt-in).
 - `lineage.layers`: Ordered list of folder names to organize lineage bands. Prefer this nested structure; legacy `lineage_layers` is deprecated.
@@ -262,7 +261,6 @@ dbt_manifest_path: "target/manifest.json"
 dbt_catalog_path: "target/catalog.json"
 data_model_file: "data_model.yml"
 dbt_model_paths: []  # Empty list includes all models
-frontend_build_dir: "./frontend/build"
 dbt_company_dummy_path: "./dbt_company_dummy"
 #lineage:
 #  enabled: false  # Set to true to enable lineage UI/endpoints
