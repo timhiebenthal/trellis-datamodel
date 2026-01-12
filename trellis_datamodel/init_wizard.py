@@ -34,9 +34,6 @@ data_model_file: "data_model.yml"
 # List of path patterns to include (empty list includes all models)
 dbt_model_paths: []  # Empty = include all models
 
-# Path to the compiled frontend build directory
-frontend_build_dir: "./frontend/build"
-
 # Helper project used by `trellis generate-company-data`.
 # Run the command to populate ./dbt_company_dummy or replace with your own project.
 dbt_company_dummy_path: "./dbt_company_dummy"
