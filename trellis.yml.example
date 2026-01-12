@@ -71,3 +71,31 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #  inference_patterns:
 #    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables (string or list)
 #    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables (string or list)
+
+# Entity modeling configuration (opt-in).
+# Use this feature if you want to enable prefix-based naming for entity models when modeling_style is entity_model.
+#
+# Behavior:
+# - Prefixes are applied when saving entities to dbt schema.yml files
+# - Prefixes are stripped from entity labels displayed on the ERD canvas for cleaner visualization
+# - This helps teams with established table naming conventions while maintaining readable labels
+#
+# Example workflow:
+# 1. Create entity "Customer" on canvas → displays as "Customer"
+# 2. Save to dbt → creates model "tbl_customer" (prefix applied)
+# 3. Load from dbt → displays as "Customer" (prefix stripped from label)
+#
+# You can specify prefixes as either a string (single prefix) or a list (multiple prefixes):
+#   prefix: "tbl_"           # Single prefix as string
+#   prefix: ["tbl_", "entity_"]  # Multiple prefixes as list (first is used for application)
+#
+# When multiple prefixes are configured:
+# - First prefix in the list is used when saving new entities
+# - All prefixes are stripped from labels (first matching prefix is removed)
+# - Case-insensitive detection prevents double-prefixing (e.g., "TBL_CUSTOMER" with prefix "tbl_" won't become "tbl_tbl_customer")
+#
+# Common naming conventions:
+# - Tables: tbl_, t_, entity_, dim_ (e.g., tbl_customer, t_employee, entity_order)
+#entity_modeling:
+#  inference_patterns:
+#    prefix: "tbl_"  # Prefix to apply to entity models (string or list)

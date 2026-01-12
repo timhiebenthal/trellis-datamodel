@@ -36,9 +36,17 @@ class DimensionalModelingConfig:
     fact_prefix: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
 
 
+@dataclass
+class EntityModelingConfig:
+    """Configuration for entity modeling features."""
+    enabled: bool = False
+    entity_prefix: list[str] = field(default_factory=list)
+
+
 # Global configuration objects (set by load_config)
 GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
+ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 
 if _TEST_DIR:
     # Test mode: use temp directory paths
@@ -72,6 +80,7 @@ if _TEST_DIR:
     Bus_MATRIX_ENABLED: bool = False
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
+    ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 else:
     # Production mode: will be set by load_config()
     CONFIG_PATH: str = ""
@@ -92,6 +101,7 @@ else:
     MODELING_STYLE: str = "entity_model"
     Bus_MATRIX_ENABLED: bool = False
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
+    ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 
 
 def _load_yaml_config(path: str) -> dict[str, Any]:
@@ -358,6 +368,34 @@ def _load_dimensional_modeling_config(
     return dimensional_config
 
 
+def _load_entity_modeling_config(
+    modeling_style: str, config: dict[str, Any]
+) -> EntityModelingConfig:
+    """Load entity modeling config, enabling prefix application based on modeling_style."""
+    entity_config = EntityModelingConfig()
+    entity_config.enabled = modeling_style == "entity_model"
+
+    # Only load prefix config when entity modeling is enabled
+    if not entity_config.enabled:
+        return entity_config
+
+    config_section = config.get("entity_modeling")
+    if not isinstance(config_section, dict):
+        return entity_config
+
+    inference_patterns = config_section.get("inference_patterns")
+    if not isinstance(inference_patterns, dict):
+        return entity_config
+
+    entity_prefix = inference_patterns.get("prefix")
+    if isinstance(entity_prefix, str):
+        entity_config.entity_prefix = [entity_prefix]
+    elif isinstance(entity_prefix, list):
+        entity_config.entity_prefix = entity_prefix
+
+    return entity_config
+
+
 def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
     """
     Find config file in order of priority:
@@ -396,7 +434,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, DIMENSIONAL_MODELING_CONFIG
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
     # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
@@ -466,6 +504,11 @@ def load_config(config_path: Optional[str] = None) -> None:
         MODELING_STYLE, config
     )
 
+    # 14. Entity modeling configuration
+    ENTITY_MODELING_CONFIG = _load_entity_modeling_config(
+        MODELING_STYLE, config
+    )
+
 
 def print_config() -> None:
     """Print current configuration for debugging."""
@@ -497,5 +540,8 @@ def print_config() -> None:
             "Dimension prefixes: %s", DIMENSIONAL_MODELING_CONFIG.dimension_prefix
         )
         logger.info("Fact prefixes: %s", DIMENSIONAL_MODELING_CONFIG.fact_prefix)
+    if ENTITY_MODELING_CONFIG.enabled:
+        logger.info("Entity modeling enabled: %s", ENTITY_MODELING_CONFIG.enabled)
+        logger.info("Entity prefixes: %s", ENTITY_MODELING_CONFIG.entity_prefix)
     if DBT_COMPANY_DUMMY_PATH:
         logger.info("dbt company dummy path: %s", DBT_COMPANY_DUMMY_PATH)

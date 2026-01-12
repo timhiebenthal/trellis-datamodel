@@ -59,19 +59,90 @@ export function toTitleCase(text: string): string {
 }
 
 /**
+ * Strip configured entity prefixes from a label.
+ * 
+ * Uses ENTITY_PREFIXES from config-info API response.
+ * Strips the first matching prefix from the label while preserving original casing of the remaining text.
+ * 
+ * @param label - The label to strip prefixes from (e.g., "tbl_customer")
+ * @param prefixes - Array of prefixes to strip (e.g., ["tbl_", "entity_"])
+ * @returns Label with first matching prefix removed (e.g., "customer")
+ * 
+ * @example
+ * stripEntityPrefixes("tbl_customer", ["tbl_"]) // "customer"
+ * stripEntityPrefixes("TBL_CUSTOMER", ["tbl_"]) // "CUSTOMER" (case-insensitive match, original casing preserved)
+ * stripEntityPrefixes("tbl_customer", ["entity_", "tbl_"]) // "customer" (first match removed)
+ * stripEntityPrefixes("customer", ["tbl_"]) // "customer" (no match, returns original)
+ * stripEntityPrefixes("tbl_", ["tbl_"]) // "" (edge case: label equals prefix, returns empty string)
+ * stripEntityPrefixes("tbl_customer", []) // "tbl_customer" (empty prefix array, returns original)
+ */
+export function stripEntityPrefixes(label: string, prefixes: string[]): string {
+    // Handle empty or undefined prefix array gracefully
+    if (!prefixes || prefixes.length === 0) {
+        return label;
+    }
+    
+    // Handle edge case where label itself is undefined/null
+    if (!label) {
+        return label;
+    }
+    
+    const lowerLabel = label.toLowerCase();
+    
+    // Check each prefix for a case-insensitive match
+    for (const prefix of prefixes) {
+        // Validate prefix is not empty string (warn user in logs)
+        if (prefix === "") {
+            console.warn(`Invalid empty prefix found in entity_prefixes config. Skipping this prefix.`);
+            continue;
+        }
+        
+        if (lowerLabel.startsWith(prefix.toLowerCase())) {
+            // Strip prefix and preserve original casing for remainder
+            const stripped = label.substring(prefix.length);
+            
+            // Handle edge case where label equals prefix (empty result after stripping)
+            if (stripped === "") {
+                console.log(`Entity label "${label}" equals prefix "${prefix}", resulting in empty string. Displaying original label.`);
+                return label; // Return original label to avoid empty UI elements
+            }
+            
+            return stripped;
+        }
+    }
+    
+    // Log prefix operation for debugging
+    if (prefixes.length > 0 && prefixes.some(p => p && p !== "")) {
+        console.log(`Stripping prefixes [${prefixes.join(", ")}] from label "${label}"`);
+    }
+    
+    // No prefix matched, return original label
+    return label;
+}
+
+/**
  * Format a dbt model name for use as an entity label.
  * Replaces underscores with spaces and title-cases each word.
+ * Optionally strips configured entity prefixes before formatting.
  * 
- * @param modelName - The model name (e.g., "entity_booking")
- * @returns Formatted label (e.g., "Entity Booking")
+ * @param modelName - The model name (e.g., "entity_booking" or "tbl_customer")
+ * @param entityPrefixes - Optional array of prefixes to strip (e.g., ["tbl_", "entity_"])
+ * @returns Formatted label (e.g., "Entity Booking" or "Customer")
  * 
  * @example
  * formatModelNameForLabel("user_id") // "User Id"
  * formatModelNameForLabel("API_key") // "Api Key"
  * formatModelNameForLabel("entity_booking") // "Entity Booking"
+ * formatModelNameForLabel("tbl_customer", ["tbl_"]) // "Customer"
+ * formatModelNameForLabel("TBL_CUSTOMER", ["tbl_"]) // "Customer"
+ * formatModelNameForLabel("tbl_customer", []) // "Tbl Customer" (backward compatible)
  */
-export function formatModelNameForLabel(modelName: string): string {
-    return modelName
+export function formatModelNameForLabel(modelName: string, entityPrefixes: string[] = []): string {
+    // Strip entity prefixes if provided (for entity modeling mode)
+    const withoutPrefix = stripEntityPrefixes(modelName, entityPrefixes);
+    
+    // Format the remaining text by splitting underscores and title-casing
+    return withoutPrefix
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ');

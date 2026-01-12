@@ -118,6 +118,7 @@ class DbtCoreAdapter:
         """
         dbt_model = entity.get("dbt_model")
         if dbt_model:
+            # Respect existing bound dbt_model values (don't re-prefix bound entities)
             # dbt unique_id for versioned models looks like model.<project>.<name>.v2
             parts = dbt_model.split(".")
             if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
@@ -129,28 +130,35 @@ class DbtCoreAdapter:
         entity_id = entity.get("id") or ""
         entity_type = entity.get("entity_type", "unclassified")
 
-        # Only apply prefixes when dimensional modeling is enabled
-        if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
-            return entity_id
+        # Apply entity modeling prefixes when enabled
+        if cfg.ENTITY_MODELING_CONFIG.enabled and cfg.ENTITY_MODELING_CONFIG.entity_prefix:
+            prefix = cfg.ENTITY_MODELING_CONFIG.entity_prefix[0]
+            # Check if entity already has a prefix (case-insensitive to avoid duplication)
+            for existing_prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
+                if entity_id.lower().startswith(existing_prefix.lower()):
+                    return entity_id  # Already has a prefix
+            return f"{prefix}{entity_id}"
 
-        # Apply prefix based on entity type
-        if (
-            entity_type == "dimension"
-            and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
-        ):
-            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix[0]
-            # Check if entity_id already has a prefix
-            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
-                if entity_id.lower().startswith(existing_prefix.lower()):
-                    return entity_id  # Already has a prefix
-            return f"{prefix}{entity_id}"
-        elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
-            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix[0]
-            # Check if entity_id already has a prefix
-            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
-                if entity_id.lower().startswith(existing_prefix.lower()):
-                    return entity_id  # Already has a prefix
-            return f"{prefix}{entity_id}"
+        # Apply dimensional modeling prefixes when enabled
+        if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
+            # Apply prefix based on entity type
+            if (
+                entity_type == "dimension"
+                and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+            ):
+                prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix[0]
+                # Check if entity_id already has a prefix
+                for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+                    if entity_id.lower().startswith(existing_prefix.lower()):
+                        return entity_id  # Already has a prefix
+                return f"{prefix}{entity_id}"
+            elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+                prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix[0]
+                # Check if entity_id already has a prefix
+                for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+                    if entity_id.lower().startswith(existing_prefix.lower()):
+                        return entity_id  # Already has a prefix
+                return f"{prefix}{entity_id}"
 
         # Default: return entity_id without prefix
         return entity_id
@@ -991,6 +999,19 @@ class DbtCoreAdapter:
                 if entity.get("id") == entity_id:
                     entity_description = entity.get("description")
                     break
+
+        # Apply prefix logic to model_name for unbound entities
+        entity = next(
+            (e for e in data_model.get("entities", []) if e.get("id") == entity_id),
+            None,
+        )
+        if entity:
+            # If entity is bound, use the bound model name from _entity_to_model_name
+            if entity.get("dbt_model"):
+                model_name = self._entity_to_model_name(entity)
+            # If entity is unbound and entity modeling is enabled, apply prefix
+            elif cfg.ENTITY_MODELING_CONFIG.enabled:
+                model_name = self._entity_to_model_name(entity)
 
         # Build a map of field names to relationships for this entity
         relationships = data_model.get("relationships", [])

@@ -1697,7 +1697,7 @@ wheels = [
 
 [[package]]
 name = "trellis-datamodel"
-version = "0.6.0b1"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "dbt-colibri" },

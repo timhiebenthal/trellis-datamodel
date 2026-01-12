@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [UNRELEASED]
+
+### Added
+- Added configurable entity prefix support for entity modeling mode to maintain table naming conventions while keeping labels clean.
+- Added `entity_modeling.inference_patterns.prefix` configuration option to `trellis.yml` supporting single string or list of strings for prefix values. Defaults to empty list (no prefix) for backward compatibility.
+- Added automatic prefix application when saving unbound entities to dbt schema.yml files (uses first configured prefix).
+- Added case-insensitive prefix detection to prevent duplication (e.g., `TBL_CUSTOMER` won't become `tbl_TBL_CUSTOMER`).
+- Added automatic prefix stripping from entity labels displayed on ERD canvas for improved readability.
+- Added support for multiple prefix patterns (e.g., `["tbl_", "entity_", "t_"]`) to handle legacy naming conventions.
+- Added preservation of bound dbt_model values to avoid re-prefixed entities that already have prefixes.
+- Added `/api/config-info` endpoint response field `entity_prefix` to expose configured prefixes to frontend.
+
+### Changed
+- Extended Entity TypedDict in backend with prefix-aware model name generation via `_entity_to_model_name()` method.
+- Updated frontend label formatting to strip configured prefixes from entity names while preserving original casing of remaining text.
+- Entity prefix feature only activates when `modeling_style` is `entity_model` (default).
+
+### Fixed
+- Added validation for prefix configuration to ensure it's a string or list of strings.
+- Added error handling for empty prefix lists to maintain backward compatibility.
+
 ## [0.6.0]
 
 ### Added
