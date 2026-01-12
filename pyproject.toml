@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trellis-datamodel"
-version = "0.6.0b1"
+version = "0.6.0"
 description = "Visual data model editor for dbt projects"
 readme = "README.md"
 requires-python = ">=3.11"
