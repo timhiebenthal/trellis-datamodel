@@ -12,6 +12,7 @@
         edges,
         draggingField,
         exposureEntityFilter,
+        modelingStyle,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -69,6 +70,9 @@
     const exposuresEnabledStore =
         getContext<Readable<boolean>>("exposuresEnabled") ?? readable(false);
     let exposuresEnabled = $derived($exposuresEnabledStore);
+
+    // Entity type controls only for dimensional modeling
+    let isDimensionalModeling = $derived($modelingStyle === "dimensional_model");
 
     const hasExposuresDataStore =
         getContext<Readable<boolean>>("hasExposuresData") ?? readable(false);
@@ -1000,8 +1004,8 @@
                     <Icon icon="lucide:chevron-down" class="w-4 h-4" />
                 {/if}
             </span>
-            <!-- Entity Type Badge -->
-            {#if data.entity_type}
+            <!-- Entity Type Badge (only shown in dimensional_model mode) -->
+            {#if isDimensionalModeling && data.entity_type}
                 <button
                     type="button"
                     class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 cursor-pointer"
@@ -1091,8 +1095,8 @@
         </div>
     </div>
 
-    <!-- Entity Type Dropdown Menu -->
-    {#if showEntityTypeMenu}
+    <!-- Entity Type Dropdown Menu (only shown in dimensional_model mode) -->
+    {#if showEntityTypeMenu && isDimensionalModeling}
         <div
             class="absolute z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px] text-sm transition-all duration-200 ease-in-out"
             style="top: 45px; right: 10px;"
