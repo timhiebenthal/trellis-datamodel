@@ -52,7 +52,8 @@ class TestCLIInit:
             original_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                result = runner.invoke(app, ["init"])
+                # Provide 'n' to decline interactive mode (backward compatible behavior)
+                result = runner.invoke(app, ["init"], input="n\n")
                 assert result.exit_code == 0
                 assert "Created trellis.yml" in result.output
 
