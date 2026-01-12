@@ -395,5 +395,6 @@
         onCancel={handleWizardCancel}
         existingEntityIds={$nodes.filter((n) => n.type === "entity").map((n) => n.id)}
         config={guidanceConfig}
+        modelingStyle={$modelingStyle}
     />
 </div>

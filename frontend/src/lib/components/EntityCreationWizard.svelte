@@ -9,9 +9,10 @@
         onCancel: () => void;
         existingEntityIds: string[];
         config: GuidanceConfig;
+        modelingStyle?: 'dimensional_model' | 'entity_model';
     };
 
-    let { open, onComplete, onCancel, existingEntityIds, config }: Props = $props();
+    let { open, onComplete, onCancel, existingEntityIds, config, modelingStyle = 'entity_model' }: Props = $props();
 
     let currentStep = $state(1);
     let formData = $state({
@@ -91,7 +92,8 @@
             } else {
                 validationErrors.label = null;
             }
-            currentStep = 2;
+            // Skip Step 2 (entity type) in entity_model mode, go directly to description
+            currentStep = modelingStyle === "entity_model" ? 3 : 2;
         } else if (currentStep === 2) {
             // Entity type selection - can proceed (optional)
             currentStep = 3;
@@ -113,7 +115,8 @@
         if (currentStep === 1) {
             // Skip label - use default "New Entity" (will be auto-named when binding dbt model)
             validationErrors.label = null;
-            currentStep = 2;
+            // Skip Step 2 (entity type) in entity_model mode, go directly to description
+            currentStep = modelingStyle === "entity_model" ? 3 : 2;
         } else if (currentStep === 2) {
             // Skip entity type - keep default unclassified
             currentStep = 3;
@@ -172,7 +175,8 @@
         } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             // Ctrl/Cmd+Enter to submit
             event.preventDefault();
-            if (currentStep < 4) {
+            const maxStep = modelingStyle === "entity_model" ? 3 : 4;
+            if (currentStep < maxStep) {
                 nextStep();
             } else {
                 complete();
@@ -248,13 +252,13 @@
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-medium text-gray-700">
-                        Step {currentStep} of 4
+                        Step {currentStep} of {modelingStyle === "entity_model" ? 3 : 4}
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
                         class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                        style="width: {(currentStep / 4) * 100}%"
+                        style="width: {(currentStep / (modelingStyle === "entity_model" ? 3 : 4)) * 100}%"
                     ></div>
                 </div>
             </div>
@@ -305,8 +309,8 @@
                 </div>
             {/if}
 
-            <!-- Step 2: Entity Type -->
-            {#if currentStep === 2}
+            <!-- Step 2: Entity Type (only shown in dimensional_model mode) -->
+            {#if currentStep === 2 && modelingStyle === "dimensional_model"}
                 <div class="space-y-4">
                     <div>
                         <span class="block text-sm font-medium text-gray-700 mb-3">
@@ -511,7 +515,7 @@
                     {/if}
                 </div>
                 <div class="flex gap-3">
-                    {#if currentStep < 4}
+                    {#if currentStep < (modelingStyle === "entity_model" ? 3 : 4)}
                         <button
                             onclick={skipStep}
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
