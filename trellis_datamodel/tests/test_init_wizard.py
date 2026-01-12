@@ -287,7 +287,7 @@ class TestDetectDbtProjectPath:
             Path(tmpdir, "dbt_project.yml").write_text("name: test")
 
             detected = detect_dbt_project_path(Path(tmpdir))
-            assert detected == "dbt_project.yml"
+            assert detected == "."
 
     def test_finds_project_in_subdirectory(self):
         """Test detection in subdirectory (depth 1)."""
@@ -298,7 +298,7 @@ class TestDetectDbtProjectPath:
             subdir.joinpath("dbt_project.yml").write_text("name: test")
 
             detected = detect_dbt_project_path(Path(tmpdir))
-            assert detected == "dbt/dbt_project.yml"
+            assert detected == "dbt"
 
     def test_finds_project_in_nested_subdirectory(self):
         """Test detection in nested subdirectory (depth 2)."""
@@ -309,7 +309,7 @@ class TestDetectDbtProjectPath:
             nested.joinpath("dbt_project.yml").write_text("name: test")
 
             detected = detect_dbt_project_path(Path(tmpdir))
-            assert detected == "dbt/project/dbt_project.yml"
+            assert detected == "dbt/project"
 
     def test_returns_none_when_not_found(self):
         """Test that None is returned when no dbt_project.yml is found."""
@@ -332,7 +332,7 @@ class TestDetectDbtProjectPath:
 
             detected = detect_dbt_project_path(tmpdir_path)
             # Should prioritize the shallower path
-            assert detected == "dbt_project.yml"
+            assert detected == "."
 
     def test_does_not_search_beyond_depth_2(self):
         """Test that depth 3 directories are not searched."""
@@ -500,8 +500,8 @@ class TestGenerateConfigFromAnswers:
         assert "- models/staging" in config
         assert "- models/marts" in config
 
-    def test_preserves_comments(self):
-        """Test that template comments are preserved."""
+    def test_preserves_boilerplate_for_unprompted_sections(self):
+        """Test that optional sections stay as commented boilerplate."""
         answers = {
             "framework": "dbt-core",
             "modeling_style": "entity_model",
@@ -512,10 +512,9 @@ class TestGenerateConfigFromAnswers:
 
         config = generate_config_from_answers(answers)
 
-        # Check that comments are preserved
-        assert "# Transformation framework currently supported." in config
-        assert "# Path to the dbt project directory" in config
-        assert "# Empty = include all models" in config
+        # Check that boilerplate remains for features not configured by the wizard
+        assert "# Lineage configuration is opt-in" in config
+        assert "# Exposures configuration (opt-in)" in config
 
     def test_dimensional_model_style(self):
         """Test config generation with dimensional_model style."""

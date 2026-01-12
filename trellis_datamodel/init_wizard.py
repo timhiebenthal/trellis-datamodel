@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any
 import typer
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 # Original template with comments (copied here to avoid circular import)
 DEFAULT_CONFIG_TEMPLATE = """\
@@ -90,6 +91,22 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables (string or list)
 #    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables (string or list)
 
+"""
+
+# Optional sections we keep as boilerplate when the wizard hasn't configured them
+BOILERPLATE_OPTIONAL_SECTIONS = """\
+
+# Lineage configuration is opt-in. Uncomment to customize defaults.
+#lineage:
+#  enabled: false  # Set to true to enable lineage UI/endpoints
+#  layers: []  # Ordered folder names that become lineage layers
+
+# Exposures configuration (opt-in). Uncomment to enable Exposures view mode.
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view mode (opt-in)
+#  default_layout: dashboards-as-rows  # dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
 """
 
 
@@ -508,60 +525,66 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     yaml.preserve_quotes = True
     yaml.indent(mapping=2, sequence=2, offset=2)
 
-    # Parse original template
-    config = yaml.load(DEFAULT_CONFIG_TEMPLATE)
+    config = CommentedMap()
+    config.yaml_set_start_comment("Trellis configuration for data model UI")
 
-    # Apply non-default values from answers
-    # Only set values that differ from template defaults
+    # Core settings the wizard always knows
+    framework = answers.get("framework", "dbt-core")
+    config["framework"] = framework
+    config.yaml_set_comment_before_after_key(
+        "framework", before="Transformation framework currently supported."
+    )
 
-    # Framework - only set if not "dbt-core" (template default)
-    if "framework" in answers and answers["framework"] != "dbt-core":
-        config["framework"] = answers["framework"]
+    dbt_project_path = answers.get("dbt_project_path", ".")
+    config["dbt_project_path"] = DoubleQuotedScalarString(dbt_project_path)
+    config.yaml_set_comment_before_after_key(
+        "dbt_project_path",
+        before="Path to the dbt project directory (relative to this file or absolute)",
+    )
 
-    # Modeling style - add if provided (not in template, so always add)
-    if "modeling_style" in answers:
-        config["modeling_style"] = answers["modeling_style"]
+    config["dbt_manifest_path"] = DoubleQuotedScalarString("target/manifest.json")
+    config["dbt_catalog_path"] = DoubleQuotedScalarString("target/catalog.json")
+    config["data_model_file"] = DoubleQuotedScalarString("data_model.yml")
 
-        # If dimensional_model is selected, uncomment and activate the dimensional_modeling section
-        if answers["modeling_style"] == "dimensional_model":
-            # Delete old commented section if it exists
-            if "dimensional_modeling" in config:
-                del config["dimensional_modeling"]
+    # dbt model paths: empty list means include all models
+    dbt_model_paths = answers.get("dbt_model_paths")
+    config["dbt_model_paths"] = dbt_model_paths if dbt_model_paths is not None else []
+    config.yaml_set_comment_before_after_key(
+        "dbt_model_paths",
+        before="List of path patterns to include (empty list includes all models)",
+    )
 
-            # Create new active dimensional_modeling section with inference patterns
-            config["dimensional_modeling"] = CommentedMap(
-                {
-                    "inference_patterns": {
+    config["dbt_company_dummy_path"] = DoubleQuotedScalarString("./dbt_company_dummy")
+    config.yaml_set_comment_before_after_key(
+        "dbt_company_dummy_path",
+        before="Helper project used by `trellis generate-company-data`.",
+    )
+
+    # Modeling style and optional dimensional modeling section
+    modeling_style = answers.get("modeling_style", "entity_model")
+    config["modeling_style"] = modeling_style
+    config.yaml_set_comment_before_after_key(
+        "modeling_style",
+        before="Select data modeling style (entity_model or dimensional_model)",
+    )
+    if modeling_style == "dimensional_model":
+        config["dimensional_modeling"] = CommentedMap(
+            {
+                "inference_patterns": CommentedMap(
+                    {
                         "dimension_prefix": ["dim_", "d_"],
                         "fact_prefix": ["fct_", "fact_"],
                     }
-                }
-            )
-            # Add inline comment for clarity
-            config["dimensional_modeling"].yaml_set_comment_before_after_key(
-                "inference_patterns",
-                before=" # Customize these patterns to match your dbt model naming conventions",
-            )
+                )
+            }
+        )
+        config["dimensional_modeling"].yaml_set_comment_before_after_key(
+            "inference_patterns",
+            before="Customize these patterns to match your dbt model naming conventions",
+        )
 
-    # DBT project path - only set if not "."
-    if "dbt_project_path" in answers and answers["dbt_project_path"] != ".":
-        config["dbt_project_path"] = answers["dbt_project_path"]
-
-    # dbt model paths - only set if not empty/None
-    # Need to delete old commented version first to preserve formatting
-    if "dbt_model_paths" in answers and answers["dbt_model_paths"] is not None:
-        # Delete old value with its comments
-        if "dbt_model_paths" in config:
-            del config["dbt_model_paths"]
-        # Add new clean value
-        config["dbt_model_paths"] = answers["dbt_model_paths"]
-
-    # Entity creation guidance - configure if enabled or any sub-field specified
+    # Entity creation guidance mirrors the wizard choice with sensible defaults
     if "entity_creation_guidance_enabled" in answers:
-        # Delete old commented section
-        if "entity_creation_guidance" in config:
-            del config["entity_creation_guidance"]
-        # Create new active section
         config["entity_creation_guidance"] = CommentedMap(
             {
                 "enabled": answers["entity_creation_guidance_enabled"],
@@ -570,17 +593,16 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
                 "disabled_guidance": [],
             }
         )
-        # Add inline comments
         config["entity_creation_guidance"].yaml_set_comment_before_after_key(
             "push_warning_enabled",
-            before=" # Show push warnings when interacting with dbt",
+            before="Show push warnings when interacting with dbt",
         )
         config["entity_creation_guidance"].yaml_set_comment_before_after_key(
             "min_description_length",
-            before=" # Minimum characters required for descriptions",
+            before="Minimum characters required for descriptions",
         )
         config["entity_creation_guidance"].yaml_set_comment_before_after_key(
-            "disabled_guidance", before=" # Helper flows to disable"
+            "disabled_guidance", before="Helper flows to disable"
         )
 
     # Generate YAML output
@@ -589,7 +611,46 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     output = StringIO()
     yaml.dump(config, output)
 
-    return output.getvalue()
+    def insert_blank_after_block(lines: list[str], startswith: str) -> list[str]:
+        """Insert a blank line after a mapping block beginning with `startswith`."""
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if line.lstrip().startswith(startswith):
+                base_indent = len(line) - len(line.lstrip(" "))
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j]
+                    next_indent = len(next_line) - len(next_line.lstrip(" "))
+                    if next_line.strip() == "":
+                        j += 1
+                        continue
+                    if next_indent <= base_indent:
+                        lines.insert(j, "")
+                        i = j  # continue after insertion
+                        break
+                    j += 1
+                else:
+                    lines.append("")
+                    i = len(lines)
+            i += 1
+        return lines
+
+    lines = output.getvalue().splitlines()
+    for marker in [
+        "framework:",
+        "data_model_file:",
+        "dbt_model_paths:",
+        "dbt_company_dummy_path:",
+        "dimensional_modeling:",
+        "entity_creation_guidance:",
+    ]:
+        lines = insert_blank_after_block(lines, marker)
+
+    formatted = "\n".join(lines).rstrip()
+
+    # Append boilerplate for settings the wizard did not ask about
+    return f"{formatted}\n{BOILERPLATE_OPTIONAL_SECTIONS}"
 
 
 def run_init_wizard(config_file_location: Path) -> Dict[str, Any]:
