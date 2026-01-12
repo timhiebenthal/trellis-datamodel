@@ -39,4 +39,4 @@ frontend/tests/.trellis-test/
 
 # Cursor MCP configuration (may contain secrets)
 .cursor/mcp.json
-specs/
+/specs/
