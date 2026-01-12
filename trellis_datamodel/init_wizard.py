@@ -528,6 +528,29 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     config = CommentedMap()
     config.yaml_set_start_comment("Trellis configuration for data model UI")
 
+    # Modeling style and optional dimensional modeling section
+    modeling_style = answers.get("modeling_style", "entity_model")
+    config["modeling_style"] = modeling_style
+    config.yaml_set_comment_before_after_key(
+        "modeling_style",
+        before="Select data modeling style (entity_model or dimensional_model)",
+    )
+    if modeling_style == "dimensional_model":
+        config["dimensional_modeling"] = CommentedMap(
+            {
+                "inference_patterns": CommentedMap(
+                    {
+                        "dimension_prefix": ["dim_", "d_"],
+                        "fact_prefix": ["fct_", "fact_"],
+                    }
+                )
+            }
+        )
+        config["dimensional_modeling"].yaml_set_comment_before_after_key(
+            "inference_patterns",
+            before="Customize these patterns to match your dbt model naming conventions",
+        )
+
     # Core settings the wizard always knows
     framework = answers.get("framework", "dbt-core")
     config["framework"] = framework
@@ -559,29 +582,6 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
         "dbt_company_dummy_path",
         before="Helper project used by `trellis generate-company-data`.",
     )
-
-    # Modeling style and optional dimensional modeling section
-    modeling_style = answers.get("modeling_style", "entity_model")
-    config["modeling_style"] = modeling_style
-    config.yaml_set_comment_before_after_key(
-        "modeling_style",
-        before="Select data modeling style (entity_model or dimensional_model)",
-    )
-    if modeling_style == "dimensional_model":
-        config["dimensional_modeling"] = CommentedMap(
-            {
-                "inference_patterns": CommentedMap(
-                    {
-                        "dimension_prefix": ["dim_", "d_"],
-                        "fact_prefix": ["fct_", "fact_"],
-                    }
-                )
-            }
-        )
-        config["dimensional_modeling"].yaml_set_comment_before_after_key(
-            "inference_patterns",
-            before="Customize these patterns to match your dbt model naming conventions",
-        )
 
     # Entity creation guidance mirrors the wizard choice with sensible defaults
     if "entity_creation_guidance_enabled" in answers:
@@ -638,11 +638,12 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
 
     lines = output.getvalue().splitlines()
     for marker in [
+        "modeling_style:",
+        "dimensional_modeling:",
         "framework:",
         "data_model_file:",
         "dbt_model_paths:",
         "dbt_company_dummy_path:",
-        "dimensional_modeling:",
         "entity_creation_guidance:",
     ]:
         lines = insert_blank_after_block(lines, marker)
@@ -676,8 +677,8 @@ def run_init_wizard(config_file_location: Path) -> Dict[str, Any]:
         typer.echo("Let's configure your trellis.yml file.\n")
 
         # Prompt for all configuration options
-        answers["framework"] = prompt_framework()
         answers["modeling_style"] = prompt_modeling_style()
+        answers["framework"] = prompt_framework()
         answers["entity_creation_guidance_enabled"] = prompt_entity_creation_guidance()
         answers["dbt_project_path"] = prompt_dbt_project_path(config_file_location)
 

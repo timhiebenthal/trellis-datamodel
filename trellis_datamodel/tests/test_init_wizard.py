@@ -541,8 +541,8 @@ class TestRunInitWizard:
 
         answers_collected = []
         prompts = [
-            "1",  # framework
             "1",  # modeling_style
+            "1",  # framework
             "y",  # entity_creation_guidance
             ".",  # dbt_project_path
             "all",  # dbt_model_paths
@@ -574,8 +574,8 @@ class TestRunInitWizard:
         monkeypatch.setattr("typer.echo", lambda *args, **kwargs: None)
 
         prompts = [
-            "1",  # framework
             "1",  # modeling_style
+            "1",  # framework
             "y",  # entity_creation_guidance
             "nonexistent_dbt",  # dbt_project_path (doesn't exist)
         ]
@@ -638,7 +638,7 @@ class TestIntegration:
                 os.chdir(tmpdir)
 
                 # Simulate user selecting interactive mode
-                # Inputs: y (interactive), 1 (framework), 1 (modeling), y (entity), . (path), all (models)
+                # Inputs: y (interactive), 1 (modeling), 1 (framework), y (entity), . (path), all (models)
                 input_data = "y\n1\n1\ny\n.\nall\n"
                 result = runner.invoke(app, ["init"], input=input_data)
 
@@ -719,8 +719,8 @@ class TestIntegration:
                 # Simulate user providing all custom values
                 input_data = (
                     "y\n"  # Interactive mode
-                    "dbt-core\n"  # Framework (default)
                     "2\n"  # Modeling style: dimensional_model
+                    "dbt-core\n"  # Framework (default)
                     "n\n"  # Entity wizard disabled
                     ".\n"  # Project path
                     "models/staging,models/marts\n"  # Custom model paths
