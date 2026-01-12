@@ -522,6 +522,25 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     if "modeling_style" in answers:
         config["modeling_style"] = answers["modeling_style"]
 
+        # If dimensional_model is selected, uncomment and activate the dimensional_modeling section
+        if answers["modeling_style"] == "dimensional_model":
+            # Delete old commented section if it exists
+            if "dimensional_modeling" in config:
+                del config["dimensional_modeling"]
+
+            # Create new active dimensional_modeling section with inference patterns
+            config["dimensional_modeling"] = CommentedMap({
+                "inference_patterns": {
+                    "dimension_prefix": ["dim_", "d_"],
+                    "fact_prefix": ["fct_", "fact_"],
+                }
+            })
+            # Add inline comment for clarity
+            config["dimensional_modeling"].yaml_set_comment_before_after_key(
+                "inference_patterns",
+                before=" # Customize these patterns to match your dbt model naming conventions"
+            )
+
     # DBT project path - only set if not "."
     if "dbt_project_path" in answers and answers["dbt_project_path"] != ".":
         config["dbt_project_path"] = answers["dbt_project_path"]
