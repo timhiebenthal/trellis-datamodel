@@ -43,6 +43,7 @@ Task types:
 - Each stream assigned to one agent
 - **KEY RULE: 1 file = 1 stream** (or 1 cohesive component)
 - Avoid parallel streams editing same files
+- A STREAM a SPRINT _MUST NOT_ depend on another SPRINT of the same SPRINT
 
 ### Task Organization Example
 
