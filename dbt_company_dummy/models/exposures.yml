@@ -12,7 +12,7 @@ exposures:
       - ref('sale')
       - ref('lead')
       - ref('product')
-      - ref('customer')
+      - ref('entity_customer')
 
     owner:
       name: Jeff Cash
