@@ -13,10 +13,11 @@ from typing import Optional, Dict, Any
 import typer
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 # Original template with comments (copied here to avoid circular import)
 DEFAULT_CONFIG_TEMPLATE = """\
-# Trellis configuration for data model UI
+# trellis configuration for data model UI
 
 # Transformation framework currently supported.
 framework: dbt-core
@@ -34,9 +35,6 @@ data_model_file: "data_model.yml"
 # List of path patterns to include (empty list includes all models)
 dbt_model_paths: []  # Empty = include all models
 
-# Path to the compiled frontend build directory
-frontend_build_dir: "./frontend/build"
-
 # Helper project used by `trellis generate-company-data`.
 # Run the command to populate ./dbt_company_dummy or replace with your own project.
 dbt_company_dummy_path: "./dbt_company_dummy"
@@ -52,6 +50,63 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #  push_warning_enabled: true  # Show push warnings when interacting with dbt
 #  min_description_length: 10  # Minimum characters required for descriptions
 #  disabled_guidance: []  # Helper flows to disable
+
+# Exposures configuration (opt-in). Uncomment to enable Exposures view mode.
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view mode (opt-in)
+#  default_layout: dashboards-as-rows  # Default table orientation: dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
+
+# Dimensional modeling configuration (opt-in).
+# Use this feature if you want to enable Kimball dimensional modeling features such as:
+# - Entity classification (fact vs dimension)
+# - Smart default positioning for star/snowflake schemas
+# - Kimball Bus Matrix view mode
+# Default is entity_model for backward compatibility.
+#modeling_style: entity_model  # Options: dimensional_model or entity_model
+
+# Dimensional modeling inference patterns (used when modeling_style is dimensional_model).
+# Customize these patterns to match your dbt model naming conventions.
+#
+# When your dbt project loads, entities are automatically classified based on model names:
+# - Models matching dimension_prefix → classified as "dimension" (green icon)
+# - Models matching fact_prefix → classified as "fact" (blue icon)
+# - Unmatched models → classified as "unclassified" (gray icon)
+#
+# You can override any classification by clicking the entity type badge on entity nodes.
+# This inference only runs on initial load; manual changes are always preserved.
+#
+# Common naming conventions:
+# - Dimensions: dim_, d_, dim, dimension (e.g., dim_customer, d_employee)
+# - Facts: fct_, fact_, f (e.g., fct_orders, fact_sales, f_transactions)
+#
+# You can specify prefixes as either a string (single prefix) or a list (multiple prefixes, first is used):
+#   dimension_prefix: "d_"           # Single prefix as string
+#   dimension_prefix: ["dim_", "d_"]  # Multiple prefixes as list (first is used)
+#   fact_prefix: "f_"                # Single prefix as string
+#   fact_prefix: ["fct_", "fact_"]   # Multiple prefixes as list (first is used)
+#dimensional_modeling:
+#  inference_patterns:
+#    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables (string or list)
+#    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables (string or list)
+
+"""
+
+# Optional sections we keep as boilerplate when the wizard hasn't configured them
+BOILERPLATE_OPTIONAL_SECTIONS = """\
+
+# Lineage configuration is opt-in. Uncomment to customize defaults.
+#lineage:
+#  enabled: false  # Set to true to enable lineage UI/endpoints
+#  layers: []  # Ordered folder names that become lineage layers
+
+# Exposures configuration (opt-in). Uncomment to enable Exposures view mode.
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view mode (opt-in)
+#  default_layout: dashboards-as-rows  # dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
 """
 
 
@@ -89,7 +144,7 @@ def prompt_framework() -> str:
 
     Note:
         Currently only dbt-core is supported. This option is shown for
-        transparency about what framework Trellis uses.
+        transparency about what framework trellis uses.
     """
     typer.echo()
     typer.echo(
@@ -196,7 +251,7 @@ def prompt_dbt_model_paths() -> Optional[list]:
         Optional[list]: List of paths or None (empty list) for "all"
 
     Note:
-        Specifying paths filters which models Trellis includes in the data
+        Specifying paths filters which models trellis includes in the data
         model. Leave empty (type 'all') to include all models in your dbt
         project.
     """
@@ -230,7 +285,7 @@ def prompt_dbt_model_paths() -> Optional[list]:
 
 def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]:
     """
-    Auto-detect dbt project path by searching for dbt_project.yml files.
+    Auto-detect dbt project directory by searching for dbt_project.yml files.
 
     Searches in current directory and subdirectories up to depth 2.
     If multiple files found, returns the closest one (shallowest depth).
@@ -239,7 +294,7 @@ def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]
         current_dir: Directory to search from (defaults to current working directory)
 
     Returns:
-        Optional[str]: Detected dbt_project.yml path relative to current_dir, or None
+        Optional[str]: Detected dbt project directory path relative to current_dir, or None
     """
     if current_dir is None:
         current_dir = Path.cwd()
@@ -273,8 +328,14 @@ def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]
     closest = found_files[0]
     rel_path = Path(closest).relative_to(current_dir)
 
+    # Return parent directory (dbt project folder), not the file itself
+    dbt_project_dir = rel_path.parent
+    # Use "." if the file is in the current directory
+    if str(dbt_project_dir) == ".":
+        return "."
+
     # Return as string with forward slashes
-    return str(rel_path).replace("\\", "/")
+    return str(dbt_project_dir).replace("\\", "/")
 
 
 def validate_dbt_project_path(
@@ -464,39 +525,66 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     yaml.preserve_quotes = True
     yaml.indent(mapping=2, sequence=2, offset=2)
 
-    # Parse original template
-    config = yaml.load(DEFAULT_CONFIG_TEMPLATE)
+    config = CommentedMap()
+    config.yaml_set_start_comment("Trellis configuration for data model UI")
 
-    # Apply non-default values from answers
-    # Only set values that differ from template defaults
+    # Modeling style and optional dimensional modeling section
+    modeling_style = answers.get("modeling_style", "entity_model")
+    config["modeling_style"] = modeling_style
+    config.yaml_set_comment_before_after_key(
+        "modeling_style",
+        before="Select data modeling style (entity_model or dimensional_model)",
+    )
+    if modeling_style == "dimensional_model":
+        config["dimensional_modeling"] = CommentedMap(
+            {
+                "inference_patterns": CommentedMap(
+                    {
+                        "dimension_prefix": ["dim_", "d_"],
+                        "fact_prefix": ["fct_", "fact_"],
+                    }
+                )
+            }
+        )
+        config["dimensional_modeling"].yaml_set_comment_before_after_key(
+            "inference_patterns",
+            before="Customize these patterns to match your dbt model naming conventions",
+        )
 
-    # Framework - only set if not "dbt-core" (template default)
-    if "framework" in answers and answers["framework"] != "dbt-core":
-        config["framework"] = answers["framework"]
+    # Core settings the wizard always knows
+    framework = answers.get("framework", "dbt-core")
+    config["framework"] = framework
+    config.yaml_set_comment_before_after_key(
+        "framework", before="Transformation framework currently supported."
+    )
 
-    # Modeling style - add if provided (not in template, so always add)
-    if "modeling_style" in answers:
-        config["modeling_style"] = answers["modeling_style"]
+    dbt_project_path = answers.get("dbt_project_path", ".")
+    config["dbt_project_path"] = DoubleQuotedScalarString(dbt_project_path)
+    config.yaml_set_comment_before_after_key(
+        "dbt_project_path",
+        before="Path to the dbt project directory (relative to this file or absolute)",
+    )
 
-    # DBT project path - only set if not "."
-    if "dbt_project_path" in answers and answers["dbt_project_path"] != ".":
-        config["dbt_project_path"] = answers["dbt_project_path"]
+    config["dbt_manifest_path"] = DoubleQuotedScalarString("target/manifest.json")
+    config["dbt_catalog_path"] = DoubleQuotedScalarString("target/catalog.json")
+    config["data_model_file"] = DoubleQuotedScalarString("data_model.yml")
 
-    # dbt model paths - only set if not empty/None
-    # Need to delete old commented version first to preserve formatting
-    if "dbt_model_paths" in answers and answers["dbt_model_paths"] is not None:
-        # Delete old value with its comments
-        if "dbt_model_paths" in config:
-            del config["dbt_model_paths"]
-        # Add new clean value
-        config["dbt_model_paths"] = answers["dbt_model_paths"]
+    # dbt model paths: empty list means include all models
+    dbt_model_paths = answers.get("dbt_model_paths")
+    config["dbt_model_paths"] = dbt_model_paths if dbt_model_paths is not None else []
+    config.yaml_set_comment_before_after_key(
+        "dbt_model_paths",
+        before="List of path patterns to include (empty list includes all models)",
+    )
 
-    # Entity creation guidance - configure if enabled or any sub-field specified
+    config["dbt_company_dummy_path"] = DoubleQuotedScalarString("./dbt_company_dummy")
+    config.yaml_set_comment_before_after_key(
+        "dbt_company_dummy_path",
+        before="Helper project used by `trellis generate-company-data`.",
+    )
+
+    # Entity creation guidance mirrors the wizard choice with sensible defaults
     if "entity_creation_guidance_enabled" in answers:
-        # Delete old commented section
-        if "entity_creation_guidance" in config:
-            del config["entity_creation_guidance"]
-        # Create new active section
         config["entity_creation_guidance"] = CommentedMap(
             {
                 "enabled": answers["entity_creation_guidance_enabled"],
@@ -505,17 +593,16 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
                 "disabled_guidance": [],
             }
         )
-        # Add inline comments
         config["entity_creation_guidance"].yaml_set_comment_before_after_key(
             "push_warning_enabled",
-            before=" # Show push warnings when interacting with dbt",
+            before="Show push warnings when interacting with dbt",
         )
         config["entity_creation_guidance"].yaml_set_comment_before_after_key(
             "min_description_length",
-            before=" # Minimum characters required for descriptions",
+            before="Minimum characters required for descriptions",
         )
         config["entity_creation_guidance"].yaml_set_comment_before_after_key(
-            "disabled_guidance", before=" # Helper flows to disable"
+            "disabled_guidance", before="Helper flows to disable"
         )
 
     # Generate YAML output
@@ -524,7 +611,47 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
     output = StringIO()
     yaml.dump(config, output)
 
-    return output.getvalue()
+    def insert_blank_after_block(lines: list[str], startswith: str) -> list[str]:
+        """Insert a blank line after a mapping block beginning with `startswith`."""
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if line.lstrip().startswith(startswith):
+                base_indent = len(line) - len(line.lstrip(" "))
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j]
+                    next_indent = len(next_line) - len(next_line.lstrip(" "))
+                    if next_line.strip() == "":
+                        j += 1
+                        continue
+                    if next_indent <= base_indent:
+                        lines.insert(j, "")
+                        i = j  # continue after insertion
+                        break
+                    j += 1
+                else:
+                    lines.append("")
+                    i = len(lines)
+            i += 1
+        return lines
+
+    lines = output.getvalue().splitlines()
+    for marker in [
+        "modeling_style:",
+        "dimensional_modeling:",
+        "framework:",
+        "data_model_file:",
+        "dbt_model_paths:",
+        "dbt_company_dummy_path:",
+        "entity_creation_guidance:",
+    ]:
+        lines = insert_blank_after_block(lines, marker)
+
+    formatted = "\n".join(lines).rstrip()
+
+    # Append boilerplate for settings the wizard did not ask about
+    return f"{formatted}\n{BOILERPLATE_OPTIONAL_SECTIONS}"
 
 
 def run_init_wizard(config_file_location: Path) -> Dict[str, Any]:
@@ -546,12 +673,12 @@ def run_init_wizard(config_file_location: Path) -> Dict[str, Any]:
         answers: Dict[str, Any] = {}
 
         typer.echo()
-        typer.echo(typer.style("Welcome to Trellis!", bold=True, fg=typer.colors.GREEN))
+        typer.echo(typer.style("Welcome to trellis!", bold=True, fg=typer.colors.GREEN))
         typer.echo("Let's configure your trellis.yml file.\n")
 
         # Prompt for all configuration options
-        answers["framework"] = prompt_framework()
         answers["modeling_style"] = prompt_modeling_style()
+        answers["framework"] = prompt_framework()
         answers["entity_creation_guidance_enabled"] = prompt_entity_creation_guidance()
         answers["dbt_project_path"] = prompt_dbt_project_path(config_file_location)
 
