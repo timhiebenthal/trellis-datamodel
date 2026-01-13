@@ -2,92 +2,85 @@ version: 0.1
 entities:
   employee:
     position:
-      x: 1399.1662684568598
+      x: 999.3549633659552
       y: 100
     width: 280
     panel_height: 200
     collapsed: false
   department:
     position:
-      x: 947.9485153361941
+      x: 548.1372102452895
       y: 100
     width: 280
     panel_height: 200
     collapsed: false
   lead:
     position:
-      x: 947.9485153361941
-      y: 740
+      x: 566.3501335112151
+      y: 886.9175810118007
     width: 280
     panel_height: 200
     collapsed: false
   sale:
     position:
-      x: 1547.948515336194
+      x: 1148.1372102452895
       y: 470
     width: 280
     panel_height: 200
     collapsed: false
   product:
     position:
-      x: 1025.0192504263466
+      x: 625.207945335442
       y: 424.67683772538146
     width: 280
     panel_height: 200
     collapsed: false
   supplier:
     position:
-      x: 2014.6666156127171
+      x: 1614.8553105218125
       y: 442.6069755325801
     width: 280
     panel_height: 200
     collapsed: false
   inventory:
     position:
-      x: 2409.0596608517517
+      x: 2009.248355760847
       y: 124.60443792874622
     width: 280
     panel_height: 200
     collapsed: false
   procurement:
     position:
-      x: 2467.5092987099133
+      x: 2067.6979936190087
       y: 799.521008123883
     width: 280
     panel_height: 200
     collapsed: false
   supplier_invoice:
     position:
-      x: 1001.3452991709015
+      x: 601.5339940799968
       y: 1356.841891891892
     width: 280
     panel_height: 200
     collapsed: false
   customer_invoice:
     position:
-      x: 1826.8454704114658
+      x: 1427.0341653205612
       y: 884.8937438182152
     width: 280
     panel_height: 200
     collapsed: false
   calendar:
     position:
-      x: 1491.3481528266352
+      x: 1091.5368477357306
       y: 1141.832255729461
-    width: 280
-    panel_height: 200
-    collapsed: false
-  new_stuff:
-    position:
-      x: -394.5143616203661
-      y: 264.6226006487941
     width: 280
     panel_height: 200
     collapsed: false
   customer:
     position:
-      x: 265.75
-      y: 663.3539977157178
+      x: 40
+      y: 769.4776602238469
     width: 280
     panel_height: 200
     collapsed: false
