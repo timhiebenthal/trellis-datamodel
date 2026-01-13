@@ -23,7 +23,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('customer')
+                to: ref('entity_customer')
                 field: customer_id
       - name: quantity
         data_type: numeric

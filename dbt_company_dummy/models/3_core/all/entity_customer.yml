@@ -21,7 +21,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('lead')
+                to: ref('entity_lead')
                 field: lead_id
       - name: created_at
         data_type: timestamp
