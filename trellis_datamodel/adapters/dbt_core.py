@@ -8,6 +8,7 @@ import copy
 import json
 import os
 import re
+import time
 import yaml
 from pathlib import Path
 from typing import Any, Optional
@@ -123,8 +124,10 @@ class DbtCoreAdapter:
             parts = dbt_model.split(".")
             if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
                 # Use the model name part (the element before the vN suffix)
-                return parts[-2]
-            return parts[-1]
+                model_name = parts[-2]
+            else:
+                model_name = parts[-1]
+            return model_name
 
         # For unbound entities, apply inference patterns
         entity_id = entity.get("id") or ""
@@ -136,8 +139,11 @@ class DbtCoreAdapter:
             # Check if entity already has a prefix (case-insensitive to avoid duplication)
             for existing_prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
                 if entity_id.lower().startswith(existing_prefix.lower()):
-                    return entity_id  # Already has a prefix
-            return f"{prefix}{entity_id}"
+                    model_name = entity_id  # Already has a prefix
+                    break
+            else:
+                model_name = f"{prefix}{entity_id}"
+            return model_name
 
         # Apply dimensional modeling prefixes when enabled
         if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
@@ -150,18 +156,23 @@ class DbtCoreAdapter:
                 # Check if entity_id already has a prefix
                 for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
                     if entity_id.lower().startswith(existing_prefix.lower()):
-                        return entity_id  # Already has a prefix
-                return f"{prefix}{entity_id}"
+                        model_name = entity_id  # Already has a prefix
+                        return model_name  # Already has a prefix
+                model_name = f"{prefix}{entity_id}"
+                return model_name
             elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
                 prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix[0]
                 # Check if entity_id already has a prefix
                 for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
                     if entity_id.lower().startswith(existing_prefix.lower()):
-                        return entity_id  # Already has a prefix
-                return f"{prefix}{entity_id}"
+                        model_name = entity_id  # Already has a prefix
+                        return model_name  # Already has a prefix
+                model_name = f"{prefix}{entity_id}"
+                return model_name
 
         # Default: return entity_id without prefix
-        return entity_id
+        model_name = entity_id
+        return model_name
 
     def _build_model_keys(self, base: str, version: Optional[str] = None) -> list[str]:
         """
@@ -229,6 +240,16 @@ class DbtCoreAdapter:
                     model_to_entity[key] = entity_id
             if entity_id:
                 model_to_entity[entity_id] = entity_id
+                if (
+                    cfg.ENTITY_MODELING_CONFIG.enabled
+                    and cfg.ENTITY_MODELING_CONFIG.entity_prefix
+                    and not dbt_model
+                ):
+                    # Add prefixed variants so inference can map prefixed model names back
+                    for prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
+                        prefixed = f"{prefix}{entity_id}"
+                        model_to_entity[prefixed] = entity_id
+                        model_to_entity[prefixed.lower()] = entity_id
         return model_to_entity
 
     def _get_model_yml_path(
@@ -714,7 +735,7 @@ class DbtCoreAdapter:
                                             "field", ""
                                         ) or args.get("field", "")
 
-                                        # If either ref target or field is missing, skip and log for debugging
+                                        # If either ref target or field is missing, skip
                                         if not to_ref or not target_field:
                                             continue
 
@@ -759,19 +780,19 @@ class DbtCoreAdapter:
                                                 continue
 
                                         relationships.append(
-                                            {
-                                                "source": target_entity_id,
-                                                "target": entity_id,
-                                                "label": "",
-                                                "type": "one_to_many",
-                                                "source_field": target_field,
-                                                "target_field": column.get("name"),
-                                                "source_model_name": target_base,
-                                                "source_model_version": target_version_int,
-                                                "target_model_name": base_model_name,
-                                                "target_model_version": source_version_int,
-                                            }
-                                        )
+                                                {
+                                                    "source": target_entity_id,
+                                                    "target": entity_id,
+                                                    "label": "",
+                                                    "type": "one_to_many",
+                                                    "source_field": target_field,
+                                                    "target_field": column.get("name"),
+                                                    "source_model_name": target_base,
+                                                    "source_model_version": target_version_int,
+                                                    "target_model_name": base_model_name,
+                                                    "target_model_version": source_version_int,
+                                                }
+                                            )
                     except Exception as e:
                         print(f"Warning: Could not parse {filepath}: {e}")
                         continue

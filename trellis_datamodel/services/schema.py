@@ -98,6 +98,33 @@ def sync_dbt_tests() -> list[Path]:
         entities = data_model.get("entities", [])
         relationships = data_model.get("relationships", [])
 
+        # Merge inferred relationships from dbt yml to avoid missing tests when
+        # the data_model.yml payload is prefix-stripped or outdated.
+        try:
+            inferred = adapter.infer_relationships(include_unbound=False)
+        except Exception:
+            inferred = []
+
+        merged: dict[tuple, dict] = {}
+        for rel in relationships:
+            key = (
+                rel.get("source"),
+                rel.get("target"),
+                rel.get("source_field"),
+                rel.get("target_field"),
+            )
+            merged[key] = rel
+        for rel in inferred:
+            key = (
+                rel.get("source"),
+                rel.get("target"),
+                rel.get("source_field"),
+                rel.get("target_field"),
+            )
+            if key not in merged:
+                merged[key] = rel
+        relationships = list(merged.values())
+
         adapter = get_adapter()
         updated_files = adapter.sync_relationships(entities, relationships)
 
