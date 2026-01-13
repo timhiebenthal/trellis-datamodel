@@ -399,6 +399,16 @@
         <!-- Separator -->
         <div class="border-t border-gray-200 mb-3"></div>
 
+        <!-- dbt Models Header -->
+        <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of dbt">
+            <img
+                src="https://www.getdbt.com/favicon.ico"
+                alt="dbt icon"
+                class="w-4 h-4 flex-shrink-0"
+            />
+            <span class="text-xs font-semibold text-gray-600">dbt Models</span>
+        </div>
+
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
             {#each treeNodes as node (node.path)}
                 <SidebarGroup {node} {onDragStart} />

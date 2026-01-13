@@ -1,9 +1,10 @@
 <script lang="ts">
     import type { DbtModel, TreeNode, EntityData } from "$lib/types";
-    import SidebarGroup from "./SidebarGroup.svelte"; 
+    import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
-    import { folderFilter, nodes } from "$lib/stores";
+    import { folderFilter, nodes, modelingStyle, dimensionPrefixes, factPrefixes } from "$lib/stores";
     import { extractRelativePath, toggleFolderFilter } from "$lib/utils/folder-utils";
+    import { classifyModelTypeFromPrefixes } from "$lib/utils";
 
     let { node, onDragStart, mainFolderPrefix = "" } = $props<{
         node: TreeNode;
@@ -32,7 +33,55 @@
     
     // Extract of relative folder path for filtering
     let filterPath = $derived(extractRelativePath(node.path));
-    
+
+    // Determine icon based on modeling style and model name
+    let modelIcon = $derived(() => {
+        if (!node.model) return 'lucide:database';
+
+        // In entity_model mode, always use database icon
+        if ($modelingStyle !== 'dimensional_model') {
+            return 'lucide:database';
+        }
+
+        // In dimensional_model mode, classify based on prefix
+        const type = classifyModelTypeFromPrefixes(
+            node.model.name,
+            $dimensionPrefixes,
+            $factPrefixes
+        );
+
+        switch (type) {
+            case 'dimension':
+                return 'lucide:list';
+            case 'fact':
+                return 'lucide:bar-chart-3';
+            default:
+                return 'lucide:circle-dashed';
+        }
+    });
+
+    // Determine icon color based on modeling style and model type
+    let modelIconColor = $derived(() => {
+        if (!node.model || $modelingStyle !== 'dimensional_model') {
+            return 'text-gray-400 group-hover:text-primary-600';
+        }
+
+        const type = classifyModelTypeFromPrefixes(
+            node.model.name,
+            $dimensionPrefixes,
+            $factPrefixes
+        );
+
+        switch (type) {
+            case 'dimension':
+                return 'text-green-600 group-hover:text-primary-600';
+            case 'fact':
+                return 'text-blue-600 group-hover:text-primary-600';
+            default:
+                return 'text-gray-500 group-hover:text-primary-600';
+        }
+    });
+
     function toggle(event: MouseEvent) {
         // Only toggle on chevron/folder icon click, not on the whole button
         const target = event.target as HTMLElement;
@@ -85,7 +134,7 @@
         role="listitem"
         title={`${node.name} (${node.model.schema}.${node.model.table})`}
     >
-        <Icon icon="lucide:database" class="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+        <Icon icon={modelIcon()} class="w-3.5 h-3.5 {modelIconColor()} transition-colors flex-shrink-0" />
         <span class="flex-1 truncate">{node.name}</span>
         {#if isModelBound}
             <Icon icon="mdi:check" class="w-3.5 h-3.5 text-success-600 flex-shrink-0" />
