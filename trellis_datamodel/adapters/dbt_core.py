@@ -134,7 +134,10 @@ class DbtCoreAdapter:
         entity_type = entity.get("entity_type", "unclassified")
 
         # Apply entity modeling prefixes when enabled
-        if cfg.ENTITY_MODELING_CONFIG.enabled and cfg.ENTITY_MODELING_CONFIG.entity_prefix:
+        if (
+            cfg.ENTITY_MODELING_CONFIG.enabled
+            and cfg.ENTITY_MODELING_CONFIG.entity_prefix
+        ):
             prefix = cfg.ENTITY_MODELING_CONFIG.entity_prefix[0]
             # Check if entity already has a prefix (case-insensitive to avoid duplication)
             for existing_prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
@@ -780,19 +783,19 @@ class DbtCoreAdapter:
                                                 continue
 
                                         relationships.append(
-                                                {
-                                                    "source": target_entity_id,
-                                                    "target": entity_id,
-                                                    "label": "",
-                                                    "type": "one_to_many",
-                                                    "source_field": target_field,
-                                                    "target_field": column.get("name"),
-                                                    "source_model_name": target_base,
-                                                    "source_model_version": target_version_int,
-                                                    "target_model_name": base_model_name,
-                                                    "target_model_version": source_version_int,
-                                                }
-                                            )
+                                            {
+                                                "source": target_entity_id,
+                                                "target": entity_id,
+                                                "label": "",
+                                                "type": "one_to_many",
+                                                "source_field": target_field,
+                                                "target_field": column.get("name"),
+                                                "source_model_name": target_base,
+                                                "source_model_version": target_version_int,
+                                                "target_model_name": base_model_name,
+                                                "target_model_version": source_version_int,
+                                            }
+                                        )
                     except Exception as e:
                         print(f"Warning: Could not parse {filepath}: {e}")
                         continue

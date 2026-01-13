@@ -62,7 +62,7 @@ entities:
 - id: customer
   label: Customer
   description: Customer records
-  dbt_model: null
+  dbt_model: model.company_dummy.entity_customer
   entity_type: unclassified
 relationships:
 - source: employee
@@ -129,3 +129,15 @@ relationships:
   type: one_to_many
   source_field: supplier_id
   target_field: supplier_id
+- source: lead
+  target: customer
+  label: ''
+  type: one_to_many
+  source_field: lead_id
+  target_field: lead_id
+- source: customer
+  target: sale
+  label: ''
+  type: one_to_many
+  source_field: customer_id
+  target_field: customer_id
