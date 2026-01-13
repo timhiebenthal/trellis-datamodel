@@ -951,7 +951,7 @@ import {
             class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60 gap-1"
         >
             <button
-                class="flex-1 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
                 class:bg-white={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:text-primary-600={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:shadow-sm={$viewMode === "conceptual" || $viewMode === "logical"}
@@ -965,7 +965,7 @@ import {
             </button>
             {#if exposuresEnabled && hasExposuresData}
                 <button
-                    class="flex-1 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
                     class:bg-white={$viewMode === "exposures"}
                     class:text-primary-600={$viewMode === "exposures"}
                     class:shadow-sm={$viewMode === "exposures"}
@@ -980,7 +980,7 @@ import {
             {/if}
             {#if busMatrixEnabled}
                 <button
-                    class="flex-1 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
                     class:bg-white={$viewMode === "bus_matrix"}
                     class:text-primary-600={$viewMode === "bus_matrix"}
                     class:shadow-sm={$viewMode === "bus_matrix"}
@@ -1022,28 +1022,28 @@ import {
 
             <button
                 onclick={handleOpenConfigInfo}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm"
+                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-sm"
                 title="Show resolved config paths"
             >
-                <Icon icon="lucide:info" class="w-4 h-4" />
+                <Icon icon="lucide:info" class="w-3.5 h-3.5" />
                 Config info
             </button>
 
             <button
                 onclick={toggleAllEntities}
                 disabled={loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                 title={allExpanded ? "Collapse all entities" : "Expand all entities"}
                 aria-label={allExpanded ? "Collapse all entities" : "Expand all entities"}
             >
                 {#if allExpanded}
                     <!-- Collapse icon: chevrons pointing inward -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
                         <path d="m7.4 21.308l-.708-.708L12 15.292l5.308 5.308l-.708.708l-4.6-4.6zm4.6-12.6L6.692 3.4l.708-.708l4.6 4.6l4.6-4.6l.708.708z"/>
                     </svg>
                 {:else}
                     <!-- Expand icon: chevrons pointing outward -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
                         <path d="M12 21.308L6.692 16l.714-.713L12 19.842l4.594-4.555l.714.713zm-4.588-12.6L6.692 8L12 2.692L17.308 8l-.72.708L12 4.158z"/>
                     </svg>
                 {/if}
@@ -1054,10 +1054,10 @@ import {
                 <button
                     onclick={handleAutoLayout}
                     disabled={loading}
-                    class="px-4 py-2 text-sm rounded-lg font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                    class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                     title="Arrange entities by fact/dimension positioning"
                 >
-                    <Icon icon="lucide:wand-2" class="w-4 h-4" />
+                    <Icon icon="lucide:wand-2" class="w-3.5 h-3.5" />
                     Auto Layout
                 </button>
             {/if}
@@ -1065,17 +1065,17 @@ import {
             <button
                 onclick={handleInferFromDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                 title="Import relationship tests from dbt yml files"
             >
-                <Icon icon="lucide:download" class="w-4 h-4" />
+                <Icon icon="lucide:download" class="w-3.5 h-3.5" />
                 Pull from dbt
             </button>
 
             <button
                 onclick={handleSyncDbt}
                 disabled={syncing || loading}
-                class="px-4 py-2 text-sm rounded-lg font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm relative"
+                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm relative"
                 class:bg-primary-600={!needsSync}
                 class:hover:bg-primary-700={!needsSync}
                 class:bg-amber-600={needsSync}
@@ -1086,15 +1086,15 @@ import {
                     : "Sync entity & field-definitions and relationship-tests to dbt schema.yml files"}
             >
                 {#if syncing}
-                    <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+                    <Icon icon="lucide:loader-2" class="w-3.5 h-3.5 animate-spin" />
                 {:else}
-                    <Icon icon="lucide:upload" class="w-4 h-4" />
+                    <Icon icon="lucide:upload" class="w-3.5 h-3.5" />
                 {/if}
                 Push to dbt
                 {#if needsSync && !syncing}
-                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
                     </span>
                 {/if}
             </button>
