@@ -12,7 +12,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('product')
+                to: ref('entity_product')
                 field: product_id
       - name: current_quantity
         data_type: numeric

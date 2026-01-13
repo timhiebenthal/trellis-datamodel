@@ -18,7 +18,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('department')
+                to: ref('entity_department')
                 field: department_id
       - name: team
         data_type: text
@@ -28,7 +28,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('employee_history')
+                to: ref('entity_employee_history')
                 field: employee_id
       - name: hire_date
         data_type: date

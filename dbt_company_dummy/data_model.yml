@@ -3,7 +3,7 @@ entities:
 - id: employee
   label: Employee
   description: Employee records
-  dbt_model: model.company_dummy.employee_history
+  dbt_model: model.company_dummy.entity_employee_history
   drafted_fields:
   - name: ''
     datatype: text
@@ -11,53 +11,62 @@ entities:
 - id: department
   label: Department
   description: Company departments
-  dbt_model: model.company_dummy.department
+  dbt_model: model.company_dummy.entity_department
   entity_type: unclassified
 - id: lead
   label: Lead
   description: Sales leads
-  dbt_model: model.company_dummy.lead
+  dbt_model: model.company_dummy.entity_lead
   entity_type: unclassified
 - id: sale
   label: Sale
   description: Sale records at order-item grain with enriched order information
-  dbt_model: model.company_dummy.sale
+  dbt_model: model.company_dummy.entity_sale
   entity_type: unclassified
 - id: product
   label: Product
   description: Product catalog
-  dbt_model: model.company_dummy.product
+  dbt_model: model.company_dummy.entity_product
   entity_type: unclassified
 - id: supplier
   label: Supplier
   description: Supplier records
-  dbt_model: model.company_dummy.supplier
+  dbt_model: model.company_dummy.entity_supplier
   entity_type: unclassified
 - id: inventory
   label: Inventory
   description: Product inventory levels
-  dbt_model: model.company_dummy.inventory
+  dbt_model: model.company_dummy.entity_inventory
   entity_type: unclassified
 - id: procurement
   label: Procurement
   description: Procurement records at purchase-order-item grain with enriched purchase
     order information
-  dbt_model: model.company_dummy.procurement
+  dbt_model: model.company_dummy.entity_procurement
   entity_type: unclassified
 - id: supplier_invoice
   label: Supplier Invoice
   description: Supplier invoices for purchase orders
-  dbt_model: model.company_dummy.supplier_invoice
+  dbt_model: model.company_dummy.entity_supplier_invoice
   entity_type: unclassified
 - id: customer_invoice
   label: Customer Invoice
   description: Customer invoices for sales orders
-  dbt_model: model.company_dummy.customer_invoice
+  dbt_model: model.company_dummy.entity_customer_invoice
   entity_type: unclassified
 - id: calendar
   label: Calendar
   description: ''
-  dbt_model: model.company_dummy.calendar
+  dbt_model: model.company_dummy.entity_calendar
+  entity_type: unclassified
+- id: new_stuff
+  label: New Stuff
+  description: ''
+  entity_type: unclassified
+- id: customer
+  label: Customer
+  description: Customer records
+  dbt_model: null
   entity_type: unclassified
 relationships:
 - source: employee

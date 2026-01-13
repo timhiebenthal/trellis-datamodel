@@ -15,7 +15,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('product')
+                to: ref('entity_product')
                 field: product_id
       - name: customer_id
         data_type: text
