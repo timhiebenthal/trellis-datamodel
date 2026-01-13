@@ -13,7 +13,7 @@
         draggingField,
         exposureEntityFilter,
         modelingStyle,
-        entityPrefixes,
+        labelPrefixes,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -387,7 +387,7 @@
                     // Extract model name from unique_id
                     const modelName = extractModelNameFromUniqueId(model.unique_id);
                     // Format label (title-case with spaces), stripping entity prefixes
-                    const formattedLabel = formatModelNameForLabel(modelName, $entityPrefixes);
+                    const formattedLabel = formatModelNameForLabel(modelName, $labelPrefixes);
                     // Generate new ID using generateSlug
                     const newId = generateSlug(formattedLabel, $nodes.map(n => n.id), id);
                     

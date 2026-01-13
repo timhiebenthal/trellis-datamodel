@@ -18,6 +18,22 @@ def _resolve_config_path() -> str | None:
     return find_config_file()
 
 
+def _resolve_label_prefixes() -> list[str]:
+    """Return the prefix list that should be used for label formatting."""
+    modeling_style = cfg.MODELING_STYLE
+
+    if modeling_style == "entity_model" and cfg.ENTITY_MODELING_CONFIG.enabled:
+        return list(cfg.ENTITY_MODELING_CONFIG.entity_prefix)
+
+    if modeling_style == "dimensional_model" and cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
+        return [
+            *cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix,
+            *cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix,
+        ]
+
+    return []
+
+
 @router.get("/config-status")
 async def get_config_status():
     """Return configuration status for the frontend."""
@@ -116,6 +132,7 @@ async def get_config_info():
             if cfg.ENTITY_MODELING_CONFIG.enabled
             else []
         ),
+        "label_prefixes": _resolve_label_prefixes(),
     }
 
 

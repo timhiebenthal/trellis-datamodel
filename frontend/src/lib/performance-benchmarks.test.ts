@@ -38,17 +38,18 @@ function benchmarkStripEntityPrefixes() {
     testCases.forEach((testCase, index) => {
         const start = performance.now();
         
+        let lastResult: string | undefined;
         for (let i = 0; i < TEST_ITERATIONS; i++) {
-            const result = stripEntityPrefixes(testCase.label, testCase.prefixes);
+            lastResult = stripEntityPrefixes(testCase.label, testCase.prefixes);
         }
         
         const end = performance.now();
         const avgTime = (end - start) / TEST_ITERATIONS;
         totalTime += avgTime;
         
-        const passed = result === testCase.expected;
+        const passed = lastResult === testCase.expected;
         console.log(`  Test ${index + 1}: stripEntityPrefixes('${testCase.label}', [${testCase.prefixes.join(', ')}])`);
-        console.log(`    Expected: '${testCase.expected}', Got: '${result}' ${passed ? '✓' : '✗'}`);
+        console.log(`    Expected: '${testCase.expected}', Got: '${lastResult}' ${passed ? '✓' : '✗'}`);
         console.log(`    Avg time: ${avgTime.toFixed(4)}ms over ${TEST_ITERATIONS} iterations`);
     });
 
@@ -73,7 +74,7 @@ function benchmarkFormatModelNameForLabel() {
         { name: 'entity_booking', prefixes: SINGLE_PREFIX, expected: 'Entity Booking' },
         { name: 'customer', prefixes: SINGLE_PREFIX, expected: 'Customer' },
         { name: 'user_id', prefixes: NO_PREFIXES, expected: 'User Id' },
-        { name: 'tbl_', prefixes: SINGLE_PREFIX, expected: 'Tbl _' }, // edge case
+        { name: 'tbl_', prefixes: SINGLE_PREFIX, expected: 'Tbl ' }, // edge case
         { name: 'API_key', prefixes: NO_PREFIXES, expected: 'Api Key' },
     ];
 
@@ -89,17 +90,18 @@ function benchmarkFormatModelNameForLabel() {
     testCases.forEach((testCase, index) => {
         const start = performance.now();
         
+        let lastResult: string | undefined;
         for (let i = 0; i < TEST_ITERATIONS; i++) {
-            const result = formatModelNameForLabel(testCase.name, testCase.prefixes);
+            lastResult = formatModelNameForLabel(testCase.name, testCase.prefixes);
         }
         
         const end = performance.now();
         const avgTime = (end - start) / TEST_ITERATIONS;
         totalTime += avgTime;
         
-        const passed = result === testCase.expected;
+        const passed = lastResult === testCase.expected;
         console.log(`  Test ${index + 1}: formatModelNameForLabel('${testCase.name}', [${testCase.prefixes.join(', ')}])`);
-        console.log(`    Expected: '${testCase.expected}', Got: '${result}' ${passed ? '✓' : '✗'}`);
+        console.log(`    Expected: '${testCase.expected}', Got: '${lastResult}' ${passed ? '✓' : '✗'}`);
         console.log(`    Avg time: ${avgTime.toFixed(4)}ms over ${TEST_ITERATIONS} iterations`);
     });
 

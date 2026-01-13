@@ -93,6 +93,7 @@ class ConfigInfoResponse(BaseModel):
     exposures_default_layout: str
     bus_matrix_enabled: bool
     modeling_style: str
+    label_prefixes: List[str]
     entity_prefix: List[str]
 
 

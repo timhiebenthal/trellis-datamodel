@@ -352,3 +352,17 @@ describe('formatModelNameForLabel with entity prefixes', () => {
         expect(formatModelNameForLabel('entity_user_profile_v2', ['entity_'])).toBe('User Profile V2');
     });
 });
+
+describe('formatModelNameForLabel with dimensional prefixes', () => {
+    const prefixes = ['dim_', 'd_', 'fct_', 'fact_'];
+
+    it('strips dimension prefixes before formatting', () => {
+        expect(formatModelNameForLabel('dim_customer', prefixes)).toBe('Customer');
+        expect(formatModelNameForLabel('d_order_detail', prefixes)).toBe('Order Detail');
+    });
+
+    it('strips fact prefixes before formatting', () => {
+        expect(formatModelNameForLabel('fct_sales', prefixes)).toBe('Sales');
+        expect(formatModelNameForLabel('fact_transactions', prefixes)).toBe('Transactions');
+    });
+});

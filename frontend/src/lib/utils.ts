@@ -1,4 +1,10 @@
-import type { DbtModel, Relationship, ModelSchema, ModelSchemaColumn } from './types';
+import type {
+    ConfigInfo,
+    DbtModel,
+    Relationship,
+    ModelSchema,
+    ModelSchemaColumn,
+} from './types';
 import type { Edge } from '@xyflow/svelte';
 
 /**
@@ -121,12 +127,28 @@ export function stripEntityPrefixes(label: string, prefixes: string[]): string {
 }
 
 /**
+ * Choose the prefix list that should be stripped from labels for the current modeling style.
+ * Falls back to entity_prefix when label_prefixes is not provided.
+ */
+export function getLabelPrefixesFromConfig(info?: ConfigInfo | null): string[] {
+    if (!info) {
+        return [];
+    }
+
+    if (info.label_prefixes && info.label_prefixes.length > 0) {
+        return info.label_prefixes;
+    }
+
+    return info.entity_prefix ?? [];
+}
+
+/**
  * Format a dbt model name for use as an entity label.
  * Replaces underscores with spaces and title-cases each word.
- * Optionally strips configured entity prefixes before formatting.
+ * Optionally strips configured prefixes before formatting.
  * 
  * @param modelName - The model name (e.g., "entity_booking" or "tbl_customer")
- * @param entityPrefixes - Optional array of prefixes to strip (e.g., ["tbl_", "entity_"])
+ * @param prefixes - Optional array of prefixes to strip (e.g., ["tbl_", "entity_"])
  * @returns Formatted label (e.g., "Entity Booking" or "Customer")
  * 
  * @example
@@ -137,9 +159,8 @@ export function stripEntityPrefixes(label: string, prefixes: string[]): string {
  * formatModelNameForLabel("TBL_CUSTOMER", ["tbl_"]) // "Customer"
  * formatModelNameForLabel("tbl_customer", []) // "Tbl Customer" (backward compatible)
  */
-export function formatModelNameForLabel(modelName: string, entityPrefixes: string[] = []): string {
-    // Strip entity prefixes if provided (for entity modeling mode)
-    const withoutPrefix = stripEntityPrefixes(modelName, entityPrefixes);
+export function formatModelNameForLabel(modelName: string, prefixes: string[] = []): string {
+    const withoutPrefix = stripEntityPrefixes(modelName, prefixes);
     
     // Format the remaining text by splitting underscores and title-casing
     return withoutPrefix

@@ -8,7 +8,7 @@ export const dbtModels = writable<DbtModel[]>([]);
 export const viewMode = writable<'conceptual' | 'logical' | 'exposures' | 'bus_matrix'>('conceptual');
 export const modelingStyle = writable<'dimensional_model' | 'entity_model'>('entity_model');
 export const configStatus = writable<any>(null);
-export const entityPrefixes = writable<string[]>([]);
+export const labelPrefixes = writable<string[]>([]);
 
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
