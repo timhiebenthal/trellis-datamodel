@@ -1,6 +1,6 @@
 version: 2
 models:
-- name: customer
+- name: entity_customer
   description: Customer records
   columns:
   - name: customer_id

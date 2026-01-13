@@ -3,7 +3,7 @@ entities:
   employee:
     position:
       x: 491.21775312066575
-      y: 100
+      y: 203.90972312387964
     width: 280
     panel_height: 200
     collapsed: false
@@ -17,70 +17,63 @@ entities:
   lead:
     position:
       x: 40
-      y: 740
+      y: 843.9097231238796
     width: 280
     panel_height: 200
     collapsed: false
   sale:
     position:
       x: 640
-      y: 470
+      y: 573.9097231238796
     width: 280
     panel_height: 200
     collapsed: false
   product:
     position:
       x: 117.07073509015254
-      y: 424.67683772538146
-    width: 280
-    panel_height: 200
-    collapsed: false
-  customer:
-    position:
-      x: 541.1040221914009
-      y: 755.5894590846048
+      y: 528.5865608492611
     width: 280
     panel_height: 200
     collapsed: false
   supplier:
     position:
       x: 1106.718100276523
-      y: 442.6069755325802
+      y: 546.5166986564598
     width: 280
     panel_height: 200
     collapsed: false
   inventory:
     position:
       x: 1501.1111455155576
-      y: 124.60443792874622
+      y: 228.51416105262587
     width: 280
     panel_height: 200
     collapsed: false
   procurement:
     position:
       x: 1559.5607833737192
-      y: 799.521008123883
+      y: 903.4307312477627
     width: 280
     panel_height: 200
     collapsed: false
   supplier_invoice:
     position:
-      x: 452.368405456329
-      y: 931.185826822956
+      x: 93.39678383470742
+      y: 1460.7516150157717
     width: 280
     panel_height: 200
     collapsed: false
   customer_invoice:
     position:
       x: 918.8969550752718
-      y: 884.8937438182152
+      y: 988.8034669420948
     width: 280
     panel_height: 200
     collapsed: false
-  entity:
+  calendar:
     position:
-      x: 1357.3996374904411
-      y: 913.8322557294612
+      x: 583.3996374904411
+      y: 1245.7419788533407
     width: 280
     panel_height: 200
     collapsed: false
@@ -97,33 +90,24 @@ relationships:
   department-employee-3:
     label_dx: 0
     label_dy: 0
-  lead-customer-4:
+  product-sale-4:
     label_dx: 0
     label_dy: 0
-  lead-customer-5:
+  product-sale-5:
     label_dx: 0
     label_dy: 0
-  customer-sale-6:
+  product-inventory-6:
     label_dx: 0
     label_dy: 0
-  product-sale-7:
+  product-inventory-7:
     label_dx: 0
     label_dy: 0
-  product-sale-8:
+  product-procurement-8:
     label_dx: 0
     label_dy: 0
-  product-inventory-9:
+  product-procurement-9:
     label_dx: 0
     label_dy: 0
-  product-inventory-10:
-    label_dx: 0
-    label_dy: 0
-  product-procurement-11:
-    label_dx: 0
-    label_dy: 0
-  product-procurement-12:
-    label_dx: 0
-    label_dy: 0
-  supplier-procurement-13:
+  supplier-procurement-10:
     label_dx: 0
     label_dy: 0

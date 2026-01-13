@@ -1,6 +1,6 @@
 version: 2
 models:
-  - name: employee
+  - name: entity_employee
     description: Employee records
     columns:
       - name: employee_id

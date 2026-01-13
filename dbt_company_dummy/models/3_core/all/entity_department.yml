@@ -1,6 +1,6 @@
 version: 2
 models:
-  - name: department
+  - name: entity_department
     description: Company departments
     columns:
       - name: department_id

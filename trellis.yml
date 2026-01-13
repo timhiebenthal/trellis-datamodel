@@ -48,7 +48,7 @@ lineage:
 # Entity creation guidance (preferred block)
 # Controls the entity creation wizard and push-to-dbt warnings
 entity_creation_guidance:
-  enabled: true  # Set false to disable the step-by-step wizard (default: true)
+  enabled: false  # Set false to disable the step-by-step wizard (default: true)
   push_warning_enabled: true
   min_description_length: 10
   disabled_guidance:

@@ -7,51 +7,58 @@ entities:
   drafted_fields:
   - name: ''
     datatype: text
+  entity_type: unclassified
 - id: department
   label: Department
   description: Company departments
   dbt_model: model.company_dummy.department
+  entity_type: unclassified
 - id: lead
   label: Lead
   description: Sales leads
   dbt_model: model.company_dummy.lead
+  entity_type: unclassified
 - id: sale
   label: Sale
   description: Sale records at order-item grain with enriched order information
   dbt_model: model.company_dummy.sale
+  entity_type: unclassified
 - id: product
   label: Product
   description: Product catalog
   dbt_model: model.company_dummy.product
-- id: customer
-  label: Customer
-  description: Customer records
-  dbt_model: model.company_dummy.customer
+  entity_type: unclassified
 - id: supplier
   label: Supplier
   description: Supplier records
   dbt_model: model.company_dummy.supplier
+  entity_type: unclassified
 - id: inventory
   label: Inventory
   description: Product inventory levels
   dbt_model: model.company_dummy.inventory
+  entity_type: unclassified
 - id: procurement
   label: Procurement
   description: Procurement records at purchase-order-item grain with enriched purchase
     order information
   dbt_model: model.company_dummy.procurement
+  entity_type: unclassified
 - id: supplier_invoice
   label: Supplier Invoice
   description: Supplier invoices for purchase orders
   dbt_model: model.company_dummy.supplier_invoice
+  entity_type: unclassified
 - id: customer_invoice
   label: Customer Invoice
   description: Customer invoices for sales orders
   dbt_model: model.company_dummy.customer_invoice
-- id: entity
-  label: Entity
+  entity_type: unclassified
+- id: calendar
+  label: Calendar
   description: ''
   dbt_model: model.company_dummy.calendar
+  entity_type: unclassified
 relationships:
 - source: employee
   target: employee
@@ -75,24 +82,6 @@ relationships:
   type: one_to_many
   source_field: department_id
   target_field: department_id
-- source: lead
-  target: customer
-  label: ''
-  type: one_to_many
-  source_field: lead_id
-  target_field: lead_id
-- source: lead
-  target: customer
-  label: ''
-  type: one_to_many
-  source_field: lead_id
-  target_field: lead_id
-- source: customer
-  target: sale
-  label: ''
-  type: one_to_many
-  source_field: customer_id
-  target_field: customer_id
 - source: product
   target: sale
   label: ''
