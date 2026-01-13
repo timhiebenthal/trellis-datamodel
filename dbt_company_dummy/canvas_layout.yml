@@ -49,13 +49,6 @@ entities:
     width: 280
     panel_height: 200
     collapsed: false
-  procurement:
-    position:
-      x: 1559.5607833737192
-      y: 799.521008123883
-    width: 280
-    panel_height: 200
-    collapsed: false
   supplier_invoice:
     position:
       x: 93.39678383470732
@@ -84,6 +77,13 @@ entities:
     width: 280
     panel_height: 200
     collapsed: false
+  procurement:
+    position:
+      x: 1370.126735676054
+      y: 729.9127267144843
+    width: 280
+    panel_height: 200
+    collapsed: false
 relationships:
   employee-employee-0:
     label_dx: 0
@@ -109,18 +109,9 @@ relationships:
   product-inventory-7:
     label_dx: 0
     label_dy: 0
-  product-procurement-8:
+  lead-customer-8:
     label_dx: 0
     label_dy: 0
-  product-procurement-9:
-    label_dx: 0
-    label_dy: 0
-  supplier-procurement-10:
-    label_dx: 0
-    label_dy: 0
-  lead-customer-11:
-    label_dx: 0
-    label_dy: 0
-  customer-sale-12:
+  customer-sale-9:
     label_dx: 0
     label_dy: 0

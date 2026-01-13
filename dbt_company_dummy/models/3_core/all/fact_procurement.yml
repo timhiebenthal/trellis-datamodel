@@ -15,7 +15,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('entity_product')
+                to: ref('dim_product')
                 field: product_id
       - name: supplier_id
         data_type: text
@@ -23,7 +23,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('entity_supplier')
+                to: ref('dim_supplier')
                 field: supplier_id
       - name: quantity
         data_type: numeric
