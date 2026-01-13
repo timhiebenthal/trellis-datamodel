@@ -96,13 +96,16 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
         if not entity_id:
             continue
 
-        # Only apply inference if entity_type is not already set
-        if "entity_type" not in entity or entity.get("entity_type") is None:
-            if entity_id in inferred_types:
-                entity["entity_type"] = inferred_types[entity_id]
-                print(
-                    f"Inferred entity_type '{inferred_types[entity_id]}' for entity '{entity_id}'"
-                )
+        # Apply inference if entity_type is missing or still unclassified
+        existing_type = entity.get("entity_type")
+        should_infer = existing_type is None or existing_type == "unclassified"
+        if should_infer and entity_id in inferred_types:
+            entity["entity_type"] = inferred_types[entity_id]
+            print(
+                f"Inferred entity_type '{inferred_types[entity_id]}' for entity '{entity_id}'"
+            )
+        else:
+            pass
 
     return model_data
 

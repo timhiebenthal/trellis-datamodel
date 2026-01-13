@@ -16,6 +16,7 @@ def _prepare_config(monkeypatch):
     monkeypatch.setattr(cfg, "LINEAGE_LAYERS", [])
     monkeypatch.setattr(cfg, "EXPOSURES_ENABLED", False)
     monkeypatch.setattr(cfg, "EXPOSURES_DEFAULT_LAYOUT", "dashboards-as-rows")
+    monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", cfg.EntityModelingConfig())
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -317,3 +318,108 @@ def test_inference_patterns_defaults_when_missing(monkeypatch, tmp_path):
     assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim_", "d_"]
     assert isinstance(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix, list)
     assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fct_", "fact_"]
+
+
+# ===== Entity Modeling Configuration Tests (Stream D) =====
+
+
+def test_entity_prefix_empty_list_default(monkeypatch, tmp_path):
+    """Test empty prefix list (default behavior)."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: entity_model
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.ENTITY_MODELING_CONFIG.enabled is True
+    assert isinstance(cfg.ENTITY_MODELING_CONFIG.entity_prefix, list)
+    assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == []
+
+
+def test_entity_prefix_single_string(monkeypatch, tmp_path):
+    """Test single string prefix configuration."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: entity_model
+        entity_modeling:
+          inference_patterns:
+            prefix: "tbl_"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.ENTITY_MODELING_CONFIG.enabled is True
+    assert isinstance(cfg.ENTITY_MODELING_CONFIG.entity_prefix, list)
+    assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == ["tbl_"]
+
+
+def test_entity_prefix_list_of_prefixes(monkeypatch, tmp_path):
+    """Test list of prefixes configuration."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: entity_model
+        entity_modeling:
+          inference_patterns:
+            prefix: ["tbl_", "entity_", "t_"]
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.ENTITY_MODELING_CONFIG.enabled is True
+    assert isinstance(cfg.ENTITY_MODELING_CONFIG.entity_prefix, list)
+    assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == ["tbl_", "entity_", "t_"]
+
+
+def test_entity_modeling_enabled_when_entity_model(monkeypatch, tmp_path):
+    """Test config loads correctly when modeling_style = entity_model."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: entity_model
+        entity_modeling:
+          inference_patterns:
+            prefix: "tbl_"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.MODELING_STYLE == "entity_model"
+    assert cfg.ENTITY_MODELING_CONFIG.enabled is True
+    assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == ["tbl_"]
+
+
+def test_entity_modeling_disabled_when_dimensional_model(monkeypatch, tmp_path):
+    """Test config disabled when modeling_style = dimensional_model."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        modeling_style: dimensional_model
+        entity_modeling:
+          inference_patterns:
+            prefix: "tbl_"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.MODELING_STYLE == "dimensional_model"
+    assert cfg.ENTITY_MODELING_CONFIG.enabled is False
+    assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == []

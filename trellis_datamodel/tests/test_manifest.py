@@ -2,6 +2,7 @@
 import os
 import json
 from trellis_datamodel import config as cfg
+from trellis_datamodel.config import DimensionalModelingConfig, EntityModelingConfig
 
 
 class TestGetConfigStatus:
@@ -45,6 +46,41 @@ class TestGetConfigInfo:
         assert response.status_code == 200
         data = response.json()
         assert data["bus_matrix_enabled"] is True
+
+    def test_label_prefixes_reflect_entity_modeling(self, test_client, monkeypatch):
+        import sys
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "MODELING_STYLE", "entity_model")
+        entity_config = EntityModelingConfig()
+        entity_config.enabled = True
+        entity_config.entity_prefix = ["tbl_", "entity_"]
+        monkeypatch.setattr(config_module, "ENTITY_MODELING_CONFIG", entity_config)
+        monkeypatch.setattr(config_module, "DIMENSIONAL_MODELING_CONFIG", DimensionalModelingConfig())
+
+        response = test_client.get("/api/config-info")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["label_prefixes"] == ["tbl_", "entity_"]
+
+    def test_label_prefixes_reflect_dimensional_modeling(self, test_client, monkeypatch):
+        import sys
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "MODELING_STYLE", "dimensional_model")
+        dimensional_config = DimensionalModelingConfig()
+        dimensional_config.enabled = True
+        dimensional_config.dimension_prefix = ["dim_", "d_"]
+        dimensional_config.fact_prefix = ["fct_", "fact_"]
+        monkeypatch.setattr(config_module, "DIMENSIONAL_MODELING_CONFIG", dimensional_config)
+        entity_config = EntityModelingConfig()
+        entity_config.enabled = False
+        monkeypatch.setattr(config_module, "ENTITY_MODELING_CONFIG", entity_config)
+
+        response = test_client.get("/api/config-info")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["label_prefixes"] == ["dim_", "d_", "fct_", "fact_"]
 
 
 class TestGetManifest:

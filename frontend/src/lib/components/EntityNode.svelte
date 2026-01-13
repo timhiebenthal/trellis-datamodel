@@ -13,6 +13,9 @@
         draggingField,
         exposureEntityFilter,
         modelingStyle,
+        labelPrefixes,
+        dimensionPrefixes,
+        factPrefixes,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -29,6 +32,7 @@
         formatModelNameForLabel,
         extractModelNameFromUniqueId,
         toTitleCase,
+        classifyModelTypeFromPrefixes,
     } from "$lib/utils";
     import { getContext } from "svelte";
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
@@ -361,6 +365,9 @@
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
 
+        // Track the final ID (may change during auto-naming)
+        let finalId = id;
+        
         // If primary model exists, add as additional model; otherwise set as primary
         let newlyAddedModelId: string | null = null;
         if (boundModelName) {
@@ -376,17 +383,24 @@
             if (!hasDescription && (model.description || "").trim().length > 0) {
                 updates.description = model.description;
             }
+            const inferredType = classifyModelTypeFromPrefixes(
+                model.name,
+                $dimensionPrefixes,
+                $factPrefixes
+            );
+            if (inferredType) {
+                updates.entity_type = inferredType;
+            }
             
             // Auto-naming: Check if entity is unnamed and binding primary model
             const isUnnamed = id.startsWith('new_entity') && data.label === 'New Entity';
-            let finalId = id; // Track the final ID to use for updateNodeData
             
             if (isUnnamed) {
                 try {
                     // Extract model name from unique_id
                     const modelName = extractModelNameFromUniqueId(model.unique_id);
-                    // Format label (title-case with spaces)
-                    const formattedLabel = formatModelNameForLabel(modelName);
+                    // Format label (title-case with spaces), stripping entity prefixes
+                    const formattedLabel = formatModelNameForLabel(modelName, $labelPrefixes);
                     // Generate new ID using generateSlug
                     const newId = generateSlug(formattedLabel, $nodes.map(n => n.id), id);
                     
@@ -442,67 +456,69 @@
         try {
             const inferred = await inferRelationships({ includeUnbound: true });
 
-                // Build model name -> entity ID map from current canvas state
-                // Include the model we just bound (since data model hasn't saved yet)
-                const modelToEntity: Record<string, string> = {};
-                for (const node of $nodes) {
-                    let boundModels: string[] = [];
-                    if (node.id === id) {
-                        // Current node: include the model we just added
-                        if (boundModelName) {
-                            const currentAdditional = (data.additional_models as string[]) || [];
-                            boundModels = [boundModelName, ...currentAdditional];
-                            if (newlyAddedModelId) {
-                                boundModels.push(newlyAddedModelId);
-                            }
-                        } else {
-                            boundModels = [model.unique_id];
+            // Build model name -> entity ID map from current canvas state
+            // Include the model we just bound (since data model hasn't saved yet)
+            const modelToEntity: Record<string, string> = {};
+            for (const node of $nodes) {
+                let boundModels: string[] = [];
+                // Use finalId to match the renamed node
+                const nodeIdToMatch = node.id === id || node.id === finalId ? finalId : node.id;
+                if (node.id === id || node.id === finalId) {
+                    // Current node: include the model we just added
+                    if (boundModelName) {
+                        const currentAdditional = (data.additional_models as string[]) || [];
+                        boundModels = [boundModelName, ...currentAdditional];
+                        if (newlyAddedModelId) {
+                            boundModels.push(newlyAddedModelId);
                         }
                     } else {
-                        // Other nodes: get all bound models
-                        const primary = node.data?.dbt_model as string | undefined;
-                        const additional = (node.data?.additional_models as string[]) || [];
-                        if (primary) {
-                            boundModels = [primary, ...additional];
-                        }
+                        boundModels = [model.unique_id];
                     }
-                    
-                    for (const boundModel of boundModels) {
-                        if (boundModel && typeof boundModel === "string") {
-                            // Extract model name from unique_id, handling versioned models:
-                            // "model.project.name" -> maps "name"
-                            // "model.project.name.v1" -> maps "name" (base name used by backend)
-                            const parts = boundModel.split(".");
-                            if (parts.length >= 3 && parts[0] === "model") {
-                                const lastPart = parts[parts.length - 1];
-                                const isVersioned = /^v\d+$/.test(lastPart);
-                                
-                                if (isVersioned && parts.length >= 4) {
-                                    // Versioned model: map base name (backend returns base_model_name)
-                                    const baseName = parts[parts.length - 2];
-                                    modelToEntity[baseName] = node.id;
-                                } else {
-                                    modelToEntity[lastPart] = node.id;
-                                }
-                            } else {
-                                const modelName = boundModel.includes(".")
-                                    ? boundModel.split(".").pop()!
-                                    : boundModel;
-                                modelToEntity[modelName] = node.id;
-                            }
-                        }
+                } else {
+                    // Other nodes: get all bound models
+                    const primary = node.data?.dbt_model as string | undefined;
+                    const additional = (node.data?.additional_models as string[]) || [];
+                    if (primary) {
+                        boundModels = [primary, ...additional];
                     }
-                    // Also map entity ID to itself
-                    modelToEntity[node.id] = node.id;
                 }
+                
+                for (const boundModel of boundModels) {
+                    if (boundModel && typeof boundModel === "string") {
+                        // Extract model name from unique_id, handling versioned models:
+                        // "model.project.name" -> maps "name"
+                        // "model.project.name.v1" -> maps "name" (base name used by backend)
+                        const parts = boundModel.split(".");
+                        if (parts.length >= 3 && parts[0] === "model") {
+                            const lastPart = parts[parts.length - 1];
+                            const isVersioned = /^v\d+$/.test(lastPart);
+                            
+                            if (isVersioned && parts.length >= 4) {
+                                // Versioned model: map base name (backend returns base_model_name)
+                                const baseName = parts[parts.length - 2];
+                                modelToEntity[baseName] = nodeIdToMatch;
+                            } else {
+                                modelToEntity[lastPart] = nodeIdToMatch;
+                            }
+                        } else {
+                            const modelName = boundModel.includes(".")
+                                ? boundModel.split(".").pop()!
+                                : boundModel;
+                            modelToEntity[modelName] = nodeIdToMatch;
+                        }
+                    }
+                }
+                // Also map entity ID to itself
+                modelToEntity[nodeIdToMatch] = nodeIdToMatch;
+            }
 
-                for (const rel of inferred) {
+            for (const rel of inferred) {
                 // Remap source/target using current canvas bindings
                 const sourceEntityId = modelToEntity[rel.source] || rel.source;
                 const targetEntityId = modelToEntity[rel.target] || rel.target;
 
-                // Check if this relationship involves the current entity
-                if (sourceEntityId !== id && targetEntityId !== id) continue;
+                // Check if this relationship involves the current entity (use finalId)
+                if (sourceEntityId !== finalId && targetEntityId !== finalId) continue;
 
                 // Check if both entities exist on the canvas
                 const sourceExists = $nodes.some(
@@ -511,7 +527,9 @@
                 const targetExists = $nodes.some(
                     (n) => n.id === targetEntityId,
                 );
-                if (!sourceExists || !targetExists) continue;
+                if (!sourceExists || !targetExists) {
+                    continue;
+                }
 
                 // Remap the relationship to use entity IDs
                 const remappedRel = {

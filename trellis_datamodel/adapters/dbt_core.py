@@ -8,6 +8,7 @@ import copy
 import json
 import os
 import re
+import time
 import yaml
 from pathlib import Path
 from typing import Any, Optional
@@ -118,42 +119,63 @@ class DbtCoreAdapter:
         """
         dbt_model = entity.get("dbt_model")
         if dbt_model:
+            # Respect existing bound dbt_model values (don't re-prefix bound entities)
             # dbt unique_id for versioned models looks like model.<project>.<name>.v2
             parts = dbt_model.split(".")
             if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
                 # Use the model name part (the element before the vN suffix)
-                return parts[-2]
-            return parts[-1]
+                model_name = parts[-2]
+            else:
+                model_name = parts[-1]
+            return model_name
 
         # For unbound entities, apply inference patterns
         entity_id = entity.get("id") or ""
         entity_type = entity.get("entity_type", "unclassified")
 
-        # Only apply prefixes when dimensional modeling is enabled
-        if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
-            return entity_id
-
-        # Apply prefix based on entity type
+        # Apply entity modeling prefixes when enabled
         if (
-            entity_type == "dimension"
-            and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+            cfg.ENTITY_MODELING_CONFIG.enabled
+            and cfg.ENTITY_MODELING_CONFIG.entity_prefix
         ):
-            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix[0]
-            # Check if entity_id already has a prefix
-            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+            prefix = cfg.ENTITY_MODELING_CONFIG.entity_prefix[0]
+            # Check if entity already has a prefix (case-insensitive to avoid duplication)
+            for existing_prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
                 if entity_id.lower().startswith(existing_prefix.lower()):
-                    return entity_id  # Already has a prefix
-            return f"{prefix}{entity_id}"
-        elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
-            prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix[0]
-            # Check if entity_id already has a prefix
-            for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
-                if entity_id.lower().startswith(existing_prefix.lower()):
-                    return entity_id  # Already has a prefix
-            return f"{prefix}{entity_id}"
+                    model_name = entity_id  # Already has a prefix
+                    break
+            else:
+                model_name = f"{prefix}{entity_id}"
+            return model_name
+
+        # Apply dimensional modeling prefixes when enabled
+        if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
+            # Apply prefix based on entity type
+            if (
+                entity_type == "dimension"
+                and cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+            ):
+                prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix[0]
+                # Check if entity_id already has a prefix
+                for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+                    if entity_id.lower().startswith(existing_prefix.lower()):
+                        model_name = entity_id  # Already has a prefix
+                        return model_name  # Already has a prefix
+                model_name = f"{prefix}{entity_id}"
+                return model_name
+            elif entity_type == "fact" and cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+                prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix[0]
+                # Check if entity_id already has a prefix
+                for existing_prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+                    if entity_id.lower().startswith(existing_prefix.lower()):
+                        model_name = entity_id  # Already has a prefix
+                        return model_name  # Already has a prefix
+                model_name = f"{prefix}{entity_id}"
+                return model_name
 
         # Default: return entity_id without prefix
-        return entity_id
+        model_name = entity_id
+        return model_name
 
     def _build_model_keys(self, base: str, version: Optional[str] = None) -> list[str]:
         """
@@ -189,6 +211,11 @@ class DbtCoreAdapter:
         model_to_entity: dict[str, str] = {}
         data_model = self._load_data_model()
         entities = data_model.get("entities", [])
+        
+        # Load manifest once to look up model aliases
+        manifest = self._load_manifest() if os.path.exists(self.manifest_path) else {}
+        manifest_nodes = manifest.get("nodes", {})
+        
         for entity in entities:
             entity_id = entity.get("id")
             dbt_model = entity.get("dbt_model")
@@ -205,6 +232,23 @@ class DbtCoreAdapter:
                 model_to_entity[dbt_model] = entity_id
                 for key in self._build_model_keys(base_name, version_part):
                     model_to_entity[key] = entity_id
+                
+                # Also map the dbt YAML-documented model name (if different from unique_id)
+                # Read the YAML file to see if it documents a different model name
+                yml_path = self._get_model_yml_path(base_name)
+                if yml_path and os.path.exists(yml_path):
+                    try:
+                        with open(yml_path, "r") as f:
+                            yml_content = yaml.safe_load(f) or {}
+                            models_list = yml_content.get("models", [])
+                            for model_entry in models_list:
+                                yml_name = model_entry.get("name")
+                                if yml_name and yml_name != base_name:
+                                    # YAML documents a model with a different name
+                                    model_to_entity[yml_name] = entity_id
+                                    model_to_entity[yml_name.lower()] = entity_id
+                    except Exception as e:
+                        pass  # Gracefully skip if YAML parsing fails
             # Map additional models to the same entity
             additional_models = entity.get("additional_models", [])
             for add_model in additional_models:
@@ -221,6 +265,63 @@ class DbtCoreAdapter:
                     model_to_entity[key] = entity_id
             if entity_id:
                 model_to_entity[entity_id] = entity_id
+                if (
+                    cfg.ENTITY_MODELING_CONFIG.enabled
+                    and cfg.ENTITY_MODELING_CONFIG.entity_prefix
+                    and not dbt_model
+                ):
+                    # Add prefixed variants so inference can map prefixed model names back
+                    for prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
+                        prefixed = f"{prefix}{entity_id}"
+                        model_to_entity[prefixed] = entity_id
+                        model_to_entity[prefixed.lower()] = entity_id
+                if (
+                    cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+                    and not dbt_model
+                ):
+                    # Add prefixed variants for dimensional modeling prefixes
+                    for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+                        prefixed = f"{prefix}{entity_id}"
+                        model_to_entity[prefixed] = entity_id
+                        model_to_entity[prefixed.lower()] = entity_id
+                    for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+                        prefixed = f"{prefix}{entity_id}"
+                        model_to_entity[prefixed] = entity_id
+                        model_to_entity[prefixed.lower()] = entity_id
+        
+        # Second pass: Map YAML-documented model names to their file-based names
+        # This handles cases where the YAML name differs from the SQL file name,
+        # even for models not yet bound to entities in data_model.yml
+        model_dirs = self.get_model_dirs()
+        for models_dir in model_dirs:
+            if not os.path.exists(models_dir):
+                continue
+            for root, _, files in os.walk(models_dir):
+                for filename in files:
+                    if not filename.endswith((".yml", ".yaml")):
+                        continue
+                    yml_path = os.path.join(root, filename)
+                    try:
+                        with open(yml_path, "r") as f:
+                            yml_content = yaml.safe_load(f) or {}
+                        models_list = yml_content.get("models", [])
+                        for model_entry in models_list:
+                            yml_name = model_entry.get("name")
+                            if not yml_name:
+                                continue
+                            # Derive the file-based name from the YAML filename
+                            # e.g., fact_procurement.yml -> fact_procurement
+                            file_base = os.path.splitext(filename)[0]
+                            # Only map if the YAML name differs from the file name
+                            if yml_name != file_base:
+                                # Map yml_name -> file_base, so entity_procurement -> fact_procurement
+                                # If file_base is already in the map (bound to an entity), map yml_name to that entity
+                                target_entity = model_to_entity.get(file_base, file_base)
+                                model_to_entity[yml_name] = target_entity
+                                model_to_entity[yml_name.lower()] = target_entity
+                    except Exception:
+                        pass  # Gracefully skip if YAML parsing fails
+        
         return model_to_entity
 
     def _get_model_yml_path(
@@ -672,14 +773,14 @@ class DbtCoreAdapter:
                                 versioned_columns.append((None, base_columns))
 
                             for model_version, columns in versioned_columns:
-                                # When include_unbound, use raw model name so frontend can remap
-                                # Otherwise resolve to entity ID from saved data model
-                                if include_unbound:
+                                # Always resolve model names to entity IDs using the model_to_entity map
+                                # This handles YAML-documented names that differ from file names
+                                entity_id = self._resolve_entity_id(
+                                    model_to_entity, base_model_name, model_version
+                                )
+                                # If not found in map and include_unbound, fall back to raw name
+                                if not entity_id:
                                     entity_id = base_model_name
-                                else:
-                                    entity_id = self._resolve_entity_id(
-                                        model_to_entity, base_model_name, model_version
-                                    )
 
                                 for column in columns or []:
                                     test_blocks = []
@@ -706,7 +807,7 @@ class DbtCoreAdapter:
                                             "field", ""
                                         ) or args.get("field", "")
 
-                                        # If either ref target or field is missing, skip and log for debugging
+                                        # If either ref target or field is missing, skip
                                         if not to_ref or not target_field:
                                             continue
 
@@ -732,21 +833,21 @@ class DbtCoreAdapter:
                                             except (ValueError, TypeError):
                                                 pass
 
-                                        # When include_unbound, use raw model name
-                                        if include_unbound:
+                                        # Always resolve model names to entity IDs
+                                        target_entity_id = self._resolve_entity_id(
+                                            model_to_entity,
+                                            target_base,
+                                            target_version_str,
+                                        )
+                                        # If not found in map and include_unbound, fall back to raw name
+                                        if not target_entity_id:
                                             target_entity_id = target_base
-                                        else:
-                                            target_entity_id = self._resolve_entity_id(
-                                                model_to_entity,
-                                                target_base,
-                                                target_version_str,
-                                            )
 
-                                            # Skip relationships where either side is not bound
+                                        # Skip relationships where either side is not bound (only when NOT include_unbound)
+                                        if not include_unbound:
                                             if (
                                                 entity_id not in bound_entities
-                                                or target_entity_id
-                                                not in bound_entities
+                                                or target_entity_id not in bound_entities
                                             ):
                                                 continue
 
@@ -991,6 +1092,19 @@ class DbtCoreAdapter:
                 if entity.get("id") == entity_id:
                     entity_description = entity.get("description")
                     break
+
+        # Apply prefix logic to model_name for unbound entities
+        entity = next(
+            (e for e in data_model.get("entities", []) if e.get("id") == entity_id),
+            None,
+        )
+        if entity:
+            # If entity is bound, use the bound model name from _entity_to_model_name
+            if entity.get("dbt_model"):
+                model_name = self._entity_to_model_name(entity)
+            # If entity is unbound and entity modeling is enabled, apply prefix
+            elif cfg.ENTITY_MODELING_CONFIG.enabled:
+                model_name = self._entity_to_model_name(entity)
 
         # Build a map of field names to relationships for this entity
         relationships = data_model.get("relationships", [])

@@ -1,21 +1,24 @@
 <script lang="ts">
     import { onMount, untrack } from "svelte";
     import {
-        nodes,
-        edges,
-        dbtModels,
-        viewMode,
-        configStatus,
-        initHistory,
-        pushHistory,
-        undo,
-        redo,
-        canUndo,
-        canRedo,
-        folderFilter,
-        tagFilter,
-        groupByFolder,
+    nodes,
+    edges,
+    dbtModels,
+    viewMode,
+    configStatus,
+    initHistory,
+    pushHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    folderFilter,
+    tagFilter,
+    groupByFolder,
         modelingStyle,
+        labelPrefixes,
+        dimensionPrefixes,
+        factPrefixes,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -28,7 +31,15 @@
         syncDbtTests,
         getExposures,
     } from "$lib/api";
-    import { getParallelOffset, getModelFolder, normalizeTags, aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils";
+import {
+    getParallelOffset,
+    getModelFolder,
+    normalizeTags,
+    aggregateRelationshipsIntoEdges,
+    mergeRelationshipIntoEdges,
+    formatModelNameForLabel,
+    getLabelPrefixesFromConfig,
+} from "$lib/utils";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import Canvas from "$lib/components/Canvas.svelte";
@@ -211,6 +222,9 @@
                 exposuresEnabled = info.exposures_enabled ?? false;
                 exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
                 $modelingStyle = info.modeling_style ?? 'entity_model';
+                $labelPrefixes = getLabelPrefixesFromConfig(info);
+                dimensionPrefixes.set(info.dimension_prefix ?? []);
+                factPrefixes.set(info.fact_prefix ?? []);
             }
         } catch (e) {
             console.error(e);
@@ -249,7 +263,7 @@
                         position: { x: 200 + addedNodes * 60, y: 200 },
                         zIndex: 10,
                         data: {
-                            label: (model?.name ?? id).trim(),
+                            label: formatModelNameForLabel((model?.name ?? id).trim(), $labelPrefixes),
                             description: model?.description ?? "",
                             dbt_model: model?.unique_id ?? null,
                             additional_models: [],
@@ -502,6 +516,9 @@
         exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
         busMatrixEnabled = info?.bus_matrix_enabled ?? false;
         $modelingStyle = info?.modeling_style ?? 'entity_model';
+        $labelPrefixes = getLabelPrefixesFromConfig(info ?? null);
+        dimensionPrefixes.set(info?.dimension_prefix ?? []);
+        factPrefixes.set(info?.fact_prefix ?? []);
 
                 // Check if exposures data exists
                 if (exposuresEnabled) {
@@ -538,14 +555,14 @@
 
                 // Helper to get folder and tags from dbt model
                 function getEntityMetadata(entity: any) {
-                    if (!entity.dbt_model) return { folder: null };
+                    if (!entity.dbt_model) return { folder: null, model: null };
 
                     const model = models.find(
                         (m: any) => m.unique_id === entity.dbt_model,
                     );
-                    if (!model) return { folder: null };
+                    if (!model) return { folder: null, model: null };
 
-                    return { folder: getModelFolder(model) };
+                    return { folder: getModelFolder(model), model };
                 }
 
                 // Map data model to Svelte Flow format with metadata
@@ -554,13 +571,15 @@
                     // Use tags from entity data if present, otherwise empty array
                     const entityTags = normalizeTags(e.tags);
                     const hasDbtBinding = Boolean(e.dbt_model);
+                    // Get model name for label formatting (strip prefixes)
+                    const modelName = metadata.model ? metadata.model.name : e.id;
                     return {
                         id: e.id,
                         type: "entity",
                         position: e.position || { x: 0, y: 0 },
                         zIndex: 10, // Entities should be above groups (zIndex 1)
                         data: {
-                            label: (e.label || "").trim(),
+                            label: e.label?.trim() || formatModelNameForLabel(modelName.trim(), $labelPrefixes),
                             description: e.description,
                             dbt_model: e.dbt_model,
                             additional_models: e.additional_models,

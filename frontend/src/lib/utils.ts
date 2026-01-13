@@ -1,4 +1,10 @@
-import type { DbtModel, Relationship, ModelSchema, ModelSchemaColumn } from './types';
+import type {
+    ConfigInfo,
+    DbtModel,
+    Relationship,
+    ModelSchema,
+    ModelSchemaColumn,
+} from './types';
 import type { Edge } from '@xyflow/svelte';
 
 /**
@@ -59,19 +65,127 @@ export function toTitleCase(text: string): string {
 }
 
 /**
+ * Strip configured entity prefixes from a label.
+ * 
+ * Uses ENTITY_PREFIXES from config-info API response.
+ * Strips the first matching prefix from the label while preserving original casing of the remaining text.
+ * 
+ * @param label - The label to strip prefixes from (e.g., "tbl_customer")
+ * @param prefixes - Array of prefixes to strip (e.g., ["tbl_", "entity_"])
+ * @returns Label with first matching prefix removed (e.g., "customer")
+ * 
+ * @example
+ * stripEntityPrefixes("tbl_customer", ["tbl_"]) // "customer"
+ * stripEntityPrefixes("TBL_CUSTOMER", ["tbl_"]) // "CUSTOMER" (case-insensitive match, original casing preserved)
+ * stripEntityPrefixes("tbl_customer", ["entity_", "tbl_"]) // "customer" (first match removed)
+ * stripEntityPrefixes("customer", ["tbl_"]) // "customer" (no match, returns original)
+ * stripEntityPrefixes("tbl_", ["tbl_"]) // "" (edge case: label equals prefix, returns empty string)
+ * stripEntityPrefixes("tbl_customer", []) // "tbl_customer" (empty prefix array, returns original)
+ */
+export function stripEntityPrefixes(label: string, prefixes: string[]): string {
+    // Handle empty or undefined prefix array gracefully
+    if (!prefixes || prefixes.length === 0) {
+        return label;
+    }
+    
+    // Handle edge case where label itself is undefined/null
+    if (!label) {
+        return label;
+    }
+    
+    const lowerLabel = label.toLowerCase();
+    
+    // Check each prefix for a case-insensitive match
+    for (const prefix of prefixes) {
+        // Validate prefix is not empty string (warn user in logs)
+        if (prefix === "") {
+            console.warn(`Invalid empty prefix found in entity_prefixes config. Skipping this prefix.`);
+            continue;
+        }
+        
+        if (lowerLabel.startsWith(prefix.toLowerCase())) {
+            // Strip prefix and preserve original casing for remainder
+            const stripped = label.substring(prefix.length);
+            
+            // Handle edge case where label equals prefix (empty result after stripping)
+            if (stripped === "") {
+                console.log(`Entity label "${label}" equals prefix "${prefix}", resulting in empty string. Displaying original label.`);
+                return label; // Return original label to avoid empty UI elements
+            }
+            
+            return stripped;
+        }
+    }
+    
+    // Log prefix operation for debugging
+    if (prefixes.length > 0 && prefixes.some(p => p && p !== "")) {
+        console.log(`Stripping prefixes [${prefixes.join(", ")}] from label "${label}"`);
+    }
+    
+    // No prefix matched, return original label
+    return label;
+}
+
+/**
+ * Choose the prefix list that should be stripped from labels for the current modeling style.
+ * Falls back to entity_prefix when label_prefixes is not provided.
+ */
+export function getLabelPrefixesFromConfig(info?: ConfigInfo | null): string[] {
+    if (!info) {
+        return [];
+    }
+
+    if (info.label_prefixes && info.label_prefixes.length > 0) {
+        return info.label_prefixes;
+    }
+
+    return info.entity_prefix ?? [];
+}
+
+/**
+ * Infer dimensional entity type from model name using configured prefixes.
+ */
+export function classifyModelTypeFromPrefixes(
+    modelName: string,
+    dimensionPrefixes: string[] = [],
+    factPrefixes: string[] = [],
+): "dimension" | "fact" | null {
+    const lower = modelName.toLowerCase();
+    for (const p of dimensionPrefixes || []) {
+        if (p && lower.startsWith(p.toLowerCase())) {
+            return "dimension";
+        }
+    }
+    for (const p of factPrefixes || []) {
+        if (p && lower.startsWith(p.toLowerCase())) {
+            return "fact";
+        }
+    }
+    return null;
+}
+
+/**
  * Format a dbt model name for use as an entity label.
  * Replaces underscores with spaces and title-cases each word.
+ * Optionally strips configured prefixes before formatting.
  * 
- * @param modelName - The model name (e.g., "entity_booking")
- * @returns Formatted label (e.g., "Entity Booking")
+ * @param modelName - The model name (e.g., "entity_booking" or "tbl_customer")
+ * @param prefixes - Optional array of prefixes to strip (e.g., ["tbl_", "entity_"])
+ * @returns Formatted label (e.g., "Entity Booking" or "Customer")
  * 
  * @example
  * formatModelNameForLabel("user_id") // "User Id"
  * formatModelNameForLabel("API_key") // "Api Key"
  * formatModelNameForLabel("entity_booking") // "Entity Booking"
+ * formatModelNameForLabel("tbl_customer", ["tbl_"]) // "Customer"
+ * formatModelNameForLabel("TBL_CUSTOMER", ["tbl_"]) // "Customer"
+ * formatModelNameForLabel("tbl_customer", []) // "Tbl Customer" (backward compatible)
  */
-export function formatModelNameForLabel(modelName: string): string {
-    return modelName
+export function formatModelNameForLabel(modelName: string, prefixes: string[] = []): string {
+    const withoutPrefix = stripEntityPrefixes(modelName, prefixes);
+    
+    // Format the remaining text by splitting underscores and title-casing
+    return withoutPrefix
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ');

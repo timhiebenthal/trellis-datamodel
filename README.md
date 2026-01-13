@@ -101,6 +101,70 @@ dimensional_modeling:
 - Legacy projects with inconsistent naming
 - Exploratory modeling
 
+### Entity Model Prefix Support
+
+Trellis includes native support for configurable entity prefixes when using entity modeling style, allowing teams with established table naming conventions to maintain consistency while keeping entity labels clean.
+
+#### Features
+
+**Prefix Application**
+- Automatically applies configured prefix when saving unbound entities to dbt schema.yml files
+- Supports single prefix or multiple prefixes (e.g., `tbl_`, `entity_`, `t_`)
+- Uses first configured prefix for application when multiple are provided
+- Case-insensitive prefix detection prevents duplication (e.g., `TBL_CUSTOMER` won't become `tbl_TBL_CUSTOMER`)
+- Respects existing bound dbt_model values (bound entities don't get re-prefixed)
+
+**Prefix Stripping from Labels**
+- Configured prefixes are automatically stripped from entity labels displayed on the ERD canvas
+- Labels remain human-readable and meaningful without technical prefixes
+- Works for all entity labels: newly created entities, entities loaded from dbt models, and entities bound to existing dbt models
+- Preserves original casing of remaining label text after stripping
+
+#### Configuration
+
+Enable entity modeling prefix support in `trellis.yml`:
+
+```yaml
+modeling_style: entity_model  # Options: dimensional_model or entity_model (default)
+
+entity_modeling:
+  inference_patterns:
+    prefix: "tbl_"  # Single prefix
+    # OR
+    prefix: ["tbl_", "entity_", "t_"]  # Multiple prefixes
+```
+
+- `modeling_style: entity_model` (default) enables entity modeling features
+- `entity_modeling.inference_patterns.prefix` defines one or more prefixes to apply when saving entities
+- Empty prefix list (default) results in no behavior change for backward compatibility
+- When multiple prefixes are configured, the first in the list is used for application, but all are recognized for stripping
+
+#### Examples
+
+**Single Prefix Configuration:**
+```yaml
+entity_modeling:
+  inference_patterns:
+    prefix: "tbl_"
+```
+- Entity "Customer" on canvas saves to dbt as `tbl_customer`
+- Loading `tbl_customer` from dbt displays as "Customer" on canvas
+
+**Multiple Prefix Configuration:**
+```yaml
+entity_modeling:
+  inference_patterns:
+    prefix: ["tbl_", "entity_", "t_"]
+```
+- Entity "Product" on canvas saves to dbt as `tbl_product` (uses first prefix)
+- Loading `entity_product` from dbt displays as "Product" on canvas (strips any matching prefix)
+- Loading `t_order` from dbt displays as "Order" on canvas (strips any matching prefix)
+
+**Backward Compatibility:**
+- Existing `entity_model` projects continue to work without modification when prefix is empty (default)
+- No breaking changes to existing APIs or data structures
+- Simply add prefix configuration to enable the feature for new or existing projects
+
 ## Tutorial & Guide
 
 Check out our [Full Tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) with video clips showing the core features in action.  Also [General Information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a) is available.
@@ -247,6 +311,8 @@ Options:
 - `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
 - `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
 - `dbt_company_dummy_path`: Helper dbt project used by `trellis generate-company-data`. Run the command to create `./dbt_company_dummy` or update this path to an existing project.
+- `modeling_style`: Modeling style to use. Options: `entity_model` (default) or `dimensional_model`. Controls whether dimensional modeling features or entity modeling prefix features are enabled.
+- `entity_modeling.inference_patterns.prefix`: Prefix(es) to apply when saving entities and strip from labels in entity modeling mode. Can be a single string or list of strings. Defaults to empty list (no prefix). See "Entity Model Prefix Support" section for examples and details.
 - `lineage.enabled`: Feature flag for lineage UI + API. Defaults to `false` (opt-in).
 - `lineage.layers`: Ordered list of folder names to organize lineage bands. Prefer this nested structure; legacy `lineage_layers` is deprecated.
 - `exposures.enabled`: Feature flag for Exposures view mode. Defaults to `false` (opt-in). Set to `true` to enable the exposures view and API.

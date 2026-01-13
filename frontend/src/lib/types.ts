@@ -148,6 +148,10 @@ export interface ConfigInfo {
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
     bus_matrix_enabled?: boolean;
     modeling_style?: 'dimensional_model' | 'entity_model';
+    entity_prefix?: string[];
+    label_prefixes?: string[];
+    dimension_prefix?: string[];
+    fact_prefix?: string[];
 }
 
 export interface FieldDragState {
