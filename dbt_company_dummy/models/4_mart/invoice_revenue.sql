@@ -11,9 +11,9 @@ select
     cal.calendar_date,
     cal.calendar_week,
     cal.year_month
-from {{ ref('entity_customer_invoice') }} ci
-cross join {{ ref('entity_supplier_invoice') }} si
-cross join {{ ref('entity_product') }} p
-cross join {{ ref('entity_calendar') }} cal
+from {{ ref('dim_customer_invoice') }} ci
+cross join {{ ref('dim_supplier_invoice') }} si
+cross join {{ ref('dim_product') }} p
+cross join {{ ref('dim_calendar') }} cal
 limit 100
 

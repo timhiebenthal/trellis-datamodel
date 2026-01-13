@@ -9,10 +9,10 @@ exposures:
       Sales dashboard showing sales by product, customer, and date.
 
     depends_on:
-      - ref('entity_sale')
-      - ref('entity_lead')
-      - ref('entity_product')
-      - ref('entity_entity_customer')
+      - ref('dim_sale')
+      - ref('dim_lead')
+      - ref('dim_product')
+      - ref('dim_customer')
 
     owner:
       name: Jeff Cash
@@ -28,11 +28,11 @@ exposures:
       Operations dashboard showing operations by product, supplier, procurement, and inventory.
 
     depends_on:
-      - ref('entity_product')
-      - ref('entity_supplier')
-      - ref('entity_supplier_invoice')
-      - ref('entity_inventory')
-      - ref('entity_procurement')
+      - ref('dim_product')
+      - ref('dim_supplier')
+      - ref('dim_supplier_invoice')
+      - ref('dim_inventory')
+      - ref('fact_procurement')
 
     owner:
       name: Clara Stock
@@ -48,10 +48,10 @@ exposures:
       Finance dashboard showing invoice revenue by customer, supplier, product, and calendar.
 
     depends_on:
-      - ref('entity_customer_invoice')
-      - ref('entity_supplier_invoice')
-      - ref('entity_product')
-      - ref('entity_calendar')
+      - ref('dim_customer_invoice')
+      - ref('dim_supplier_invoice')
+      - ref('dim_product')
+      - ref('dim_calendar')
       - ref('invoice_revenue')
 
     owner:
