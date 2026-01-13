@@ -9,6 +9,8 @@ export const viewMode = writable<'conceptual' | 'logical' | 'exposures' | 'bus_m
 export const modelingStyle = writable<'dimensional_model' | 'entity_model'>('entity_model');
 export const configStatus = writable<any>(null);
 export const labelPrefixes = writable<string[]>([]);
+export const dimensionPrefixes = writable<string[]>([]);
+export const factPrefixes = writable<string[]>([]);
 
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);

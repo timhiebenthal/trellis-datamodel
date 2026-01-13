@@ -7,62 +7,57 @@ entities:
   drafted_fields:
   - name: ''
     datatype: text
-  entity_type: unclassified
+  entity_type: dimension
 - id: department
   label: Department
   description: Company departments
   dbt_model: model.company_dummy.dim_department
-  entity_type: unclassified
+  entity_type: dimension
 - id: lead
   label: Lead
   description: Sales leads
   dbt_model: model.company_dummy.dim_lead
-  entity_type: unclassified
+  entity_type: dimension
 - id: sale
   label: Sale
   description: Sale records at order-item grain with enriched order information
   dbt_model: model.company_dummy.dim_sale
-  entity_type: unclassified
+  entity_type: dimension
 - id: product
   label: Product
   description: Product catalog
   dbt_model: model.company_dummy.dim_product
-  entity_type: unclassified
+  entity_type: dimension
 - id: supplier
   label: Supplier
   description: Supplier records
   dbt_model: model.company_dummy.dim_supplier
-  entity_type: unclassified
+  entity_type: dimension
 - id: inventory
   label: Inventory
   description: Product inventory levels
   dbt_model: model.company_dummy.dim_inventory
-  entity_type: unclassified
+  entity_type: dimension
 - id: supplier_invoice
   label: Supplier Invoice
   description: Supplier invoices for purchase orders
   dbt_model: model.company_dummy.dim_supplier_invoice
-  entity_type: unclassified
-- id: customer_invoice
-  label: Customer Invoice
-  description: Customer invoices for sales orders
-  dbt_model: model.company_dummy.dim_customer_invoice
-  entity_type: unclassified
+  entity_type: dimension
 - id: calendar
   label: Calendar
   description: ''
   dbt_model: model.company_dummy.dim_calendar
-  entity_type: unclassified
+  entity_type: dimension
 - id: customer
   label: Customer
   description: Customer records
   dbt_model: model.company_dummy.dim_customer
-  entity_type: unclassified
+  entity_type: dimension
 - id: procurement
   label: Procurement
   description: ''
   dbt_model: model.company_dummy.fact_procurement
-  entity_type: unclassified
+  entity_type: fact
 relationships:
 - source: employee
   target: employee
@@ -110,15 +105,27 @@ relationships:
   type: one_to_many
   source_field: product_id
   target_field: product_id
-- source: lead
-  target: customer
-  label: ''
-  type: one_to_many
-  source_field: lead_id
-  target_field: lead_id
 - source: customer
   target: sale
   label: ''
   type: one_to_many
   source_field: customer_id
   target_field: customer_id
+- source: lead
+  target: customer
+  label: ''
+  type: one_to_many
+  source_field: lead_id
+  target_field: lead_id
+- source: product
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: supplier
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: supplier_id
+  target_field: supplier_id

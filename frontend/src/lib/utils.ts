@@ -143,6 +143,28 @@ export function getLabelPrefixesFromConfig(info?: ConfigInfo | null): string[] {
 }
 
 /**
+ * Infer dimensional entity type from model name using configured prefixes.
+ */
+export function classifyModelTypeFromPrefixes(
+    modelName: string,
+    dimensionPrefixes: string[] = [],
+    factPrefixes: string[] = [],
+): "dimension" | "fact" | null {
+    const lower = modelName.toLowerCase();
+    for (const p of dimensionPrefixes || []) {
+        if (p && lower.startsWith(p.toLowerCase())) {
+            return "dimension";
+        }
+    }
+    for (const p of factPrefixes || []) {
+        if (p && lower.startsWith(p.toLowerCase())) {
+            return "fact";
+        }
+    }
+    return null;
+}
+
+/**
  * Format a dbt model name for use as an entity label.
  * Replaces underscores with spaces and title-cases each word.
  * Optionally strips configured prefixes before formatting.

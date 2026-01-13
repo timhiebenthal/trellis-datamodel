@@ -133,6 +133,16 @@ async def get_config_info():
             else []
         ),
         "label_prefixes": _resolve_label_prefixes(),
+        "dimension_prefix": (
+            cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+            if cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+            else []
+        ),
+        "fact_prefix": (
+            cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix
+            if cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+            else []
+        ),
     }
 
 

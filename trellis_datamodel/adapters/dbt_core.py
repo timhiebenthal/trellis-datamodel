@@ -211,6 +211,11 @@ class DbtCoreAdapter:
         model_to_entity: dict[str, str] = {}
         data_model = self._load_data_model()
         entities = data_model.get("entities", [])
+        
+        # Load manifest once to look up model aliases
+        manifest = self._load_manifest() if os.path.exists(self.manifest_path) else {}
+        manifest_nodes = manifest.get("nodes", {})
+        
         for entity in entities:
             entity_id = entity.get("id")
             dbt_model = entity.get("dbt_model")
@@ -227,6 +232,23 @@ class DbtCoreAdapter:
                 model_to_entity[dbt_model] = entity_id
                 for key in self._build_model_keys(base_name, version_part):
                     model_to_entity[key] = entity_id
+                
+                # Also map the dbt YAML-documented model name (if different from unique_id)
+                # Read the YAML file to see if it documents a different model name
+                yml_path = self._get_model_yml_path(base_name)
+                if yml_path and os.path.exists(yml_path):
+                    try:
+                        with open(yml_path, "r") as f:
+                            yml_content = yaml.safe_load(f) or {}
+                            models_list = yml_content.get("models", [])
+                            for model_entry in models_list:
+                                yml_name = model_entry.get("name")
+                                if yml_name and yml_name != base_name:
+                                    # YAML documents a model with a different name
+                                    model_to_entity[yml_name] = entity_id
+                                    model_to_entity[yml_name.lower()] = entity_id
+                    except Exception as e:
+                        pass  # Gracefully skip if YAML parsing fails
             # Map additional models to the same entity
             additional_models = entity.get("additional_models", [])
             for add_model in additional_models:
@@ -253,6 +275,53 @@ class DbtCoreAdapter:
                         prefixed = f"{prefix}{entity_id}"
                         model_to_entity[prefixed] = entity_id
                         model_to_entity[prefixed.lower()] = entity_id
+                if (
+                    cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+                    and not dbt_model
+                ):
+                    # Add prefixed variants for dimensional modeling prefixes
+                    for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
+                        prefixed = f"{prefix}{entity_id}"
+                        model_to_entity[prefixed] = entity_id
+                        model_to_entity[prefixed.lower()] = entity_id
+                    for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
+                        prefixed = f"{prefix}{entity_id}"
+                        model_to_entity[prefixed] = entity_id
+                        model_to_entity[prefixed.lower()] = entity_id
+        
+        # Second pass: Map YAML-documented model names to their file-based names
+        # This handles cases where the YAML name differs from the SQL file name,
+        # even for models not yet bound to entities in data_model.yml
+        model_dirs = self.get_model_dirs()
+        for models_dir in model_dirs:
+            if not os.path.exists(models_dir):
+                continue
+            for root, _, files in os.walk(models_dir):
+                for filename in files:
+                    if not filename.endswith((".yml", ".yaml")):
+                        continue
+                    yml_path = os.path.join(root, filename)
+                    try:
+                        with open(yml_path, "r") as f:
+                            yml_content = yaml.safe_load(f) or {}
+                        models_list = yml_content.get("models", [])
+                        for model_entry in models_list:
+                            yml_name = model_entry.get("name")
+                            if not yml_name:
+                                continue
+                            # Derive the file-based name from the YAML filename
+                            # e.g., fact_procurement.yml -> fact_procurement
+                            file_base = os.path.splitext(filename)[0]
+                            # Only map if the YAML name differs from the file name
+                            if yml_name != file_base:
+                                # Map yml_name -> file_base, so entity_procurement -> fact_procurement
+                                # If file_base is already in the map (bound to an entity), map yml_name to that entity
+                                target_entity = model_to_entity.get(file_base, file_base)
+                                model_to_entity[yml_name] = target_entity
+                                model_to_entity[yml_name.lower()] = target_entity
+                    except Exception:
+                        pass  # Gracefully skip if YAML parsing fails
+        
         return model_to_entity
 
     def _get_model_yml_path(
@@ -704,14 +773,14 @@ class DbtCoreAdapter:
                                 versioned_columns.append((None, base_columns))
 
                             for model_version, columns in versioned_columns:
-                                # When include_unbound, use raw model name so frontend can remap
-                                # Otherwise resolve to entity ID from saved data model
-                                if include_unbound:
+                                # Always resolve model names to entity IDs using the model_to_entity map
+                                # This handles YAML-documented names that differ from file names
+                                entity_id = self._resolve_entity_id(
+                                    model_to_entity, base_model_name, model_version
+                                )
+                                # If not found in map and include_unbound, fall back to raw name
+                                if not entity_id:
                                     entity_id = base_model_name
-                                else:
-                                    entity_id = self._resolve_entity_id(
-                                        model_to_entity, base_model_name, model_version
-                                    )
 
                                 for column in columns or []:
                                     test_blocks = []
@@ -764,21 +833,21 @@ class DbtCoreAdapter:
                                             except (ValueError, TypeError):
                                                 pass
 
-                                        # When include_unbound, use raw model name
-                                        if include_unbound:
+                                        # Always resolve model names to entity IDs
+                                        target_entity_id = self._resolve_entity_id(
+                                            model_to_entity,
+                                            target_base,
+                                            target_version_str,
+                                        )
+                                        # If not found in map and include_unbound, fall back to raw name
+                                        if not target_entity_id:
                                             target_entity_id = target_base
-                                        else:
-                                            target_entity_id = self._resolve_entity_id(
-                                                model_to_entity,
-                                                target_base,
-                                                target_version_str,
-                                            )
 
-                                            # Skip relationships where either side is not bound
+                                        # Skip relationships where either side is not bound (only when NOT include_unbound)
+                                        if not include_unbound:
                                             if (
                                                 entity_id not in bound_entities
-                                                or target_entity_id
-                                                not in bound_entities
+                                                or target_entity_id not in bound_entities
                                             ):
                                                 continue
 

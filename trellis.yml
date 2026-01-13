@@ -1,7 +1,7 @@
 # Configuration for data model UI
 
-modeling_style: entity_model  # Options: dimensional_model or entity_model
-# modeling_style: dimensional_model
+# modeling_style: entity_model  # Options: dimensional_model or entity_model
+modeling_style: dimensional_model
 
 # Transformation framework: dbt-core, dbt-fusion, sqlmesh, bruin, pydantic
 # (currently only dbt-core is implemented)
@@ -62,11 +62,11 @@ exposures:
   enabled: true
   default_layout: "dashboards-as-rows"
 
-# dimensional_modeling:
-#  inference_patterns:
-#    dimension_prefix: "dim_"  # Prefixes for dimension tables
-#    fact_prefix: "fct_"  # Prefixes for fact tables
+dimensional_modeling:
+ inference_patterns:
+   dimension_prefix: "dim_"  # Prefixes for dimension tables
+   fact_prefix: "fact_"  # Prefixes for fact tables
 
-entity_modeling:
-  inference_patterns:
-    prefix: entity_
+# entity_modeling:
+#   inference_patterns:
+#     prefix: entity_

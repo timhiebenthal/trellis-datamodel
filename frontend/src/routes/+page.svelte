@@ -15,8 +15,10 @@
     folderFilter,
     tagFilter,
     groupByFolder,
-    modelingStyle,
-    labelPrefixes,
+        modelingStyle,
+        labelPrefixes,
+        dimensionPrefixes,
+        factPrefixes,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -221,6 +223,8 @@ import {
                 exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
                 $modelingStyle = info.modeling_style ?? 'entity_model';
                 $labelPrefixes = getLabelPrefixesFromConfig(info);
+                dimensionPrefixes.set(info.dimension_prefix ?? []);
+                factPrefixes.set(info.fact_prefix ?? []);
             }
         } catch (e) {
             console.error(e);
@@ -513,6 +517,8 @@ import {
         busMatrixEnabled = info?.bus_matrix_enabled ?? false;
         $modelingStyle = info?.modeling_style ?? 'entity_model';
         $labelPrefixes = getLabelPrefixesFromConfig(info ?? null);
+        dimensionPrefixes.set(info?.dimension_prefix ?? []);
+        factPrefixes.set(info?.fact_prefix ?? []);
 
                 // Check if exposures data exists
                 if (exposuresEnabled) {
