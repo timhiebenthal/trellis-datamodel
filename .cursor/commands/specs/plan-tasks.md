@@ -44,6 +44,7 @@ Task types:
 - **KEY RULE: 1 file = 1 stream** (or 1 cohesive component)
 - Avoid parallel streams editing same files
 - A STREAM a SPRINT _MUST NOT_ depend on another SPRINT of the same SPRINT
+- STREAM names reset and start with 'A' at each SPRINT
 
 ### Task Organization Example
 

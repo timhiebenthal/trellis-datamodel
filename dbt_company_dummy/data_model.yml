@@ -56,7 +56,7 @@ entities:
 - id: procurement
   label: Procurement
   description: ''
-  dbt_model: model.company_dummy.fact_procurement
+  dbt_model: null
   entity_type: fact
 relationships:
 - source: employee
@@ -123,6 +123,18 @@ relationships:
   type: one_to_many
   source_field: product_id
   target_field: product_id
+- source: product
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: product_id
+  target_field: product_id
+- source: supplier
+  target: procurement
+  label: ''
+  type: one_to_many
+  source_field: supplier_id
+  target_field: supplier_id
 - source: supplier
   target: procurement
   label: ''

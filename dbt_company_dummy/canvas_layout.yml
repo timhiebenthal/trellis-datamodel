@@ -111,6 +111,12 @@ relationships:
   product-procurement-10:
     label_dx: 0
     label_dy: 0
-  supplier-procurement-11:
+  product-procurement-11:
+    label_dx: 0
+    label_dy: 0
+  supplier-procurement-12:
+    label_dx: 0
+    label_dy: 0
+  supplier-procurement-13:
     label_dx: 0
     label_dy: 0

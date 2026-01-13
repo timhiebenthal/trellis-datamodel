@@ -15,6 +15,8 @@ export const factPrefixes = writable<string[]>([]);
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
 export const tagFilter = writable<string[]>([]);
+export const entityTypeFilter = writable<string | null>(null); // 'dimension' | 'fact' | 'unclassified' | null
+export const modelBoundFilter = writable<'bound' | 'unbound' | null>(null); // Filter by model bound status
 export const groupByFolder = writable<boolean>(true);
 
 // Exposure filter stores
