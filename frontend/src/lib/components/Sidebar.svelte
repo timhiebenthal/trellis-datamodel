@@ -11,7 +11,7 @@
         entityTypeFilter,
         modelBoundFilter,
     } from "$lib/stores";
-    import type { DbtModel, TreeNode } from "$lib/types";
+    import type { DbtModel, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
