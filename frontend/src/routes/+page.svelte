@@ -948,10 +948,10 @@ import {
 
         <!-- View Switcher -->
         <div
-            class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60"
+            class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60 gap-1"
         >
             <button
-                class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                class="flex-1 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
                 class:bg-white={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:text-primary-600={$viewMode === "conceptual" || $viewMode === "logical"}
                 class:shadow-sm={$viewMode === "conceptual" || $viewMode === "logical"}
@@ -965,7 +965,7 @@ import {
             </button>
             {#if exposuresEnabled && hasExposuresData}
                 <button
-                    class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                    class="flex-1 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
                     class:bg-white={$viewMode === "exposures"}
                     class:text-primary-600={$viewMode === "exposures"}
                     class:shadow-sm={$viewMode === "exposures"}
@@ -980,7 +980,7 @@ import {
             {/if}
             {#if busMatrixEnabled}
                 <button
-                    class="px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center gap-2"
+                    class="flex-1 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
                     class:bg-white={$viewMode === "bus_matrix"}
                     class:text-primary-600={$viewMode === "bus_matrix"}
                     class:shadow-sm={$viewMode === "bus_matrix"}

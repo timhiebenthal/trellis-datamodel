@@ -5,9 +5,14 @@
         folderFilter,
         tagFilter,
         nodes,
+        modelingStyle,
+        dimensionPrefixes,
+        factPrefixes,
+        entityTypeFilter,
+        modelBoundFilter,
     } from "$lib/stores";
     import type { DbtModel, TreeNode } from "$lib/types";
-    import { getModelFolder, normalizeTags } from "$lib/utils";
+    import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -94,6 +99,37 @@
                 }
             }
 
+            // Entity type filter (only in dimensional_model mode)
+            if ($modelingStyle === 'dimensional_model' && $entityTypeFilter) {
+                const type = classifyModelTypeFromPrefixes(
+                    m.name,
+                    $dimensionPrefixes,
+                    $factPrefixes
+                );
+                if (type !== $entityTypeFilter) {
+                    return false;
+                }
+            }
+
+            // Model bound filter (only in dimensional_model mode)
+            if ($modelingStyle === 'dimensional_model' && $modelBoundFilter) {
+                const currentNodes = $nodes;
+                const isBound = currentNodes.some((n) => {
+                    if (n.type !== 'entity') return false;
+                    const data = n.data as unknown as EntityData;
+                    const primaryMatch = data.dbt_model === m.unique_id;
+                    const additionalMatch = (data.additional_models || []).includes(m.unique_id);
+                    return primaryMatch || additionalMatch;
+                });
+                
+                if ($modelBoundFilter === 'bound' && !isBound) {
+                    return false;
+                }
+                if ($modelBoundFilter === 'unbound' && isBound) {
+                    return false;
+                }
+            }
+
             return true;
         }),
     );
@@ -127,6 +163,8 @@
     function clearAllFilters() {
         $folderFilter = [];
         $tagFilter = [];
+        $entityTypeFilter = null;
+        $modelBoundFilter = null;
     }
 
     function buildTree(models: DbtModel[]): TreeNode[] {
@@ -247,7 +285,7 @@
                 >
                     Filters
                 </h3>
-                {#if $folderFilter.length > 0 || $tagFilter.length > 0}
+                {#if $folderFilter.length > 0 || $tagFilter.length > 0 || $entityTypeFilter || $modelBoundFilter}
                     <button
                         onclick={clearAllFilters}
                         class="text-[10px] text-gray-500 hover:text-danger-600 transition-colors"
@@ -394,9 +432,93 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Separator -->
+            <!-- Entity Type Filter (only in dimensional_model mode) -->
+            {#if $modelingStyle === 'dimensional_model'}
+                <div>
+                    <label
+                        class="text-xs text-gray-600 mb-2 flex items-center gap-1"
+                    >
+                        <Icon icon="lucide:database" class="w-3 h-3" />
+                        Filter by Entity Type
+                    </label>
+
+                    <div class="flex flex-wrap gap-1">
+                        <button
+                            onclick={() => entityTypeFilter.set($entityTypeFilter === 'dimension' ? null : 'dimension')}
+                            class={$entityTypeFilter === 'dimension'
+                                ? 'inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium border border-primary-600 hover:bg-primary-700'
+                                : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
+                            title={$entityTypeFilter === 'dimension' ? 'Clear dimension filter' : 'Filter by dimension'}
+                        >
+                            <Icon icon="lucide:list" class="w-3 h-3" />
+                            <span>Dimension</span>
+                        </button>
+
+                        <button
+                            onclick={() => entityTypeFilter.set($entityTypeFilter === 'fact' ? null : 'fact')}
+                            class={$entityTypeFilter === 'fact'
+                                ? 'inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium border border-primary-600 hover:bg-primary-700'
+                                : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
+                            title={$entityTypeFilter === 'fact' ? 'Clear fact filter' : 'Filter by fact'}
+                        >
+                            <Icon icon="lucide:bar-chart-3" class="w-3 h-3" />
+                            <span>Fact</span>
+                        </button>
+
+                        <button
+                            onclick={() => entityTypeFilter.set($entityTypeFilter === 'unclassified' ? null : 'unclassified')}
+                            class={$entityTypeFilter === 'unclassified'
+                                ? 'inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium border border-primary-600 hover:bg-primary-700'
+                                : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
+                            title={$entityTypeFilter === 'unclassified' ? 'Clear unclassified filter' : 'Filter by unclassified'}
+                        >
+                            <Icon icon="lucide:circle-dashed" class="w-3 h-3" />
+                            <span>Unclassified</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/if}
+
+                <!-- Model Bound Filter (only in dimensional_model mode) -->
+                {#if $modelingStyle === 'dimensional_model'}
+                    <div>
+                        <label
+                            class="text-xs text-gray-600 mb-2 flex items-center gap-1"
+                        >
+                            <Icon icon="lucide:check-circle-2" class="w-3 h-3" />
+                            Filter by Status
+                        </label>
+
+                        <div class="flex flex-wrap gap-1">
+                            <button
+                                onclick={() => modelBoundFilter.set($modelBoundFilter === 'bound' ? null : 'bound')}
+                                class={$modelBoundFilter === 'bound'
+                                    ? 'inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium border border-primary-600 hover:bg-primary-700'
+                                    : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
+                                title={$modelBoundFilter === 'bound' ? 'Clear bound filter' : 'Filter by bound'}
+                            >
+                                <Icon icon="lucide:check" class="w-3 h-3" />
+                                <span>Bound</span>
+                            </button>
+
+                            <button
+                                onclick={() => modelBoundFilter.set($modelBoundFilter === 'unbound' ? null : 'unbound')}
+                                class={$modelBoundFilter === 'unbound'
+                                    ? 'inline-flex items-center gap-1 px-2 py-1 bg-primary-600 text-white rounded text-[10px] font-medium border border-primary-600 hover:bg-primary-700'
+                                    : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
+                                title={$modelBoundFilter === 'unbound' ? 'Clear unbound filter' : 'Filter by unbound'}
+                            >
+                                <Icon icon="lucide:circle-off" class="w-3 h-3" />
+                                <span>Unbound</span>
+                            </button>
+                        </div>
+                    </div>
+                {/if}
+            </div>
+
+            <!-- Separator -->
         <div class="border-t border-gray-200 mb-3"></div>
 
         <!-- dbt Models Header -->
