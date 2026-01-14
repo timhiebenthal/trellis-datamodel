@@ -8,38 +8,38 @@ Implements the `/config` page with backend-validated apply flow, backups, confli
 ## SPRINT 1: Backend foundation
 
 ### Stream A: Config schema & API (backend)
-- [ ] Define Pydantic schema for user-facing fields (enums, paths, lists) and defaults.
-- [ ] Implement loader that reads `trellis.yml`, normalizes via YAML parser, and returns current values plus schema metadata.
-- [ ] Add validation for paths (project/manifest/catalog existence) and type/enum checks; reject unknown fields.
-- [ ] Implement conflict detection (mtime/hash) surfaced in responses for optimistic concurrency.
-- [ ] Implement backup + atomic write (temp file + move) with timestamped `.bak` before overwrite; normalized formatting acceptable.
-- [ ] Add FastAPI endpoints (GET/PUT `/api/config`) with structured errors and beta flag metadata.
-- [ ] Error handling for missing/unreadable config with clear messages; no crash of other routes.
+- [x] Define Pydantic schema for user-facing fields (enums, paths, lists) and defaults.
+- [x] Implement loader that reads `trellis.yml`, normalizes via YAML parser, and returns current values plus schema metadata.
+- [x] Add validation for paths (project/manifest/catalog existence) and type/enum checks; reject unknown fields.
+- [x] Implement conflict detection (mtime/hash) surfaced in responses for optimistic concurrency.
+- [x] Implement backup + atomic write (temp file + move) with timestamped `.bak` before overwrite; normalized formatting acceptable.
+- [x] Add FastAPI endpoints (GET/PUT `/api/config`) with structured errors and beta flag metadata.
+- [x] Error handling for missing/unreadable config with clear messages; no crash of other routes.
 
 ## SPRINT 2: Frontend config UI
 
 ### Stream A: Config page route (frontend)
-- [ ] Add `/config` route under `(app)` layout; fetch config + schema on load.
-- [ ] Build form sections for paths, modeling style, entity guidance, dimensional/entity patterns, exposures/lineage, etc.
-- [ ] Implement Danger Zone gating (ack checkbox) before enabling beta toggles.
-- [ ] Add Apply flow: submit to PUT, surface validation errors inline, show success toast, reload saved state.
-- [ ] Handle conflict warning if mtime/hash differs; offer reload or confirm overwrite.
-- [ ] Handle missing/unreadable config state with recovery UI.
-- [ ] Add navigation/link entry to reach `/config`.
+- [x] Add `/config` route under `(app)` layout; fetch config + schema on load.
+- [x] Build form sections for paths, modeling style, entity guidance, dimensional/entity patterns, exposures/lineage, etc.
+- [x] Implement Danger Zone gating (ack checkbox) before enabling beta toggles.
+- [x] Add Apply flow: submit to PUT, surface validation errors inline, show success toast, reload saved state.
+- [x] Handle conflict warning if mtime/hash differs; offer reload or confirm overwrite.
+- [x] Handle missing/unreadable config state with recovery UI.
+- [x] Add navigation/link entry to reach `/config`.
 
 ## SPRINT 3: Tests & polish
 
 ### Stream A: Backend tests
-- [ ] pytest coverage for GET/PUT: valid save, validation errors, conflict detection, backup creation, normalized write.
-- [ ] Fixtures for temp config files and path validation cases.
+- [x] pytest coverage for GET/PUT: valid save, validation errors, conflict detection, backup creation, normalized write.
+- [x] Fixtures for temp config files and path validation cases.
 
 ### Stream B: Frontend tests
 - [ ] Vitest/component tests for form rendering, validation display, ack gating, success/error states.
 - [ ] (Optional) Playwright smoke for load + apply happy path against mock/dev backend.
 
 ### Stream C: Documentation
-- [ ] Update `specs/2026-01-14-config-ui/spec.md` notes if schema/options change.
-- [ ] Add brief README/usage note pointing to `/config` page and backup behavior.
+- [x] Update `specs/2026-01-14-config-ui/spec.md` notes if schema/options change.
+- [x] Add brief README/usage note pointing to `/config` page and backup behavior.
 
 ## Summary
 

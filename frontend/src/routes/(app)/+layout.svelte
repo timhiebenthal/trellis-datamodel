@@ -853,6 +853,18 @@ import {
                     Bus Matrix
                 </a>
             {/if}
+            <a
+                href="/config"
+                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                class:bg-white={$page.url.pathname === '/config'}
+                class:text-primary-600={$page.url.pathname === '/config'}
+                class:shadow-sm={$page.url.pathname === '/config'}
+                class:text-gray-500={$page.url.pathname !== '/config'}
+                class:hover:text-gray-900={$page.url.pathname !== '/config'}
+            >
+                <Icon icon="lucide:settings" class="w-3.5 h-3.5" />
+                Config
+            </a>
         </div>
 
         <!-- Actions -->

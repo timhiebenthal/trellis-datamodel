@@ -236,3 +236,39 @@ export interface Domain {
     color: string;
     entities: string[];
 }
+
+// Config API types
+export interface ConfigFieldMetadata {
+    type: string;
+    enum_values?: string[];
+    default: any;
+    required: boolean;
+    description: string;
+    beta: boolean;
+}
+
+export interface ConfigSchema {
+    fields: Record<string, ConfigFieldMetadata>;
+    beta_flags: string[];
+}
+
+export interface ConfigGetResponse {
+    config: Record<string, any>;
+    schema_metadata: ConfigSchema;
+    file_info?: {
+        path: string;
+        mtime: number;
+        hash: string;
+        backup_path?: string;
+    };
+    error?: string;
+}
+
+export interface ConfigUpdateResponse {
+    config: Record<string, any>;
+    file_info: {
+        path: string;
+        mtime: number;
+        hash: string;
+    };
+}

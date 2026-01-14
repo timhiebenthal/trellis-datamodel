@@ -81,3 +81,12 @@ Add a `/config` page that lets users view and edit user-facing `trellis.yml` set
 ## Notes
 - If we later add auto-save, keep it opt-in and reuse the same validation + backup path.
 - Ensure error messages avoid leaking sensitive paths in logs; UI can still show local paths for clarity.
+
+## Implementation Notes
+- Backend implementation completed: Pydantic schemas, config service, and FastAPI endpoints
+- Frontend implementation completed: Svelte config page with form sections, validation, and conflict handling
+- All user-facing keys from specification are supported
+- Beta features (lineage, exposures) are gated behind Danger Zone acknowledgment
+- Backups are created with timestamp format: `trellis.yml.bak.YYYYMMDD-HHMMSS`
+- Conflict detection uses mtime and hash for optimistic concurrency
+- Normalized YAML output (comments not preserved)
