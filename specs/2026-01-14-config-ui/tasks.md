@@ -15,6 +15,7 @@ Implements the `/config` page with backend-validated apply flow, backups, confli
 - [x] Implement backup + atomic write (temp file + move) with timestamped `.bak` before overwrite; normalized formatting acceptable.
 - [x] Add FastAPI endpoints (GET/PUT `/api/config`) with structured errors and beta flag metadata.
 - [x] Error handling for missing/unreadable config with clear messages; no crash of other routes.
+- [ ] Include `lineage.layers` options from `trellis.yml` in schema metadata and responses.
 
 ## SPRINT 2: Frontend config UI
 
@@ -26,6 +27,8 @@ Implements the `/config` page with backend-validated apply flow, backups, confli
 - [x] Handle conflict warning if mtime/hash differs; offer reload or confirm overwrite.
 - [x] Handle missing/unreadable config state with recovery UI.
 - [x] Add navigation/link entry to reach `/config`.
+- [ ] Show `lineage.layers` from `trellis.yml` in the config form.
+- [ ] Hide dimensional/entity modeling prefix inputs when their modeling style is not selected.
 
 ## SPRINT 3: Tests & polish
 
@@ -46,16 +49,16 @@ Implements the `/config` page with backend-validated apply flow, backups, confli
 ### Sprint Overview
 | Sprint | Name | Tasks | Streams |
 |--------|------|-------|---------|
-| SPRINT 1 | Backend foundation | 7 | 1 |
-| SPRINT 2 | Frontend config UI | 7 | 1 |
+| SPRINT 1 | Backend foundation | 8 | 1 |
+| SPRINT 2 | Frontend config UI | 9 | 1 |
 | SPRINT 3 | Tests & polish | 7 | 3 |
 
 ### Stream Overview
 **SPRINT 1**
-- Stream A: Config schema & API (backend) - 7 tasks
+- Stream A: Config schema & API (backend) - 8 tasks
 
 **SPRINT 2**
-- Stream A: Config page route (frontend) - 7 tasks
+- Stream A: Config page route (frontend) - 9 tasks
 
 **SPRINT 3**
 - Stream A: Backend tests - 2 tasks
@@ -70,7 +73,7 @@ Implements the `/config` page with backend-validated apply flow, backups, confli
 ### Total Effort
 - SPRINTS: 3
 - STREAMS: 5
-- Tasks: 21
+- Tasks: 24
 
 ## Notes
 - Normalize YAML on save; comments may be lost.
