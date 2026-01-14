@@ -38,6 +38,7 @@
     import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import TagEditor from "./TagEditor.svelte";
+    import SourceEditorModal from "./SourceEditorModal.svelte";
     import { openLineageModal } from "$lib/stores";
     import Icon from "@iconify/svelte";
     import { readable, type Readable } from "svelte/store";
@@ -57,6 +58,7 @@
     let showDeleteModal = $state(false);
     let showEntityTypeMenu = $state(false);
     let showUndescribedAttributesWarning = $state(false);
+    let showSourceEditorModal = $state(false);
     let undescribedAttributeNames = $state<string[]>([]);
     let warningResolve: ((value: boolean) => void) | null = null;
     // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
@@ -715,6 +717,19 @@
         });
     }
 
+    // Source system update handler (only for unbound entities)
+    function handleSourcesUpdate(newSources: string[]) {
+        // Source systems are only editable for unbound entities
+        if (isBound) {
+            console.warn('Source systems for bound entities are derived from lineage and cannot be edited');
+            return;
+        }
+
+        updateNodeData(id, {
+            source_system: newSources
+        });
+    }
+
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
 
@@ -1056,7 +1071,7 @@
                 ondblclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => e.stopPropagation()}
                 onkeyup={(e) => e.stopPropagation()}
-                class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm text-gray-800"
+                class="font-bold inline-input bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm"
                 placeholder="Entity Name"
             />
         </div>
@@ -1183,6 +1198,31 @@
                             >
                                 {modelDetails.materialization}
                             </span>
+                        </div>
+                    {/if}
+
+                    <!-- Source Systems (Logical View Only) - Bound entities: read-only badges from lineage -->
+                    {#if $viewMode === "logical" && isBound}
+                        <div class="mb-2.5 text-gray-500 flex flex-wrap items-center gap-2">
+                            <span
+                                class="font-medium text-[10px] uppercase tracking-wider"
+                                >Source Systems</span
+                            >
+                            {#if data.source_system && data.source_system.length > 0}
+                                <div class="flex flex-wrap gap-1.5">
+                                    {#each data.source_system as sourceSystem}
+                                        <span
+                                            class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-semibold uppercase border border-blue-200"
+                                        >
+                                            {sourceSystem}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <span class="text-[10px] text-gray-400 italic">
+                                    No source systems in lineage
+                                </span>
+                            {/if}
                         </div>
                     {/if}
 
@@ -1334,7 +1374,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="column_name"
                                                     />
                                                     <input
@@ -1485,6 +1525,42 @@
                             </div>
                         </div>
 
+                        <!-- Source Systems Editor for Unbound Entities (Logical View Only) -->
+                        {#if $viewMode === "logical" && !isBound}
+                            <div class="mb-2.5">
+                                {#if isBatchEditing}
+                                    <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
+                                        <Icon icon="lucide:layers" class="w-3 h-3" />
+                                        Batch editing {selectedEntityNodes.length + 1} entities
+                                    </div>
+                                {/if}
+                                <div class="flex items-center gap-2 flex-wrap mb-1">
+                                    <span
+                                        class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
+                                    >Source Systems</span
+                                    >
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {#each (data.source_system || []) as sourceSystem}
+                                            <span
+                                                class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-semibold uppercase border border-blue-200"
+                                            >
+                                                {sourceSystem}
+                                            </span>
+                                        {/each}
+                                        <button
+                                            onmousedown={(e) => e.preventDefault()}
+                                            onclick={() => showSourceEditorModal = true}
+                                            class="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[10px] font-semibold border border-blue-200 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                            title="Edit source systems"
+                                            aria-label="Edit source systems"
+                                        >
+                                            <Icon icon="lucide:plus" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
+
                         <div
                             class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
@@ -1552,7 +1628,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="field_name"
                                                     />
                                                     <select
@@ -1742,6 +1818,14 @@
     attributeNames={undescribedAttributeNames}
     onConfirm={handleWarningConfirm}
     onCancel={handleWarningCancel}
+/>
+
+<SourceEditorModal
+    open={showSourceEditorModal}
+    entityLabel={data.label || "Entity"}
+    sources={(data.source_system || [])}
+    onConfirm={handleSourcesUpdate}
+    onCancel={() => showSourceEditorModal = false}
 />
 
 <style>

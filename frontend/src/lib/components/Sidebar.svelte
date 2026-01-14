@@ -273,7 +273,7 @@
                 type="text"
                 placeholder="Search models..."
                 bind:value={searchTerm}
-                class="w-full pl-8 pr-2 py-1.5 border border-gray-200 rounded bg-white text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                class="inline-input w-full pl-8 pr-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
             />
         </div>
 

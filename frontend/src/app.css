@@ -107,6 +107,13 @@ input[type="text"][placeholder*="column_name"] {
     color: rgb(17 24 39) !important; /* text-gray-900 */
 }
 
+/* Reusable inline input styling for tag, source, and similar inline inputs */
+/* Apply this class to any small inline input that needs proper text visibility */
+.inline-input {
+    background-color: white !important;
+    color: rgb(31 41 55) !important; /* text-gray-800 */
+}
+
 /* Fix scrollbar styling for Cursor browser and other browsers */
 .scrollbar-thin::-webkit-scrollbar {
     width: 6px !important;
