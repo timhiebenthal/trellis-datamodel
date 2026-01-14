@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { getConfig, getConfigSchema, updateConfig, validateConfig, type ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
+    import { getConfig, getConfigSchema, updateConfig, validateConfig } from '$lib/api';
+    import type { ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
     import Icon from '$lib/components/Icon.svelte';
 
     let loading = true;
@@ -258,7 +259,7 @@
             </div>
         {/if}
 
-        <form on:submit|preventDefault={handleApply} class="space-y-8">
+        <form onsubmit={handleApply} class="space-y-8">
             <!-- Framework Section -->
             <div class="bg-white border border-gray-200 rounded-lg p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Framework</h2>
@@ -269,7 +270,7 @@
                         </label>
                         <select
                             value={getFieldValue('framework')}
-                            on:change={(e) => handleFieldChange('framework', e.currentTarget.value)}
+                            onchange={(e) => handleFieldChange('framework', e.currentTarget.value)}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                             {#each getFieldMetadata('framework')?.enum_values || [] as value}
@@ -287,7 +288,7 @@
                         </label>
                         <select
                             value={getFieldValue('modeling_style')}
-                            on:change={(e) => handleFieldChange('modeling_style', e.currentTarget.value)}
+                            onchange={(e) => handleFieldChange('modeling_style', e.currentTarget.value)}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                             {#each getFieldMetadata('modeling_style')?.enum_values || [] as value}
@@ -312,7 +313,7 @@
                         <input
                             type="text"
                             value={getFieldValue('dbt_project_path')}
-                            on:input={(e) => handleFieldChange('dbt_project_path', e.currentTarget.value)}
+                            oninput={(e) => handleFieldChange('dbt_project_path', e.currentTarget.value)}
                             placeholder="./dbt_project"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['dbt_project_path'] ? 'border-red-500' : ''}"
                         />
@@ -331,7 +332,7 @@
                         <input
                             type="text"
                             value={getFieldValue('dbt_manifest_path')}
-                            on:input={(e) => handleFieldChange('dbt_manifest_path', e.currentTarget.value)}
+                            oninput={(e) => handleFieldChange('dbt_manifest_path', e.currentTarget.value)}
                             placeholder="target/manifest.json"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['dbt_manifest_path'] ? 'border-red-500' : ''}"
                         />
@@ -350,7 +351,7 @@
                         <input
                             type="text"
                             value={getFieldValue('dbt_catalog_path')}
-                            on:input={(e) => handleFieldChange('dbt_catalog_path', e.currentTarget.value)}
+                            oninput={(e) => handleFieldChange('dbt_catalog_path', e.currentTarget.value)}
                             placeholder="target/catalog.json"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['dbt_catalog_path'] ? 'border-red-500' : ''}"
                         />
@@ -369,7 +370,7 @@
                         <input
                             type="text"
                             value={getFieldValue('data_model_file')}
-                            on:input={(e) => handleFieldChange('data_model_file', e.currentTarget.value)}
+                            oninput={(e) => handleFieldChange('data_model_file', e.currentTarget.value)}
                             placeholder="data_model.yml"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['data_model_file'] ? 'border-red-500' : ''}"
                         />
@@ -388,7 +389,7 @@
                         <input
                             type="text"
                             value={getFieldValue('dbt_company_dummy_path') || ''}
-                            on:input={(e) => handleFieldChange('dbt_company_dummy_path', e.currentTarget.value || null)}
+                            oninput={(e) => handleFieldChange('dbt_company_dummy_path', e.currentTarget.value || null)}
                             placeholder="./dbt_company_dummy"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
@@ -405,7 +406,7 @@
                             <input
                                 type="text"
                                 value={path}
-                                on:input={(e) => {
+                                oninput={(e) => {
                                     const newPaths = [...(getFieldValue('dbt_model_paths') || [])];
                                     newPaths[index] = e.currentTarget.value;
                                     handleFieldChange('dbt_model_paths', newPaths);
@@ -473,7 +474,7 @@
                             type="number"
                             min="0"
                             value={getFieldValue('entity_creation_guidance.min_description_length')}
-                            on:input={(e) => handleNestedFieldChange('entity_creation_guidance.min_description_length', parseInt(e.currentTarget.value) || 0)}
+                            oninput={(e) => handleNestedFieldChange('entity_creation_guidance.min_description_length', parseInt(e.currentTarget.value) || 0)}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
                         {#if getFieldMetadata('entity_creation_guidance.min_description_length')?.description}
@@ -489,7 +490,7 @@
                             <input
                                 type="text"
                                 value={item}
-                                on:input={(e) => {
+                                oninput={(e) => {
                                     const newItems = [...(getFieldValue('entity_creation_guidance.disabled_guidance') || [])];
                                     newItems[index] = e.currentTarget.value;
                                     handleNestedFieldChange('entity_creation_guidance.disabled_guidance', newItems);
@@ -516,7 +517,7 @@
                         <input
                             type="text"
                             value={getFieldValue('dimensional_modeling.inference_patterns.dimension_prefix') || ''}
-                            on:input={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.dimension_prefix', e.currentTarget.value)}
+                            oninput={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.dimension_prefix', e.currentTarget.value)}
                             placeholder="dim_"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
@@ -532,7 +533,7 @@
                         <input
                             type="text"
                             value={getFieldValue('dimensional_modeling.inference_patterns.fact_prefix') || ''}
-                            on:input={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.fact_prefix', e.currentTarget.value)}
+                            oninput={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.fact_prefix', e.currentTarget.value)}
                             placeholder="fact_"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
@@ -554,7 +555,7 @@
                         <input
                             type="text"
                             value={getFieldValue('entity_modeling.inference_patterns.prefix') || ''}
-                            on:input={(e) => handleNestedFieldChange('entity_modeling.inference_patterns.prefix', e.currentTarget.value)}
+                            oninput={(e) => handleNestedFieldChange('entity_modeling.inference_patterns.prefix', e.currentTarget.value)}
                             placeholder="entity_"
                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
@@ -626,7 +627,7 @@
                             <input
                                 type="text"
                                 value={layer}
-                                on:input={(e) => {
+                                oninput={(e) => {
                                     const newLayers = [...(getFieldValue('lineage.layers') || [])];
                                     newLayers[index] = e.currentTarget.value;
                                     handleNestedFieldChange('lineage.layers', newLayers);
@@ -673,7 +674,7 @@
                         </label>
                         <select
                             value={getFieldValue('exposures.default_layout')}
-                            on:change={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
+                            onchange={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
                             disabled={!isDangerZoneEnabled()}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled() ? '' : 'opacity-50'}"
                         >
