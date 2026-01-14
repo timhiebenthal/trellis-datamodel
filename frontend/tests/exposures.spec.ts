@@ -13,7 +13,7 @@ test.describe('Exposures View', () => {
         await page.waitForLoadState('networkidle');
         
         // Check if Exposures button is visible
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         
         // In a real test environment with exposures.enabled: true, this should be visible
         // For now, we're documenting the expected behavior
@@ -26,7 +26,7 @@ test.describe('Exposures View', () => {
         await page.waitForLoadState('networkidle');
         
         // Exposures button should not be visible
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         await expect(exposuresButton).not.toBeVisible({ timeout: 5000 });
     });
 
@@ -34,7 +34,7 @@ test.describe('Exposures View', () => {
         // Skip if exposures is disabled
         await page.waitForLoadState('networkidle');
         
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 2000 }).catch(() => false);
         
         if (!isVisible) {
@@ -56,7 +56,7 @@ test.describe('Exposures View', () => {
     test('should switch back to Canvas view when switching away', async ({ page, request }) => {
         await page.waitForLoadState('networkidle');
         
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 2000 }).catch(() => false);
         
         if (!isVisible) {
@@ -73,7 +73,7 @@ test.describe('Exposures View', () => {
         await expect(exposuresTable).toBeVisible({ timeout: 10000 });
 
         // Click Canvas button
-        const canvasButton = page.getByRole('button', { name: 'Canvas View' });
+        const canvasButton = page.getByRole('link', { name: 'Canvas' });
         await canvasButton.click();
 
         // Wait for canvas to be visible
@@ -87,7 +87,7 @@ test.describe('Exposures View', () => {
     test('should show empty state when no exposures', async ({ page, request }) => {
         await page.waitForLoadState('networkidle');
         
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 2000 }).catch(() => false);
         
         if (!isVisible) {
@@ -116,7 +116,7 @@ test.describe('Exposures Layout Toggle', () => {
     test('should show layout toggle button in exposures view', async ({ page }) => {
         await page.waitForLoadState('networkidle');
         
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 2000 }).catch(() => false);
         
         if (!isVisible) {
@@ -135,7 +135,7 @@ test.describe('Exposures Layout Toggle', () => {
     test('should toggle layout when button is clicked', async ({ page }) => {
         await page.waitForLoadState('networkidle');
         
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 2000 }).catch(() => false);
         
         if (!isVisible) {
@@ -162,7 +162,7 @@ test.describe('Exposures Layout Toggle', () => {
     test('should maintain filters after layout toggle', async ({ page }) => {
         await page.waitForLoadState('networkidle');
         
-        const exposuresButton = page.getByRole('button', { name: 'Exposures View' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 2000 }).catch(() => false);
         
         if (!isVisible) {
