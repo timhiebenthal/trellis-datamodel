@@ -47,10 +47,12 @@ import {
     import LineageModal from "$lib/components/LineageModal.svelte";
     import IncompleteEntitiesWarningModal from "$lib/components/IncompleteEntitiesWarningModal.svelte";
     import UndescribedAttributesWarningModal from "$lib/components/UndescribedAttributesWarningModal.svelte";
+    import SourceEditorModal from "$lib/components/SourceEditorModal.svelte";
+    import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, DbtModel, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
-    import { lineageModal, closeLineageModal } from "$lib/stores";
+    import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
     import { 
         getIncompleteEntities, 
@@ -985,5 +987,38 @@ import {
         entitiesWithAttributes={entitiesWithUndescribedAttributes}
         onConfirm={handleUndescribedAttributesConfirm}
         onCancel={handleUndescribedAttributesCancel}
+    />
+
+    <DeleteConfirmModal
+        open={$deleteConfirmModal.open}
+        entityLabel={$deleteConfirmModal.entityLabel}
+        onConfirm={() => {
+            // Find and delete the entity from the store
+            const nodeToDelete = $nodes.find(n => n.data.label === $deleteConfirmModal.entityLabel);
+            if (nodeToDelete) {
+                nodes.update((list) => list.filter((n) => n.id !== nodeToDelete.id));
+                edges.update((list) => list.filter((e) => e.source !== nodeToDelete.id && e.target !== nodeToDelete.id));
+            }
+            closeDeleteConfirmModal();
+        }}
+        onCancel={closeDeleteConfirmModal}
+    />
+
+    <SourceEditorModal
+        open={$sourceEditorModal.open}
+        entityLabel={$sourceEditorModal.entityLabel}
+        sources={$sourceEditorModal.sources}
+        onConfirm={(newSources) => {
+            // Update the entity's source systems in the store
+            nodes.update((list) =>
+                list.map((node) =>
+                    node.id === $sourceEditorModal.entityId
+                        ? { ...node, data: { ...node.data, source_system: newSources } }
+                        : node
+                )
+            );
+            closeSourceEditorModal();
+        }}
+        onCancel={closeSourceEditorModal}
     />
 </div>

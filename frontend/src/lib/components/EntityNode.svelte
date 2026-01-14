@@ -16,6 +16,10 @@
         labelPrefixes,
         dimensionPrefixes,
         factPrefixes,
+        openSourceEditorModal,
+        closeSourceEditorModal,
+        openDeleteConfirmModal,
+        closeDeleteConfirmModal,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -35,10 +39,8 @@
         classifyModelTypeFromPrefixes,
     } from "$lib/utils";
     import { getContext } from "svelte";
-    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import TagEditor from "./TagEditor.svelte";
-    import SourceEditorModal from "./SourceEditorModal.svelte";
     import { openLineageModal } from "$lib/stores";
     import Icon from "@iconify/svelte";
     import { readable, type Readable } from "svelte/store";
@@ -55,13 +57,11 @@
     let data = $derived(rawData as unknown as EntityData);
 
     const { updateNodeData, getNodes } = useSvelteFlow();
-    let showDeleteModal = $state(false);
     let showEntityTypeMenu = $state(false);
     let showUndescribedAttributesWarning = $state(false);
-    let showSourceEditorModal = $state(false);
     let undescribedAttributeNames = $state<string[]>([]);
     let warningResolve: ((value: boolean) => void) | null = null;
-    // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
+    // Delete and SourceEditor modals are rendered at page-level (outside SvelteFlow) via global stores
 
     // Batch editing support
     let selectedEntityNodes = $derived(
@@ -644,7 +644,7 @@
 
     function handleDeleteClick(event: MouseEvent) {
         event.stopPropagation(); // Prevent collapse toggle
-        showDeleteModal = true;
+        openDeleteConfirmModal(data.label || "Entity");
     }
 
     function deleteEntity() {
@@ -657,11 +657,11 @@
             // Remove the node itself
             nodes.update((list) => list.filter((node) => node.id !== id));
 
-            showDeleteModal = false;
+            closeDeleteConfirmModal();
         } catch (error) {
             console.error("Failed to delete entity:", error);
             alert("Failed to delete entity. Please try again.");
-            showDeleteModal = false;
+            closeDeleteConfirmModal();
         }
     }
 
@@ -1549,7 +1549,7 @@
                                         {/each}
                                         <button
                                             onmousedown={(e) => e.preventDefault()}
-                                            onclick={() => showSourceEditorModal = true}
+                                            onclick={() => openSourceEditorModal(data.label || "Entity", id, (data.source_system || []))}
                                             class="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[10px] font-semibold border border-blue-200 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
                                             title="Edit source systems"
                                             aria-label="Edit source systems"
@@ -1806,26 +1806,11 @@
     {/if}
 </div>
 
-<DeleteConfirmModal
-    open={showDeleteModal}
-    entityLabel={data.label || "Entity"}
-    onConfirm={deleteEntity}
-    onCancel={cancelDelete}
-/>
-
 <UndescribedAttributesWarningModal
     open={showUndescribedAttributesWarning}
     attributeNames={undescribedAttributeNames}
     onConfirm={handleWarningConfirm}
     onCancel={handleWarningCancel}
-/>
-
-<SourceEditorModal
-    open={showSourceEditorModal}
-    entityLabel={data.label || "Entity"}
-    sources={(data.source_system || [])}
-    onConfirm={handleSourcesUpdate}
-    onCancel={() => showSourceEditorModal = false}
 />
 
 <style>

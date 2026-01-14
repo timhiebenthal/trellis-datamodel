@@ -55,20 +55,20 @@
     >
         <!-- Modal Content -->
         <div
-            class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+            class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full mx-4"
             role="document"
             tabindex="-1"
             aria-label="Warning about attributes without descriptions"
         >
-            <div class="flex items-start gap-3 mb-4">
+            <div class="flex items-start gap-3 mb-6">
                 <div class="flex-shrink-0">
                     <Icon icon="lucide:alert-triangle" class="w-6 h-6 text-amber-600" />
                 </div>
                 <div class="flex-1">
-                    <h2 id="warning-modal-title" class="text-lg font-semibold text-gray-900 mb-2">
+                    <h2 id="warning-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
                         ⚠️ Attributes Without Descriptions
                     </h2>
-                    <p class="text-sm text-gray-600 mb-4">
+                    <p class="text-sm text-gray-600 mb-6">
                         {#if isMultipleEntities}
                             {entitiesWithAttributes!.length} {entitiesWithAttributes!.length === 1 ? 'entity has' : 'entities have'} {totalAttributes} {totalAttributes === 1 ? 'attribute' : 'attributes'} without descriptions.
                         {:else}
@@ -118,7 +118,7 @@
             {/if}
 
             <!-- Actions -->
-            <div class="flex justify-end gap-3">
+            <div class="flex justify-end gap-4">
                 <button
                     onclick={onCancel}
                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"

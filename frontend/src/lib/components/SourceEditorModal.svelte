@@ -168,27 +168,27 @@
     >
         <!-- Modal -->
         <div
-            class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4"
+            class="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full mx-4"
             role="document"
             tabindex="-1"
         >
             <h2
                 id="source-editor-modal-title"
-                class="text-lg font-semibold text-gray-900 mb-2"
+                class="text-xl font-semibold text-gray-900 mb-3"
             >
                 Edit Source Systems
             </h2>
-            <p class="text-sm text-gray-600 mb-4">
+            <p class="text-sm text-gray-600 mb-6">
                 Manage source systems for <span class="font-medium">'{entityLabel}'</span
                 >. Source systems indicate the origin of data for this entity.
             </p>
 
             <!-- Sources Display -->
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">
                     Source Systems
                 </label>
-                <div class="flex flex-wrap gap-2 min-h-[40px] p-3 border border-gray-300 rounded-md bg-gray-50">
+                <div class="flex flex-wrap gap-2 min-h-[48px] p-4 border border-gray-300 rounded-md bg-gray-50">
                     {#each newSources as source}
                         <div class="flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded border border-gray-200">
                             <span>{source}</span>
@@ -249,13 +249,13 @@
                     </div>
                 {/if}
 
-                <p class="mt-2 text-xs text-gray-500">
+                <p class="mt-3 text-xs text-gray-500">
                     Press Enter or comma to add. Select from suggestions for known systems.
                 </p>
             </div>
 
             <!-- Buttons -->
-            <div class="flex justify-end gap-3">
+            <div class="flex justify-end gap-4">
                 <button
                     onclick={handleCancel}
                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
