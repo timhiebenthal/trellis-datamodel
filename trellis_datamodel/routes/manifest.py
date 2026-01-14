@@ -1,13 +1,12 @@
 """Routes for manifest and catalog operations."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 import os
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.config import (
-    find_config_file,
-)
+from trellis_datamodel.config import find_config_file
 from trellis_datamodel.adapters import get_adapter
+from trellis_datamodel.services.manifest import get_models
 
 router = APIRouter(prefix="/api", tags=["manifest"])
 
@@ -17,6 +16,22 @@ def _resolve_config_path() -> str | None:
     if cfg.CONFIG_PATH and os.path.exists(cfg.CONFIG_PATH):
         return cfg.CONFIG_PATH
     return find_config_file()
+
+
+def _resolve_label_prefixes() -> list[str]:
+    """Return the prefix list that should be used for label formatting."""
+    modeling_style = cfg.MODELING_STYLE
+
+    if modeling_style == "entity_model" and cfg.ENTITY_MODELING_CONFIG.enabled:
+        return list(cfg.ENTITY_MODELING_CONFIG.entity_prefix)
+
+    if modeling_style == "dimensional_model" and cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
+        return [
+            *cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix,
+            *cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix,
+        ]
+
+    return []
 
 
 @router.get("/config-status")
@@ -100,17 +115,39 @@ async def get_config_info():
             "min_description_length": cfg.GUIDANCE_CONFIG.min_description_length,
             "disabled_guidance": cfg.GUIDANCE_CONFIG.disabled_guidance,
         },
+        "entity_creation_guidance": {
+            "entity_wizard_enabled": cfg.GUIDANCE_CONFIG.entity_wizard_enabled,
+            "push_warning_enabled": cfg.GUIDANCE_CONFIG.push_warning_enabled,
+            "min_description_length": cfg.GUIDANCE_CONFIG.min_description_length,
+            "disabled_guidance": cfg.GUIDANCE_CONFIG.disabled_guidance,
+        },
+        "lineage_enabled": cfg.LINEAGE_ENABLED,
+        "lineage_layers": cfg.LINEAGE_LAYERS,
+        "exposures_enabled": cfg.EXPOSURES_ENABLED,
+        "exposures_default_layout": cfg.EXPOSURES_DEFAULT_LAYOUT,
+        "bus_matrix_enabled": cfg.Bus_MATRIX_ENABLED,
+        "modeling_style": cfg.MODELING_STYLE,
+        "entity_prefix": (
+            cfg.ENTITY_MODELING_CONFIG.entity_prefix
+            if cfg.ENTITY_MODELING_CONFIG.enabled
+            else []
+        ),
+        "label_prefixes": _resolve_label_prefixes(),
+        "dimension_prefix": (
+            cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+            if cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+            else []
+        ),
+        "fact_prefix": (
+            cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix
+            if cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+            else []
+        ),
     }
 
 
 @router.get("/manifest")
 async def get_manifest():
     """Return parsed models from the transformation framework."""
-    try:
-        adapter = get_adapter()
-        models = adapter.get_models()
-        return {"models": models}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading manifest: {str(e)}")
+    models = get_models()
+    return {"models": models}

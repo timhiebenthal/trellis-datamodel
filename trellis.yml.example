@@ -1,0 +1,142 @@
+# Trellis configuration for data model UI
+
+# Transformation framework currently supported.
+framework: dbt-core
+
+# ==============================================================================
+# SWITCHING BETWEEN KIMBALL AND ENTITY VERSIONS
+# ==============================================================================
+#
+# This repository contains two parallel dbt projects for comparing modeling approaches:
+#
+# 1. Kimball Dimensional Model (dbt_company_dummy_kimball/)
+#    - Uses traditional dim_ and fact_ prefixes
+#    - Example: dim_customer.sql, fact_sale.sql
+#    - Data model: data_model_kimball.yml
+#    - modeling_style: dimensional_model
+#
+# 2. Entity-Logic Model (dbt_company_dummy_entity/)
+#    - Uses neutral naming without prefixes
+#    - Example: customer.sql, sale.sql
+#    - Data model: data_model_entity.yml
+#    - modeling_style: dimensional_model (with neutral prefixes) or entity_model
+#
+# To switch between versions, update the following three configuration values:
+#
+# ===== Kimball Version =====
+# dbt_project_path: "./dbt_company_dummy_kimball"
+# data_model_file: "data_model_kimball.yml"
+# modeling_style: dimensional_model
+#
+# ===== Entity Version =====
+# dbt_project_path: "./dbt_company_dummy_entity"
+# data_model_file: "data_model_entity.yml"
+# modeling_style: dimensional_model  # or entity_model
+#
+# Switching workflow:
+# 1. Edit trellis.yml with the desired configuration above
+# 2. Restart trellis backend (Ctrl+C then run again)
+# 3. Reload browser at http://localhost:8089
+# 4. Verify correct models load in the UI
+#
+# Note: dbt_manifest_path and dbt_catalog_path remain the same ("target/manifest.json",
+# "target/catalog.json") since both projects use the same target directory structure.
+#
+# ==============================================================================
+
+# Path to dbt project directory (relative to this file or absolute)
+dbt_project_path: "."
+# Path to dbt manifest.json (relative to dbt_project_path or absolute)
+dbt_manifest_path: "target/manifest.json"
+# Path to dbt catalog.json (relative to dbt_project_path or absolute)
+dbt_catalog_path: "target/catalog.json"
+
+# Where the generated data_model.yml is written (relative to dbt_project_path)
+data_model_file: "data_model.yml"
+
+# List of path patterns to include (empty list includes all models)
+dbt_model_paths: []  # Empty = include all models
+
+# Helper project used by `trellis generate-company-data`.
+# Run the command to populate ./dbt_company_dummy or replace with your own project.
+dbt_company_dummy_path: "./dbt_company_dummy"
+
+# Lineage configuration is opt-in. Uncomment to customize defaults.
+#lineage:
+#  enabled: false  # Set to true to enable lineage UI/endpoints
+#  layers: []  # Ordered folder names that become lineage layers
+
+# Entity creation guidance (preferred block). Defaults match new schema.
+#entity_creation_guidance:
+#  enabled: true  # Set false to disable the step-by-step wizard
+#  push_warning_enabled: true  # Show push warnings when interacting with dbt
+#  min_description_length: 10  # Minimum characters required for descriptions
+#  disabled_guidance: []  # Helper flows to disable
+
+# Exposures configuration (opt-in). Uncomment to enable Exposures view mode.
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view mode (opt-in)
+#  default_layout: dashboards-as-rows  # Default table orientation: dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
+
+# Dimensional modeling configuration (opt-in).
+# Use this feature if you want to enable Kimball dimensional modeling features such as:
+# - Entity classification (fact vs dimension)
+# - Smart default positioning for star/snowflake schemas
+# - Kimball Bus Matrix view mode
+# Default is entity_model for backward compatibility.
+#modeling_style: entity_model  # Options: dimensional_model or entity_model
+
+# Dimensional modeling inference patterns (used when modeling_style is dimensional_model).
+# Customize these patterns to match your dbt model naming conventions.
+#
+# When your dbt project loads, entities are automatically classified based on model names:
+# - Models matching dimension_prefix → classified as "dimension" (green icon)
+# - Models matching fact_prefix → classified as "fact" (blue icon)
+# - Unmatched models → classified as "unclassified" (gray icon)
+#
+# You can override any classification by clicking the entity type badge on entity nodes.
+# This inference only runs on initial load; manual changes are always preserved.
+#
+# Common naming conventions:
+# - Dimensions: dim_, d_, dim, dimension (e.g., dim_customer, d_employee)
+# - Facts: fct_, fact_, f (e.g., fct_orders, fact_sales, f_transactions)
+#
+# You can specify prefixes as either a string (single prefix) or a list (multiple prefixes, first is used):
+#   dimension_prefix: "d_"           # Single prefix as string
+#   dimension_prefix: ["dim_", "d_"]  # Multiple prefixes as list (first is used)
+#   fact_prefix: "f_"                # Single prefix as string
+#   fact_prefix: ["fct_", "fact_"]   # Multiple prefixes as list (first is used)
+#dimensional_modeling:
+#  inference_patterns:
+#    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables (string or list)
+#    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables (string or list)
+
+# Entity modeling configuration (opt-in).
+# Use this feature if you want to enable prefix-based naming for entity models when modeling_style is entity_model.
+#
+# Behavior:
+# - Prefixes are applied when saving entities to dbt schema.yml files
+# - Prefixes are stripped from entity labels displayed on the ERD canvas for cleaner visualization
+# - This helps teams with established table naming conventions while maintaining readable labels
+#
+# Example workflow:
+# 1. Create entity "Customer" on canvas → displays as "Customer"
+# 2. Save to dbt → creates model "tbl_customer" (prefix applied)
+# 3. Load from dbt → displays as "Customer" (prefix stripped from label)
+#
+# You can specify prefixes as either a string (single prefix) or a list (multiple prefixes):
+#   prefix: "tbl_"           # Single prefix as string
+#   prefix: ["tbl_", "entity_"]  # Multiple prefixes as list (first is used for application)
+#
+# When multiple prefixes are configured:
+# - First prefix in the list is used when saving new entities
+# - All prefixes are stripped from labels (first matching prefix is removed)
+# - Case-insensitive detection prevents double-prefixing (e.g., "TBL_CUSTOMER" with prefix "tbl_" won't become "tbl_tbl_customer")
+#
+# Common naming conventions:
+# - Tables: tbl_, t_, entity_, dim_ (e.g., tbl_customer, t_employee, entity_order)
+#entity_modeling:
+#  inference_patterns:
+#    prefix: "tbl_"  # Prefix to apply to entity models (string or list)

@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test('smoke test - app loads without errors', async ({ page }) => {
+    await page.addInitScript(() => {
+        // Flag to let frontend short-circuit noisy calls during smoke
+        (window as any).__SMOKE_TEST__ = true;
+    });
+
     // Collect console errors
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {
@@ -40,7 +45,8 @@ test('smoke test - app loads without errors', async ({ page }) => {
     // Check title if available (proves app bootstrapped)
     const title = await page.title();
     if (title) {
-        expect(title).toMatch(/Data Model UI/);
+        // After routing changes, titles are now "trellis - [View Name]" format
+        expect(title).toMatch(/trellis/);
     }
 
     // These checks may fail if backend is not running - that's ok for smoke test

@@ -1,0 +1,34 @@
+version: 2
+models:
+  - name: dim_customer_invoice
+    description: Customer invoices for sales orders
+    columns:
+      - name: customer_invoice_id
+        data_type: text
+        description: unique customer invoice ID
+      - name: order_id
+        data_type: text
+        description: order ID
+      - name: invoice_number
+        data_type: text
+        description: invoice number
+      - name: invoice_date
+        data_type: timestamp
+        description: invoice date
+      - name: due_date
+        data_type: timestamp
+        description: payment due date
+      - name: amount
+        data_type: numeric
+        description: invoice amount
+      - name: status
+        data_type: text
+        description: invoice status (draft, sent, paid, overdue, cancelled)
+      - name: payment_terms
+        data_type: text
+        description: payment terms
+      - name: paid_date
+        data_type: timestamp
+        description: date when invoice was paid
+      - name: created_at
+        data_type: timestamp

@@ -10,6 +10,7 @@ import os
 from typing import Any, Optional
 from collections import deque
 from trellis_datamodel import config as cfg
+from trellis_datamodel.exceptions import DomainError, FileOperationError, NotFoundError
 
 try:
     from dbt_colibri import extract_lineage as colibri_extract_lineage
@@ -19,7 +20,7 @@ except ImportError:
     COLIBRI_AVAILABLE = False
 
 
-class LineageError(Exception):
+class LineageError(DomainError):
     """Error during lineage extraction."""
 
     pass
@@ -50,7 +51,7 @@ def extract_upstream_lineage(
     """
     # Validate manifest exists
     if not os.path.exists(manifest_path):
-        raise FileNotFoundError(f"Manifest not found at {manifest_path}")
+        raise FileOperationError(f"Manifest not found at {manifest_path}")
 
     try:
         # Load manifest
@@ -78,11 +79,11 @@ def extract_upstream_lineage(
                 if uid.endswith(f".{model_name}") or uid.endswith(f".{model_name}.v")
             ]
             if matching_models:
-                raise LineageError(
+                raise NotFoundError(
                     f"Model '{model_unique_id}' not found in manifest. "
                     f"Found similar models: {', '.join(matching_models[:3])}"
                 )
-            raise LineageError(
+            raise NotFoundError(
                 f"Model '{model_unique_id}' not found in manifest. "
                 f"Available models: {len([n for n in nodes.values() if n.get('resource_type') == 'model'])} model(s)"
             )
@@ -94,7 +95,7 @@ def extract_upstream_lineage(
         # Transform to our format
         return _transform_lineage_data(lineage_data, model_unique_id, manifest)
 
-    except FileNotFoundError:
+    except (FileNotFoundError, FileOperationError, NotFoundError):
         raise
     except Exception as e:
         raise LineageError(f"Failed to extract lineage: {str(e)}") from e

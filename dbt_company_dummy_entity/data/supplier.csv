@@ -1,0 +1,11 @@
+id,name,contact_name,email,phone,category,status,payment_terms,created_at
+1,"Hoffman, Santiago and Jenkins",Teresa Henderson,schmittcaroline@example.com,798-332-7315,Components,inactive,Prepaid,2025-02-11 05:22:40.629639
+2,"Perez, Patterson and Hoffman",Lisa Leonard,lynchdiane@example.net,302-444-5502x296,Software,inactive,COD,2025-01-30 07:46:30.689307
+3,Davis PLC,Jason Peterson,larry59@example.net,802-929-0147,Raw Materials,inactive,Net 15,2024-11-17 16:23:12.873597
+4,Nelson-Fischer,Jeffrey Campbell,trose@example.org,669.600.3432,Services,inactive,Prepaid,2024-06-17 06:11:55.354166
+5,Jimenez Group,James Padilla,charles06@example.org,715.496.9664x160,Software,inactive,COD,2025-03-04 12:26:09.772833
+6,"Stevens, Norris and Cox",Brian Graham,zwarren@example.com,001-453-552-1818x8355,Raw Materials,on_hold,Net 30,2024-02-14 08:00:12.159999
+7,Gonzalez-Morrison,Mary Thompson,kmarshall@example.net,299.755.2717x744,Services,on_hold,Net 15,2024-09-23 19:49:49.788970
+8,Murray-Johnson,Dustin Newman,gilbertwilliam@example.com,001-480-279-3597,Software,inactive,Net 30,2024-08-23 13:53:19.140397
+9,Haas-Miller,Amanda Zimmerman,nwarren@example.org,(854)666-5905x151,Raw Materials,active,Prepaid,2024-05-06 09:19:40.701591
+10,"Brandt, Morrison and Hernandez",Matthew Rangel,tammy62@example.net,001-214-786-5281x685,Software,active,Net 15,2024-06-06 16:00:56.649436

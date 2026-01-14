@@ -47,6 +47,7 @@ export interface EntityData {
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
+    entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
@@ -69,6 +70,7 @@ export interface Entity {
     panel_height?: number;
     collapsed?: boolean;
     tags?: string[];
+    entity_type?: "fact" | "dimension" | "unclassified";
     source_system?: string[]; // Only for unbound entities (mock sources)
 }
 
@@ -97,6 +99,7 @@ export interface DataModel {
     version: number;
     entities: Entity[];
     relationships: Relationship[];
+    domains?: Domain[];
 }
 
 export interface ConfigStatus {
@@ -121,6 +124,7 @@ export interface GuidanceConfig {
 export interface EntityWizardData {
     label: string;
     description: string;
+    entity_type?: "fact" | "dimension" | "unclassified";
 }
 
 export interface ConfigInfo {
@@ -138,7 +142,18 @@ export interface ConfigInfo {
     frontend_build_dir: string;
     model_paths_configured: string[];
     model_paths_resolved: string[];
+    entity_creation_guidance?: GuidanceConfig;
     guidance?: GuidanceConfig;
+    lineage_enabled?: boolean;
+    lineage_layers?: string[];
+    exposures_enabled?: boolean;
+    exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
+    bus_matrix_enabled?: boolean;
+    modeling_style?: 'dimensional_model' | 'entity_model';
+    entity_prefix?: string[];
+    label_prefixes?: string[];
+    dimension_prefix?: string[];
+    fact_prefix?: string[];
 }
 
 export interface FieldDragState {
@@ -217,3 +232,9 @@ export interface LineageResponse {
     metadata: LineageMetadata;
 }
 
+export interface Domain {
+    id: string;
+    label: string;
+    color: string;
+    entities: string[];
+}

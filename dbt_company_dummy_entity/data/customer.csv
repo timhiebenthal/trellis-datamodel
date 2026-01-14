@@ -1,0 +1,19 @@
+id,name,email,company_name,status,lead_id,created_at
+1,Christopher Mcdonald,tinaferguson@example.com,"Elliott, Johnson and Day",churned,,2025-02-06 07:42:40.029303
+2,Melissa Bentley,michaeljones@example.net,Hanson-Alvarado,active,1.0,2025-09-23 09:02:22.260908
+3,Anthony Gray,shawnrogers@example.com,Walton-Decker,active,,2025-03-20 20:52:56.026289
+4,Alec Ryan,jeffrey10@example.org,Gonzalez Inc,churned,,2025-08-02 13:53:02.266101
+5,John Wilson,stevenscott@example.com,Obrien Ltd,churned,,2025-09-06 23:47:34.561004
+6,Carla Collins,hickmanbarbara@example.com,David-Gonzalez,active,,2025-07-22 21:45:39.152375
+7,Dana Terry,melissa91@example.net,Reed Group,inactive,,2025-08-17 05:54:37.999917
+8,Matthew Smith,gshort@example.com,Reid-Poole,inactive,,2025-09-02 23:00:26.387915
+9,Nicholas Sheppard,christina87@example.com,Petersen-Vargas,active,,2025-04-15 10:22:18.328892
+10,Timothy Ramirez,dsanchez@example.net,"Barnett, Rogers and Snyder",active,,2025-04-16 10:06:27.798540
+11,Mr. David Ramirez,angela83@example.org,Cortez Group,inactive,,2025-07-09 10:19:38.008446
+12,John Joseph,fmcguire@example.com,Sullivan and Sons,churned,,2025-04-09 13:20:54.366183
+13,Kara Schmidt,jbarajas@example.com,Warner-Nelson,active,,2025-03-20 13:16:47.332673
+14,Corey Wilson,jamesrodgers@example.com,"Lawrence, Wolf and Carlson",churned,,2025-12-11 16:15:24.242266
+15,Elizabeth Ward,alexis82@example.com,Mccann PLC,churned,,2025-04-04 10:06:02.222616
+16,Margaret Mullins,salasaudrey@example.com,Alexander-Lopez,inactive,,2025-01-06 13:02:37.153101
+17,Karen Short,kvasquez@example.net,"Brown, Hernandez and Hart",churned,,2025-04-08 16:34:57.701457
+18,Bailey Duran DDS,kimberlyjames@example.com,Dalton-Branch,churned,,2025-04-09 06:06:52.384855

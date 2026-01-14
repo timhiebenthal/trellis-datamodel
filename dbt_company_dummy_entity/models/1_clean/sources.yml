@@ -1,0 +1,58 @@
+version: 2
+
+sources:
+  - name: mock_csv
+    schema: main
+    tables:
+      - name: department
+        description: "Company departments"
+        meta:
+          external_location: "data/department.csv"
+      - name: employee
+        description: "Employee records"
+        meta:
+          external_location: "data/employee.csv"
+      - name: lead
+        description: "Sales leads"
+        meta:
+          external_location: "data/lead.csv"
+      - name: customer
+        description: "Customer records"
+        meta:
+          external_location: "data/customer.csv"
+      - name: products
+        description: "Product catalog"
+        meta:
+          external_location: "data/products.csv"
+      - name: order
+        description: "Customer orders"
+        meta:
+          external_location: "data/order.csv"
+      - name: order_item
+        description: "Order line items"
+        meta:
+          external_location: "data/order_item.csv"
+      - name: customer_invoice
+        description: "Customer invoices"
+        meta:
+          external_location: "data/customer_invoice.csv"
+      - name: supplier
+        description: "Supplier records"
+        meta:
+          external_location: "data/supplier.csv"
+      - name: purchase_order
+        description: "Purchase orders to suppliers"
+        meta:
+          external_location: "data/purchase_order.csv"
+      - name: purchase_order_item
+        description: "Purchase order line items"
+        meta:
+          external_location: "data/purchase_order_item.csv"
+      - name: supplier_invoice
+        description: "Supplier invoices"
+        meta:
+          external_location: "data/supplier_invoice.csv"
+      - name: inventory
+        description: "Product inventory levels"
+        meta:
+          external_location: "data/inventory.csv"

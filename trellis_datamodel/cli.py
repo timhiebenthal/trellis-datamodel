@@ -17,6 +17,15 @@ from trellis_datamodel.config import (
     find_config_file,
     print_config,
 )
+from trellis_datamodel.init_wizard import (
+    prompt_interactive_mode,
+    run_init_wizard,
+    generate_config_from_answers,
+    DEFAULT_CONFIG_TEMPLATE as WIZARD_DEFAULT_CONFIG_TEMPLATE,
+)
+
+# Use the template from wizard module to keep single source of truth
+DEFAULT_CONFIG_TEMPLATE = WIZARD_DEFAULT_CONFIG_TEMPLATE
 
 app = typer.Typer(
     name="trellis",
@@ -157,18 +166,23 @@ def init():
         )
         raise typer.Exit(1)
 
-    default_config = """\
-# Trellis configuration
-framework: dbt-core
-dbt_project_path: "."
-dbt_manifest_path: "target/manifest.json"
-dbt_catalog_path: "target/catalog.json"
-data_model_file: "data_model.yml"
-dbt_model_paths: []  # Empty = include all models
-"""
-    config_file.write_text(default_config)
+    # Ask if user wants interactive mode
+    use_interactive = prompt_interactive_mode()
+
+    if use_interactive:
+        # Run the interactive wizard
+        answers = run_init_wizard(config_file)
+        config_content = generate_config_from_answers(answers)
+    else:
+        # Use the default template (existing behavior)
+        config_content = DEFAULT_CONFIG_TEMPLATE
+
+    # Write the config file
+    config_file.write_text(config_content)
+
+    # Success message
     typer.echo(typer.style("✓ Created trellis.yml", fg=typer.colors.GREEN))
-    typer.echo("  Edit the file to configure your dbt project paths, then run:")
+    typer.echo("  Edit the file to configure additional options, then run:")
     typer.echo(typer.style("  trellis run", fg=typer.colors.CYAN))
 
 

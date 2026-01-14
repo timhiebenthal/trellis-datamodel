@@ -3,7 +3,13 @@ import type { APIRequestContext, Page } from '@playwright/test';
 // Playwright pages use the frontend baseURL (localhost:5173). Point API calls to the backend.
 const API_URL = process.env.VITE_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-const EMPTY_DATA_MODEL = {
+export type DataModelPayload = {
+    version: number;
+    entities: Array<Record<string, any>>;
+    relationships: Array<Record<string, any>>;
+};
+
+const EMPTY_DATA_MODEL: DataModelPayload = {
     version: 0.1,
     entities: [],
     relationships: [],
@@ -13,10 +19,14 @@ const EMPTY_DATA_MODEL = {
  * Reset the backend data model to an empty state via the API.
  * This is faster and more reliable than driving the UI for cleanup.
  */
-export async function resetDataModel(request: APIRequestContext): Promise<void> {
-    await request.post(`${API_URL}/data-model`, {
-        data: EMPTY_DATA_MODEL,
-    });
+export async function resetDataModel(
+    request: APIRequestContext,
+    dataModel: DataModelPayload = EMPTY_DATA_MODEL,
+): Promise<void> {
+    const res = await request.post(`${API_URL}/data-model`, { data: dataModel });
+    if (!res.ok()) {
+        throw new Error(`Failed to reset data model: ${res.status()} ${res.statusText()}`);
+    }
 }
 
 /**
@@ -61,7 +71,7 @@ export async function cleanupTestEntities(page: Page): Promise<void> {
 
 /**
  * Complete the entity creation wizard by skipping through all steps
- * This handles the wizard modal that appears when entity_wizard_enabled is true
+ * This handles the wizard modal that appears when `guidance.entity_wizard.enabled` is true
  */
 export async function completeEntityWizard(page: Page): Promise<void> {
     // Check if wizard modal is visible
@@ -103,4 +113,3 @@ export async function completeEntityWizard(page: Page): Promise<void> {
     // Wait for wizard to close
     await wizardModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 }
-

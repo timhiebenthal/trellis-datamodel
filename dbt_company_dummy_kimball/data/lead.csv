@@ -1,0 +1,13 @@
+id,name,email,company_name,status,source,created_at,converted_at
+1,Melissa Bentley,michaeljones@example.net,Hanson-Alvarado,converted,email_campaign,2025-02-02 06:42:04.954792,2025-09-23 09:02:22.260908
+2,Katie Estrada,richard48@example.org,Fisher Group,lost,email_campaign,2025-08-23 00:17:19.722121,
+3,Lisa Turner,torresjason@example.net,"Pena, Marshall and Ramos",lost,cold_call,2025-03-06 19:00:28.381592,
+4,Steven Flynn,donnacampbell@example.net,"Harvey, Davis and Crane",lost,website,2025-03-14 12:25:57.123137,
+5,Robert Hernandez,sanchezthomas@example.org,Perry-Soto,new,trade_show,2025-02-27 18:14:10.625823,
+6,Kathleen Sanchez,staffordmichelle@example.org,Robinson-Brock,lost,cold_call,2025-08-29 19:10:14.780810,
+7,Justin Lowery,bryantlaurie@example.net,"Travis, Larson and Dodson",qualified,website,2025-11-09 03:52:28.996358,
+8,Michelle Wagner,vmerritt@example.com,Green-Wright,qualified,email_campaign,2025-08-08 12:53:52.070173,
+9,Kelly Sims,scott43@example.com,Flores-Fernandez,contacted,email_campaign,2025-02-07 07:08:25.403974,
+10,Michael Mccarthy,perrymark@example.com,Brown-Wall,new,trade_show,2025-05-09 22:48:01.764265,
+11,Theresa Smith,wwoods@example.com,Castaneda-Ashley,qualified,social_media,2025-05-20 17:36:36.169014,
+12,Kimberly Morrison,tracynelson@example.com,Price Ltd,contacted,social_media,2025-08-23 16:15:59.486254,

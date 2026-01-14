@@ -38,4 +38,3 @@ def get_adapter() -> Union[DbtCoreAdapter, TransformationAdapter]:
 
 
 __all__ = ["get_adapter", "TransformationAdapter", "DbtCoreAdapter"]
-

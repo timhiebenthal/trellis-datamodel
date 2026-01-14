@@ -1,0 +1,55 @@
+version: 2
+models:
+  - name: fact_sale
+    description: Sale records at order-item grain with enriched order information
+    columns:
+      - name: sale_id
+        data_type: text
+        description: unique sale ID (order_item_id)
+      - name: order_id
+        data_type: text
+        description: order ID
+      - name: product_id
+        data_type: text
+        description: product ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_id
+      - name: customer_id
+        data_type: text
+        description: customer ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_id
+      - name: quantity
+        data_type: numeric
+      - name: unit_price
+        data_type: numeric
+      - name: subtotal
+        data_type: numeric
+      - name: order_date
+        data_type: timestamp
+        description: order date
+      - name: order_status
+        data_type: text
+        description: order status
+      - name: order_amount
+        data_type: numeric
+        description: total order amount
+      - name: order_discount
+        data_type: numeric
+        description: order discount amount
+      - name: order_net_amount
+        data_type: numeric
+        description: net order amount after discount
+      - name: order_created_at
+        data_type: timestamp
+      - name: order_updated_at
+        data_type: timestamp
+      - name: sale_created_at
+        data_type: timestamp
+        description: sale (order item) creation timestamp

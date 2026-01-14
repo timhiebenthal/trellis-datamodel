@@ -1,5 +1,8 @@
 # Configuration for data model UI
 
+# modeling_style: entity_model  # Options: dimensional_model or entity_model
+modeling_style: dimensional_model
+
 # Transformation framework: dbt-core, dbt-fusion, sqlmesh, bruin, pydantic
 # (currently only dbt-core is implemented)
 framework: dbt-core
@@ -7,7 +10,7 @@ framework: dbt-core
 # Path to the dbt project directory (relative to this config file or absolute)
 # dbt_project_path: "./dbt_concept"
 # dbt_project_path: "./dbt_built"
-dbt_project_path: "./dbt_company_dummy"
+dbt_project_path: "./dbt_company_dummy_entity"
 
 # Path to the dbt manifest.json (relative to dbt_project_path or absolute)
 dbt_manifest_path: "target/manifest.json"
@@ -23,35 +26,47 @@ data_model_file: "data_model.yml"
 dbt_model_paths:
   - "3_core"
 
-# Path to frontend build directory (relative to this config file or absolute)
-frontend_build_dir: "./frontend/build"
-
 # Path to the dbt company dummy project directory (relative to this config file or absolute)
 # Used by 'trellis generate-company-data' command
 # Defaults to "./dbt_company_dummy" if not specified
 # dbt_company_dummy_path: "./dbt_company_dummy"
 
-# Ordered list of folder names to organize lineage into layers
-# Models are assigned to layers based on the first folder after models/ in their original_file_path
-# Sources are always assigned to "sources" layer (displayed at top)
-# Models without a matching folder are assigned to "unassigned" layer (displayed at bottom)
-# If not specified, lineage displays without layer organization (backward compatible)
-# Example:
-lineage_layers:
-  - "1_clean"
-  - "2_prep"
-  - "3_core"
+# Lineage configuration (opt-in)
+# When enabled: false, all lineage UI and endpoints are disabled (default: false)
+# layers: Ordered list of folder names to organize lineage into layers
+#   Models are assigned to layers based on the first folder after models/ in their original_file_path
+#   Sources are always assigned to "sources" layer (displayed at top)
+#   Models without a matching folder are assigned to "unassigned" layer (displayed at bottom)
+# Legacy top-level key `lineage_layers` is deprecated; use nested `lineage.layers` instead.
+lineage:
+  enabled: true
+  layers:
+    - "1_clean"
+    - "2_prep"
+    - "3_core"
 
-# Guidance settings for entity creation
+# Entity creation guidance (preferred block)
 # Controls the entity creation wizard and push-to-dbt warnings
-# guidance:
-#   # Enable/disable entity creation wizard (default: true)
-#   entity_wizard_enabled: true
-#   # Enable/disable push-to-dbt warnings for incomplete entities (default: true)
-#   push_warning_enabled: true
-#   # Minimum description length in characters (default: 10)
-#   min_description_length: 10
-#   # Disable specific guidance types (optional)
-#   disabled_guidance:
-#     - attribute_suggestions  # Don't show attribute suggestions in wizard step 3
+entity_creation_guidance:
+  enabled: false  # Set false to disable the step-by-step wizard (default: true)
+  push_warning_enabled: true
+  min_description_length: 10
+  disabled_guidance:
+    #- attribute_suggestions  # Don't show attribute suggestions in wizard step 3
 
+
+# Exposures configuration (opt-in).
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+exposures:
+  enabled: true
+  default_layout: "dashboards-as-rows"
+
+dimensional_modeling:
+ inference_patterns:
+   dimension_prefix: "dim_"  # Prefixes for dimension tables
+   fact_prefix: "fact_"  # Prefixes for fact tables
+
+# entity_modeling:
+#   inference_patterns:
+#     prefix: entity_

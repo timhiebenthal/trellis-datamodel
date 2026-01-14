@@ -14,14 +14,17 @@
         type Connection,
         type Edge,
     } from "@xyflow/svelte";
-    import { nodes, edges, viewMode } from "$lib/stores";
+    import { setContext } from "svelte";
+    import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
+    import { DimensionalModelPositioner, GroupSizeCalculator } from "$lib/services/position-calculator";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
-    import Icon from "@iconify/svelte";
+    import Icon from "$lib/components/Icon.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
+    import { writable } from "svelte/store";
 
     const nodeTypes = {
         entity: EntityNode,
@@ -33,11 +36,41 @@
     };
 
     // Props
-    let { guidanceConfig }: { guidanceConfig: GuidanceConfig } = $props();
+    let {
+        guidanceConfig,
+        lineageEnabled = false,
+        exposuresEnabled = false,
+        hasExposuresData = false,
+    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean; hasExposuresData?: boolean } = $props();
+
+    const lineageEnabledStore = writable(lineageEnabled);
+    setContext("lineageEnabled", lineageEnabledStore);
+
+    const exposuresEnabledStore = writable(exposuresEnabled);
+    setContext("exposuresEnabled", exposuresEnabledStore);
+
+    const hasExposuresDataStore = writable(hasExposuresData);
+    setContext("hasExposuresData", hasExposuresDataStore);
+
+    $effect(() => {
+        lineageEnabledStore.set(lineageEnabled);
+    });
+
+    $effect(() => {
+        exposuresEnabledStore.set(exposuresEnabled);
+    });
+
+    $effect(() => {
+        hasExposuresDataStore.set(hasExposuresData);
+    });
 
     // Wizard state
     let wizardOpen = $state(false);
     let wizardData = $state<EntityWizardData | null>(null);
+
+    // Position calculator services
+    const positioner = new DimensionalModelPositioner();
+    const groupSizeCalculator = new GroupSizeCalculator();
 
     function onConnect(connection: Connection) {
         const connectionKey = `${connection.source}-${connection.target}`;
@@ -132,16 +165,28 @@
             10,
         );
 
+        // Calculate smart position based on entity type and modeling style
+        let position: { x: number; y: number };
+
+        if ($modelingStyle === "dimensional_model" && data.entity_type) {
+            // Smart positioning for dimensional modeling
+            position = calculateSmartPosition(data.entity_type);
+        } else {
+            // Default random positioning
+            position = {
+                x: 100 + Math.random() * 200,
+                y: 100 + Math.random() * 200,
+            };
+        }
+
         const newNode: Node = {
             id,
             type: "entity",
-            position: {
-                x: 100 + Math.random() * 200,
-                y: 100 + Math.random() * 200,
-            },
+            position,
             data: {
                 label,
                 description: data.description || "",
+                entity_type: data.entity_type || "unclassified",
                 width: 280,
                 panelHeight: 200,
                 collapsed: false,
@@ -149,6 +194,11 @@
             zIndex: maxZIndex + 1, // Place on top of all other nodes
         };
         $nodes = [...$nodes, newNode];
+    }
+
+    function calculateSmartPosition(entityType: "fact" | "dimension" | "unclassified"): { x: number; y: number } {
+        // Use positioner service for smart positioning
+        return positioner.calculateSmartPosition(entityType, $nodes);
     }
 
     function handleWizardComplete(data: EntityWizardData) {
@@ -204,97 +254,15 @@
 
     // Auto-resize groups to fit children
     function updateGroupSizes() {
-        // Skip updates during drag to prevent interruption
-        // Check both manual state and store state
-        if (isDragging || $nodes.some((n) => n.dragging)) return;
-
-        const groups = $nodes.filter(
-            (n) => n.type === "group" && !n.data.collapsed,
+        // Use group size calculator service
+        const result = groupSizeCalculator.calculateGroupSizes(
+            $nodes,
+            $viewMode as "conceptual" | "logical",
+            isDragging,
         );
-        if (groups.length === 0) return;
 
-        const updates = new Map<string, { width: number; height: number }>();
-
-        for (const group of groups) {
-            // Skip groups that have been manually resized
-            if (group.data?.manuallyResized) continue;
-            
-            const children = $nodes.filter(
-                (n) => n.parentId === group.id && !n.hidden,
-            );
-            if (children.length === 0) continue;
-
-            let maxX = 0;
-            let maxY = 0;
-
-            for (const child of children) {
-                // Use measured dimensions if available and valid
-                // Fallback to data dimensions or defaults
-                const measuredWidth = child.measured?.width;
-                const measuredHeight = child.measured?.height;
-
-                const width =
-                    measuredWidth && measuredWidth > 0
-                        ? measuredWidth
-                        : ((child.data?.width as number) ?? 320);
-
-                // For height, if measured is small (e.g. collapsed state) but data says it should be expanded,
-                // we might want to trust data? But measured is usually truth.
-                // However, if just expanded, measured might be old.
-                // We'll trust measured if it's substantial, otherwise check data.
-                let height = measuredHeight ?? 0;
-
-                // If height is missing or suspiciously small (<50) and it's not collapsed, estimate
-                if ((!height || height < 50) && !child.data?.collapsed) {
-                    let estimatedHeight = (child.data?.panelHeight as number)
-                        ? (child.data.panelHeight as number) + 80 // Header + padding
-                        : 300;
-
-                    // Add extra height for logical view metadata if bound
-                    if ($viewMode === "logical" && child.data?.dbt_model) {
-                        estimatedHeight += 100; // Schema/table + materialization badges + tags
-                    }
-
-                    height = estimatedHeight;
-                } else if (!height) {
-                    height = 200;
-                }
-
-                const right = child.position.x + width;
-                const bottom = child.position.y + height;
-
-                if (right > maxX) maxX = right;
-                if (bottom > maxY) maxY = bottom;
-            }
-
-            // Add padding
-            const padding = 40; // Increased padding
-            const newWidth = Math.max(maxX + padding, 300); // Min width 300
-            const newHeight = Math.max(maxY + padding, 200); // Min height 200
-
-            const currentWidth = (group.data.width as number) ?? 0;
-            const currentHeight = (group.data.height as number) ?? 0;
-
-            // Only update if difference is significant
-            if (
-                Math.abs(newWidth - currentWidth) > 5 ||
-                Math.abs(newHeight - currentHeight) > 5
-            ) {
-                updates.set(group.id, { width: newWidth, height: newHeight });
-            }
-        }
-
-        if (updates.size > 0) {
-            $nodes = $nodes.map((n) => {
-                if (updates.has(n.id)) {
-                    const u = updates.get(n.id)!;
-                    return {
-                        ...n,
-                        data: { ...n.data, width: u.width, height: u.height },
-                    };
-                }
-                return n;
-            });
+        if (result.needsUpdate) {
+            $nodes = groupSizeCalculator.applyGroupSizes($nodes, result.sizes);
         }
     }
 
@@ -379,44 +347,46 @@
                 </div>
             </div>
         {/if}
-
-        <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
-        {#if $viewMode === "conceptual" || $viewMode === "logical"}
-            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
-                <div
-                    class="flex bg-white rounded-full p-1 border-[3px] border-primary-600 shadow-lg"
-                    style="box-shadow: 0 0 8px rgba(13, 148, 136, 0.4), 0 0 16px rgba(13, 148, 136, 0.25);"
-                >
-                    <button
-                        class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
-                        class:bg-primary-50={$viewMode === "conceptual"}
-                        class:text-primary-600={$viewMode === "conceptual"}
-                        class:shadow-sm={$viewMode === "conceptual"}
-                        class:text-gray-500={$viewMode !== "conceptual"}
-                        class:hover:text-gray-900={$viewMode !== "conceptual"}
-                        onclick={() => ($viewMode = "conceptual")}
-                        title="Conceptual View"
-                    >
-                        <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
-                        Conceptual
-                    </button>
-                    <button
-                        class="px-4 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center gap-2"
-                        class:bg-primary-50={$viewMode === "logical"}
-                        class:text-primary-600={$viewMode === "logical"}
-                        class:shadow-sm={$viewMode === "logical"}
-                        class:text-gray-500={$viewMode !== "logical"}
-                        class:hover:text-gray-900={$viewMode !== "logical"}
-                        onclick={() => ($viewMode = "logical")}
-                        title="Logical View"
-                    >
-                        <Icon icon="lucide:database" class="w-3.5 h-3.5" />
-                        Logical
-                    </button>
-                </div>
-            </div>
-        {/if}
     </SvelteFlow>
+
+    <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
+    {#if $viewMode === "conceptual" || $viewMode === "logical"}
+        <div
+            class="absolute bottom-14 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto inline-flex items-center bg-white rounded-full border border-primary-500 shadow-md relative overflow-hidden transition-all duration-150 px-1 w-auto"
+            style="box-shadow: 0 0 6px rgba(13, 148, 136, 0.25);"
+        >
+            <!-- Conceptual Option -->
+            <button
+                type="button"
+                class="px-3 py-2 text-sm font-semibold flex items-center gap-2 transition-all duration-150 border-0 bg-transparent cursor-pointer"
+                class:text-primary-600={$viewMode === "conceptual"}
+                class:text-gray-500={$viewMode !== "conceptual"}
+                class:hover:text-gray-900={$viewMode !== "conceptual"}
+                onclick={() => ($viewMode = "conceptual")}
+                title="Conceptual View"
+            >
+                <Icon icon="octicon:workflow-16" class="w-3.5 h-3.5" />
+                Conceptual
+            </button>
+
+            <!-- Vertical Divider -->
+            <div class="w-[1px] h-7 bg-gray-200"></div>
+
+            <!-- Logical Option -->
+            <button
+                type="button"
+                class="px-3 py-2 text-sm font-semibold flex items-center gap-2 transition-all duration-150 border-0 bg-transparent cursor-pointer"
+                class:text-primary-600={$viewMode === "logical"}
+                class:text-gray-500={$viewMode !== "logical"}
+                class:hover:text-gray-900={$viewMode !== "logical"}
+                onclick={() => ($viewMode = "logical")}
+                title="Logical View"
+            >
+                <Icon icon="lucide:database" class="w-3.5 h-3.5" />
+                Logical
+            </button>
+        </div>
+    {/if}
 
     <!-- Entity Creation Wizard -->
     <EntityCreationWizard
@@ -425,5 +395,6 @@
         onCancel={handleWizardCancel}
         existingEntityIds={$nodes.filter((n) => n.type === "entity").map((n) => n.id)}
         config={guidanceConfig}
+        modelingStyle={$modelingStyle}
     />
 </div>

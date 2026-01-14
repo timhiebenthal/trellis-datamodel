@@ -21,9 +21,149 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 - Organize entities based on subdirectories and tags from your pyhsical implementation.
 - Write description or tags back to your dbt-project
 
-**Two Ways of getting started** 
-- Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML  
+**Two Ways of getting started**
+- Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML
 - Brownfield: document your existing data model by loading existing dbt models and utilize relationship tests to infer links
+
+## Dimensional Modeling Support
+
+Trellis includes native support for Kimball dimensional modeling, making it easier to design, visualize, and document star and snowflake schemas.
+
+### Features
+
+**Entity Classification**
+- Classify entities as **fact** (transaction tables), **dimension** (descriptive tables), or **unclassified**
+- Manual classification during entity creation or via context menu
+- Automatic inference from dbt model naming patterns (e.g., `dim_customer` → dimension, `fct_orders` → fact)
+- Configurable inference patterns in `trellis.yml`
+
+**Smart Default Positioning**
+- Facts are automatically placed in the center area of the canvas
+- Dimensions are placed in an outer ring around facts
+- Reduces manual layout effort for star/snowflake schemas
+- Can be re-applied anytime with "Auto-Layout" button
+
+**Kimball Bus Matrix View**
+- Visual matrix showing dimensions (rows) and facts (columns)
+- Checkmarks (✓) indicate dimension-fact connections
+- Filter by dimension name, fact name, or tags
+- Click cells to highlight relationships on the canvas
+- Dedicated view mode accessible from navigation bar
+
+### Configuration
+
+Enable dimensional modeling features in `trellis.yml`:
+
+```yaml
+modeling_style: dimensional_model  # Options: dimensional_model or entity_model (default)
+
+dimensional_modeling:
+  inference_patterns:
+    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables
+    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables
+```
+
+- `modeling_style: dimensional_model` enables all dimensional modeling features
+- `modeling_style: entity_model` (default) preserves current generic behavior
+- Inference patterns customize how entities are auto-classified from dbt model names
+
+### Entity Classification Workflow
+
+**Creating New Entities:**
+1. Click "Create Entity" button
+2. Fill in entity name and description
+3. Select entity type: Fact, Dimension, or Unclassified
+4. Entity is placed on canvas according to type (facts center, dimensions outer ring)
+
+**Loading Existing dbt Models:**
+1. System automatically infers entity types from naming patterns
+2. Entity type icons appear on nodes (database for fact, box for dimension)
+3. Override incorrect classifications via context menu: right-click → "Set as Fact/Dimension"
+
+**Bus Matrix Workflow:**
+1. Click "Bus Matrix" icon in navigation bar
+2. View dimensions (rows) and facts (columns)
+3. Checkmarks show connections between entities
+4. Filter to focus on specific dimensions, facts, or tags
+5. Click checkmark to highlight relationship on canvas
+
+### Use Cases
+
+**When to Use Dimensional Modeling:**
+- Designing data warehouses with star/snowflake schemas
+- Following Kimball methodology
+- Working with fact and dimension tables
+- Documenting data models for BI stakeholders
+
+**When to Use Entity Model:**
+- Generic data modeling (not strictly dimensional)
+- Mixed schema patterns
+- Legacy projects with inconsistent naming
+- Exploratory modeling
+
+### Entity Model Prefix Support
+
+Trellis includes native support for configurable entity prefixes when using entity modeling style, allowing teams with established table naming conventions to maintain consistency while keeping entity labels clean.
+
+#### Features
+
+**Prefix Application**
+- Automatically applies configured prefix when saving unbound entities to dbt schema.yml files
+- Supports single prefix or multiple prefixes (e.g., `tbl_`, `entity_`, `t_`)
+- Uses first configured prefix for application when multiple are provided
+- Case-insensitive prefix detection prevents duplication (e.g., `TBL_CUSTOMER` won't become `tbl_TBL_CUSTOMER`)
+- Respects existing bound dbt_model values (bound entities don't get re-prefixed)
+
+**Prefix Stripping from Labels**
+- Configured prefixes are automatically stripped from entity labels displayed on the ERD canvas
+- Labels remain human-readable and meaningful without technical prefixes
+- Works for all entity labels: newly created entities, entities loaded from dbt models, and entities bound to existing dbt models
+- Preserves original casing of remaining label text after stripping
+
+#### Configuration
+
+Enable entity modeling prefix support in `trellis.yml`:
+
+```yaml
+modeling_style: entity_model  # Options: dimensional_model or entity_model (default)
+
+entity_modeling:
+  inference_patterns:
+    prefix: "tbl_"  # Single prefix
+    # OR
+    prefix: ["tbl_", "entity_", "t_"]  # Multiple prefixes
+```
+
+- `modeling_style: entity_model` (default) enables entity modeling features
+- `entity_modeling.inference_patterns.prefix` defines one or more prefixes to apply when saving entities
+- Empty prefix list (default) results in no behavior change for backward compatibility
+- When multiple prefixes are configured, the first in the list is used for application, but all are recognized for stripping
+
+#### Examples
+
+**Single Prefix Configuration:**
+```yaml
+entity_modeling:
+  inference_patterns:
+    prefix: "tbl_"
+```
+- Entity "Customer" on canvas saves to dbt as `tbl_customer`
+- Loading `tbl_customer` from dbt displays as "Customer" on canvas
+
+**Multiple Prefix Configuration:**
+```yaml
+entity_modeling:
+  inference_patterns:
+    prefix: ["tbl_", "entity_", "t_"]
+```
+- Entity "Product" on canvas saves to dbt as `tbl_product` (uses first prefix)
+- Loading `entity_product` from dbt displays as "Product" on canvas (strips any matching prefix)
+- Loading `t_order` from dbt displays as "Order" on canvas (strips any matching prefix)
+
+**Backward Compatibility:**
+- Existing `entity_model` projects continue to work without modification when prefix is empty (default)
+- No breaking changes to existing APIs or data structures
+- Simply add prefix configuration to enable the feature for new or existing projects
 
 ## Tutorial & Guide
 
@@ -160,6 +300,7 @@ Options:
 ## Configuration
 
 Run `trellis init` to create a starter `trellis.yml` file in your project.
+The generated file mirrors the annotated defaults in `trellis.yml.example`, so review that example when you need to customize optional sections (lineage, guidance, helpers).
 
 Options:
 
@@ -169,6 +310,14 @@ Options:
 - `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
 - `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
 - `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
+- `dbt_company_dummy_path`: Helper dbt project used by `trellis generate-company-data`. Run the command to create `./dbt_company_dummy` or update this path to an existing project.
+- `modeling_style`: Modeling style to use. Options: `entity_model` (default) or `dimensional_model`. Controls whether dimensional modeling features or entity modeling prefix features are enabled.
+- `entity_modeling.inference_patterns.prefix`: Prefix(es) to apply when saving entities and strip from labels in entity modeling mode. Can be a single string or list of strings. Defaults to empty list (no prefix). See "Entity Model Prefix Support" section for examples and details.
+- `lineage.enabled`: Feature flag for lineage UI + API. Defaults to `false` (opt-in).
+- `lineage.layers`: Ordered list of folder names to organize lineage bands. Prefer this nested structure; legacy `lineage_layers` is deprecated.
+- `exposures.enabled`: Feature flag for Exposures view mode. Defaults to `false` (opt-in). Set to `true` to enable the exposures view and API.
+- `exposures.default_layout`: Default table layout for exposures view. Options: `dashboards-as-rows` (default, dashboards as rows, entities as columns) or `entities-as-rows` (exposures as columns, entities as rows). Users can manually toggle between layouts.
+- `entity_creation_guidance`: Encounter-friendly guidance for the entity wizard (current defaults are shown in `trellis.yml.example`).
 
 **Example `trellis.yml`:**
 ```yaml
@@ -177,8 +326,22 @@ dbt_project_path: "./dbt_built"
 dbt_manifest_path: "target/manifest.json"
 dbt_catalog_path: "target/catalog.json"
 data_model_file: "data_model.yml"
-dbt_model_paths:
-  - "3_core"
+dbt_model_paths: []  # Empty list includes all models
+dbt_company_dummy_path: "./dbt_company_dummy"
+#lineage:
+#  enabled: false  # Set to true to enable lineage UI/endpoints
+#  layers: []
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view (opt-in)
+#  default_layout: dashboards-as-rows  # Options: dashboards-as-rows (default) or entities-as-rows
+#entity_creation_guidance:
+#  enabled: true  # Set false to disable the step-by-step wizard
+#  push_warning_enabled: true
+#  min_description_length: 10
+#  disabled_guidance: []
+```
+
+Lineage and entity creation guidance sections are documented fully in `trellis.yml.example`; the CLI leaves them commented out by default.
 ```
 
 

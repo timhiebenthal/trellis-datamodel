@@ -1030,6 +1030,282 @@ class TestInferRelationships:
         assert rel["target_field"] == "player_id"
 
 
+class TestEntityPrefixApplication:
+    """Tests for entity prefix application in save endpoint."""
+
+    def test_applies_prefix_to_unbound_entity(
+        self, test_client, temp_dir, temp_data_model_path, monkeypatch
+    ):
+        """Test that entity prefix is applied when saving unbound entity."""
+        from trellis_datamodel import config as cfg
+
+        # Set up entity modeling config with prefix
+        original_config = cfg.ENTITY_MODELING_CONFIG
+        monkeypatch.setattr(
+            cfg,
+            "ENTITY_MODELING_CONFIG",
+            type("obj", (object,), {"enabled": True, "entity_prefix": ["tbl_"]})(),
+        )
+        monkeypatch.setattr(cfg, "MODELING_STYLE", "entity_model")
+
+        # Data model with unbound entity
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "customer",
+                    "label": "Customer",
+                    "position": {"x": 0, "y": 0},
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Save schema
+        request_data = {
+            "entity_id": "customer",
+            "model_name": "customer",
+            "fields": [{"name": "id", "datatype": "int"}],
+            "description": "Customer entity",
+        }
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        # Verify prefix was applied in saved schema
+        result = response.json()
+        with open(result["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+
+        assert schema["models"][0]["name"] == "tbl_customer"
+
+        # Restore original config
+        monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", original_config)
+
+    def test_does_not_double_prefix_bound_entity(
+        self, test_client, temp_dir, temp_data_model_path, monkeypatch
+    ):
+        """Test that bound entity with prefix doesn't get double-prefixed."""
+        from trellis_datamodel import config as cfg
+
+        # Set up entity modeling config with prefix
+        original_config = cfg.ENTITY_MODELING_CONFIG
+        monkeypatch.setattr(
+            cfg,
+            "ENTITY_MODELING_CONFIG",
+            type("obj", (object,), {"enabled": True, "entity_prefix": ["tbl_"]})(),
+        )
+        monkeypatch.setattr(cfg, "MODELING_STYLE", "entity_model")
+
+        # Create manifest with prefixed model
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        manifest_data = {
+            "nodes": {
+                "model.project.tbl_orders": {
+                    "unique_id": "model.project.tbl_orders",
+                    "resource_type": "model",
+                    "name": "tbl_orders",
+                    "schema": "public",
+                    "alias": "tbl_orders",
+                    "original_file_path": "models/3_core/tbl_orders.sql",
+                    "columns": {},
+                    "description": "Orders table",
+                    "config": {"materialized": "table"},
+                    "tags": [],
+                }
+            }
+        }
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f)
+
+        # Data model with bound entity (already has prefix)
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "order",
+                    "label": "Order",
+                    "dbt_model": "model.project.tbl_orders",
+                    "position": {"x": 0, "y": 0},
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Save schema - should not double prefix
+        request_data = {
+            "entity_id": "order",
+            "model_name": "order",
+            "fields": [{"name": "order_id", "datatype": "int"}],
+            "description": "Order entity",
+        }
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        # Verify no double prefix in saved schema
+        result = response.json()
+        with open(result["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+
+        assert schema["models"][0]["name"] == "tbl_orders"  # Not "tbl_tbl_orders"
+
+        # Restore original config
+        monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", original_config)
+
+    def test_case_insensitive_prefix_detection(
+        self, test_client, temp_dir, temp_data_model_path, monkeypatch
+    ):
+        """Test that prefix detection is case-insensitive."""
+        from trellis_datamodel import config as cfg
+
+        # Set up entity modeling config with lowercase prefix
+        original_config = cfg.ENTITY_MODELING_CONFIG
+        monkeypatch.setattr(
+            cfg,
+            "ENTITY_MODELING_CONFIG",
+            type("obj", (object,), {"enabled": True, "entity_prefix": ["tbl_"]})(),
+        )
+        monkeypatch.setattr(cfg, "MODELING_STYLE", "entity_model")
+
+        # Data model with entity ID that has prefix in uppercase
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "TBL_CUSTOMER",  # Uppercase prefix
+                    "label": "Customer",
+                    "position": {"x": 0, "y": 0},
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Save schema - should detect prefix and not double
+        request_data = {
+            "entity_id": "TBL_CUSTOMER",
+            "model_name": "TBL_CUSTOMER",
+            "fields": [{"name": "id", "datatype": "int"}],
+            "description": "Customer entity",
+        }
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        # Verify no double prefix (case-insensitive match)
+        result = response.json()
+        with open(result["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+
+        assert schema["models"][0]["name"] == "TBL_CUSTOMER"  # Not "tbl_TBL_CUSTOMER"
+
+        # Restore original config
+        monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", original_config)
+
+    def test_uses_first_prefix_from_multiple_configured(
+        self, test_client, temp_dir, temp_data_model_path, monkeypatch
+    ):
+        """Test that first configured prefix is used when multiple are provided."""
+        from trellis_datamodel import config as cfg
+
+        # Set up entity modeling config with multiple prefixes
+        original_config = cfg.ENTITY_MODELING_CONFIG
+        monkeypatch.setattr(
+            cfg,
+            "ENTITY_MODELING_CONFIG",
+            type("obj", (object,), {"enabled": True, "entity_prefix": ["tbl_", "entity_", "t_"]})(),
+        )
+        monkeypatch.setattr(cfg, "MODELING_STYLE", "entity_model")
+
+        # Data model with unbound entity
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "product",
+                    "label": "Product",
+                    "position": {"x": 0, "y": 0},
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Save schema - should use first prefix
+        request_data = {
+            "entity_id": "product",
+            "model_name": "product",
+            "fields": [{"name": "product_id", "datatype": "int"}],
+            "description": "Product entity",
+        }
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        # Verify first prefix was applied
+        result = response.json()
+        with open(result["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+
+        assert schema["models"][0]["name"] == "tbl_product"  # Uses first prefix
+
+        # Restore original config
+        monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", original_config)
+
+    def test_no_prefix_when_entity_modeling_disabled(
+        self, test_client, temp_dir, temp_data_model_path, monkeypatch
+    ):
+        """Test that no prefix is applied when entity modeling is disabled."""
+        from trellis_datamodel import config as cfg
+
+        # Set up entity modeling config as disabled
+        original_config = cfg.ENTITY_MODELING_CONFIG
+        monkeypatch.setattr(
+            cfg,
+            "ENTITY_MODELING_CONFIG",
+            type("obj", (object,), {"enabled": False, "entity_prefix": ["tbl_"]})(),
+        )
+        monkeypatch.setattr(cfg, "MODELING_STYLE", "dimensional_model")
+
+        # Data model with unbound entity
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "category",
+                    "label": "Category",
+                    "position": {"x": 0, "y": 0},
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        # Save schema - should not apply prefix
+        request_data = {
+            "entity_id": "category",
+            "model_name": "category",
+            "fields": [{"name": "category_id", "datatype": "int"}],
+            "description": "Category entity",
+        }
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        # Verify no prefix was applied
+        result = response.json()
+        with open(result["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+
+        assert schema["models"][0]["name"] == "category"  # Not "tbl_category"
+
+        # Restore original config
+        monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", original_config)
+
+
 class TestModelSchemaVersionHandling:
     """Ensure schema read/write honors requested dbt model version."""
 

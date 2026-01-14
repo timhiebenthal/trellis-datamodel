@@ -13,11 +13,16 @@
     getNodeCenter,
     calculateConnectionInfo,
     getSideRotation,
-    buildOrthogonalPath,
-    buildSelfLoopPath,
     calculateMarkerPosition,
     type Side
   } from '$lib/edge-utils';
+  import {
+    calculateBaseOffset,
+    calculateLabelPositionWithContext,
+    buildEdgePathWithContext,
+    MARKER_PADDING,
+    type EdgeCalculationContext
+  } from '$lib/utils/edge-calculations';
 
   let { 
     id,
@@ -52,12 +57,7 @@
   });
 
   // Calculate base offset for parallel edges - spread them out horizontally
-  const baseOffset = $derived.by(() => {
-    if (totalParallel <= 1) return 0;
-    const spacing = 50; // pixels between parallel edges
-    const totalWidth = (totalParallel - 1) * spacing;
-    return (parallelIndex * spacing) - (totalWidth / 2);
-  });
+  const baseOffset = $derived.by(() => calculateBaseOffset(parallelIndex, totalParallel));
 
   // Get stored label offset (user-dragged position)
   let storedOffsetX = $derived((data?.label_dx as number) || 0);
@@ -81,63 +81,39 @@
 
   // Build the edge path
   const edgePath = $derived.by(() => {
-    const { sourceSide, targetSide, sourcePoint, targetPoint } = connectionInfo;
-    let path: string;
-    if (isSelfEdge) {
-      path = buildSelfLoopPath(
-        sourcePoint,
-        targetPoint,
-        sourceSide,
-        baseOffset,
-        60 // stable loop radius; label offset handled separately
-      );
-    } else {
-      path = buildOrthogonalPath(
-        sourcePoint,
-        targetPoint,
-        sourceSide,
-        targetSide,
-        baseOffset,
-        storedOffsetX + dragOffsetX,
-        storedOffsetY + dragOffsetY
-      );
-    }
-    return path;
+    const context: EdgeCalculationContext = {
+      parallelIndex,
+      totalParallel,
+      sourceSide: connectionInfo.sourceSide,
+      targetSide: connectionInfo.targetSide,
+      sourcePoint: connectionInfo.sourcePoint,
+      targetPoint: connectionInfo.targetPoint,
+      isSelfEdge,
+      storedOffsetX,
+      storedOffsetY,
+      dragOffsetX,
+      dragOffsetY
+    };
+    return buildEdgePathWithContext(context);
   });
 
 
   // Label position at the middle of the edge
   const edgeLabelPos = $derived.by(() => {
-    const { sourceSide, sourcePoint, targetPoint } = connectionInfo;
-    
-    // Special handling for self-loops: position label outside the loop curve
-    if (isSelfEdge) {
-      const midY = (sourcePoint.y + targetPoint.y) / 2 + baseOffset;
-      // Position label to the right of the node edge, offset by loop radius + padding
-      const loopRadius = 60;
-      const labelOffset = loopRadius + 20; // Extra padding for readability
-      const midX = sourcePoint.x + labelOffset + storedOffsetX + dragOffsetX;
-      return { x: midX, y: midY + storedOffsetY + dragOffsetY };
-    }
-    
-    let sX = sourcePoint.x;
-    let sY = sourcePoint.y;
-    let tX = targetPoint.x;
-    let tY = targetPoint.y;
-    
-    if (sourceSide === 'left' || sourceSide === 'right') {
-      sY += baseOffset;
-      tY += baseOffset;
-      const midX = (sX + tX) / 2 + storedOffsetX + dragOffsetX;
-      const midY = (sY + tY) / 2;
-      return { x: midX, y: midY };
-    } else {
-      sX += baseOffset;
-      tX += baseOffset;
-      const midX = (sX + tX) / 2;
-      const midY = (sY + tY) / 2 + storedOffsetY + dragOffsetY;
-      return { x: midX, y: midY };
-    }
+    const context: EdgeCalculationContext = {
+      parallelIndex,
+      totalParallel,
+      sourceSide: connectionInfo.sourceSide,
+      targetSide: connectionInfo.targetSide,
+      sourcePoint: connectionInfo.sourcePoint,
+      targetPoint: connectionInfo.targetPoint,
+      isSelfEdge,
+      storedOffsetX,
+      storedOffsetY,
+      dragOffsetX,
+      dragOffsetY
+    };
+    return calculateLabelPositionWithContext(context);
   });
 
   // Use raw data.label for input value, default to empty
@@ -481,17 +457,16 @@
     if (selected) {
       return `stroke: #26A69A; stroke-width: 2; ${style || ''}`;
     }
-    
-    // Ensure default stroke styling when not selected
-    const defaultStyle = 'stroke: #64748b; stroke-width: 2';
+
+    // Ensure default stroke styling when not selected - using very light gray
+    const defaultStyle = 'stroke: #cbd5e1; stroke-width: 2'; // Very light gray for edges
     return style ? `${defaultStyle}; ${style}` : defaultStyle;
   });
-  
+
   // Crow's foot marker positions and rotations based on connection sides
   const markerColor = $derived(selected ? '#26A69A' : '#64748b');
 
-  // Padding to offset markers slightly away from node border
-  const MARKER_PADDING = 8;
+  // Constants imported from edge-calculations
 
   const sourceMarkerTransform = $derived.by(() => {
     const { sourceSide, sourcePoint } = connectionInfo;
@@ -504,7 +479,6 @@
     const pos = calculateMarkerPosition(targetPoint, targetSide, baseOffset, MARKER_PADDING);
     return `translate(${pos.x} ${pos.y}) rotate(${getSideRotation(targetSide)})`;
   });
-
 </script>
 
 <BaseEdge path={edgePath} {markerEnd} style={edgeStyle} />
@@ -616,41 +590,29 @@
     </div>
   </EdgeLabel>
 {:else}
-  <!-- Compact text-only view - SVG text with background to mask edge line -->
-  <g 
-    class="edge-label-compact"
-    onclick={selectThisEdge}
-    onpointerdown={(e) => { e.stopPropagation(); startLabelDrag(e); }}
-    onkeydown={handleCompactLabelKeydown}
-    role="button"
-    tabindex="0"
-    style="cursor: pointer; pointer-events: all;"
-  >
-    <!-- Background rectangle to mask the edge line - matches canvas bg -->
-    <!-- Limit width to prevent overflow, max 200px -->
-    <rect
-      x={edgeLabelPos.x - maxLabelWidth / 2}
-      y={edgeLabelPos.y - 10}
-      width={maxLabelWidth}
-      height="20"
-      fill="#f8fafc"
-      stroke="#e2e8f0"
-      stroke-width="1"
-      rx="4"
-      ry="4"
-    />
-    <title>{displayLabel}</title>
-    <text
-      x={edgeLabelPos.x}
-      y={edgeLabelPos.y}
-      text-anchor="middle"
-      dominant-baseline="middle"
-      class="pointer-events-none"
-      fill="#64748b"
-      font-size="11"
-      font-weight="500"
+  <!-- Compact text-only view - use EdgeLabel (HTML overlay) to render on top of all edge paths -->
+  <EdgeLabel x={edgeLabelPos.x} y={edgeLabelPos.y} style="background: transparent; pointer-events: none;">
+    <div
+      class="pointer-events-auto nodrag nopan inline-block px-2 py-0.5 rounded bg-[#f8fafc] border border-[#e2e8f0] cursor-move select-none text-center"
+      style="width: {maxLabelWidth}px;"
+      onclick={(e) => {
+        e.stopPropagation();
+        selectThisEdge(e as unknown as MouseEvent);
+      }}
+      onpointerdown={(e) => {
+        e.stopPropagation();
+        startLabelDrag(e);
+      }}
+      onkeydown={handleCompactLabelKeydown}
+      role="button"
+      tabindex="0"
     >
-      {truncatedLabel}
-    </text>
-  </g>
+      <span
+        class="pointer-events-none text-[11px] font-medium text-[#64748b]"
+        style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+      >
+        {truncatedLabel}
+      </span>
+    </div>
+  </EdgeLabel>
 {/if}

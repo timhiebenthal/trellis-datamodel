@@ -5,12 +5,18 @@ import type { DbtModel, FieldDragState } from './types';
 export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
 export const dbtModels = writable<DbtModel[]>([]);
-export const viewMode = writable<'conceptual' | 'logical' | 'exposures'>('conceptual');
+export const viewMode = writable<'conceptual' | 'logical' | 'exposures' | 'bus_matrix'>('conceptual');
+export const modelingStyle = writable<'dimensional_model' | 'entity_model'>('entity_model');
 export const configStatus = writable<any>(null);
+export const labelPrefixes = writable<string[]>([]);
+export const dimensionPrefixes = writable<string[]>([]);
+export const factPrefixes = writable<string[]>([]);
 
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
 export const tagFilter = writable<string[]>([]);
+export const entityTypeFilter = writable<string | null>(null); // 'dimension' | 'fact' | 'unclassified' | null
+export const modelBoundFilter = writable<'bound' | 'unbound' | null>(null); // Filter by model bound status
 export const groupByFolder = writable<boolean>(true);
 
 // Exposure filter stores

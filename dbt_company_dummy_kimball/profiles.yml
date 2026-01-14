@@ -1,0 +1,6 @@
+company_dummy_kimball:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'company_dummy_kimball.duckdb'

@@ -5,13 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [UNRELEASED]
+
+### Added
+- Added configurable entity prefix support for entity modeling mode to maintain table naming conventions while keeping labels clean.
+- Added `entity_modeling.inference_patterns.prefix` configuration option to `trellis.yml` supporting single string or list of strings for prefix values. Defaults to empty list (no prefix) for backward compatibility.
+- Added automatic prefix application when saving unbound entities to dbt schema.yml files (uses first configured prefix).
+- Added case-insensitive prefix detection to prevent duplication (e.g., `TBL_CUSTOMER` won't become `tbl_TBL_CUSTOMER`).
+- Added automatic prefix stripping from entity labels displayed on ERD canvas for improved readability.
+- Added support for multiple prefix patterns (e.g., `["tbl_", "entity_", "t_"]`) to handle legacy naming conventions.
+- Added preservation of bound dbt_model values to avoid re-prefixed entities that already have prefixes.
+- Added `/api/config-info` endpoint response field `entity_prefix` to expose configured prefixes to frontend.
+
+### Changed
+- Extended Entity TypedDict in backend with prefix-aware model name generation via `_entity_to_model_name()` method.
+- Updated frontend label formatting to strip configured prefixes from entity names while preserving original casing of remaining text.
+- Entity prefix feature only activates when `modeling_style` is `entity_model` (default).
+
+### Fixed
+- Added validation for prefix configuration to ensure it's a string or list of strings.
+- Added error handling for empty prefix lists to maintain backward compatibility.
+
+## [0.6.0]
+
+### Added
+- Added native support for Kimball dimensional modeling with entity classification (fact/dimension/unclassified) and smart default positioning for star/snowflake schemas.
+- Added `modeling_style` configuration option to `trellis.yml` with values `dimensional_model` and `entity_model` (default for backward compatibility).
+- Added configurable inference patterns for automatic entity type classification from dbt model naming: `dimensional_modeling.inference_patterns` with `dimension_prefix` and `fact_prefix`.
+- Added Kimball Bus Matrix view mode displaying dimensions as rows and facts as columns with checkmarks for connections.
+- Added Bus Matrix filter controls for dimensions, facts, and tags with real-time filtering.
+- Added entity type indicators (icons/badges) on entity nodes with color coding: blue for fact, green for dimension, gray for unclassified.
+- Added smart default positioning logic: facts placed in canvas center, dimensions in outer ring when `modeling_style` is `dimensional_model`.
+- Added "Auto-Layout" button to toolbar to reposition entities according to fact/dimension rules.
+- Added entity type selection step to Entity Creation Wizard with radio buttons and descriptions.
+- Added context menu options to change entity type (Set as Fact/Set as Dimension/Set as Unclassified).
+- Added entity type badge click handler with dropdown menu for quick type changes.
+- Added Bus Matrix navigation button to main navigation bar alongside Canvas and Exposures views.
+- Added Bus Matrix icon badge to entity nodes linking to pre-filtered matrix view for that entity.
+- Added tooltips for entity type badges explaining each type's meaning.
+
+### Changed
+- Extended Entity TypedDict in backend with optional `entity_type` field ("fact", "dimension", "unclassified").
+- Extended frontend Entity interface with `entity_type` field.
+- Updated `/data-model` GET endpoint to include `entity_type` in entity data.
+- Updated `/data-model` POST endpoint to persist `entity_type` changes.
+- Added `/bus-matrix` GET endpoint returning dimensions, facts, and connections with optional filtering by domain, tag, fact_id, or dimension_id.
+- Entity type inference only activates when `modeling_style` is `dimensional_model`.
+- Existing entity positions from `canvas_layout.yml` are preserved during smart positioning.
+- Manual positioning overrides are respected (not overwritten by auto-layout unless explicitly requested).
+
+### Fixed
+- Added validation for `entity_type` field values against allowed enum (fact/dimension/unclassified).
+- Added error handling for invalid entity_type submissions with user-friendly error messages.
+- Added graceful handling for Bus Matrix endpoint errors (missing relationships, empty data model, invalid query parameters).
+- Added smooth CSS transitions for entity position changes to prevent jarring UI jumps.
+- Added debouncing to Bus Matrix filter inputs for improved performance with large datasets.
+
+tbd
+
+## [0.5.0] - 2026-01-07
 
 ### Added
 - Added a new "Exposures" view mode that provides a cross-table visualization of entity usage across downstream dbt exposures.
-- Added "Exposures" tab to the main navigation for switching between Conceptual, Logical, and Exposures views.
 - Added support for fetching and displaying exposure metadata (labels, types, owners, descriptions) from the backend API.
 - Added automated empty state handling for projects without `exposures.yml` with helpful guidance for users.
+- Added exposures view feature flag (`exposures.enabled`) to optionally disable Exposures view; exposures can be enabled via `trellis.yml` configuration (default: false, opt-in).
+- Added transposed table layout for exposures view with manual toggle button; default layout shows dashboards as rows and entities as columns for improved readability when dashboards outnumber tables or have longer names.
+- Added `exposures.default_layout` configuration option to set initial table orientation; values are `dashboards-as-rows` (default) or `entities-as-rows`.
+- Added layout toggle button in Exposures view to switch between orientations without persistence (resets to default on page reload).
+- Added API guard returning 403 Forbidden when exposures feature is disabled to avoid unnecessary data processing and improve performance for organizations not using exposures.
+- Added support for progressive header density (normal/narrow/angled) to entity column headers when in transposed layout.
+
+### Changed
+- Added `lineage.enabled` feature flag (default: false) with nested `lineage.layers` configuration; top-level `lineage_layers` remains supported with deprecation warning. Lineage UI and API routes are now disabled unless explicitly enabled.
+- Added `guidance.entity_wizard.enabled` feature flag (default: true) so the entity creation wizard mirrors the nested feature-flag style; the loader still honors legacy `guidance.entity_wizard_enabled` for compatibility.
+- Renamed guidance block to `entity_creation_guidance` with flat `enabled`; `guidance`, `entity_wizard_enabled`, and `entity_creation_guidance.wizard.enabled` remain supported with deprecation warnings.
+- Improved floating view mode switcher in canvas: restructured from nested buttons to single button with vertical divider bar, increased height by ~30%, and refined styling for better user experience.
+- Exposures view is now opt-in (disabled by default) to reduce UI noise for organizations that don't use downstream exposure tracking in dbt.
+- Backend config-info endpoint now exposes `exposures_enabled` and `exposures_default_layout` for frontend consumption.
+
+### Fixed
+- Fixed exposures not loading: added missing `import json` statement that was causing manifest loading to fail silently
+- Fixed exposures.yml file location detection: now checks project root directory (`dbt_concept/exposures.yml`) in addition to `models/exposures.yml`
+- Improved exposure loading to read from manifest.json first (canonical source with resolved model references), then fallback to YAML file
+
+## [0.4.0] - 2025-01-15
+
+### Added
 - Added upstream table-level lineage visualization: users can now double-click on any entity bound to a dbt model to view its upstream lineage in a modal overlay. The lineage graph shows all upstream models back to source tables, using dbt-colibri for lineage extraction. The modal includes zoom controls, minimap navigation, and progressive display of lineage levels. Requires `dbt docs generate` to be run for full lineage enrichment via catalog.json.
 - Added auto-naming for entities when binding dbt models: when a user binds a dbt model to an unnamed entity (ID starts with `new_entity` and label is `"New Entity"`), the entity ID and label are automatically derived from the dbt model name. Model names are formatted with title-case and spaces (e.g., `entity_booking` → `"Entity Booking"`), and the entity ID is generated as a slugified version. This reduces manual naming steps and improves developer experience.
 - Added layer-based organization for lineage visualization: lineage views now support horizontal layer bands based on dbt folder structure. Configure `lineage_layers` in `trellis.yml` with an ordered list of folder names (e.g., `["1_clean", "2_prep", "3_core"]`) to group models into semantic transformation stages. Models are automatically assigned to layers based on their folder path, with sources displayed at the top and unassigned models at the bottom. Layer bands are displayed with light background shading and labels on the left side, providing visual organization without obscuring the graph. Configuration is optional and backward compatible - projects without `lineage_layers` config display lineage without layers.
