@@ -2,8 +2,8 @@ version: 0.1
 entities:
   customer:
     position:
-      x: 115.43811694316895
-      y: 145.8798117469736
+      x: 118.29704886923031
+      y: -44.90543959264385
     width: 280
     panel_height: 200
     collapsed: false
@@ -25,6 +25,20 @@ entities:
     position:
       x: 813.155927227514
       y: 466.0010479616705
+    width: 280
+    panel_height: 200
+    collapsed: false
+  new_entity:
+    position:
+      x: -107.27126236194948
+      y: 402.4078324999236
+    width: 280
+    panel_height: 200
+    collapsed: false
+  new_entity_1:
+    position:
+      x: 991.16114186742
+      y: 78.65605245476438
     width: 280
     panel_height: 200
     collapsed: false

@@ -1,7 +1,7 @@
 # Configuration for data model UI
 
-# modeling_style: entity_model  # Options: dimensional_model or entity_model
-modeling_style: dimensional_model
+modeling_style: entity_model  # Options: dimensional_model or entity_model
+# modeling_style: dimensional_model
 
 # Transformation framework: dbt-core, dbt-fusion, sqlmesh, bruin, pydantic
 # (currently only dbt-core is implemented)

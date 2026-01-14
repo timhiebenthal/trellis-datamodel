@@ -20,6 +20,14 @@ entities:
   description: Supplier records
   dbt_model: model.company_dummy_entity.supplier
   entity_type: unclassified
+- id: new_entity
+  label: New Entity
+  description: ''
+  entity_type: unclassified
+- id: new_entity_1
+  label: New Entity
+  description: ''
+  entity_type: unclassified
 relationships:
 - source: lead
   target: customer

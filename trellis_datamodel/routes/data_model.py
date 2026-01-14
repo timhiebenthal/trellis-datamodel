@@ -239,6 +239,8 @@ def _split_model_and_layout(
         # Only persist source_system for unbound entities (not for bound entities)
         if "source_system" in entity and not entity.get("dbt_model"):
             model_entity["source_system"] = entity["source_system"]
+            # Log instrumentation
+            print(f"DEBUG: Entity {entity_id} is unbound, persisting source_system: {entity.get('source_system')}")
 
         model_data["entities"].append(model_entity)
 

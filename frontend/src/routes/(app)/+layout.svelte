@@ -1017,6 +1017,10 @@ import {
                         : node
                 )
             );
+            // Trigger an immediate save to persist changes to disk
+            // This ensures that when the next modal opens and calls getSourceSystemSuggestions(),
+            // it will read the updated data_model.yml file with the new source systems
+            autoSaveService?.saveNow($nodes, $edges);
             closeSourceEditorModal();
         }}
         onCancel={closeSourceEditorModal}

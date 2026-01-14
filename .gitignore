@@ -40,3 +40,17 @@ frontend/tests/.trellis-test/
 # Cursor MCP configuration (may contain secrets)
 .cursor/mcp.json
 /specs/
+dbt_company_dummy_entity/logs/dbt.log
+dbt_company_dummy_entity/target/catalog.json
+dbt_company_dummy_entity/target/graph_summary.json
+dbt_company_dummy_entity/target/graph.gpickle
+dbt_company_dummy_entity/target/manifest.json
+dbt_company_dummy_entity/target/partial_parse.msgpack
+dbt_company_dummy_entity/target/run_results.json
+dbt_company_dummy_entity/target/index.html
+dbt_company_dummy_entity/target/semantic_manifest.json
+dbt_company_dummy_entity/target/run/
+dbt_company_dummy_entity/target/compiled/
+dbt_company_dummy_entity/logs/
+dbt_company_dummy_entity/target/
+.cursor/debug.log

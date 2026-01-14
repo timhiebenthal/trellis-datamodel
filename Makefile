@@ -92,4 +92,4 @@ create_mock_dbt_project:
 
 dbt_refresh:
 	@echo "Refreshing dbt artifacts ..."
-	cd dbt_company_dummy && uv run dbt run && uv run dbt docs generate
+	cd dbt_company_dummy_entity && uv run dbt run && uv run dbt docs generate
