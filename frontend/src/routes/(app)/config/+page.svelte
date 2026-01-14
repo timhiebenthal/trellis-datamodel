@@ -42,6 +42,49 @@
             schema = response.schema_metadata;
             fileInfo = response.file_info || null;
 
+            // Ensure defaults when schema metadata is missing
+            if (!schema?.fields || Object.keys(schema.fields).length === 0) {
+                schema = {
+                    fields: {
+                        framework: {
+                            type: 'enum',
+                            enum_values: ['dbt-core'],
+                            default: 'dbt-core',
+                            required: true,
+                            description: 'Transformation framework',
+                            beta: false,
+                        },
+                        modeling_style: {
+                            type: 'enum',
+                            enum_values: ['dimensional_model', 'entity_model'],
+                            default: 'entity_model',
+                            required: true,
+                            description: 'Modeling style approach',
+                            beta: false,
+                        },
+                        'exposures.default_layout': {
+                            type: 'enum',
+                            enum_values: ['dashboards-as-rows', 'entities-as-rows'],
+                            default: 'dashboards-as-rows',
+                            required: false,
+                            description: 'Default layout for exposures visualization',
+                            beta: true,
+                        },
+                    },
+                    beta_flags: ['lineage.enabled', 'lineage.layers', 'exposures.enabled', 'exposures.default_layout'],
+                };
+            }
+
+            if (!config.framework) {
+                config.framework = 'dbt-core';
+            }
+            if (!config.modeling_style) {
+                config.modeling_style = 'entity_model';
+            }
+            if (!getFieldValue('exposures.default_layout')) {
+                handleNestedFieldChange('exposures.default_layout', 'dashboards-as-rows');
+            }
+
             // Determine if beta features are enabled
             dangerZoneAcknowledged = false;
         } catch (e) {
@@ -183,6 +226,12 @@
     function isDangerZoneEnabled(): boolean {
         return dangerZoneAcknowledged;
     }
+
+    function getEnumOptions(path: string, fallback: string[]): string[] {
+        const options = getFieldMetadata(path)?.enum_values;
+        if (options && options.length > 0) return options;
+        return fallback;
+    }
 </script>
 
 <svelte:head>
@@ -190,7 +239,8 @@
     <meta name="description" content="Configure trellis data model settings" />
 </svelte:head>
 
-<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="flex-1 overflow-y-auto">
+        <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="mb-6">
         <h1 class="text-3xl font-bold text-gray-900 mb-2">Configuration</h1>
         <p class="text-gray-600">
@@ -273,7 +323,7 @@
                             onchange={(e) => handleFieldChange('framework', e.currentTarget.value)}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
-                            {#each getFieldMetadata('framework')?.enum_values || [] as value}
+                            {#each getEnumOptions('framework', ['dbt-core']) as value}
                                 <option value={value}>{value}</option>
                             {/each}
                         </select>
@@ -291,7 +341,7 @@
                             onchange={(e) => handleFieldChange('modeling_style', e.currentTarget.value)}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
-                            {#each getFieldMetadata('modeling_style')?.enum_values || [] as value}
+                            {#each getEnumOptions('modeling_style', ['dimensional_model', 'entity_model']) as value}
                                 <option value={value}>{value}</option>
                             {/each}
                         </select>
@@ -678,7 +728,7 @@
                             disabled={!isDangerZoneEnabled()}
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled() ? '' : 'opacity-50'}"
                         >
-                            {#each getFieldMetadata('exposures.default_layout')?.enum_values || [] as value}
+                            {#each getEnumOptions('exposures.default_layout', ['dashboards-as-rows', 'entities-as-rows']) as value}
                                 <option value={value}>{value}</option>
                             {/each}
                         </select>
@@ -722,7 +772,8 @@
             {/if}
         </form>
     {/if}
-</div>
+        </div>
+    </div>
 
 <style>
     @keyframes fade-in {
