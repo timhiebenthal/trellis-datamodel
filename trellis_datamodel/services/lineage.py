@@ -418,10 +418,14 @@ def _get_node_info(
     is_source = node_id in source_set or node_id.startswith("source.")
 
     # Extract source-name for source nodes
-    # Source IDs follow format: source.project.source_name.table_name
+    # Get source_name from the actual node in manifest (more reliable than parsing unique_id)
     source_name = None
-    if is_source and len(parts) >= 3:
-        source_name = parts[2]  # Third part is the source-name
+    if is_source:
+        # Look up the node in manifest to get source_name field
+        nodes = manifest.get("nodes", {})
+        node = nodes.get(node_id)
+        if node:
+            source_name = node.get("source_name")
 
     # Get level (distance from root)
     level = levels.get(node_id, 0)
