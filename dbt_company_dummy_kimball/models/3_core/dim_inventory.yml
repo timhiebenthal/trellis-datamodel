@@ -1,0 +1,29 @@
+version: 2
+models:
+  - name: dim_inventory
+    description: Product inventory levels
+    columns:
+      - name: inventory_id
+        data_type: text
+        description: unique inventory ID (product_id)
+      - name: product_id
+        data_type: text
+        description: product ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_id
+      - name: current_quantity
+        data_type: numeric
+        description: current stock quantity
+      - name: reorder_level
+        data_type: numeric
+        description: reorder threshold
+      - name: reorder_quantity
+        data_type: numeric
+        description: quantity to reorder
+      - name: warehouse_location
+        data_type: text
+      - name: last_updated
+        data_type: timestamp

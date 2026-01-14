@@ -1,0 +1,21 @@
+version: 0.1
+entities:
+- id: customer
+  label: Customer
+  description: Customer records
+  dbt_model: model.company_dummy_entity.customer
+- id: sale
+  label: Sale
+  description: Sale records at order-item grain with enriched order information
+  dbt_model: model.company_dummy_entity.sale
+- id: lead
+  label: Lead
+  description: Sales leads
+  dbt_model: model.company_dummy_entity.lead
+relationships:
+- source: lead
+  target: customer
+  label: ''
+  type: one_to_many
+  source_field: lead_id
+  target_field: lead_id

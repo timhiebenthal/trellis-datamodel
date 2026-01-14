@@ -1,0 +1,23 @@
+
+  
+    
+    
+
+    create  table
+      "company_dummy_kimball"."main"."dim_supplier__dbt_tmp"
+  
+    as (
+      select 
+    cast(supplier_id as text) as supplier_id,
+    supplier_name,
+    contact_name,
+    email,
+    phone,
+    category,
+    status,
+    payment_terms,
+    created_at
+from "company_dummy_kimball"."main"."prep_supplier"
+    );
+  
+  

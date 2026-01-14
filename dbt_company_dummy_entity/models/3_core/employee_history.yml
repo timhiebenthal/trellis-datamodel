@@ -1,0 +1,45 @@
+version: 2
+models:
+  - name: employee_history
+    description: |-
+      Employee records
+    columns:
+      - name: employee_id
+        data_type: text
+        description: unique employee ID
+      - name: employee_name
+        data_type: text
+        description: employee name
+      - name: email
+        data_type: text
+      - name: department_id
+        data_type: text
+        description: department ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('department')
+                field: department_id
+      - name: team
+        data_type: text
+      - name: supervisor_id
+        data_type: text
+        description: supervisor employee ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('employee_history')
+                field: employee_id
+      - name: hire_date
+        data_type: date
+      - name: role
+        data_type: text
+      - name: created_at
+        data_type: timestamp
+      - name: valid_from
+        data_type: date
+        description: "DEMO: Start date of validity period for this employee record"
+      - name: valid_to
+        data_type: date
+        description: "DEMO: End date of validity period for this employee record"
+

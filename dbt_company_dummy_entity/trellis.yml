@@ -1,0 +1,41 @@
+# Trellis configuration for data model UI
+# Select data modeling style (entity_model or dimensional_model)
+modeling_style: entity_model
+
+# Transformation framework currently supported.
+framework: dbt-core
+
+# Path to the dbt project directory (relative to this file or absolute)
+dbt_project_path: "."
+dbt_manifest_path: "target/manifest.json"
+dbt_catalog_path: "target/catalog.json"
+data_model_file: "data_model.yml"
+
+# List of path patterns to include (empty list includes all models)
+dbt_model_paths:
+  - 3_core
+
+# Helper project used by `trellis generate-company-data`.
+dbt_company_dummy_path: "./dbt_company_dummy"
+
+entity_creation_guidance:
+  enabled: true
+
+# Show push warnings when interacting with dbt
+  push_warning_enabled: true
+# Minimum characters required for descriptions
+  min_description_length: 10
+# Helper flows to disable
+  disabled_guidance: []
+
+# Lineage configuration is opt-in. Uncomment to customize defaults.
+#lineage:
+#  enabled: false  # Set to true to enable lineage UI/endpoints
+#  layers: []  # Ordered folder names that become lineage layers
+
+# Exposures configuration (opt-in). Uncomment to enable Exposures view mode.
+# Use this feature if you want to track and visualize how your dbt models are used in
+# downstream BI dashboards, notebooks, and applications via dbt exposures.
+#exposures:
+#  enabled: false  # Set to true to enable Exposures view mode (opt-in)
+#  default_layout: dashboards-as-rows  # dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.

@@ -1,0 +1,26 @@
+id,name,email,department_id,team,supervisor,hire_date,role,created_at
+1,Steven Hayes,jeffreymorgan@example.net,7,Team Alpha,13,2024-08-16,Manager,2024-02-22 08:27:15.896090
+2,Michael Brown,whiteheadmichele@example.org,2,Team Beta,24,2024-07-04,Senior,2023-07-11 01:54:18.992772
+3,Mr. Nathaniel Khan,esanchez@example.com,1,Team Beta,8,2023-07-15,Intern,2023-02-28 13:12:41.315040
+4,Jeff Owens,nuneztracey@example.org,7,Team Delta,13,2023-02-23,Senior,2024-06-03 09:17:08.450162
+5,Ashley Lee,ltaylor@example.com,5,Team Beta,8,2024-05-08,Manager,2024-09-18 03:58:39.095140
+6,Robert Chase,williamsyvette@example.org,7,Team Gamma,10,2025-11-14,Mid-level,2024-10-26 00:55:59.352289
+7,Carol Tucker,michellebarrera@example.org,3,Team Gamma,13,2024-02-06,Senior,2024-12-08 01:35:40.394875
+8,Richard Gibson,uhorton@example.net,2,Team Delta,22,2024-12-12,Manager,2023-12-10 01:28:00.275862
+9,Daniel Brown,adkinsbrian@example.net,2,Team Gamma,22,2024-05-24,Mid-level,2024-10-20 22:38:46.115841
+10,Amy Romero,caseyjones@example.org,5,Team Delta,15,2024-03-05,Manager,2024-11-06 03:44:51.936593
+11,Lauren Williams,barnesbrandy@example.net,2,Team Alpha,22,2023-11-30,Junior,2023-06-28 03:35:54.953112
+12,Emily Baker,emilyevans@example.com,5,Team Gamma,15,2025-10-01,Intern,2024-11-01 21:02:53.977720
+13,Marc Hart,jonesjason@example.com,4,Team Alpha,5,2023-05-13,Manager,2023-08-31 13:37:06.238882
+14,David Mitchell,tbass@example.com,4,Team Alpha,8,2024-10-18,Mid-level,2024-12-09 11:18:24.789366
+15,Aimee Montoya,sarah12@example.com,4,Team Delta,13,2023-04-24,Manager,2023-03-07 22:15:14.186088
+16,Denise Jacobs,james48@example.com,5,Team Gamma,24,2023-09-19,Junior,2024-10-12 17:55:48.363098
+17,Mark Calderon,smithkellie@example.net,3,Team Gamma,5,2025-11-25,Mid-level,2023-04-16 17:53:59.407547
+18,Michael Hoffman,jonesnicole@example.org,4,Team Alpha,1,2024-08-07,Mid-level,2024-08-20 01:05:18.094251
+19,Brittany Anderson,michael05@example.org,3,Team Beta,5,2025-01-03,Intern,2024-04-19 15:39:25.075605
+20,Justin Baxter,sarayoung@example.org,3,Team Delta,8,2025-11-21,Junior,2024-08-02 15:42:14.920081
+21,Allison Doyle,kimberly63@example.com,5,Team Beta,8,2023-06-11,Intern,2024-05-14 17:22:38.882360
+22,Andrew Ruiz,lisastevens@example.com,6,Team Beta,24,2025-06-04,Manager,2024-09-15 20:33:47.517952
+23,Matthew Ross,michelle45@example.net,1,Team Delta,22,2024-06-28,Mid-level,2024-04-28 20:08:27.761219
+24,Erin Johnson,gregory40@example.org,5,Team Beta,13,2024-10-02,Manager,2023-08-29 03:25:18.507868
+25,Jessica Joyce,cruzbarbara@example.com,6,Team Delta,5,2023-02-05,Senior,2023-11-03 02:42:40.614776

@@ -1,0 +1,21 @@
+version: 2
+models:
+  - name: dim_product
+    description: Product catalog
+    columns:
+      - name: product_id
+        data_type: text
+        description: unique product ID
+      - name: product_name
+        data_type: text
+        description: product name
+      - name: category
+        data_type: text
+      - name: price
+        data_type: numeric
+      - name: description
+        data_type: text
+      - name: created_at
+        data_type: timestamp
+      - name: active
+        data_type: boolean

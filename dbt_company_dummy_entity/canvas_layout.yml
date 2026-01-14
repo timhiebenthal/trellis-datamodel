@@ -1,0 +1,27 @@
+version: 0.1
+entities:
+  customer:
+    position:
+      x: 115.43811694316895
+      y: 145.8798117469736
+    width: 280
+    panel_height: 200
+    collapsed: false
+  sale:
+    position:
+      x: 551.4413659575124
+      y: 141.89449375397845
+    width: 280
+    panel_height: 200
+    collapsed: false
+  lead:
+    position:
+      x: 311.6998367507094
+      y: 503.2430014912735
+    width: 280
+    panel_height: 200
+    collapsed: false
+relationships:
+  lead-customer-0:
+    label_dx: 0
+    label_dy: 0

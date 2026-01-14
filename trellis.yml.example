@@ -3,7 +3,48 @@
 # Transformation framework currently supported.
 framework: dbt-core
 
-# Path to the dbt project directory (relative to this file or absolute)
+# ==============================================================================
+# SWITCHING BETWEEN KIMBALL AND ENTITY VERSIONS
+# ==============================================================================
+#
+# This repository contains two parallel dbt projects for comparing modeling approaches:
+#
+# 1. Kimball Dimensional Model (dbt_company_dummy_kimball/)
+#    - Uses traditional dim_ and fact_ prefixes
+#    - Example: dim_customer.sql, fact_sale.sql
+#    - Data model: data_model_kimball.yml
+#    - modeling_style: dimensional_model
+#
+# 2. Entity-Logic Model (dbt_company_dummy_entity/)
+#    - Uses neutral naming without prefixes
+#    - Example: customer.sql, sale.sql
+#    - Data model: data_model_entity.yml
+#    - modeling_style: dimensional_model (with neutral prefixes) or entity_model
+#
+# To switch between versions, update the following three configuration values:
+#
+# ===== Kimball Version =====
+# dbt_project_path: "./dbt_company_dummy_kimball"
+# data_model_file: "data_model_kimball.yml"
+# modeling_style: dimensional_model
+#
+# ===== Entity Version =====
+# dbt_project_path: "./dbt_company_dummy_entity"
+# data_model_file: "data_model_entity.yml"
+# modeling_style: dimensional_model  # or entity_model
+#
+# Switching workflow:
+# 1. Edit trellis.yml with the desired configuration above
+# 2. Restart trellis backend (Ctrl+C then run again)
+# 3. Reload browser at http://localhost:8089
+# 4. Verify correct models load in the UI
+#
+# Note: dbt_manifest_path and dbt_catalog_path remain the same ("target/manifest.json",
+# "target/catalog.json") since both projects use the same target directory structure.
+#
+# ==============================================================================
+
+# Path to dbt project directory (relative to this file or absolute)
 dbt_project_path: "."
 # Path to dbt manifest.json (relative to dbt_project_path or absolute)
 dbt_manifest_path: "target/manifest.json"

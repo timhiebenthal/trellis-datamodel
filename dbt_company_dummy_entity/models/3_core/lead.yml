@@ -1,0 +1,25 @@
+version: 2
+models:
+  - name: lead
+    description: Sales leads
+    columns:
+      - name: lead_id
+        data_type: text
+        description: unique lead ID
+      - name: lead_name
+        data_type: text
+        description: lead contact name
+      - name: email
+        data_type: text
+      - name: company_name
+        data_type: text
+      - name: status
+        data_type: text
+      - name: source
+        data_type: text
+        description: lead source (website, referral, etc.)
+      - name: created_at
+        data_type: timestamp
+      - name: converted_at
+        data_type: timestamp
+        description: timestamp when lead was converted to customer
