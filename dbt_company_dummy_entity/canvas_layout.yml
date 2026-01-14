@@ -21,6 +21,13 @@ entities:
     width: 280
     panel_height: 200
     collapsed: false
+  supplier:
+    position:
+      x: 813.155927227514
+      y: 466.0010479616705
+    width: 280
+    panel_height: 200
+    collapsed: false
 relationships:
   lead-customer-0:
     label_dx: 0

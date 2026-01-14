@@ -21,14 +21,14 @@ test.describe('Exposures Feature Flag - E2E', () => {
         await page.waitForLoadState('networkidle');
 
         // If Exposures is enabled in this environment, this test isn't applicable.
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         if (await exposuresButton.isVisible().catch(() => false)) {
             test.skip();
             return;
         }
 
         // Canvas button should be active (default view)
-        const canvasButton = page.getByRole('button', { name: 'Canvas' });
+        const canvasButton = page.getByRole('link', { name: 'Canvas' });
         await expect(canvasButton).toBeVisible();
         await expect(canvasButton).toHaveClass(/bg-white/); // active state
     });
@@ -40,7 +40,7 @@ test.describe('Exposures Feature Flag - E2E', () => {
         await page.waitForLoadState('networkidle');
 
         // Exposures button should be visible
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         
         // Wait a bit and check if button appears (may not appear if disabled)
         const isVisible = await exposuresButton.isVisible({ timeout: 3000 }).catch(() => false);
@@ -60,7 +60,7 @@ test.describe('Exposures Feature Flag - E2E', () => {
         ).toBeVisible({ timeout: 10000 });
 
         // Verify we can navigate back to canvas
-        const canvasButton = page.getByRole('button', { name: 'Canvas' });
+        const canvasButton = page.getByRole('link', { name: 'Canvas' });
         await canvasButton.click();
 
         // Verify canvas is visible again
@@ -109,7 +109,7 @@ test.describe('Exposures Transposed Layout - E2E', () => {
     test('should default to dashboards-as-rows layout', async ({ page }) => {
         await page.waitForLoadState('networkidle');
 
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 3000 }).catch(() => false);
         
         if (!isVisible) {
@@ -137,7 +137,7 @@ test.describe('Exposures Transposed Layout - E2E', () => {
     test('should toggle to entities-as-rows when button is clicked', async ({ page }) => {
         await page.waitForLoadState('networkidle');
 
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 3000 }).catch(() => false);
         
         if (!isVisible) {
@@ -176,7 +176,7 @@ test.describe('Exposures Transposed Layout - E2E', () => {
     test('should maintain filters when toggling layout', async ({ page }) => {
         await page.waitForLoadState('networkidle');
 
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 3000 }).catch(() => false);
         
         if (!isVisible) {
@@ -229,7 +229,7 @@ test.describe('Exposures Transposed Layout - E2E', () => {
     test('should work with auto-fit columns in both layouts', async ({ page }) => {
         await page.waitForLoadState('networkidle');
 
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 3000 }).catch(() => false);
         
         if (!isVisible) {
@@ -266,7 +266,7 @@ test.describe('Exposures Transposed Layout - E2E', () => {
     test('should handle empty states in both layouts', async ({ page }) => {
         await page.waitForLoadState('networkidle');
 
-        const exposuresButton = page.getByRole('button', { name: 'Exposures' });
+        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
         const isVisible = await exposuresButton.isVisible({ timeout: 3000 }).catch(() => false);
         
         if (!isVisible) {
