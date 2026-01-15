@@ -238,7 +238,8 @@ export class AutoSaveService {
                             : undefined;
 
                     const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
-                    return {
+                    const source_system = ((n.data as any)?.source_system) as string[] | undefined;
+                    const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
                         description: n.data.description as string | undefined,
@@ -254,6 +255,14 @@ export class AutoSaveService {
                         // Include entity_type with default "unclassified" if not set
                         entity_type: entity_type,
                     };
+                    
+                    // Only persist source_system for unbound entities
+                    // Bound entities get source_system from lineage
+                    if (!isBound && source_system && source_system.length > 0) {
+                        entity.source_system = source_system;
+                    }
+                    
+                    return entity;
                 }),
             relationships: currentEdges.flatMap((e) => {
                 // If edge has multiple model relationships, expand them
