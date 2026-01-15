@@ -421,9 +421,9 @@ def _get_node_info(
     # Get source_name from the actual node in manifest (more reliable than parsing unique_id)
     source_name = None
     if is_source:
-        # Look up the node in manifest to get source_name field
-        nodes = manifest.get("nodes", {})
-        node = nodes.get(node_id)
+        # Look up the node in manifest sources section to get source_name field
+        sources = manifest.get("sources", {})
+        node = sources.get(node_id)
         if node:
             source_name = node.get("source_name")
 

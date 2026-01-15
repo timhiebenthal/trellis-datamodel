@@ -577,6 +577,7 @@ import {
                             _schemaTags: hasDbtBinding ? [] : entityTags,
                             _manifestTags: hasDbtBinding ? entityTags : [],
                             entity_type: e.entity_type,
+                            source_system: e.source_system,
                         },
                         parentId: undefined,
                     };

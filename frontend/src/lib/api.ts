@@ -174,7 +174,7 @@ export async function getExposures(): Promise<ExposuresResponse> {
 
 export async function getLineage(modelId: string): Promise<LineageResponse | null> {
     try {
-        const res = await fetch(`${API_BASE}/lineage?model_id=${modelId}`);
+        const res = await fetch(`${API_BASE}/lineage/${encodeURIComponent(modelId)}`);
         if (!res.ok) {
             if (res.status === 404) return null;
             throw new Error(`Failed to fetch lineage: ${res.status}`);

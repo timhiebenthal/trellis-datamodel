@@ -24,10 +24,14 @@ entities:
   label: New Entity
   description: ''
   entity_type: unclassified
+  source_system:
+  - salesforce
 - id: new_entity_1
   label: New Entity
   description: ''
   entity_type: unclassified
+  source_system:
+  - salesforce
 relationships:
 - source: lead
   target: customer
