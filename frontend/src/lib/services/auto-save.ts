@@ -2,6 +2,8 @@ import type { Node, Edge } from '@xyflow/svelte';
 import type { DataModel } from '$lib/types';
 import { saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
+import { get } from 'svelte/store';
+import { sourceColors as sourceColorsStore } from '$lib/stores';
 
 /**
  * AutoSave service - Manages debounced saves for node/edge state changes.
@@ -218,8 +220,12 @@ export class AutoSaveService {
         currentNodes: Node[],
         currentEdges: Edge[],
     ): DataModel {
+        // Read source colors from store to include in save payload
+        const sourceColors = get(sourceColorsStore);
+
         return {
             version: 0.1,
+            source_colors: Object.keys(sourceColors).length > 0 ? sourceColors : undefined,
             entities: currentNodes
                 .filter((n) => n.type === 'entity')
                 .map((n) => {

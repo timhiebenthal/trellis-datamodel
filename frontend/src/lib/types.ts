@@ -100,6 +100,7 @@ export interface DataModel {
     entities: Entity[];
     relationships: Relationship[];
     domains?: Domain[];
+    source_colors?: Record<string, string>; // Map of source name to color (from canvas_layout.yml)
 }
 
 export interface ConfigStatus {

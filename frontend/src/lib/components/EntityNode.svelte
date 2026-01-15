@@ -16,6 +16,7 @@
         labelPrefixes,
         dimensionPrefixes,
         factPrefixes,
+        sourceColors,
         openSourceEditorModal,
         closeSourceEditorModal,
         openDeleteConfirmModal,
@@ -730,6 +731,37 @@
         });
     }
 
+    // Get source chip style from source_colors config or generate deterministic fallback
+    function getSourceChipStyle(sourceSystem: string): string {
+        // Check if custom color is defined in canvas_layout.yml
+        const customColor = $sourceColors[sourceSystem];
+        if (customColor) {
+            return `background-color: ${customColor}; color: white; border: 1px solid ${customColor};`;
+        }
+
+        // Generate deterministic fallback color based on source name
+        const colors = [
+            '#3B82F6', // blue-500
+            '#8B5CF6', // violet-500
+            '#EC4899', // pink-500
+            '#F59E0B', // amber-500
+            '#10B981', // emerald-500
+            '#EF4444', // red-500
+            '#06B6D4', // cyan-500
+            '#6366F1', // indigo-500
+        ];
+
+        // Simple hash for consistent color selection
+        let hash = 0;
+        for (let i = 0; i < sourceSystem.length; i++) {
+            hash = sourceSystem.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash) % colors.length;
+        const bgColor = colors[index];
+
+        return `background-color: ${bgColor}20; color: ${bgColor}; border: 1px solid ${bgColor}40;`;
+    }
+
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
 
@@ -1212,7 +1244,8 @@
                                 <div class="flex flex-wrap gap-1.5">
                                     {#each data.source_system as sourceSystem}
                                         <span
-                                            class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-semibold uppercase border border-blue-200"
+                                            class:source-chip={true}
+                                            style={getSourceChipStyle(sourceSystem)}
                                         >
                                             {sourceSystem}
                                         </span>
@@ -1542,7 +1575,8 @@
                                     <div class="flex flex-wrap gap-1.5">
                                         {#each (data.source_system || []) as sourceSystem}
                                             <span
-                                                class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-semibold uppercase border border-blue-200"
+                                                class:source-chip={true}
+                                                style={getSourceChipStyle(sourceSystem)}
                                             >
                                                 {sourceSystem}
                                             </span>
@@ -1837,5 +1871,16 @@
         height: 6px;
         cursor: ns-resize;
         border-radius: 999px;
+    }
+
+    .source-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 </style>

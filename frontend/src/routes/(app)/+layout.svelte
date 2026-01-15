@@ -21,6 +21,7 @@
         labelPrefixes,
         dimensionPrefixes,
         factPrefixes,
+        sourceColors,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -524,6 +525,11 @@ import {
 
                 // Load Data Model
                 const dataModel = await getDataModel();
+
+                // Load source_colors from canvas_layout.yml
+                if (dataModel.source_colors) {
+                    $sourceColors = dataModel.source_colors;
+                }
 
                 // If no relationships in data model, try to infer from dbt yml files
                 let relationships = dataModel.relationships || [];

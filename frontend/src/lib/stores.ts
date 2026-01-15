@@ -12,6 +12,9 @@ export const labelPrefixes = writable<string[]>([]);
 export const dimensionPrefixes = writable<string[]>([]);
 export const factPrefixes = writable<string[]>([]);
 
+// Source colors from canvas_layout.yml
+export const sourceColors = writable<Record<string, string>>({});
+
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
 export const tagFilter = writable<string[]>([]);

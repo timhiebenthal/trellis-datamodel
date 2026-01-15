@@ -9,6 +9,7 @@ class DataModelUpdate(BaseModel):
     version: float = 0.1
     entities: List[Dict[str, Any]]
     relationships: List[Dict[str, Any]]
+    source_colors: Optional[Dict[str, str]] = None  # Map of source name to color from canvas_layout.yml
 
 
 class DbtSchemaRequest(BaseModel):

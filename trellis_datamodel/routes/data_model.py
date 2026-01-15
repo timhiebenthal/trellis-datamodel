@@ -18,19 +18,34 @@ router = APIRouter(prefix="/api", tags=["data-model"])
 def _load_canvas_layout() -> Dict[str, Any]:
     """Load canvas layout file if it exists."""
     if not os.path.exists(cfg.CANVAS_LAYOUT_PATH):
-        return {"version": 0.1, "entities": {}, "relationships": {}}
+        return {
+            "version": 0.1,
+            "entities": {},
+            "relationships": {},
+            "source_colors": {},
+        }
 
     try:
         with open(cfg.CANVAS_LAYOUT_PATH, "r") as f:
             layout = yaml.safe_load(f) or {}
+        source_colors = layout.get("source_colors")
+        # Ensure source_colors is always a dict, not None
+        if source_colors is None:
+            source_colors = {}
         return {
             "version": layout.get("version", 0.1),
             "entities": layout.get("entities", {}),
             "relationships": layout.get("relationships", {}),
+            "source_colors": source_colors,
         }
     except Exception as e:
         print(f"Warning: Could not load canvas layout: {e}")
-        return {"version": 0.1, "entities": {}, "relationships": {}}
+        return {
+            "version": 0.1,
+            "entities": {},
+            "relationships": {},
+            "source_colors": {},
+        }
 
 
 def _merge_layout_into_model(
@@ -115,8 +130,17 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
 @router.get("/data-model")
 async def get_data_model():
     """Return current data model with layout merged in."""
+    # Load layout data (including source_colors) even if data_model.yml doesn't exist
+    layout_data = _load_canvas_layout()
+
     if not os.path.exists(cfg.DATA_MODEL_PATH):
-        return {"version": 0.1, "entities": [], "relationships": []}
+        # No data model file, but still return source_colors from canvas_layout.yml
+        return {
+            "version": 0.1,
+            "entities": [],
+            "relationships": [],
+            "source_colors": layout_data.get("source_colors", {}),
+        }
 
     try:
         # Load model data
@@ -132,9 +156,11 @@ async def get_data_model():
         if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             model_data = _apply_entity_type_inference(model_data)
 
-        # Load and merge layout data
-        layout_data = _load_canvas_layout()
+        # Merge layout data
         merged_data = _merge_layout_into_model(model_data, layout_data)
+
+        # Pass through source_colors from canvas_layout.yml
+        merged_data["source_colors"] = layout_data.get("source_colors", {})
 
         # Add source_system field to entities
         # For bound entities: extract from lineage
@@ -210,7 +236,12 @@ def _split_model_and_layout(
         "relationships": [],
     }
 
-    layout_data = {"version": 0.1, "entities": {}, "relationships": {}}
+    layout_data = {
+        "version": 0.1,
+        "entities": {},
+        "relationships": {},
+        "source_colors": {},
+    }
 
     # Split entities
     entities = content.get("entities", [])
@@ -241,7 +272,9 @@ def _split_model_and_layout(
         if "source_system" in entity and not entity.get("dbt_model"):
             model_entity["source_system"] = entity["source_system"]
             # Log instrumentation
-            print(f"DEBUG: Entity {entity_id} is unbound, persisting source_system: {entity.get('source_system')}")
+            print(
+                f"DEBUG: Entity {entity_id} is unbound, persisting source_system: {entity.get('source_system')}"
+            )
 
         model_data["entities"].append(model_entity)
 
@@ -294,6 +327,10 @@ def _split_model_and_layout(
             # Use source-target-index as key
             rel_key = f"{source}-{target}-{idx}"
             layout_data["relationships"][rel_key] = layout_rel
+
+    # Preserve source_colors if present in the request
+    if "source_colors" in content and content["source_colors"] is not None:
+        layout_data["source_colors"] = content["source_colors"]
 
     return model_data, layout_data
 
