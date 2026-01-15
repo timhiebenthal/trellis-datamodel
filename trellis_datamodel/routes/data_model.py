@@ -10,6 +10,7 @@ from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.schemas import DataModelUpdate
 from trellis_datamodel.services.lineage import extract_source_systems_for_model
 from trellis_datamodel.adapters import get_adapter
+from trellis_datamodel.utils.yaml_handler import YamlHandler
 
 router = APIRouter(prefix="/api", tags=["data-model"])
 
@@ -417,19 +418,11 @@ async def save_data_model(data: DataModelUpdate):
         # Save model file
         print(f"Saving data model to: {cfg.DATA_MODEL_PATH}")
 
-        os.makedirs(os.path.dirname(cfg.DATA_MODEL_PATH), exist_ok=True)
-        with open(cfg.DATA_MODEL_PATH, "w") as f:
-            yaml.dump(model_data, f, default_flow_style=False, sort_keys=False)
-            f.flush()
-            os.fsync(f.fileno())
+        YamlHandler().save_file(cfg.DATA_MODEL_PATH, model_data)
 
         # Save layout file
         print(f"Saving canvas layout to: {cfg.CANVAS_LAYOUT_PATH}")
-        os.makedirs(os.path.dirname(cfg.CANVAS_LAYOUT_PATH), exist_ok=True)
-        with open(cfg.CANVAS_LAYOUT_PATH, "w") as f:
-            yaml.dump(layout_data, f, default_flow_style=False, sort_keys=False)
-            f.flush()
-            os.fsync(f.fileno())
+        YamlHandler().save_file(cfg.CANVAS_LAYOUT_PATH, layout_data)
 
         return {"status": "success"}
     except ValidationError:
