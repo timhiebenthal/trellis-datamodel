@@ -3,6 +3,16 @@
 modeling_style: entity_model  # Options: dimensional_model or entity_model
 # modeling_style: dimensional_model
 
+# Source chips configuration
+# Enable/disable source chip display on entities
+sources_enabled: true
+
+# Control which sources are displayed on entities
+# - "manual": Only user-defined sources from entity edits
+# - "lineage": Only lineage-derived sources (read-only, for bound entities)
+# - "both": Both manual and lineage (manual sources take precedence for unbound)
+source_sources: "both"  # Options: "manual", "lineage", "both" (default: "both")
+
 # Transformation framework: dbt-core, dbt-fusion, sqlmesh, bruin, pydantic
 # (currently only dbt-core is implemented)
 framework: dbt-core
