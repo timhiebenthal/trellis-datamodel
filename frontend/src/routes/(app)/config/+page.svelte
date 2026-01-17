@@ -324,7 +324,7 @@
                         <select
                             value={getFieldValue('framework')}
                             onchange={(e) => handleFieldChange('framework', e.currentTarget.value)}
-                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         >
                             {#each getEnumOptions('framework', ['dbt-core']) as value}
                                 <option value={value}>{value}</option>
@@ -342,7 +342,7 @@
                         <select
                             value={getFieldValue('modeling_style')}
                             onchange={(e) => handleFieldChange('modeling_style', e.currentTarget.value)}
-                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         >
                             {#each getEnumOptions('modeling_style', ['dimensional_model', 'entity_model']) as value}
                                 <option value={value}>{value}</option>
@@ -368,7 +368,7 @@
                             value={getFieldValue('dbt_project_path')}
                             oninput={(e) => handleFieldChange('dbt_project_path', e.currentTarget.value)}
                             placeholder="./dbt_project"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['dbt_project_path'] ? 'border-red-500' : ''}"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_project_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
                         />
                         {#if getFieldMetadata('dbt_project_path')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_project_path')?.description}</p>
@@ -387,7 +387,7 @@
                             value={getFieldValue('dbt_manifest_path')}
                             oninput={(e) => handleFieldChange('dbt_manifest_path', e.currentTarget.value)}
                             placeholder="target/manifest.json"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['dbt_manifest_path'] ? 'border-red-500' : ''}"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_manifest_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
                         />
                         {#if getFieldMetadata('dbt_manifest_path')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_manifest_path')?.description}</p>
@@ -406,7 +406,7 @@
                             value={getFieldValue('dbt_catalog_path')}
                             oninput={(e) => handleFieldChange('dbt_catalog_path', e.currentTarget.value)}
                             placeholder="target/catalog.json"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['dbt_catalog_path'] ? 'border-red-500' : ''}"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_catalog_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
                         />
                         {#if getFieldMetadata('dbt_catalog_path')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_catalog_path')?.description}</p>
@@ -425,7 +425,7 @@
                             value={getFieldValue('data_model_file')}
                             oninput={(e) => handleFieldChange('data_model_file', e.currentTarget.value)}
                             placeholder="data_model.yml"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors['data_model_file'] ? 'border-red-500' : ''}"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['data_model_file'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
                         />
                         {#if getFieldMetadata('data_model_file')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('data_model_file')?.description}</p>
@@ -444,7 +444,7 @@
                             value={getFieldValue('dbt_company_dummy_path') || ''}
                             oninput={(e) => handleFieldChange('dbt_company_dummy_path', e.currentTarget.value || null)}
                             placeholder="./dbt_company_dummy"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         />
                         {#if getFieldMetadata('dbt_company_dummy_path')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_company_dummy_path')?.description}</p>
@@ -465,7 +465,7 @@
                                     handleFieldChange('dbt_model_paths', newPaths);
                                 }}
                                 placeholder="3_core"
-                                class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                             />
                         {/each}
                         {#if (getFieldValue('dbt_model_paths') || []).length === 0}
@@ -493,9 +493,9 @@
                                 type="checkbox"
                                 checked={getFieldValue('entity_creation_guidance.enabled')}
                                 onchange={(e) => handleNestedFieldChange('entity_creation_guidance.enabled', e.currentTarget.checked)}
-                                class="sr-only peer"
+                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
                             />
-                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
                         </label>
                     </div>
 
@@ -513,9 +513,9 @@
                                 type="checkbox"
                                 checked={getFieldValue('entity_creation_guidance.push_warning_enabled')}
                                 onchange={(e) => handleNestedFieldChange('entity_creation_guidance.push_warning_enabled', e.currentTarget.checked)}
-                                class="sr-only peer"
+                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
                             />
-                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
                         </label>
                     </div>
 
@@ -528,7 +528,7 @@
                             min="0"
                             value={getFieldValue('entity_creation_guidance.min_description_length')}
                             oninput={(e) => handleNestedFieldChange('entity_creation_guidance.min_description_length', parseInt(e.currentTarget.value) || 0)}
-                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         />
                         {#if getFieldMetadata('entity_creation_guidance.min_description_length')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('entity_creation_guidance.min_description_length')?.description}</p>
@@ -573,7 +573,7 @@
                             value={getFieldValue('dimensional_modeling.inference_patterns.dimension_prefix') || ''}
                             oninput={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.dimension_prefix', e.currentTarget.value)}
                             placeholder="dim_"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         />
                         {#if getFieldMetadata('dimensional_modeling.inference_patterns.dimension_prefix')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dimensional_modeling.inference_patterns.dimension_prefix')?.description}</p>
@@ -589,7 +589,7 @@
                             value={getFieldValue('dimensional_modeling.inference_patterns.fact_prefix') || ''}
                             oninput={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.fact_prefix', e.currentTarget.value)}
                             placeholder="fact_"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         />
                         {#if getFieldMetadata('dimensional_modeling.inference_patterns.fact_prefix')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dimensional_modeling.inference_patterns.fact_prefix')?.description}</p>
@@ -613,7 +613,7 @@
                             value={getFieldValue('entity_modeling.inference_patterns.prefix') || ''}
                             oninput={(e) => handleNestedFieldChange('entity_modeling.inference_patterns.prefix', e.currentTarget.value)}
                             placeholder="entity_"
-                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                         />
                         {#if getFieldMetadata('entity_modeling.inference_patterns.prefix')?.description}
                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('entity_modeling.inference_patterns.prefix')?.description}</p>
@@ -635,19 +635,19 @@
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="flex items-start gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={dangerZoneAcknowledged}
-                            onchange={(e) => dangerZoneAcknowledged = e.currentTarget.checked}
-                            class="mt-1 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                        />
-                        <span class="text-sm font-medium text-amber-900">
-                            I understand these features are experimental and may change
-                        </span>
-                    </label>
-                </div>
+                    <div class="mb-4">
+                        <label class="flex items-start gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={dangerZoneAcknowledged}
+                                onchange={(e) => dangerZoneAcknowledged = e.currentTarget.checked}
+                                class="mt-1 w-4 h-4 text-primary-600 rounded-full border border-gray-300 focus:ring-0 focus:ring-primary-500 focus:ring-offset-0"
+                            />
+                            <span class="text-sm font-medium text-gray-900">
+                                I understand these features are experimental and may change
+                            </span>
+                        </label>
+                    </div>
 
                 <div class="space-y-4 {isDangerZoneEnabled() ? '' : 'opacity-50 pointer-events-none'}">
                     <div class="flex items-center justify-between">
@@ -670,9 +670,9 @@
                                 checked={getFieldValue('lineage.enabled')}
                                 onchange={(e) => handleNestedFieldChange('lineage.enabled', e.currentTarget.checked)}
                                 disabled={!isDangerZoneEnabled()}
-                                class="sr-only peer"
+                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
                             />
-                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled() ? '' : 'opacity-50'}"></div>
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled() ? '' : 'opacity-50'}"></div>
                         </label>
                     </div>
 
@@ -719,9 +719,9 @@
                                 checked={getFieldValue('exposures.enabled')}
                                 onchange={(e) => handleNestedFieldChange('exposures.enabled', e.currentTarget.checked)}
                                 disabled={!isDangerZoneEnabled()}
-                                class="sr-only peer"
+                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
                             />
-                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled() ? '' : 'opacity-50'}"></div>
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled() ? '' : 'opacity-50'}"></div>
                         </label>
                     </div>
 
