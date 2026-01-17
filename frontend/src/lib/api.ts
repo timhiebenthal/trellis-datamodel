@@ -291,11 +291,24 @@ export interface ConfigUpdateResponse {
 
 export async function getConfig(): Promise<ConfigGetResponse> {
     try {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'frontend/src/lib/api.ts:293',message:'getConfig - calling API',data:{api_base:API_BASE},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
         const res = await fetch(`${API_BASE}/config`);
         if (!res.ok) throw new Error(`Status: ${res.status}`);
+
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'frontend/src/lib/api.ts:296',message:'getConfig - API response received',data:{status:res.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
         return await res.json();
     } catch (e) {
         console.error("Error fetching config:", e);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'frontend/src/lib/api.ts:300',message:'getConfig - caught error',data:{error:e instanceof Error ? e.message : String(e)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
         return {
             config: {},
             schema_metadata: { fields: {}, beta_flags: [] },

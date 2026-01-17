@@ -535,6 +535,7 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
         "modeling_style",
         before="Select data modeling style (entity_model or dimensional_model)",
     )
+    # Enforce mutual exclusion - only write the appropriate config based on modeling_style
     if modeling_style == "dimensional_model":
         config["dimensional_modeling"] = CommentedMap(
             {
@@ -550,6 +551,7 @@ def generate_config_from_answers(answers: Dict[str, Any]) -> str:
             "inference_patterns",
             before="Customize these patterns to match your dbt model naming conventions",
         )
+    # Note: entity_model is the default and doesn't require explicit config
 
     # Core settings the wizard always knows
     framework = answers.get("framework", "dbt-core")

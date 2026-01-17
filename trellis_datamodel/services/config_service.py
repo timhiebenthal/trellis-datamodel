@@ -12,6 +12,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+import json
 
 import yaml
 from pydantic import ValidationError
@@ -211,6 +212,16 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if key in config:
             normalized[key] = config[key]
 
+    # Enforce mutual exclusion between dimensional_modeling and entity_modeling
+    # based on the modeling_style setting
+    modeling_style = normalized.get("modeling_style", "entity_model")
+    if modeling_style == "dimensional_model":
+        # Remove entity_modeling if present
+        config = {k: v for k, v in config.items() if k != "entity_modeling"}
+    elif modeling_style == "entity_model":
+        # Remove dimensional_modeling if present
+        config = {k: v for k, v in config.items() if k != "dimensional_modeling"}
+
     # Normalize nested sections
     # Lineage
     if "lineage" in config:
@@ -231,8 +242,12 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(guidance, dict):
             normalized["entity_creation_guidance"] = {
                 "enabled": bool(guidance.get("enabled", False)),
-                "push_warning_enabled": bool(guidance.get("push_warning_enabled", True)),
-                "min_description_length": int(guidance.get("min_description_length", 10)),
+                "push_warning_enabled": bool(
+                    guidance.get("push_warning_enabled", True)
+                ),
+                "min_description_length": int(
+                    guidance.get("min_description_length", 10)
+                ),
                 "disabled_guidance": (
                     list(guidance.get("disabled_guidance", []))
                     if isinstance(guidance.get("disabled_guidance"), list)
@@ -391,7 +406,9 @@ def get_schema_metadata() -> ConfigSchemaResponse:
     return ConfigSchemaResponse(fields=_FIELD_DEFINITIONS, beta_flags=_BETA_FIELDS)
 
 
-def load_config(config_path: Optional[str] = None) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+def load_config(
+    config_path: Optional[str] = None,
+) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     """
     Load and normalize config from trellis.yml.
 

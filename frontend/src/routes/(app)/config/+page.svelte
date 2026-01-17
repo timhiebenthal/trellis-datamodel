@@ -130,6 +130,9 @@
 
             // Show success message
             showSuccessToast();
+
+            // Reset saving state after successful save
+            saving = false;
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
 
