@@ -354,13 +354,13 @@ def _validate_paths(config: Dict[str, Any], config_path: str) -> list[str]:
 
 def _create_backup(config_path: str) -> Optional[str]:
     """
-    Create a timestamped backup of the config file.
+    Create a backup of the config file.
 
     Returns path to backup file or None if backup failed.
+    Uses a single .backup file instead of timestamped backups.
     """
     try:
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup_path = f"{config_path}.bak.{timestamp}"
+        backup_path = f"{config_path}.backup"
 
         shutil.copy2(config_path, backup_path)
         logger.info(f"Created backup: {backup_path}")
