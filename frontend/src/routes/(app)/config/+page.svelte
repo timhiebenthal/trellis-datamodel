@@ -557,6 +557,7 @@
             </div>
 
             <!-- Dimensional Modeling Section -->
+            {#if getFieldValue('modeling_style') === 'dimensional_model'}
             <div class="bg-white border border-gray-200 rounded-lg p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Dimensional Modeling</h2>
                 <div class="space-y-4">
@@ -593,8 +594,10 @@
                     </div>
                 </div>
             </div>
+            {/if}
 
             <!-- Entity Modeling Section -->
+            {#if getFieldValue('modeling_style') === 'entity_model'}
             <div class="bg-white border border-gray-200 rounded-lg p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Entity Modeling</h2>
                 <div class="space-y-4">
@@ -615,6 +618,7 @@
                     </div>
                 </div>
             </div>
+            {/if}
 
             <!-- Danger Zone Section -->
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-6">
