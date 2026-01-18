@@ -24,6 +24,9 @@
     let conflictWarning: string | null = null;
     let conflictInfo: any = null;
 
+    // Reactive modeling style for conditional rendering
+    $: modelingStyle = config.modeling_style;
+
     onMount(async () => {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:28',message:'onMount starting',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{}); // #endregion
@@ -600,13 +603,9 @@
                     </div>
 
                     <!-- Dimensional Modeling Section -->
-                    <div class="bg-white border border-gray-200 rounded-lg p-6" style="background-color: #fef3c7; border-color: #f59e0b;">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Dimensional Modeling (DEBUG: Always Visible)</h2>
-                        {#if getFieldValue('modeling_style') === 'dimensional_model'}
-                            <p class="text-sm text-green-600 mb-4">✓ Modeling style is 'dimensional_model'</p>
-                        {:else}
-                            <p class="text-sm text-red-600 mb-4">✗ Modeling style is '{getFieldValue('modeling_style')}'</p>
-                        {/if}
+                    {#if modelingStyle === 'dimensional_model'}
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Dimensional Modeling</h2>
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -641,9 +640,10 @@
                             </div>
                         </div>
                     </div>
+                    {/if}
 
                     <!-- Entity Modeling Section -->
-                    {#if getFieldValue('modeling_style') === 'entity_model'}
+                    {#if modelingStyle === 'entity_model'}
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
                         <h2 class="text-lg font-semibold text-gray-900 mb-4">Entity Modeling</h2>
                         <div class="space-y-4">
