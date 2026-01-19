@@ -20,6 +20,9 @@
     // Danger Zone acknowledgment
     let dangerZoneAcknowledged = false;
 
+    // Reactive state for danger zone
+    $: isDangerZoneEnabled = dangerZoneAcknowledged;
+
     // Conflict state
     let conflictWarning: string | null = null;
     let conflictInfo: any = null;
@@ -260,10 +263,6 @@
 
     function isBetaField(path: string): boolean {
         return schema.beta_flags.includes(path);
-    }
-
-    function isDangerZoneEnabled(): boolean {
-        return dangerZoneAcknowledged;
     }
 
     function getEnumOptions(path: string, fallback: string[]): string[] {
@@ -692,7 +691,7 @@
                             </div>
                         </div>
 
-                        <div class="space-y-4 {isDangerZoneEnabled() ? '' : 'opacity-50 pointer-events-none'}">
+                        <div class="space-y-4 {isDangerZoneEnabled ? '' : 'opacity-50 pointer-events-none'}">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
@@ -712,10 +711,10 @@
                                         type="checkbox"
                                         checked={getFieldValue('lineage.enabled')}
                                         onchange={(e) => handleNestedFieldChange('lineage.enabled', e.currentTarget.checked)}
-                                        disabled={!isDangerZoneEnabled()}
+                                        disabled={!isDangerZoneEnabled}
                                         class="sr-only peer focus:ring-0 focus:ring-offset-0"
                                     />
-                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled() ? '' : 'opacity-50'}"></div>
+                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
                                 </label>
                             </div>
 
@@ -724,22 +723,49 @@
                                     Lineage Layers
                                 </label>
                                 {#each getFieldValue('lineage.layers') || [] as layer, index}
-                                    <input
-                                        type="text"
-                                        value={layer}
-                                        oninput={(e) => {
-                                            const newLayers = [...(getFieldValue('lineage.layers') || [])];
-                                            newLayers[index] = e.currentTarget.value;
-                                            handleNestedFieldChange('lineage.layers', newLayers);
-                                        }}
-                                        placeholder="1_clean"
-                                        disabled={!isDangerZoneEnabled()}
-                                        class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled() ? '' : 'opacity-50'}"
-                                    />
+                                    <div class="flex gap-2 mb-2">
+                                        <input
+                                            type="text"
+                                            value={layer}
+                                            oninput={(e) => {
+                                                const newLayers = [...(getFieldValue('lineage.layers') || [])];
+                                                newLayers[index] = e.currentTarget.value;
+                                                handleNestedFieldChange('lineage.layers', newLayers);
+                                            }}
+                                            placeholder="1_clean"
+                                            disabled={!isDangerZoneEnabled}
+                                            class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        />
+                                        <button
+                                            type="button"
+                                            onclick={() => {
+                                                const newLayers = [...(getFieldValue('lineage.layers') || [])];
+                                                newLayers.splice(index, 1);
+                                                handleNestedFieldChange('lineage.layers', newLayers);
+                                            }}
+                                            disabled={!isDangerZoneEnabled}
+                                            class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium {isDangerZoneEnabled ? '' : 'opacity-50 cursor-not-allowed'}"
+                                            title="Remove layer"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
                                 {/each}
                                 {#if (getFieldValue('lineage.layers') || []).length === 0}
                                     <p class="mt-1.5 text-xs text-amber-700">No layers configured</p>
                                 {/if}
+                                <button
+                                    type="button"
+                                    onclick={() => {
+                                        const newLayers = [...(getFieldValue('lineage.layers') || [])];
+                                        newLayers.push('');
+                                        handleNestedFieldChange('lineage.layers', newLayers);
+                                    }}
+                                    disabled={!isDangerZoneEnabled}
+                                    class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md {isDangerZoneEnabled ? '' : 'opacity-50 cursor-not-allowed'}"
+                                >
+                                    + Add Layer
+                                </button>
                             </div>
 
                             <div class="flex items-center justify-between">
@@ -759,10 +785,10 @@
                                         type="checkbox"
                                         checked={getFieldValue('exposures.enabled')}
                                         onchange={(e) => handleNestedFieldChange('exposures.enabled', e.currentTarget.checked)}
-                                        disabled={!isDangerZoneEnabled()}
+                                        disabled={!isDangerZoneEnabled}
                                         class="sr-only peer focus:ring-0 focus:ring-offset-0"
                                     />
-                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled() ? '' : 'opacity-50'}"></div>
+                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
                                 </label>
                             </div>
 
@@ -773,8 +799,8 @@
                                 <select
                                     value={getFieldValue('exposures.default_layout')}
                                     onchange={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
-                                    disabled={!isDangerZoneEnabled()}
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled() ? '' : 'opacity-50'}"
+                                    disabled={!isDangerZoneEnabled}
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
                                 >
                                     {#each getEnumOptions('exposures.default_layout', ['dashboards-as-rows', 'entities-as-rows']) as value}
                                         <option value={value}>{value}</option>
