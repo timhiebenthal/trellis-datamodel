@@ -274,7 +274,7 @@
                             id="entity-label"
                             type="text"
                             bind:value={formData.label}
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors.label ? 'border-red-500' : validationErrors.label === null && formData.label && formData.label !== 'New Entity' ? 'border-green-500' : ''}"
+                            class="inline-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors.label ? 'border-red-500' : validationErrors.label === null && formData.label && formData.label !== 'New Entity' ? 'border-green-500' : ''}"
                             placeholder="e.g., Customer, Order, Product"
                         />
                         {#if validationErrors.label}

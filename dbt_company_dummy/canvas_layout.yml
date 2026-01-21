@@ -2,15 +2,15 @@ version: 0.1
 entities:
   employee:
     position:
-      x: 491.21775312066575
-      y: 100
+      x: 340
+      y: 390
     width: 280
     panel_height: 200
     collapsed: false
   department:
     position:
       x: 40
-      y: 100
+      y: 390
     width: 280
     panel_height: 200
     collapsed: false
@@ -24,14 +24,14 @@ entities:
   sale:
     position:
       x: 640
-      y: 470
+      y: 1400
     width: 280
     panel_height: 200
     collapsed: false
   product:
     position:
-      x: 117.07073509015254
-      y: 424.67683772538146
+      x: 340
+      y: 1080
     width: 280
     panel_height: 200
     collapsed: false
@@ -44,8 +44,8 @@ entities:
     collapsed: false
   inventory:
     position:
-      x: 1501.1111455155576
-      y: 124.60443792874622
+      x: 640
+      y: 1080
     width: 280
     panel_height: 200
     collapsed: false
@@ -76,6 +76,13 @@ entities:
       y: 859.7704843746575
     width: 280
     panel_height: 200
+    collapsed: false
+  calls:
+    position:
+      x: 684.6200634985356
+      y: 249.26170905942143
+    width: 280
+    panel_height: 431.59857177734375
     collapsed: false
 relationships:
   employee-employee-0:

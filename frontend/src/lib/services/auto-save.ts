@@ -1,7 +1,9 @@
 import type { Node, Edge } from '@xyflow/svelte';
 import type { DataModel } from '$lib/types';
-import { saveDataModel as apiSaveDataModel } from '$lib/api';
+import { getApiBase, saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
+import { get } from 'svelte/store';
+import { sourceColors as sourceColorsStore } from '$lib/stores';
 
 /**
  * AutoSave service - Manages debounced saves for node/edge state changes.
@@ -130,7 +132,7 @@ export class AutoSaveService {
         const payload = JSON.stringify(
             this.buildDataModelFromState(currentNodes, currentEdges),
         );
-        const url = `${import.meta.env.VITE_API_BASE || ''}/data-model`;
+        const url = `${getApiBase()}/data-model`;
 
         try {
             const response = await fetch(url, {
@@ -218,8 +220,12 @@ export class AutoSaveService {
         currentNodes: Node[],
         currentEdges: Edge[],
     ): DataModel {
+        // Read source colors from store to include in save payload
+        const sourceColors = get(sourceColorsStore);
+
         return {
             version: 0.1,
+            source_colors: Object.keys(sourceColors).length > 0 ? sourceColors : undefined,
             entities: currentNodes
                 .filter((n) => n.type === 'entity')
                 .map((n) => {
@@ -238,7 +244,8 @@ export class AutoSaveService {
                             : undefined;
 
                     const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
-                    return {
+                    const source_system = ((n.data as any)?.source_system) as string[] | undefined;
+                    const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
                         description: n.data.description as string | undefined,
@@ -254,6 +261,14 @@ export class AutoSaveService {
                         // Include entity_type with default "unclassified" if not set
                         entity_type: entity_type,
                     };
+                    
+                    // Only persist source_system for unbound entities
+                    // Bound entities get source_system from lineage
+                    if (!isBound && source_system && source_system.length > 0) {
+                        entity.source_system = source_system;
+                    }
+                    
+                    return entity;
                 }),
             relationships: currentEdges.flatMap((e) => {
                 // If edge has multiple model relationships, expand them

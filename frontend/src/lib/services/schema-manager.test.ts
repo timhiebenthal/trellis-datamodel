@@ -6,8 +6,10 @@ import type { ModelSchema } from '$lib/types';
 vi.mock('$lib/api', () => ({
     getModelSchema: vi.fn(),
     updateModelSchema: vi.fn().mockResolvedValue({
-        status: 'ok',
-        message: 'saved',
+        model_name: 'model1',
+        description: '',
+        columns: [],
+        tags: [],
         file_path: 'models/model1.sql',
     }),
 }));
@@ -291,11 +293,11 @@ describe('SchemaManager', () => {
 
             expect(manager.hasUnsavedChanges()).toBe(true);
 
-            vi.mocked(updateModelSchema).mockResolvedValue({
-                status: 'ok',
-                message: 'saved',
-                file_path: 'models/model1.sql',
-            });
+            vi.mocked(updateModelSchema).mockResolvedValue(
+                asModelSchema({
+                    columns: [],
+                }),
+            );
 
             await manager.saveSchema();
 

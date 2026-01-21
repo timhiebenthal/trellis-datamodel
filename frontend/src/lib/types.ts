@@ -48,6 +48,7 @@ export interface EntityData {
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
+    source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
     _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
@@ -70,6 +71,7 @@ export interface Entity {
     collapsed?: boolean;
     tags?: string[];
     entity_type?: "fact" | "dimension" | "unclassified";
+    source_system?: string[]; // Only for unbound entities (mock sources)
 }
 
 /**
@@ -98,6 +100,7 @@ export interface DataModel {
     entities: Entity[];
     relationships: Relationship[];
     domains?: Domain[];
+    source_colors?: Record<string, string>; // Map of source name to color (from canvas_layout.yml)
 }
 
 export interface ConfigStatus {

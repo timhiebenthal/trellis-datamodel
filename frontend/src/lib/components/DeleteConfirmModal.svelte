@@ -38,14 +38,14 @@
     >
         <!-- Modal -->
         <div
-            class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+            class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full mx-4"
             role="document"
             tabindex="-1"
         >
-            <h2 id="delete-modal-title" class="text-lg font-semibold text-gray-900 mb-2">
+            <h2 id="delete-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
                 Delete Entity?
             </h2>
-            <p class="text-sm text-gray-600 mb-6">
+            <p class="text-sm text-gray-600 mb-8">
                 Are you sure you want to delete <span class="font-medium">'{entityLabel}'</span>? 
                 This will also remove all relationships connected to this entity.
             </p>

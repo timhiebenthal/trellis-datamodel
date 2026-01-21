@@ -16,6 +16,11 @@
         labelPrefixes,
         dimensionPrefixes,
         factPrefixes,
+        sourceColors,
+        openSourceEditorModal,
+        closeSourceEditorModal,
+        openDeleteConfirmModal,
+        closeDeleteConfirmModal,
     } from "$lib/stores";
     import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
     import {
@@ -35,7 +40,6 @@
         classifyModelTypeFromPrefixes,
     } from "$lib/utils";
     import { getContext } from "svelte";
-    import DeleteConfirmModal from "./DeleteConfirmModal.svelte";
     import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import TagEditor from "./TagEditor.svelte";
     import { openLineageModal } from "$lib/stores";
@@ -54,12 +58,11 @@
     let data = $derived(rawData as unknown as EntityData);
 
     const { updateNodeData, getNodes } = useSvelteFlow();
-    let showDeleteModal = $state(false);
     let showEntityTypeMenu = $state(false);
     let showUndescribedAttributesWarning = $state(false);
     let undescribedAttributeNames = $state<string[]>([]);
     let warningResolve: ((value: boolean) => void) | null = null;
-    // Lineage modal is rendered at page-level (outside SvelteFlow) via a global store
+    // Delete and SourceEditor modals are rendered at page-level (outside SvelteFlow) via global stores
 
     // Batch editing support
     let selectedEntityNodes = $derived(
@@ -454,7 +457,7 @@
 
         // Auto-create relationships from yml relationship tests
         try {
-            const inferred = await inferRelationships({ includeUnbound: true });
+            const inferred = await inferRelationships();
 
             // Build model name -> entity ID map from current canvas state
             // Include the model we just bound (since data model hasn't saved yet)
@@ -642,7 +645,7 @@
 
     function handleDeleteClick(event: MouseEvent) {
         event.stopPropagation(); // Prevent collapse toggle
-        showDeleteModal = true;
+        openDeleteConfirmModal(data.label || "Entity");
     }
 
     function deleteEntity() {
@@ -655,16 +658,12 @@
             // Remove the node itself
             nodes.update((list) => list.filter((node) => node.id !== id));
 
-            showDeleteModal = false;
+            closeDeleteConfirmModal();
         } catch (error) {
             console.error("Failed to delete entity:", error);
             alert("Failed to delete entity. Please try again.");
-            showDeleteModal = false;
+            closeDeleteConfirmModal();
         }
-    }
-
-    function cancelDelete() {
-        showDeleteModal = false;
     }
 
     // Entity type menu functionality
@@ -713,6 +712,50 @@
                 });
             }
         });
+    }
+
+    // Source system update handler (only for unbound entities)
+    function handleSourcesUpdate(newSources: string[]) {
+        // Source systems are only editable for unbound entities
+        if (isBound) {
+            console.warn('Source systems for bound entities are derived from lineage and cannot be edited');
+            return;
+        }
+
+        updateNodeData(id, {
+            source_system: newSources
+        });
+    }
+
+    // Get source chip style from source_colors config or generate deterministic fallback
+    function getSourceChipStyle(sourceSystem: string): string {
+        // Check if custom color is defined in canvas_layout.yml
+        const customColor = $sourceColors[sourceSystem];
+        if (customColor) {
+            return `background-color: ${customColor}; color: white; border: 1px solid ${customColor};`;
+        }
+
+        // Generate deterministic fallback color based on source name
+        const colors = [
+            '#3B82F6', // blue-500
+            '#8B5CF6', // violet-500
+            '#EC4899', // pink-500
+            '#F59E0B', // amber-500
+            '#10B981', // emerald-500
+            '#EF4444', // red-500
+            '#06B6D4', // cyan-500
+            '#6366F1', // indigo-500
+        ];
+
+        // Simple hash for consistent color selection
+        let hash = 0;
+        for (let i = 0; i < sourceSystem.length; i++) {
+            hash = sourceSystem.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash) % colors.length;
+        const bgColor = colors[index];
+
+        return `background-color: ${bgColor}20; color: ${bgColor}; border: 1px solid ${bgColor}40;`;
     }
 
     // Field drafting functionality
@@ -1056,7 +1099,7 @@
                 ondblclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => e.stopPropagation()}
                 onkeyup={(e) => e.stopPropagation()}
-                class="font-bold bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm text-gray-800"
+                class="font-bold inline-input bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm"
                 placeholder="Entity Name"
             />
         </div>
@@ -1183,6 +1226,32 @@
                             >
                                 {modelDetails.materialization}
                             </span>
+                        </div>
+                    {/if}
+
+                    <!-- Source Systems (Logical View Only) - Bound entities: read-only badges from lineage -->
+                    {#if $viewMode === "logical" && isBound}
+                        <div class="mb-2.5 text-gray-500 flex flex-wrap items-center gap-2">
+                            <span
+                                class="font-medium text-[10px] uppercase tracking-wider"
+                                >Source Systems</span
+                            >
+                            {#if data.source_system && data.source_system.length > 0}
+                                <div class="flex flex-wrap gap-1.5">
+                                    {#each data.source_system as sourceSystem}
+                                        <span
+                                            class:source-chip={true}
+                                            style={getSourceChipStyle(sourceSystem)}
+                                        >
+                                            {sourceSystem}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <span class="text-[10px] text-gray-400 italic">
+                                    No source systems in lineage
+                                </span>
+                            {/if}
                         </div>
                     {/if}
 
@@ -1334,7 +1403,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="column_name"
                                                     />
                                                     <input
@@ -1485,6 +1554,43 @@
                             </div>
                         </div>
 
+                        <!-- Source Systems Editor for Unbound Entities (Logical View Only) -->
+                        {#if $viewMode === "logical" && !isBound}
+                            <div class="mb-2.5">
+                                {#if isBatchEditing}
+                                    <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
+                                        <Icon icon="lucide:layers" class="w-3 h-3" />
+                                        Batch editing {selectedEntityNodes.length + 1} entities
+                                    </div>
+                                {/if}
+                                <div class="flex items-center gap-2 flex-wrap mb-1">
+                                    <span
+                                        class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
+                                    >Source Systems</span
+                                    >
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {#each (data.source_system || []) as sourceSystem}
+                                            <span
+                                                class:source-chip={true}
+                                                style={getSourceChipStyle(sourceSystem)}
+                                            >
+                                                {sourceSystem}
+                                            </span>
+                                        {/each}
+                                        <button
+                                            onmousedown={(e) => e.preventDefault()}
+                                            onclick={() => openSourceEditorModal(data.label || "Entity", id, (data.source_system || []))}
+                                            class="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[10px] font-semibold border border-blue-200 hover:bg-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                            title="Edit source systems"
+                                            aria-label="Edit source systems"
+                                        >
+                                            <Icon icon="lucide:plus" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
+
                         <div
                             class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
@@ -1552,7 +1658,7 @@
                                                                     ).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                        class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
                                                         placeholder="field_name"
                                                     />
                                                     <select
@@ -1730,13 +1836,6 @@
     {/if}
 </div>
 
-<DeleteConfirmModal
-    open={showDeleteModal}
-    entityLabel={data.label || "Entity"}
-    onConfirm={deleteEntity}
-    onCancel={cancelDelete}
-/>
-
 <UndescribedAttributesWarningModal
     open={showUndescribedAttributesWarning}
     attributeNames={undescribedAttributeNames}
@@ -1768,5 +1867,16 @@
         height: 6px;
         cursor: ns-resize;
         border-radius: 999px;
+    }
+
+    .source-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 </style>

@@ -21,6 +21,7 @@
         labelPrefixes,
         dimensionPrefixes,
         factPrefixes,
+        sourceColors,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -47,10 +48,12 @@ import {
     import LineageModal from "$lib/components/LineageModal.svelte";
     import IncompleteEntitiesWarningModal from "$lib/components/IncompleteEntitiesWarningModal.svelte";
     import UndescribedAttributesWarningModal from "$lib/components/UndescribedAttributesWarningModal.svelte";
+    import SourceEditorModal from "$lib/components/SourceEditorModal.svelte";
+    import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, DbtModel, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
-    import { lineageModal, closeLineageModal } from "$lib/stores";
+    import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
     import { 
         getIncompleteEntities, 
@@ -523,6 +526,11 @@ import {
                 // Load Data Model
                 const dataModel = await getDataModel();
 
+                // Load source_colors from canvas_layout.yml
+                if (dataModel.source_colors) {
+                    $sourceColors = dataModel.source_colors;
+                }
+
                 // If no relationships in data model, try to infer from dbt yml files
                 let relationships = dataModel.relationships || [];
                 if (relationships.length === 0) {
@@ -575,6 +583,7 @@ import {
                             _schemaTags: hasDbtBinding ? [] : entityTags,
                             _manifestTags: hasDbtBinding ? entityTags : [],
                             entity_type: e.entity_type,
+                            source_system: e.source_system,
                         },
                         parentId: undefined,
                     };
@@ -988,5 +997,42 @@ import {
         entitiesWithAttributes={entitiesWithUndescribedAttributes}
         onConfirm={handleUndescribedAttributesConfirm}
         onCancel={handleUndescribedAttributesCancel}
+    />
+
+    <DeleteConfirmModal
+        open={$deleteConfirmModal.open}
+        entityLabel={$deleteConfirmModal.entityLabel}
+        onConfirm={() => {
+            // Find and delete the entity from the store
+            const nodeToDelete = $nodes.find(n => n.data.label === $deleteConfirmModal.entityLabel);
+            if (nodeToDelete) {
+                nodes.update((list) => list.filter((n) => n.id !== nodeToDelete.id));
+                edges.update((list) => list.filter((e) => e.source !== nodeToDelete.id && e.target !== nodeToDelete.id));
+            }
+            closeDeleteConfirmModal();
+        }}
+        onCancel={closeDeleteConfirmModal}
+    />
+
+    <SourceEditorModal
+        open={$sourceEditorModal.open}
+        entityLabel={$sourceEditorModal.entityLabel}
+        sources={$sourceEditorModal.sources}
+        onConfirm={(newSources) => {
+            // Update the entity's source systems in the store
+            nodes.update((list) =>
+                list.map((node) =>
+                    node.id === $sourceEditorModal.entityId
+                        ? { ...node, data: { ...node.data, source_system: newSources } }
+                        : node
+                )
+            );
+            // Trigger an immediate save to persist changes to disk
+            // This ensures that when the next modal opens and calls getSourceSystemSuggestions(),
+            // it will read the updated data_model.yml file with the new source systems
+            autoSaveService?.saveNow($nodes, $edges);
+            closeSourceEditorModal();
+        }}
+        onCancel={closeSourceEditorModal}
     />
 </div>

@@ -77,6 +77,15 @@ def _mount_static_routes(app: FastAPI, static_dir_path: str) -> None:
     if os.path.exists(app_path):
         app.mount("/_app", StaticFiles(directory=app_path), name="app")
 
+    # Serve SvelteKit data files (e.g., __data.json) before catch-all SPA route
+    @app.get("/__data.json", include_in_schema=False)
+    async def serve_data_json():
+        """Serve SvelteKit __data.json file."""
+        data_file = os.path.join(static_dir_path, "__data.json")
+        if os.path.exists(data_file):
+            return FileResponse(data_file, media_type="application/json")
+        raise HTTPException(status_code=404, detail="Not found")
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(request: Request, full_path: str):
         """Serve SPA index.html for non-API routes."""
@@ -160,6 +169,7 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health_check():
         return {"status": "ok"}
+
 
     # Favicon endpoint - serves trellis_squared.svg
     @app.get("/favicon.ico", include_in_schema=False)

@@ -5,6 +5,7 @@ import type {
     ConfigStatus,
     ConfigInfo,
     ModelSchema,
+    ModelSchemaColumn,
     Relationship,
     ExposuresResponse,
     LineageResponse,
@@ -13,7 +14,7 @@ import type {
 /**
  * API base URL. Uses relative URL when served from the same origin (production),
  * or can be configured via PUBLIC_API_URL environment variable for development.
- * 
+ *
  * To override, set PUBLIC_API_URL in your .env file:
  *   PUBLIC_API_URL=http://your-backend-url/api
  */
@@ -25,9 +26,30 @@ export function getApiBase(): string {
         import.meta.env?.PUBLIC_API_URL ??
         '';
     if (typeof maybe === 'string' && maybe.length > 0) {
-        return maybe;
+        const trimmed = maybe.replace(/\/+$/g, '');
+        if (trimmed.endsWith('/api')) {
+            return trimmed;
+        }
+        if (typeof window !== 'undefined') {
+            try {
+                const rawUrl = new URL(trimmed, window.location.origin);
+                if (rawUrl.origin === window.location.origin) {
+                    const path = rawUrl.pathname.replace(/\/+$/g, '');
+                    if (path === '' || path === '/') {
+                        return `${rawUrl.origin}/api`;
+                    }
+                }
+            } catch {
+                // fall through to trimmed
+            }
+        }
+        return trimmed;
     }
-    // Use relative URL - works when frontend is served by the backend
+    if (import.meta.env?.DEV) {
+        const devTarget = import.meta.env?.VITE_DEV_API_TARGET ?? 'http://localhost:8089';
+        return `${devTarget.replace(/\/+$/g, '')}/api`;
+    }
+    // Use relative URL - works when frontend is served by backend
     return '/api';
 }
 
@@ -35,7 +57,7 @@ const API_BASE = getApiBase();
 
 export async function getManifest(): Promise<DbtModel[]> {
     try {
-        // Short-circuit in test/smoke environments to avoid console 500s when backend absent
+        // Short-circuit in test/smoke environments to avoid console 500s when backend is absent
         const isSmokeMode =
             import.meta.env?.MODE === 'test' ||
             import.meta.env?.VITE_SMOKE_TEST === 'true' ||
@@ -48,188 +70,142 @@ export async function getManifest(): Promise<DbtModel[]> {
         const res = await fetch(`${API_BASE}/manifest`);
         if (!res.ok) {
             if (res.status === 404) return [];
-            return [];
+            throw new Error(`Failed to fetch manifest: ${res.status}`);
         }
         const data = await res.json();
-        return data.models;
+        return data.models || [];
     } catch (e) {
+        console.error("Error fetching manifest:", e);
         return [];
     }
 }
 
-export async function getBusMatrix(
-    dimensionId?: string,
-    factId?: string,
-    tag?: string
-): Promise<{ dimensions: any[], facts: any[], connections: any[] }> {
-    try {
-        const params = new URLSearchParams();
-        if (dimensionId) params.append('dimension_id', dimensionId);
-        if (factId) params.append('fact_id', factId);
-        if (tag) params.append('tag', tag);
-        
-        const res = await fetch(`${API_BASE}/bus-matrix?${params.toString()}`);
-        if (!res.ok) {
-            if (res.status === 404) return { dimensions: [], facts: [], connections: [] };
-            throw new Error(`Status: ${res.status}`);
-        }
-        const data = await res.json();
-        return data;
-    } catch (e) {
-        console.error("Error fetching Bus Matrix:", e);
-        return { dimensions: [], facts: [], connections: [] };
+async function fetchDataModelOnce(): Promise<DataModel> {
+    const res = await fetch(`${API_BASE}/data-model`);
+    if (!res.ok) {
+        throw new Error(`Failed to fetch data model: ${res.status}`);
     }
+    return await res.json();
 }
 
 export async function getDataModel(): Promise<DataModel> {
     try {
-        const res = await fetch(`${API_BASE}/data-model`);
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
-        return await res.json();
+        const isSmokeMode =
+            import.meta.env?.MODE === 'test' ||
+            import.meta.env?.VITE_SMOKE_TEST === 'true' ||
+            import.meta.env?.PUBLIC_SMOKE_TEST === 'true' ||
+            (typeof window !== 'undefined' && Boolean((window as any).__SMOKE_TEST__));
+        if (isSmokeMode) {
+            return { version: 0.1, entities: [], relationships: [] };
+        }
+
+        try {
+            return await fetchDataModelOnce();
+        } catch (e) {
+            if (e instanceof TypeError && e.message.includes('Failed to fetch')) {
+                return await fetchDataModelOnce();
+            }
+            throw e;
+        }
     } catch (e) {
         console.error("Error fetching data model:", e);
-        // Return empty default
-        return { version: 0.1, entities: [], relationships: [] };
+        throw e;
     }
 }
 
-export async function saveDataModel(dataModel: DataModel): Promise<void> {
-    const res = await fetch(`${API_BASE}/data-model`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataModel)
-    });
-    if (!res.ok) throw new Error(`Failed to save data model: ${res.status}`);
+export async function saveDataModel(model: DataModel): Promise<void> {
+    try {
+        const res = await fetch(`${API_BASE}/data-model`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(model),
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Failed to save data model: ${res.status} - ${errorText}`);
+        }
+    } catch (e) {
+        console.error("Error saving data model:", e);
+        throw e;
+    }
 }
 
 export async function getConfigStatus(): Promise<ConfigStatus> {
     try {
         const res = await fetch(`${API_BASE}/config-status`);
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        if (!res.ok) {
+            throw new Error(`Failed to fetch config status: ${res.status}`);
+        }
         return await res.json();
     } catch (e) {
         console.error("Error fetching config status:", e);
-        return {
-            config_present: false,
-            config_filename: 'trellis.yml',
-            dbt_project_path: '',
-            manifest_path: '',
-            catalog_path: '',
-            manifest_exists: false,
-            catalog_exists: false,
-            data_model_exists: false,
-        };
+        throw e;
     }
 }
 
-export async function getConfigInfo(): Promise<ConfigInfo | null> {
+export async function getConfigInfo(): Promise<ConfigInfo> {
     try {
         const res = await fetch(`${API_BASE}/config-info`);
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        if (!res.ok) {
+            throw new Error(`Failed to fetch config info: ${res.status}`);
+        }
         return await res.json();
     } catch (e) {
         console.error("Error fetching config info:", e);
-        return null;
+        throw e;
     }
 }
 
-export async function saveDbtSchema(entityId: string, modelName: string, fields: DraftedField[], description?: string, tags?: string[]): Promise<{ status: string; file_path: string; message: string }> {
-    const res = await fetch(`${API_BASE}/dbt-schema`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            entity_id: entityId, 
-            model_name: modelName, 
-            fields,
-            description,
-            tags
-        })
-    });
-    if (!res.ok) {
-        const error = await res.text();
-        throw new Error(`Failed to save dbt schema: ${error}`);
-    }
-    return await res.json();
-}
-
-export async function inferRelationships(options?: { includeUnbound?: boolean }): Promise<Relationship[]> {
+export async function inferRelationships(): Promise<Relationship[]> {
     try {
-        const params = options?.includeUnbound ? '?include_unbound=true' : '';
-        const res = await fetch(`${API_BASE}/infer-relationships${params}`);
+        const res = await fetch(`${API_BASE}/infer-relationships`);
         if (!res.ok) {
-            // Handle 400 (no schema files) and 404 (endpoint not found) gracefully
-            if (res.status === 400 || res.status === 404) return [];
-            throw new Error(`Status: ${res.status}`);
-        }
-        const data = await res.json();
-        return data.relationships || [];
-    } catch (e) {
-        // Don't log expected errors (400 = no schema files, 404 = endpoint not found)
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        if (!errorMessage.includes('400') && !errorMessage.includes('404')) {
-            console.error("Error inferring relationships:", e);
-        }
-        return [];
-    }
-}
-
-export async function syncDbtTests(): Promise<{ status: string; message: string; files: string[] }> {
-    const res = await fetch(`${API_BASE}/sync-dbt-tests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) {
-        const error = await res.text();
-        throw new Error(`Failed to sync dbt tests: ${error}`);
-    }
-    return await res.json();
-}
-
-export async function getModelSchema(modelName: string, version?: number): Promise<ModelSchema | null> {
-    try {
-        const params = version !== undefined ? `?version=${version}` : "";
-        const res = await fetch(`${API_BASE}/models/${modelName}/schema${params}`);
-        if (!res.ok) {
-            if (res.status === 404) return null; // Model not found
-            throw new Error(`Status: ${res.status}`);
+            if (res.status === 400) {
+                // Treat config/schema absence as a non-fatal case for the UI/tests
+                return [];
+            }
+            const errorText = await res.text();
+            const details = errorText ? ` - ${errorText}` : '';
+            throw new Error(
+                `Failed to infer relationships: ${res.status} ${res.statusText}${details}`,
+            );
         }
         return await res.json();
     } catch (e) {
-        console.error("Error fetching model schema:", e);
-        return null;
+        console.error("Error inferring relationships:", e);
+        throw e;
     }
 }
 
-export async function updateModelSchema(modelName: string, columns: { name: string; data_type?: string; description?: string }[], description?: string, tags?: string[], version?: number): Promise<{ status: string; message: string; file_path: string }> {
-    const res = await fetch(`${API_BASE}/models/${modelName}/schema`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columns, description, tags, version })
-    });
-    if (!res.ok) {
-        const error = await res.text();
-        throw new Error(`Failed to update model schema: ${error}`);
+export async function syncDbtTests(): Promise<{ message: string }> {
+    try {
+        const res = await fetch(`${API_BASE}/sync-dbt-tests`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to sync dbt tests: ${res.status}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error("Error syncing dbt tests:", e);
+        throw e;
     }
-    return await res.json();
 }
 
 export async function getExposures(): Promise<ExposuresResponse> {
-    const endpointUrl = `${API_BASE}/exposures`;
     try {
-        const res = await fetch(endpointUrl);
+        const res = await fetch(`${API_BASE}/exposures`);
         if (!res.ok) {
-            if (res.status === 404) {
-                // Return empty response if endpoint doesn't exist yet
-                return { exposures: [], entityUsage: {} };
-            }
-            throw new Error(`Status: ${res.status}`);
+            throw new Error(`Failed to fetch exposures: ${res.status}`);
         }
-        const jsonData = await res.json();
-        return jsonData;
+        return await res.json();
     } catch (e) {
         console.error("Error fetching exposures:", e);
-        // Return empty response on error
-        return { exposures: [], entityUsage: {} };
+        throw e;
     }
 }
 
@@ -237,19 +213,73 @@ export async function getLineage(modelId: string): Promise<LineageResponse | nul
     try {
         const res = await fetch(`${API_BASE}/lineage/${encodeURIComponent(modelId)}`);
         if (!res.ok) {
-            if (res.status === 404) {
-                // Model not found - return null to allow modal to handle gracefully
-                return null;
-            }
-            // For 500 errors, throw with error message
-            const error = await res.text();
-            throw new Error(error || `Failed to fetch lineage: ${res.status}`);
+            if (res.status === 404) return null;
+            throw new Error(`Failed to fetch lineage: ${res.status}`);
         }
         return await res.json();
     } catch (e) {
         console.error("Error fetching lineage:", e);
         // Return null on error to allow modal to handle error display
         return null;
+    }
+}
+
+export async function getModelSchema(
+    modelName: string,
+    version?: number
+): Promise<ModelSchema | null> {
+    try {
+        const url = version
+            ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
+            : `${API_BASE}/schema?model_name=${modelName}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            if (res.status === 404) return null;
+            throw new Error(`Failed to fetch schema: ${res.status}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching schema:", e);
+        return null;
+    }
+}
+
+export async function updateModelSchema(
+    modelName: string,
+    version: number | undefined,
+    columns: ModelSchemaColumn[]
+): Promise<ModelSchema> {
+    try {
+        const url = version
+            ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
+            : `${API_BASE}/schema?model_name=${modelName}`;
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ columns }),
+        });
+        if (!res.ok) {
+            throw new Error(`Failed to update schema: ${res.status}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error("Error updating schema:", e);
+        throw e;
+    }
+}
+
+export async function getSourceSystemSuggestions(): Promise<string[]> {
+    try {
+        const res = await fetch(`${API_BASE}/source-systems/suggestions`);
+        if (!res.ok) {
+            // Return empty array on error
+            return [];
+        }
+        const data = await res.json();
+        return data.suggestions || [];
+    } catch (e) {
+        console.error("Error fetching source system suggestions:", e);
+        return [];
     }
 }
 
@@ -366,4 +396,36 @@ export async function validateConfig(config: Record<string, any>): Promise<{ val
         }
         throw e;
     }
+}
+
+/**
+ * Fetch Bus Matrix data showing dimension-fact connections.
+ * 
+ * @param dimensionId - Optional filter by specific dimension entity ID
+ * @param factId - Optional filter by specific fact entity ID
+ * @param tag - Optional filter by tag (entities must have this tag)
+ * @returns Promise containing dimensions, facts, and their connections
+ */
+export async function getBusMatrix(
+    dimensionId?: string,
+    factId?: string,
+    tag?: string
+): Promise<{
+    dimensions: Array<{ id: string; label: string; tags?: string[] }>;
+    facts: Array<{ id: string; label: string; tags?: string[] }>;
+    connections: Array<{ dimension_id: string; fact_id: string }>;
+}> {
+    const params = new URLSearchParams();
+    if (dimensionId) params.append('dimension_id', dimensionId);
+    if (factId) params.append('fact_id', factId);
+    if (tag) params.append('tag', tag);
+
+    const queryString = params.toString();
+    const url = `${API_BASE}/bus-matrix${queryString ? `?${queryString}` : ''}`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+        throw new Error(`Failed to fetch bus matrix: ${res.statusText}`);
+    }
+    return await res.json();
 }

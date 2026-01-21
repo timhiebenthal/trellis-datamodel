@@ -101,6 +101,49 @@ def extract_upstream_lineage(
         raise LineageError(f"Failed to extract lineage: {str(e)}") from e
 
 
+def extract_source_systems_for_model(
+    manifest_path: str,
+    catalog_path: Optional[str],
+    model_unique_id: str,
+) -> list[str]:
+    """
+    Extract unique source system names from upstream lineage.
+    
+    Args:
+        manifest_path: Path to dbt manifest.json file
+        catalog_path: Path to dbt catalog.json file (optional)
+        model_unique_id: Unique ID of the model (e.g., "model.project.model_name")
+    
+    Returns:
+        List of unique source-name values (e.g., ["salesforce_prod", "postgres_warehouse"])
+        Returns empty list if lineage extraction fails or no sources found.
+    """
+    try:
+        # Reuse existing lineage extraction
+        lineage_data = extract_upstream_lineage(
+            manifest_path, catalog_path, model_unique_id
+        )
+        
+        # Extract unique source names from nodes
+        source_systems: set[str] = set()
+        nodes = lineage_data.get("nodes", [])
+        
+        for node in nodes:
+            if node.get("isSource") and node.get("sourceName"):
+                source_systems.add(node["sourceName"])
+        
+        # Return sorted list for consistency
+        return sorted(list(source_systems))
+    except Exception as e:
+        # Log warning but don't raise - return empty list gracefully
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Failed to extract source systems for model {model_unique_id}: {str(e)}"
+        )
+        return []
+
+
 def _extract_lineage_from_manifest(
     manifest: dict[str, Any],
     root_model_id: str,
@@ -375,10 +418,14 @@ def _get_node_info(
     is_source = node_id in source_set or node_id.startswith("source.")
 
     # Extract source-name for source nodes
-    # Source IDs follow format: source.project.source_name.table_name
+    # Get source_name from the actual node in manifest (more reliable than parsing unique_id)
     source_name = None
-    if is_source and len(parts) >= 3:
-        source_name = parts[2]  # Third part is the source-name
+    if is_source:
+        # Look up the node in manifest sources section to get source_name field
+        sources = manifest.get("sources", {})
+        node = sources.get(node_id)
+        if node:
+            source_name = node.get("source_name")
 
     # Get level (distance from root)
     level = levels.get(node_id, 0)

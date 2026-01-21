@@ -22,6 +22,7 @@ _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
 @dataclass
 class GuidanceConfig:
     """Configuration for entity creation guidance features."""
+
     entity_wizard_enabled: bool = True
     push_warning_enabled: bool = True
     min_description_length: int = 10
@@ -31,6 +32,7 @@ class GuidanceConfig:
 @dataclass
 class DimensionalModelingConfig:
     """Configuration for dimensional modeling features."""
+
     enabled: bool = False
     dimension_prefix: list[str] = field(default_factory=lambda: ["dim_", "d_"])
     fact_prefix: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
@@ -39,14 +41,24 @@ class DimensionalModelingConfig:
 @dataclass
 class EntityModelingConfig:
     """Configuration for entity modeling features."""
+
     enabled: bool = False
     entity_prefix: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SourceChipsConfig:
+    """Configuration for source chip features."""
+
+    enabled: bool = True
+    source_sources: str = "both"  # Options: "manual", "lineage", "both"
 
 
 # Global configuration objects (set by load_config)
 GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
+SOURCE_CHIPS_CONFIG: SourceChipsConfig = SourceChipsConfig()
 
 if _TEST_DIR:
     # Test mode: use temp directory paths
@@ -233,9 +245,7 @@ def _load_lineage_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
         if isinstance(lineage_layers, list):
             layers = lineage_layers
         elif lineage_layers is not None:
-            logger.warning(
-                "'lineage.layers' must be a list. Ignoring provided value."
-            )
+            logger.warning("'lineage.layers' must be a list. Ignoring provided value.")
 
     legacy_present = "lineage_layers" in config
     if lineage_config and legacy_present:
@@ -279,16 +289,16 @@ def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
             "entity_wizard"
         )
         if isinstance(wizard_section, dict):
-            entity_wizard_enabled = wizard_section.get(
-                "enabled", entity_wizard_enabled
-            )
+            entity_wizard_enabled = wizard_section.get("enabled", entity_wizard_enabled)
         return GuidanceConfig(
             entity_wizard_enabled=bool(entity_wizard_enabled),
             push_warning_enabled=guidance_section.get("push_warning_enabled", True),
             min_description_length=guidance_section.get("min_description_length", 10),
-            disabled_guidance=guidance_section.get("disabled_guidance", [])
-            if isinstance(guidance_section.get("disabled_guidance"), list)
-            else [],
+            disabled_guidance=(
+                guidance_section.get("disabled_guidance", [])
+                if isinstance(guidance_section.get("disabled_guidance"), list)
+                else []
+            ),
         )
 
     return GuidanceConfig()
@@ -328,9 +338,7 @@ def _load_modeling_style(config: dict[str, Any]) -> str:
     return modeling_style
 
 
-def _resolve_bus_matrix_enabled(
-    modeling_style: str, bus_matrix_config: Any
-) -> bool:
+def _resolve_bus_matrix_enabled(modeling_style: str, bus_matrix_config: Any) -> bool:
     """Derive Bus Matrix enablement from modeling style and optional override."""
     enabled = modeling_style == "dimensional_model"
     if isinstance(bus_matrix_config, dict) and modeling_style == "dimensional_model":
@@ -438,7 +446,9 @@ def load_config(config_path: Optional[str] = None) -> None:
 
     # Skip loading config file in test mode (paths already set via environment)
     # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
-    if os.environ.get("DATAMODEL_TEST_DIR") and not os.environ.get("TRELLIS_CONFIG_PATH"):
+    if os.environ.get("DATAMODEL_TEST_DIR") and not os.environ.get(
+        "TRELLIS_CONFIG_PATH"
+    ):
         return
 
     CONFIG_PATH = _resolve_config_path(config_path) or ""
@@ -505,9 +515,7 @@ def load_config(config_path: Optional[str] = None) -> None:
     )
 
     # 14. Entity modeling configuration
-    ENTITY_MODELING_CONFIG = _load_entity_modeling_config(
-        MODELING_STYLE, config
-    )
+    ENTITY_MODELING_CONFIG = _load_entity_modeling_config(MODELING_STYLE, config)
 
 
 def print_config() -> None:
@@ -520,9 +528,7 @@ def print_config() -> None:
     logger.info("Looking for catalog at: %s", CATALOG_PATH)
     logger.info("Looking for data model at: %s", DATA_MODEL_PATH)
     logger.info("Looking for canvas layout at: %s", CANVAS_LAYOUT_PATH)
-    logger.info(
-        "Canvas layout version control: %s", CANVAS_LAYOUT_VERSION_CONTROL
-    )
+    logger.info("Canvas layout version control: %s", CANVAS_LAYOUT_VERSION_CONTROL)
     logger.info("Filtering models by paths: %s", DBT_MODEL_PATHS)
     logger.info("Lineage enabled: %s", LINEAGE_ENABLED)
     if LINEAGE_LAYERS:

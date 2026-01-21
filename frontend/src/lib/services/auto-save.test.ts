@@ -5,6 +5,7 @@ import type { Node, Edge } from '@xyflow/svelte';
 // Mock API function
 vi.mock('$lib/api', () => ({
     saveDataModel: vi.fn().mockResolvedValue(undefined),
+    getApiBase: vi.fn().mockReturnValue('http://localhost:8089/api'),
 }));
 
 import { saveDataModel as apiSaveDataModel } from '$lib/api';

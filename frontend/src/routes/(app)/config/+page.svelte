@@ -347,10 +347,11 @@
                         </div>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="framework-select" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Framework
                                 </label>
                                 <select
+                                    id="framework-select"
                                     value={getFieldValue('framework')}
                                     onchange={(e) => handleFieldChange('framework', e.currentTarget.value)}
                                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
@@ -365,10 +366,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="modeling-style-select" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Modeling Style
                                 </label>
                                 <select
+                                    id="modeling-style-select"
                                     value={getFieldValue('modeling_style')}
                                     onchange={(e) => handleFieldChange('modeling_style', e.currentTarget.value)}
                                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
@@ -394,10 +396,11 @@
                         </div>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="dbt-project-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     dbt Project Path
                                 </label>
                                 <input
+                                    id="dbt-project-path-input"
                                     type="text"
                                     value={getFieldValue('dbt_project_path')}
                                     oninput={(e) => handleFieldChange('dbt_project_path', e.currentTarget.value)}
@@ -413,10 +416,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="dbt-manifest-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Manifest Path
                                 </label>
                                 <input
+                                    id="dbt-manifest-path-input"
                                     type="text"
                                     value={getFieldValue('dbt_manifest_path')}
                                     oninput={(e) => handleFieldChange('dbt_manifest_path', e.currentTarget.value)}
@@ -432,10 +436,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="dbt-catalog-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Catalog Path
                                 </label>
                                 <input
+                                    id="dbt-catalog-path-input"
                                     type="text"
                                     value={getFieldValue('dbt_catalog_path')}
                                     oninput={(e) => handleFieldChange('dbt_catalog_path', e.currentTarget.value)}
@@ -451,10 +456,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="data-model-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Data Model File
                                 </label>
                                 <input
+                                    id="data-model-file-input"
                                     type="text"
                                     value={getFieldValue('data_model_file')}
                                     oninput={(e) => handleFieldChange('data_model_file', e.currentTarget.value)}
@@ -470,10 +476,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="dbt-company-dummy-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     dbt Company Dummy Path
                                 </label>
                                 <input
+                                    id="dbt-company-dummy-path-input"
                                     type="text"
                                     value={getFieldValue('dbt_company_dummy_path') || ''}
                                     oninput={(e) => handleFieldChange('dbt_company_dummy_path', e.currentTarget.value || null)}
@@ -486,11 +493,12 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="dbt-model-paths-0" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     dbt Model Paths
                                 </label>
                                 {#each getFieldValue('dbt_model_paths') || [] as path, index}
                                     <input
+                                        id={`dbt-model-paths-${index}`}
                                         type="text"
                                         value={path}
                                         oninput={(e) => {
@@ -520,7 +528,7 @@
                         <div class="space-y-4">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label for="entity-guidance-enabled" class="block text-sm font-medium text-gray-700 mb-1.5">
                                         Enable Entity Wizard
                                     </label>
                                     {#if getFieldMetadata('entity_creation_guidance.enabled')?.description}
@@ -529,6 +537,7 @@
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input
+                                        id="entity-guidance-enabled"
                                         type="checkbox"
                                         checked={getFieldValue('entity_creation_guidance.enabled')}
                                         onchange={(e) => handleNestedFieldChange('entity_creation_guidance.enabled', e.currentTarget.checked)}
@@ -540,7 +549,7 @@
 
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label for="entity-guidance-push-warning" class="block text-sm font-medium text-gray-700 mb-1.5">
                                         Push Warning Enabled
                                     </label>
                                     {#if getFieldMetadata('entity_creation_guidance.push_warning_enabled')?.description}
@@ -549,6 +558,7 @@
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input
+                                        id="entity-guidance-push-warning"
                                         type="checkbox"
                                         checked={getFieldValue('entity_creation_guidance.push_warning_enabled')}
                                         onchange={(e) => handleNestedFieldChange('entity_creation_guidance.push_warning_enabled', e.currentTarget.checked)}
@@ -559,10 +569,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="entity-guidance-min-description" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Min Description Length
                                 </label>
                                 <input
+                                    id="entity-guidance-min-description"
                                     type="number"
                                     min="0"
                                     value={getFieldValue('entity_creation_guidance.min_description_length')}
@@ -575,11 +586,12 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="entity-guidance-disabled-0" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Disabled Guidance
                                 </label>
                                 {#each getFieldValue('entity_creation_guidance.disabled_guidance') || [] as item, index}
                                     <input
+                                        id={`entity-guidance-disabled-${index}`}
                                         type="text"
                                         value={item}
                                         oninput={(e) => {
@@ -609,10 +621,11 @@
                         </div>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="dimension-prefix-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Dimension Prefix
                                 </label>
                                 <input
+                                    id="dimension-prefix-input"
                                     type="text"
                                     value={getFieldValue('dimensional_modeling.inference_patterns.dimension_prefix') || ''}
                                     oninput={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.dimension_prefix', e.currentTarget.value)}
@@ -625,10 +638,11 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="fact-prefix-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Fact Prefix
                                 </label>
                                 <input
+                                    id="fact-prefix-input"
                                     type="text"
                                     value={getFieldValue('dimensional_modeling.inference_patterns.fact_prefix') || ''}
                                     oninput={(e) => handleNestedFieldChange('dimensional_modeling.inference_patterns.fact_prefix', e.currentTarget.value)}
@@ -654,10 +668,11 @@
                         </div>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label for="entity-prefix-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     Entity Prefix
                                 </label>
                                 <input
+                                    id="entity-prefix-input"
                                     type="text"
                                     value={getFieldValue('entity_modeling.inference_patterns.prefix') || ''}
                                     oninput={(e) => handleNestedFieldChange('entity_modeling.inference_patterns.prefix', e.currentTarget.value)}
@@ -716,7 +731,7 @@
                                     <div class="flex items-center justify-between">
                                         <div class="flex-1">
                                             <div class="flex items-center gap-2">
-                                                <label class="block text-sm font-medium text-gray-700">
+                                                <label for="lineage-enabled-toggle" class="block text-sm font-medium text-gray-700">
                                                     Lineage Enabled
                                                 </label>
                                                 {#if isBetaField('lineage.enabled')}
@@ -729,6 +744,7 @@
                                         </div>
                                         <label class="relative inline-flex items-center cursor-pointer">
                                             <input
+                                                id="lineage-enabled-toggle"
                                                 type="checkbox"
                                                 checked={getFieldValue('lineage.enabled')}
                                                 onchange={(e) => handleNestedFieldChange('lineage.enabled', e.currentTarget.checked)}
@@ -740,12 +756,13 @@
                                     </div>
 
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        <label for="lineage-layer-0" class="block text-sm font-medium text-gray-700 mb-1.5">
                                             Lineage Layers
                                         </label>
                                         {#each lineageLayers as layer, index (index)}
                                             <div class="flex gap-2 mb-2">
                                                 <input
+                                                    id={`lineage-layer-${index}`}
                                                     type="text"
                                                     value={layer}
                                                     oninput={(e) => {
@@ -803,7 +820,7 @@
                                     <div class="flex items-center justify-between">
                                         <div class="flex-1">
                                             <div class="flex items-center gap-2">
-                                                <label class="block text-sm font-medium text-gray-700">
+                                                <label for="exposures-enabled-toggle" class="block text-sm font-medium text-gray-700">
                                                     Exposures Enabled
                                                 </label>
                                                 {#if isBetaField('exposures.enabled')}
@@ -816,6 +833,7 @@
                                         </div>
                                         <label class="relative inline-flex items-center cursor-pointer">
                                             <input
+                                                id="exposures-enabled-toggle"
                                                 type="checkbox"
                                                 checked={getFieldValue('exposures.enabled')}
                                                 onchange={(e) => handleNestedFieldChange('exposures.enabled', e.currentTarget.checked)}
@@ -827,10 +845,11 @@
                                     </div>
 
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        <label for="exposures-default-layout" class="block text-sm font-medium text-gray-700 mb-1.5">
                                             Exposures Default Layout
                                         </label>
                                         <select
+                                            id="exposures-default-layout"
                                             value={getFieldValue('exposures.default_layout')}
                                             onchange={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
                                             disabled={!isDangerZoneEnabled}
@@ -897,7 +916,7 @@
         }
     }
 
-    .animate-fade-in {
+    :global(.animate-fade-in) {
         animation: fade-in 0.3s ease-out;
     }
 </style>

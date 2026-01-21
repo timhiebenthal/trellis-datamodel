@@ -12,6 +12,9 @@ export const labelPrefixes = writable<string[]>([]);
 export const dimensionPrefixes = writable<string[]>([]);
 export const factPrefixes = writable<string[]>([]);
 
+// Source colors from canvas_layout.yml
+export const sourceColors = writable<Record<string, string>>({});
+
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
 export const tagFilter = writable<string[]>([]);
@@ -39,6 +42,42 @@ export function openLineageModal(modelId: string) {
 
 export function closeLineageModal() {
     lineageModal.set({ open: false, modelId: null });
+}
+
+export const sourceEditorModal = writable<{
+    open: boolean;
+    entityLabel: string;
+    entityId: string;
+    sources: string[];
+}>({
+    open: false,
+    entityLabel: '',
+    entityId: '',
+    sources: [],
+});
+
+export function openSourceEditorModal(entityLabel: string, entityId: string, sources: string[]) {
+    sourceEditorModal.set({ open: true, entityLabel, entityId, sources });
+}
+
+export function closeSourceEditorModal() {
+    sourceEditorModal.set({ open: false, entityLabel: '', entityId: '', sources: [] });
+}
+
+export const deleteConfirmModal = writable<{
+    open: boolean;
+    entityLabel: string;
+}>({
+    open: false,
+    entityLabel: '',
+});
+
+export function openDeleteConfirmModal(entityLabel: string) {
+    deleteConfirmModal.set({ open: true, entityLabel });
+}
+
+export function closeDeleteConfirmModal() {
+    deleteConfirmModal.set({ open: false, entityLabel: '' });
 }
 
 // Undo/Redo history management
