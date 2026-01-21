@@ -2,47 +2,20 @@ version: 0.1
 entities:
   customer:
     position:
-      x: 118.29704886923031
-      y: -44.90543959264385
+      x: 100
+      y: 100
     width: 280
     panel_height: 200
     collapsed: false
-  sale:
+  test_unbound_entity:
     position:
-      x: 551.4413659575124
-      y: 141.89449375397845
+      x: 500
+      y: 100
     width: 280
     panel_height: 200
     collapsed: false
-  lead:
-    position:
-      x: 311.6998367507094
-      y: 503.2430014912735
-    width: 280
-    panel_height: 200
-    collapsed: false
-  supplier:
-    position:
-      x: 813.155927227514
-      y: 466.0010479616705
-    width: 280
-    panel_height: 200
-    collapsed: false
-  new_entity:
-    position:
-      x: -107.27126236194948
-      y: 402.4078324999236
-    width: 280
-    panel_height: 200
-    collapsed: false
-  new_entity_1:
-    position:
-      x: 991.16114186742
-      y: 78.65605245476438
-    width: 280
-    panel_height: 200
-    collapsed: false
-relationships:
-  lead-customer-0:
-    label_dx: 0
-    label_dy: 0
+relationships: {}
+source_colors:
+  salesforce: '#0176D3'
+  hubspot: '#FF7A59'
+  sap: '#0FAAFF'

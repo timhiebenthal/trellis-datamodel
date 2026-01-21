@@ -2,42 +2,12 @@ version: 0.1
 entities:
   - id: customer
     label: Customer
-    description: Customer records
-    dbt_model: model.company_dummy_entity.customer
-    entity_type: unclassified
-  - id: sale
-    label: Sale
-    description: Sale records at order-item grain with enriched order information
-    dbt_model: model.company_dummy_entity.sale
-    entity_type: unclassified
-  - id: lead
-    label: Lead
-    description: Sales leads
-    dbt_model: model.company_dummy_entity.lead
-    entity_type: unclassified
-  - id: supplier
-    label: Supplier
-    description: Supplier records
-    dbt_model: model.company_dummy_entity.supplier
-    entity_type: unclassified
-  - id: new_entity
-    label: New Entity
     description: ''
-    entity_type: unclassified
+  - id: test_unbound_entity
+    label: Test Unbound Entity
+    description: Testing source systems display
     source_system:
+      - salesforce
       - hubspot
-      - salesforce
       - sap
-  - id: new_entity_1
-    label: New Entity
-    description: ''
-    entity_type: unclassified
-    source_system:
-      - salesforce
-relationships:
-  - source: lead
-    target: customer
-    label: ''
-    type: one_to_many
-    source_field: lead_id
-    target_field: lead_id
+relationships: []
