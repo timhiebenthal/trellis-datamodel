@@ -793,7 +793,7 @@
                                             value={getFieldValue('exposures.default_layout')}
                                             onchange={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
                                             disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
                                         >
                                             {#each getEnumOptions('exposures.default_layout', ['dashboards-as-rows', 'entities-as-rows']) as value}
                                                 <option value={value}>{value}</option>
