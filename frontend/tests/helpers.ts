@@ -1,7 +1,23 @@
 import type { APIRequestContext, Page } from '@playwright/test';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 // Playwright pages use the frontend baseURL (localhost:5173). Point API calls to the backend.
 const API_URL = process.env.VITE_PUBLIC_API_URL || 'http://localhost:8000/api';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const DBT_COMPANY_DUMMY_PATH = path.join(REPO_ROOT, 'dbt_company_dummy');
+
+type ConfigFileInfo = {
+    mtime: number;
+    hash: string;
+};
+
+type ConfigResponse = {
+    config: Record<string, any>;
+    file_info?: ConfigFileInfo | null;
+};
 
 export type DataModelPayload = {
     version: number;
@@ -27,6 +43,71 @@ export async function resetDataModel(
     if (!res.ok()) {
         throw new Error(`Failed to reset data model: ${res.status()} ${res.statusText()}`);
     }
+}
+
+export async function getConfig(
+    request: APIRequestContext,
+): Promise<ConfigResponse> {
+    const res = await request.get(`${API_URL}/config`);
+    if (!res.ok()) {
+        throw new Error(`Failed to fetch config: ${res.status()} ${res.statusText()}`);
+    }
+    return (await res.json()) as ConfigResponse;
+}
+
+export async function saveConfig(
+    request: APIRequestContext,
+    config: Record<string, any>,
+    fileInfo?: ConfigFileInfo | null,
+): Promise<void> {
+    const res = await request.put(`${API_URL}/config`, {
+        data: {
+            config,
+            expected_mtime: fileInfo?.mtime ?? null,
+            expected_hash: fileInfo?.hash ?? null,
+        },
+    });
+    if (!res.ok()) {
+        throw new Error(`Failed to update config: ${res.status()} ${res.statusText()}`);
+    }
+}
+
+export async function reloadConfig(request: APIRequestContext): Promise<void> {
+    const res = await request.post(`${API_URL}/config/reload`);
+    if (!res.ok()) {
+        throw new Error(`Failed to reload config: ${res.status()} ${res.statusText()}`);
+    }
+}
+
+export async function applyConfigOverrides(
+    request: APIRequestContext,
+    overrides: Record<string, any>,
+): Promise<Record<string, any>> {
+    const current = await getConfig(request);
+    const nextConfig = {
+        ...current.config,
+        ...overrides,
+    };
+    await saveConfig(request, nextConfig, current.file_info ?? null);
+    await reloadConfig(request);
+    return current.config;
+}
+
+export async function restoreConfig(
+    request: APIRequestContext,
+    config: Record<string, any>,
+): Promise<void> {
+    const current = await getConfig(request);
+    await saveConfig(request, config, current.file_info ?? null);
+    await reloadConfig(request);
+}
+
+export function getCompanyDummyConfigOverrides(): Record<string, any> {
+    return {
+        dbt_project_path: DBT_COMPANY_DUMMY_PATH,
+        dbt_manifest_path: path.join(DBT_COMPANY_DUMMY_PATH, 'target', 'manifest.json'),
+        dbt_catalog_path: path.join(DBT_COMPANY_DUMMY_PATH, 'target', 'catalog.json'),
+    };
 }
 
 /**

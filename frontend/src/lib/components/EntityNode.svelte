@@ -40,6 +40,7 @@
         classifyModelTypeFromPrefixes,
     } from "$lib/utils";
     import { getContext } from "svelte";
+    import { goto } from "$app/navigation";
     import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import TagEditor from "./TagEditor.svelte";
     import { openLineageModal } from "$lib/stores";
@@ -51,6 +52,7 @@
         event.stopPropagation(); // Prevent collapse toggle
         exposureEntityFilter.set(id);
         viewMode.set('exposures');
+        goto('/exposures');
     }
 
     let { data: rawData, id, selected }: NodeProps = $props();
