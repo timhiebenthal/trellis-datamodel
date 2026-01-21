@@ -85,12 +85,20 @@
 
         // Get selected text
         const selectedText = range.toString();
-        const endPos = startPos + selectedText.length;
+        const trimmedText = selectedText.trim();
+        
+        // Calculate how many leading/trailing spaces to skip
+        const leadingSpaces = selectedText.length - selectedText.trimStart().length;
+        const trailingSpaces = selectedText.length - selectedText.trimEnd().length;
+        
+        // Adjust positions to exclude whitespace
+        const adjustedStart = startPos + leadingSpaces;
+        const adjustedEnd = startPos + selectedText.length - trailingSpaces;
 
         return {
-            start: startPos,
-            end: endPos,
-            text: selectedText.trim(),
+            start: adjustedStart,
+            end: adjustedEnd,
+            text: trimmedText,
         };
     }
 
