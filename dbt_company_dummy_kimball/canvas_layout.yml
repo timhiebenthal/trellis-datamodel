@@ -80,19 +80,13 @@ relationships:
   product-sale-2:
     label_dx: 0
     label_dy: 0
-  customer-sale-3:
+  product-inventory-3:
     label_dx: 0
     label_dy: 0
-  product-inventory-4:
+  department-employee-4:
     label_dx: 0
     label_dy: 0
-  department-employee-5:
-    label_dx: 0
-    label_dy: 0
-  employee-employee-6:
-    label_dx: 0
-    label_dy: 0
-  lead-customer-7:
+  employee-employee-5:
     label_dx: 0
     label_dy: 0
 source_colors: {}
