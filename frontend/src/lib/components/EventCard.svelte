@@ -102,100 +102,100 @@
 </script>
 
 <div
-    class="rounded-lg border border-gray-300 bg-white shadow-sm hover:shadow-md transition-all duration-200 p-4"
+    class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
 >
-    <!-- Header with type badge -->
-    <div class="flex items-start justify-between mb-3">
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-            <span
-                class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}"
-            >
-                {event.type}
-            </span>
+    <!-- List-like row layout -->
+    <div class="flex items-center gap-4">
+        <!-- Event text with annotations (flex-1 to take available space) -->
+        <div class="flex-1 min-w-0 text-sm text-gray-700 leading-relaxed">
+            {#each renderAnnotatedText() as part}
+                {#if part.type === "dimension"}
+                    <span
+                        class="bg-blue-200 text-blue-900 px-1 rounded font-medium"
+                        title="Dimension: {part.text}"
+                    >
+                        {part.text}
+                    </span>
+                {:else if part.type === "fact"}
+                    <span
+                        class="bg-green-200 text-green-900 px-1 rounded font-medium"
+                        title="Fact: {part.text}"
+                    >
+                        {part.text}
+                    </span>
+                {:else}
+                    {part.text}
+                {/if}
+            {/each}
+        </div>
+
+        <!-- Status badges -->
+        <div class="flex items-center gap-2 flex-shrink-0">
             {#if hasDerivedEntities}
                 <span
                     class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300 flex items-center gap-1"
                     title="Entities have been generated from this event"
                 >
                     <Icon icon="lucide:check-circle" class="w-3 h-3" />
-                    Entities Generated
+                    Generated
                 </span>
             {/if}
         </div>
-    </div>
 
-    <!-- Event text with annotations -->
-    <div class="mb-4 text-sm text-gray-700 leading-relaxed">
-        {#each renderAnnotatedText() as part}
-            {#if part.type === "dimension"}
-                <span
-                    class="bg-blue-200 text-blue-900 px-1 rounded font-medium"
-                    title="Dimension: {part.text}"
-                >
-                    {part.text}
-                </span>
-            {:else if part.type === "fact"}
-                <span
-                    class="bg-green-200 text-green-900 px-1 rounded font-medium"
-                    title="Fact: {part.text}"
-                >
-                    {part.text}
-                </span>
-            {:else}
-                {part.text}
-            {/if}
-        {/each}
-    </div>
+        <!-- Type badge on the right -->
+        <div class="flex-shrink-0">
+            <span
+                class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}"
+            >
+                {event.type}
+            </span>
+        </div>
 
-    <!-- Action buttons -->
-    <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-200">
-        <button
-            onclick={() => onAnnotate(event)}
-            class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 flex items-center gap-1.5"
-            title="Annotate text segments as dimensions or facts"
-        >
-            <Icon icon="lucide:tag" class="w-3.5 h-3.5" />
-            Annotate
-        </button>
+        <!-- Action buttons -->
+        <div class="flex items-center gap-1 flex-shrink-0">
+            <button
+                onclick={() => onAnnotate(event)}
+                class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                title="Annotate text segments as dimensions or facts"
+            >
+                <Icon icon="lucide:tag" class="w-4 h-4" />
+            </button>
 
-        <button
-            onclick={() => onGenerateEntities(event)}
-            disabled={!canGenerateEntities}
-            class="px-3 py-1.5 text-xs font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 flex items-center gap-1.5 transition-all"
-            class:text-white={canGenerateEntities}
-            class:bg-blue-600={canGenerateEntities}
-            class:hover:bg-blue-700={canGenerateEntities}
-            class:text-gray-400={!canGenerateEntities}
-            class:bg-gray-100={!canGenerateEntities}
-            class:cursor-not-allowed={!canGenerateEntities}
-            class:cursor-pointer={canGenerateEntities}
-            title={
-                canGenerateEntities
-                    ? "Generate dimensional entities from annotations"
-                    : "Add at least one dimension and one fact annotation to generate entities"
-            }
-        >
-            <Icon icon="lucide:sparkles" class="w-3.5 h-3.5" />
-            Generate Entities
-        </button>
+            <button
+                onclick={() => onGenerateEntities(event)}
+                disabled={!canGenerateEntities}
+                class="p-1.5 rounded transition-colors"
+                class:text-blue-600={canGenerateEntities}
+                class:hover:text-blue-700={canGenerateEntities}
+                class:hover:bg-blue-50={canGenerateEntities}
+                class:text-gray-400={!canGenerateEntities}
+                class:cursor-not-allowed={!canGenerateEntities}
+                class:cursor-pointer={canGenerateEntities}
+                title={
+                    canGenerateEntities
+                        ? "Generate dimensional entities from annotations"
+                        : "Add at least one dimension and one fact annotation to generate entities"
+                }
+            >
+                <Icon icon="lucide:sparkles" class="w-4 h-4" />
+            </button>
 
-        <button
-            onclick={() => onEdit(event)}
-            class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 flex items-center gap-1.5"
-            title="Edit event text or type"
-        >
-            <Icon icon="lucide:pencil" class="w-3.5 h-3.5" />
-            Edit
-        </button>
+            <button
+                onclick={() => onEdit(event)}
+                class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                title="Edit event text or type"
+            >
+                <Icon icon="lucide:pencil" class="w-4 h-4" />
+            </button>
 
-        <button
-            onclick={handleDelete}
-            class="px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 flex items-center gap-1.5"
-            title="Delete this event"
-        >
-            <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
-            Delete
-        </button>
+            <button
+                onclick={handleDelete}
+                class="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                title="Delete this event"
+            >
+                <Icon icon="lucide:trash-2" class="w-4 h-4" />
+            </button>
+        </div>
     </div>
 </div>
 

@@ -4,12 +4,18 @@
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
+    import AnnotateEventModal from './AnnotateEventModal.svelte';
+    import EventCard from './EventCard.svelte';
 
     let events = $state<BusinessEvent[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
     let selectedFilter = $state<BusinessEventType | 'all'>('all');
     let showCreateModal = $state(false);
+    let showEditModal = $state(false);
+    let showAnnotateModal = $state(false);
+    let editingEvent = $state<BusinessEvent | null>(null);
+    let annotatingEvent = $state<BusinessEvent | null>(null);
 
     // Filter events based on selected type
     let filteredEvents = $derived(
@@ -61,21 +67,34 @@
 
     function handleModalClose() {
         showCreateModal = false;
-        // Reload events after modal closes (assuming event was created)
         reloadEvents();
     }
 
-    function getTypeBadgeColor(type: BusinessEventType): string {
-        switch (type) {
-            case 'discrete':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'evolving':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'recurring':
-                return 'bg-purple-100 text-purple-800 border-purple-200';
-            default:
-                return 'bg-gray-100 text-gray-800 border-gray-200';
-        }
+    function handleAnnotate(event: BusinessEvent) {
+        annotatingEvent = event;
+        showAnnotateModal = true;
+    }
+
+    function handleAnnotateModalClose() {
+        showAnnotateModal = false;
+        annotatingEvent = null;
+        reloadEvents();
+    }
+
+    function handleGenerateEntities(event: BusinessEvent) {
+        console.log('Generate entities for event:', event);
+        // TODO: Implement entity generation
+    }
+
+    function handleEdit(event: BusinessEvent) {
+        editingEvent = event;
+        showEditModal = true;
+    }
+
+    function handleEditModalClose() {
+        showEditModal = false;
+        editingEvent = null;
+        reloadEvents();
     }
 </script>
 
@@ -166,69 +185,15 @@
                     </div>
                 </div>
             {:else}
-                <div class="space-y-4">
+                <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                     {#each filteredEvents as event (event.id)}
-                        <!-- Event Card (basic version - will be replaced by EventCard component in Stream C) -->
-                        <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
-                            <div class="flex items-start justify-between mb-2">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <span
-                                            class="px-2 py-1 text-xs font-medium rounded border {getTypeBadgeColor(event.type)}"
-                                        >
-                                            {event.type}
-                                        </span>
-                                        {#if event.derived_entities.length > 0}
-                                            <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800 border border-green-200">
-                                                <Icon icon="lucide:check" class="w-3 h-3 inline mr-1" />
-                                                Entities Generated
-                                            </span>
-                                        {/if}
-                                    </div>
-                                    <p class="text-gray-800 mb-2">{event.text}</p>
-                                    {#if event.annotations.length > 0}
-                                        <div class="flex flex-wrap gap-2 mt-2">
-                                            {#each event.annotations as annotation}
-                                                <span
-                                                    class="px-2 py-1 text-xs rounded {annotation.type === 'dimension'
-                                                        ? 'bg-blue-100 text-blue-800'
-                                                        : 'bg-green-100 text-green-800'}"
-                                                >
-                                                    {annotation.text} ({annotation.type})
-                                                </span>
-                                            {/each}
-                                        </div>
-                                    {/if}
-                                </div>
-                                <div class="flex items-center gap-2 ml-4">
-                                    <button
-                                        class="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                        title="Annotate"
-                                    >
-                                        <Icon icon="lucide:tag" class="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        class="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                        title="Generate Entities"
-                                        disabled={event.annotations.length === 0}
-                                    >
-                                        <Icon icon="lucide:sparkles" class="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        class="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                        title="Edit"
-                                    >
-                                        <Icon icon="lucide:edit" class="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        class="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        title="Delete"
-                                    >
-                                        <Icon icon="lucide:trash" class="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <EventCard
+                            {event}
+                            onAnnotate={handleAnnotate}
+                            onGenerateEntities={handleGenerateEntities}
+                            onEdit={handleEdit}
+                            onDelete={reloadEvents}
+                        />
                     {/each}
                 </div>
             {/if}
@@ -240,5 +205,23 @@
         open={showCreateModal}
         onSave={handleModalClose}
         onCancel={() => { showCreateModal = false; }}
+    />
+
+    <!-- Edit Event Modal -->
+    {#if showEditModal && editingEvent}
+        <CreateEventModal
+            open={showEditModal}
+            onSave={handleEditModalClose}
+            onCancel={() => { showEditModal = false; editingEvent = null; }}
+            event={editingEvent}
+        />
+    {/if}
+
+    <!-- Annotate Event Modal -->
+    <AnnotateEventModal
+        open={showAnnotateModal}
+        event={annotatingEvent}
+        onSave={handleAnnotateModalClose}
+        onCancel={() => { showAnnotateModal = false; annotatingEvent = null; }}
     />
 </div>
