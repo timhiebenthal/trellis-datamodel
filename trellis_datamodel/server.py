@@ -170,6 +170,7 @@ def create_app() -> FastAPI:
     def health_check():
         return {"status": "ok"}
 
+
     # Favicon endpoint - serves trellis_squared.svg
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon():

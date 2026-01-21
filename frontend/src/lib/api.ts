@@ -26,7 +26,24 @@ export function getApiBase(): string {
         import.meta.env?.PUBLIC_API_URL ??
         '';
     if (typeof maybe === 'string' && maybe.length > 0) {
-        return maybe;
+        const trimmed = maybe.replace(/\/+$/g, '');
+        if (trimmed.endsWith('/api')) {
+            return trimmed;
+        }
+        if (typeof window !== 'undefined') {
+            try {
+                const rawUrl = new URL(trimmed, window.location.origin);
+                if (rawUrl.origin === window.location.origin) {
+                    const path = rawUrl.pathname.replace(/\/+$/g, '');
+                    if (path === '' || path === '/') {
+                        return `${rawUrl.origin}/api`;
+                    }
+                }
+            } catch {
+                // fall through to trimmed
+            }
+        }
+        return trimmed;
     }
     if (import.meta.env?.DEV) {
         const devTarget = import.meta.env?.VITE_DEV_API_TARGET ?? 'http://localhost:8089';
@@ -63,6 +80,14 @@ export async function getManifest(): Promise<DbtModel[]> {
     }
 }
 
+async function fetchDataModelOnce(): Promise<DataModel> {
+    const res = await fetch(`${API_BASE}/data-model`);
+    if (!res.ok) {
+        throw new Error(`Failed to fetch data model: ${res.status}`);
+    }
+    return await res.json();
+}
+
 export async function getDataModel(): Promise<DataModel> {
     try {
         const isSmokeMode =
@@ -74,11 +99,14 @@ export async function getDataModel(): Promise<DataModel> {
             return { version: 0.1, entities: [], relationships: [] };
         }
 
-        const res = await fetch(`${API_BASE}/data-model`);
-        if (!res.ok) {
-            throw new Error(`Failed to fetch data model: ${res.status}`);
+        try {
+            return await fetchDataModelOnce();
+        } catch (e) {
+            if (e instanceof TypeError && e.message.includes('Failed to fetch')) {
+                return await fetchDataModelOnce();
+            }
+            throw e;
         }
-        return await res.json();
     } catch (e) {
         console.error("Error fetching data model:", e);
         throw e;
