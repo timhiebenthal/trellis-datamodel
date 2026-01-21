@@ -66,6 +66,7 @@ async def client(temp_config_dir):
     """Create a test client with config path set."""
     # Monkeypatch to find the temp config
     import trellis_datamodel.config as config_module
+
     original_find = config_module.find_config_file
 
     def patched_find(config_override=None):
@@ -73,8 +74,11 @@ async def client(temp_config_dir):
 
     config_module.find_config_file = patched_find
 
-    from httpx import AsyncClient
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    from httpx import ASGITransport
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         yield client
 
     config_module.find_config_file = original_find
