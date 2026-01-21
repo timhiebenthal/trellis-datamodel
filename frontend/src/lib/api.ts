@@ -235,9 +235,10 @@ export async function getModelSchema(
     version?: number
 ): Promise<ModelSchema | null> {
     try {
+        const encodedModel = encodeURIComponent(modelName);
         const url = version
-            ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
-            : `${API_BASE}/schema?model_name=${modelName}`;
+            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
+            : `${API_BASE}/models/${encodedModel}/schema`;
         const res = await fetch(url);
         if (!res.ok) {
             if (res.status === 404) return null;
@@ -256,9 +257,10 @@ export async function updateModelSchema(
     columns: ModelSchemaColumn[]
 ): Promise<ModelSchema> {
     try {
+        const encodedModel = encodeURIComponent(modelName);
         const url = version
-            ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
-            : `${API_BASE}/schema?model_name=${modelName}`;
+            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
+            : `${API_BASE}/models/${encodedModel}/schema`;
         const res = await fetch(url, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
