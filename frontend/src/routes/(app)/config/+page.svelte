@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { getConfig, getConfigSchema, updateConfig, validateConfig } from '$lib/api';
+    import { getConfig, getConfigSchema, updateConfig, validateConfig, reloadConfig } from '$lib/api';
     import type { ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
     import Icon from '$lib/components/Icon.svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
@@ -30,6 +30,12 @@
 
     // Reactive modeling style for conditional rendering
     $: modelingStyle = config.modeling_style;
+
+    // Entity guidance toggle state for dependent fields
+    $: entityGuidanceEnabled = !!config?.entity_creation_guidance?.enabled;
+    $: if (!entityGuidanceEnabled && getFieldValue('entity_creation_guidance.push_warning_enabled')) {
+        handleNestedFieldChange('entity_creation_guidance.push_warning_enabled', false);
+    }
     
     // Reactive lineage layers for UI updates
     $: lineageLayers = config.lineage?.layers || [];
@@ -144,8 +150,20 @@
             // Update file info with new values
             fileInfo = response.file_info;
 
-            // Show success message
-            showSuccessToast();
+            // Reload backend config to apply changes
+            try {
+                await reloadConfig();
+                // Show success message and reload page to pick up new config values
+                showSuccessToast();
+                // Reload page after a short delay to allow toast to be visible
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } catch (reloadError) {
+                // Reload failed - show error but keep old runtime state
+                const reloadMessage = reloadError instanceof Error ? reloadError.message : String(reloadError);
+                showErrorToast(`Configuration saved but reload failed: ${reloadMessage}`);
+            }
 
             // Reset saving state after successful save
             saving = false;
@@ -173,13 +191,26 @@
         // Simple toast notification
         const toast = document.createElement('div');
         toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
-        toast.textContent = '✓ Configuration saved successfully';
+        toast.textContent = '✓ Configuration saved and reloaded successfully';
         document.body.appendChild(toast);
 
         setTimeout(() => {
             toast.classList.add('opacity-0');
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    }
+
+    function showErrorToast(message: string) {
+        // Error toast notification
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('opacity-0');
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
     }
 
     function handleReload() {
@@ -337,6 +368,30 @@
                 {/if}
 
                 <form onsubmit={handleApply} class="space-y-8">
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end gap-3 mb-6">
+                        <button
+                            type="button"
+                            onclick={handleReload}
+                            disabled={saving}
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                            Reset Changes
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            class="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {#if saving}
+                                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8 0 0 4 0 0 0 0 4 0 0 0 0 4 0 4 0 0 4 0 0 4 0 0 0 4 0 0 4 0 0 0 0 4 0 0 0 0z"></path>
+                                </svg>
+                            {/if}
+                            Apply Configuration
+                        </button>
+                    </div>
                     <!-- Framework Section -->
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
                         <div class="flex items-center gap-2 mb-4">
@@ -868,32 +923,7 @@
                         </div>
                     </div>
 
-                            <!-- Action Buttons -->
-                            <div class="flex items-center justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onclick={handleReload}
-                                    disabled={saving}
-                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                                >
-                                    Reset Changes
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    class="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {#if saving}
-                                        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8 0 0 4 0 0 0 0 4 0 0 0 0 4 0 4 0 0 4 0 0 4 0 0 0 4 0 0 4 0 0 0 0 4 0 0 0 0z"></path>
-                                        </svg>
-                                    {/if}
-                                    Apply Configuration
-                                </button>
-                            </div>
-
-                            {#if fileInfo}
+                    {#if fileInfo}
                                 <div class="mt-6 text-xs text-gray-500">
                                     <p>Config file: {fileInfo.path}</p>
                                     <p>Last modified: {new Date(fileInfo.mtime * 1000).toLocaleString()}</p>

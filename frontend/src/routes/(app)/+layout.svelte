@@ -3,7 +3,7 @@
     import '../../app.css';
     import logoHref from '$lib/assets/trellis_squared.svg?url';
     import { page } from '$app/stores';
-    import { onMount, untrack, setContext } from 'svelte';
+    import { onMount, setContext, untrack } from 'svelte';
     import { writable } from 'svelte/store';
     import {
     nodes,
@@ -100,13 +100,14 @@ import {
         disabled_guidance: [],
     });
     const guidanceConfigStore = writable(guidanceConfig);
-    setContext('guidanceConfig', guidanceConfigStore);
     const lineageEnabledStore = writable(lineageEnabled);
-    setContext('lineageEnabled', lineageEnabledStore);
     const exposuresEnabledStore = writable(exposuresEnabled);
-    setContext('exposuresEnabled', exposuresEnabledStore);
     const hasExposuresDataStore = writable(hasExposuresData);
+    setContext('guidanceConfig', guidanceConfigStore);
+    setContext('lineageEnabled', lineageEnabledStore);
+    setContext('exposuresEnabled', exposuresEnabledStore);
     setContext('hasExposuresData', hasExposuresDataStore);
+
     let warningModalOpen = $state(false);
     let incompleteEntitiesForWarning = $state<Node[]>([]);
     let warningModalResolve: ((value: boolean) => void) | null = null;

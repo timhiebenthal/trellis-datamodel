@@ -347,3 +347,56 @@ async def test_config_schema_field_descriptions(client: AsyncClient):
         assert "required" in field_metadata
         assert "description" in field_metadata
         assert "beta" in field_metadata
+
+
+@pytest.mark.asyncio
+async def test_reload_config_success(client: AsyncClient, temp_config_dir):
+    """Test POST /api/config/reload successfully reloads config."""
+    # First, update config to change a value
+    get_response = await client.get("/api/config")
+    assert get_response.status_code == 200
+    initial_config = get_response.json()["config"]
+    file_info = get_response.json()["file_info"]
+
+    # Update a field
+    updated_config = {**initial_config, "modeling_style": "dimensional_model"}
+    put_response = await client.put(
+        "/api/config",
+        json={
+            "config": updated_config,
+            "expected_mtime": file_info["mtime"],
+            "expected_hash": file_info["hash"],
+        },
+    )
+    assert put_response.status_code == 200
+
+    # Now reload config
+    reload_response = await client.post("/api/config/reload")
+
+    assert reload_response.status_code == 200
+    data = reload_response.json()
+
+    assert "status" in data
+    assert data["status"] == "success"
+    assert "message" in data
+    assert "reloaded" in data["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_reload_config_missing_file(client: AsyncClient, temp_config_dir, monkeypatch):
+    """Test POST /api/config/reload fails gracefully when config file is missing."""
+    import trellis_datamodel.config as config_module
+
+    def patched_find(config_override=None):
+        return None  # Simulate missing config file
+
+    monkeypatch.setattr(config_module, "find_config_file", patched_find)
+
+    # Reload should fail with 400 (configuration error)
+    reload_response = await client.post("/api/config/reload")
+
+    assert reload_response.status_code == 400
+    data = reload_response.json()
+
+    assert "error" in data["detail"]
+    assert "configuration_error" in data["detail"]["error"]

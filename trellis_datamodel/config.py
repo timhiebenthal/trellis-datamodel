@@ -518,6 +518,45 @@ def load_config(config_path: Optional[str] = None) -> None:
     ENTITY_MODELING_CONFIG = _load_entity_modeling_config(MODELING_STYLE, config)
 
 
+def reload_config(config_path: Optional[str] = None) -> None:
+    """
+    Reload configuration from trellis.yml at runtime.
+    
+    This function reloads the config file and updates all global configuration
+    variables. Should be called after config file changes to apply new settings
+    without restarting the server.
+    
+    Args:
+        config_path: Optional override path to config file. If None, uses
+                    find_config_file() to locate trellis.yml.
+    
+    Raises:
+        ConfigurationError: If config file cannot be found or loaded.
+    """
+    from trellis_datamodel.exceptions import ConfigurationError
+    
+    logger.info("Reloading configuration...")
+    try:
+        # Use provided path or find config file
+        if not config_path:
+            config_path = find_config_file()
+        
+        if not config_path:
+            raise ConfigurationError(
+                "No config file found. Please create trellis.yml in the current directory."
+            )
+        
+        # Reload config (this updates all global variables)
+        load_config(config_path)
+        logger.info("Configuration reloaded successfully")
+    except ConfigurationError:
+        # Re-raise ConfigurationError as-is
+        raise
+    except Exception as e:
+        logger.error(f"Failed to reload configuration: {e}")
+        raise ConfigurationError(f"Failed to reload configuration: {e}") from e
+
+
 def print_config() -> None:
     """Print current configuration for debugging."""
     logger.info("Using Config: %s", CONFIG_PATH)

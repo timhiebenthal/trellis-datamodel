@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from trellis_datamodel.config import find_config_file
+from trellis_datamodel.config import find_config_file, reload_config
 from trellis_datamodel.exceptions import ConfigurationError, ValidationError
 from trellis_datamodel.models.schemas import (
     ConfigGetResponse,
@@ -180,6 +180,48 @@ async def update_config(request: ConfigUpdateRequest) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error saving config: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": str(e)},
+        )
+
+
+@config_router.post("/reload")
+async def reload_config_endpoint() -> Dict[str, Any]:
+    """
+    Reload configuration from trellis.yml at runtime.
+
+    Reloads the config file and updates all global configuration variables,
+    clearing any cached state that depends on config. Should be called after
+    config file changes to apply new settings without restarting the server.
+
+    Returns:
+        Success response with status message.
+
+    Raises:
+        HTTPException: If config cannot be reloaded (file not found, invalid, etc.)
+    """
+    try:
+        # Reload config (updates all global variables)
+        reload_config()
+
+        # Clear adapter caches that depend on config
+        from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
+        DbtCoreAdapter.reset_inference_cache()
+
+        logger.info("Configuration reloaded successfully via API")
+        return {
+            "status": "success",
+            "message": "Configuration reloaded successfully",
+        }
+    except ConfigurationError as e:
+        logger.error(f"Config error during reload: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "configuration_error", "message": str(e)},
+        )
+    except Exception as e:
+        logger.error(f"Error reloading config: {e}")
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": str(e)},

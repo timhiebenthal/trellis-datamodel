@@ -1224,6 +1224,17 @@ class DbtCoreAdapter:
     _inference_cache: dict[str, str] | None = None
     _inference_cache_key: str | None = None
 
+    @classmethod
+    def reset_inference_cache(cls) -> None:
+        """
+        Reset the entity type inference cache.
+        
+        Should be called when configuration changes that affect inference
+        (e.g., dimensional modeling config, manifest path changes).
+        """
+        cls._inference_cache = None
+        cls._inference_cache_key = None
+
     def infer_entity_types(self) -> dict[str, str]:
         """
         Infer entity types from dbt model naming patterns.

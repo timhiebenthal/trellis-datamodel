@@ -235,9 +235,10 @@ export async function getModelSchema(
     version?: number
 ): Promise<ModelSchema | null> {
     try {
+        const encodedModel = encodeURIComponent(modelName);
         const url = version
-            ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
-            : `${API_BASE}/schema?model_name=${modelName}`;
+            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
+            : `${API_BASE}/models/${encodedModel}/schema`;
         const res = await fetch(url);
         if (!res.ok) {
             if (res.status === 404) return null;
@@ -256,9 +257,10 @@ export async function updateModelSchema(
     columns: ModelSchemaColumn[]
 ): Promise<ModelSchema> {
     try {
+        const encodedModel = encodeURIComponent(modelName);
         const url = version
-            ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
-            : `${API_BASE}/schema?model_name=${modelName}`;
+            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
+            : `${API_BASE}/models/${encodedModel}/schema`;
         const res = await fetch(url, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -401,6 +403,25 @@ export async function validateConfig(config: Record<string, any>): Promise<{ val
             return { valid: false, error: message };
         }
         throw e;
+    }
+}
+
+export async function reloadConfig(): Promise<{ status: string; message: string }> {
+    try {
+        const res = await fetch(`${API_BASE}/config/reload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail?.message || `Status: ${res.status}`);
+        }
+
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(message);
     }
 }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { getContext } from 'svelte';
     import { readable, type Readable } from 'svelte/store';
+    import { viewMode, nodes, edges } from '$lib/stores';
     import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
 
@@ -25,7 +26,6 @@
     const hasExposuresDataStore =
         getContext<Readable<boolean>>('hasExposuresData') ?? readable(false);
     const hasExposuresData = $derived($hasExposuresDataStore);
-
 </script>
 
 <svelte:head>
