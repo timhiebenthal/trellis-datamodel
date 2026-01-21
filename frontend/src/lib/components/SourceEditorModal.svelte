@@ -185,7 +185,7 @@
 
             <!-- Sources Display -->
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-3">
+                <label for="source-systems-input" class="block text-sm font-medium text-gray-700 mb-3">
                     Source Systems
                 </label>
                 <div class="flex flex-wrap gap-2 min-h-[48px] p-4 border border-gray-300 rounded-md bg-gray-50">
@@ -219,6 +219,7 @@
 
                     <!-- Add Source Input -->
                     <input
+                        id="source-systems-input"
                         type="text"
                         class="source-input inline-input px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 min-w-[120px] flex-1"
                         bind:value={sourceInput}

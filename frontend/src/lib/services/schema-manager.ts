@@ -224,19 +224,14 @@ export class SchemaManager {
         this.updateState({ isSaving: true, error: null });
 
         try {
-            // Only save schema tags (explicit), not manifest tags (which may be inherited)
-            const tagsToSave = this.state.schemaTags;
-
             await updateModelSchema(
                 this.modelName,
+                this.version ?? undefined,
                 this.state.editableColumns.map((col) => ({
                     name: col.name,
                     data_type: col.data_type,
                     description: col.description,
                 })),
-                description,
-                tagsToSave.length > 0 ? tagsToSave : undefined,
-                this.version ?? undefined,
             );
 
             this.updateState({

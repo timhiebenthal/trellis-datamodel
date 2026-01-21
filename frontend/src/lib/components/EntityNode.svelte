@@ -457,7 +457,7 @@
 
         // Auto-create relationships from yml relationship tests
         try {
-            const inferred = await inferRelationships({ includeUnbound: true });
+            const inferred = await inferRelationships();
 
             // Build model name -> entity ID map from current canvas state
             // Include the model we just bound (since data model hasn't saved yet)
@@ -664,10 +664,6 @@
             alert("Failed to delete entity. Please try again.");
             closeDeleteConfirmModal();
         }
-    }
-
-    function cancelDelete() {
-        showDeleteModal = false;
     }
 
     // Entity type menu functionality
