@@ -21,6 +21,7 @@ Each task should be:
 - Clear outcome
 - Appropriately sized
 - Testable/verifiable
+- Include brief implementation detail when useful (e.g., file, function, API)
 
 Task types:
 - Setup: Environment, dependencies
@@ -52,13 +53,17 @@ Task types:
 ## SPRINT 1: Foundation
 
 ### Stream A: wizard.py
-- [ ] Create module structure
-- [ ] Implement prompts
-- [ ] Add error handling
+- [ ] Create module structure in `wizard.py` with `WizardStep` types
+- [ ] Implement prompts in `build_prompt()` and wire to CLI args
+- [ ] Add error handling for missing config and invalid inputs
 
 ### Stream B: cli.py
-- [ ] Modify init command
-- [ ] Integrate wizard
+- [ ] Modify `init` command to accept `--wizard` flag
+- [ ] Integrate wizard flow via `run_wizard()` and return exit codes
+
+### Stream C: test_cli.py
+- [ ] Add tests mocking error codes `E_CONFIG` and `E_IO` from `run_wizard()`
+- [ ] Assert exit codes and user-facing messages per error code
 ```
 
 ### Dependencies
@@ -113,6 +118,8 @@ Implementation notes, edge cases, standards
 
 - Reference `.cursor/project.md` for tech stack
 - Make tasks concrete and focused
+- Prefer 1-2 lines per task if extra technical detail helps
+- Include file or symbol when it reduces ambiguity (e.g., `routes/data_model.py`, `load_config()`)
 - Include testing tasks
 - Order by: dependencies → logical flow → risk
 
