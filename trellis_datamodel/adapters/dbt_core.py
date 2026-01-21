@@ -849,13 +849,7 @@ class DbtCoreAdapter:
                                                 or target_entity_id
                                                 not in bound_entities
                                             ):
-                                                allow_by_entity_presence = (
-                                                    entity_id in data_model_entities
-                                                    and target_entity_id
-                                                    in data_model_entities
-                                                )
-                                                if not allow_by_entity_presence:
-                                                    continue
+                                                continue
 
                                         relationships.append(
                                             {
