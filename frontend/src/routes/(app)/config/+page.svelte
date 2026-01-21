@@ -29,22 +29,17 @@
 
     // Reactive modeling style for conditional rendering
     $: modelingStyle = config.modeling_style;
+    
+    // Reactive lineage layers for UI updates
+    $: lineageLayers = config.lineage?.layers || [];
 
     onMount(async () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:28',message:'onMount starting',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{}); // #endregion
         await loadConfig();
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:30',message:'onMount after loadConfig',data:{config,loading,modeling_style:config.modeling_style},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{}); // #endregion
         loading = false;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:32',message:'loading set to false',data:{config_keys:Object.keys(config)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{}); // #endregion
     });
 
     async function loadConfig() {
         try {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:33',message:'loadConfig starting',data:{config_keys:Object.keys(config)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{}); // #endregion
             const response: ConfigGetResponse = await getConfig();
 
             if (response.error) {
@@ -53,8 +48,6 @@
             }
 
             config = response.config || {};
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:41',message:'config assigned',data:{config_keys:Object.keys(config),modeling_style:config.modeling_style},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{}); // #endregion
             schema = response.schema_metadata;
             fileInfo = response.file_info || null;
 
@@ -101,14 +94,8 @@
                 handleNestedFieldChange('exposures.default_layout', 'dashboards-as-rows');
             }
 
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:87',message:'loadConfig defaults set',data:{config,has_dimensional_modeling:!!config.dimensional_modeling},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{}); // #endregion
-
-            // FIX: Trigger reactivity by reassigning config
+            // Trigger reactivity by reassigning config
             config = { ...config };
-
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:94',message:'config reassigned for reactivity',data:{modeling_style:config.modeling_style},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{}); // #endregion
 
             // Determine if beta features are enabled
             dangerZoneAcknowledged = false;
@@ -118,7 +105,10 @@
         }
     }
 
-    async function handleApply() {
+    async function handleApply(event?: Event) {
+        if (event) {
+            event.preventDefault();
+        }
         saving = true;
         error = null;
         validationErrors = {};
@@ -218,6 +208,11 @@
         for (let i = 0; i < parts.length - 1; i++) {
             if (!current[parts[i]]) {
                 current[parts[i]] = {};
+            } else {
+                // Deep clone the nested object to ensure Svelte detects the change
+                current[parts[i]] = Array.isArray(current[parts[i]]) 
+                    ? [...current[parts[i]]]
+                    : { ...current[parts[i]] };
             }
             current = current[parts[i]];
         }
@@ -232,33 +227,19 @@
         const parts = path.split('.');
         let current: any = config;
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:207',message:'getFieldValue called',data:{path,config_keys:Object.keys(config)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{}); // #endregion
-
         for (const part of parts) {
             if (current && current[part] !== undefined) {
                 current = current[part];
             } else {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:215',message:'getFieldValue returned null',data:{path,current_part:part,has_current:!!current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{}); // #endregion
                 return null;
             }
         }
 
-        // #region agent log
-        if (path === 'modeling_style' || path.startsWith('dimensional_modeling')) {
-            fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:220',message:'getFieldValue success',data:{path,value:current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{}); // #endregion
-        } // #endregion
         return current;
     }
 
     function getFieldMetadata(path: string): ConfigFieldMetadata | null {
-        const metadata = schema.fields[path] || null;
-        // #region agent log
-        if (path.startsWith('dimensional_modeling')) {
-            fetch('http://127.0.0.1:7242/ingest/5005a234-c969-4c96-a71f-2c33a7d43099',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'config/+page.svelte:225',message:'getFieldMetadata',data:{path,has_metadata:!!metadata},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{}); // #endregion
-        } // #endregion
-        return metadata;
+        return schema.fields[path] || null;
     }
 
     function isBetaField(path: string): boolean {
@@ -722,13 +703,13 @@
                                 <label class="block text-sm font-medium text-amber-900 mb-1.5">
                                     Lineage Layers
                                 </label>
-                                {#each getFieldValue('lineage.layers') || [] as layer, index}
+                                {#each lineageLayers as layer, index (index)}
                                     <div class="flex gap-2 mb-2">
                                         <input
                                             type="text"
                                             value={layer}
                                             oninput={(e) => {
-                                                const newLayers = [...(getFieldValue('lineage.layers') || [])];
+                                                const newLayers = [...lineageLayers];
                                                 newLayers[index] = e.currentTarget.value;
                                                 handleNestedFieldChange('lineage.layers', newLayers);
                                             }}
@@ -739,7 +720,7 @@
                                         <button
                                             type="button"
                                             onclick={() => {
-                                                const newLayers = [...(getFieldValue('lineage.layers') || [])];
+                                                const newLayers = [...lineageLayers];
                                                 newLayers.splice(index, 1);
                                                 handleNestedFieldChange('lineage.layers', newLayers);
                                             }}
@@ -751,13 +732,13 @@
                                         </button>
                                     </div>
                                 {/each}
-                                {#if (getFieldValue('lineage.layers') || []).length === 0}
+                                {#if lineageLayers.length === 0}
                                     <p class="mt-1.5 text-xs text-amber-700">No layers configured</p>
                                 {/if}
                                 <button
                                     type="button"
                                     onclick={() => {
-                                        const newLayers = [...(getFieldValue('lineage.layers') || [])];
+                                        const newLayers = [...lineageLayers];
                                         newLayers.push('');
                                         handleNestedFieldChange('lineage.layers', newLayers);
                                     }}
