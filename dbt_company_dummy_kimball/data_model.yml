@@ -8,8 +8,10 @@ entities:
   - id: customer
     label: Customer
     description: Customer records
-    dbt_model: model.company_dummy_kimball.dim_customer
+    dbt_model:
     entity_type: dimension
+    source_system:
+      - mock_csv
   - id: product
     label: Product
     description: Product catalog
@@ -44,6 +46,8 @@ entities:
     label: Employee
     description: Employee records
     dbt_model: model.company_dummy_kimball.dim_employee
+    additional_models:
+      - model.company_dummy_kimball.dim_employee_history
     entity_type: dimension
   - id: lead
     label: Lead
@@ -69,12 +73,6 @@ relationships:
     type: one_to_many
     source_field: product_id
     target_field: product_id
-  - source: customer
-    target: sale
-    label: ''
-    type: one_to_many
-    source_field: customer_id
-    target_field: customer_id
   - source: product
     target: inventory
     label: ''
@@ -93,9 +91,3 @@ relationships:
     type: one_to_many
     source_field: employee_id
     target_field: supervisor_id
-  - source: lead
-    target: customer
-    label: ''
-    type: one_to_many
-    source_field: lead_id
-    target_field: lead_id
