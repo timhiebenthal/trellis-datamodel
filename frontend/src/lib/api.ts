@@ -9,6 +9,10 @@ import type {
     Relationship,
     ExposuresResponse,
     LineageResponse,
+    BusinessEvent,
+    BusinessEventType,
+    Annotation,
+    GeneratedEntitiesResult,
 } from './types';
 
 /**
@@ -455,4 +459,353 @@ export async function getBusMatrix(
         throw new Error(`Failed to fetch bus matrix: ${res.statusText}`);
     }
     return await res.json();
+}
+
+/**
+ * Business Events API functions
+ */
+
+/**
+ * Fetch all business events.
+ * @returns Promise containing array of BusinessEvent objects
+ */
+export async function getBusinessEvents(): Promise<BusinessEvent[]> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events`);
+        if (!res.ok) {
+            throw new Error(`Failed to fetch business events: ${res.statusText}`);
+        }
+        const data = await res.json();
+        // Handle both { events: [...] } and direct array response
+        return Array.isArray(data) ? data : (data.events || []);
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error fetching business events: ${message}`);
+    }
+}
+
+/**
+ * Create a new business event.
+ * @param text - Event description text
+ * @param type - Event type (discrete, evolving, recurring)
+ * @returns Promise containing the created BusinessEvent
+ */
+export async function createBusinessEvent(
+    text: string,
+    type: BusinessEventType
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, type }),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to create business event: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error creating business event: ${message}`);
+    }
+}
+
+/**
+ * Update an existing business event.
+ * @param id - Event ID to update
+ * @param updates - Dictionary with fields to update (text, type, annotations, derived_entities)
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function updateBusinessEvent(
+    id: string,
+    updates: Partial<BusinessEvent>
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to update business event: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error updating business event: ${message}`);
+    }
+}
+
+/**
+ * Delete a business event.
+ * @param id - Event ID to delete
+ */
+export async function deleteBusinessEvent(id: string): Promise<void> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${id}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to delete business event: ${res.statusText}`);
+        }
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error deleting business event: ${message}`);
+    }
+}
+
+/**
+ * Add an annotation to a business event.
+ * @param eventId - Event ID
+ * @param text - Annotated text segment
+ * @param type - Annotation type ('dimension' or 'fact')
+ * @param startPos - Start position in event text
+ * @param endPos - End position in event text
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function addAnnotation(
+    eventId: string,
+    text: string,
+    type: 'dimension' | 'fact',
+    startPos: number,
+    endPos: number
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/annotations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, type, start_pos: startPos, end_pos: endPos }),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to add annotation: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error adding annotation: ${message}`);
+    }
+}
+
+/**
+ * Remove an annotation from a business event.
+ * @param eventId - Event ID
+ * @param index - Index of annotation to remove
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function removeAnnotation(
+    eventId: string,
+    index: number
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/annotations/${index}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to remove annotation: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error removing annotation: ${message}`);
+    }
+}
+
+/**
+ * Generate entities from a business event.
+ * @param eventId - Event ID to generate entities from
+ * @returns Promise containing GeneratedEntitiesResult
+ */
+export async function generateEntitiesFromEvent(
+    eventId: string
+): Promise<GeneratedEntitiesResult> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/generate-entities`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error generating entities: ${message}`);
+    }
+}
+
+/**
+ * Fetch all business events.
+ * @returns Promise containing array of business events
+ */
+export async function getBusinessEvents(): Promise<BusinessEvent[]> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events`);
+        if (!res.ok) {
+            throw new Error(`Failed to fetch business events: ${res.statusText}`);
+        }
+        const data = await res.json();
+        return data.events || [];
+    } catch (e) {
+        console.error('Error fetching business events:', e);
+        throw e;
+    }
+}
+
+/**
+ * Create a new business event.
+ * @param text - Event description text
+ * @param type - Event type (discrete, evolving, recurring)
+ * @returns Promise containing the created business event
+ */
+export async function createBusinessEvent(
+    text: string,
+    type: BusinessEventType
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, type }),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to create business event: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error creating business event:', e);
+        throw e;
+    }
+}
+
+/**
+ * Update an existing business event.
+ * @param id - Event ID
+ * @param updates - Partial event data to update
+ * @returns Promise containing the updated business event
+ */
+export async function updateBusinessEvent(
+    id: string,
+    updates: Partial<BusinessEvent>
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to update business event: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error updating business event:', e);
+        throw e;
+    }
+}
+
+/**
+ * Delete a business event.
+ * @param id - Event ID to delete
+ */
+export async function deleteBusinessEvent(id: string): Promise<void> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${id}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to delete business event: ${res.statusText}`);
+        }
+    } catch (e) {
+        console.error('Error deleting business event:', e);
+        throw e;
+    }
+}
+
+/**
+ * Add an annotation to a business event.
+ * @param eventId - Event ID
+ * @param text - Annotated text segment
+ * @param type - Annotation type ('dimension' or 'fact')
+ * @param startPos - Start position in event text
+ * @param endPos - End position in event text
+ * @returns Promise containing the updated business event
+ */
+export async function addAnnotation(
+    eventId: string,
+    text: string,
+    type: 'dimension' | 'fact',
+    startPos: number,
+    endPos: number
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/annotations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, type, start_pos: startPos, end_pos: endPos }),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to add annotation: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error adding annotation:', e);
+        throw e;
+    }
+}
+
+/**
+ * Remove an annotation from a business event by index.
+ * @param eventId - Event ID
+ * @param index - Index of annotation to remove
+ * @returns Promise containing the updated business event
+ */
+export async function removeAnnotation(
+    eventId: string,
+    index: number
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/annotations/${index}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to remove annotation: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error removing annotation:', e);
+        throw e;
+    }
+}
+
+/**
+ * Generate entities and relationships from an annotated business event.
+ * @param eventId - Event ID
+ * @returns Promise containing generated entities, relationships, and any errors
+ */
+export async function generateEntitiesFromEvent(
+    eventId: string
+): Promise<GeneratedEntitiesResult> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/generate-entities`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error generating entities from event:', e);
+        throw e;
+    }
 }

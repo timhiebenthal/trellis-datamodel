@@ -90,6 +90,8 @@ if _TEST_DIR:
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
     MODELING_STYLE: str = "entity_model"
     Bus_MATRIX_ENABLED: bool = False
+    BUSINESS_EVENTS_ENABLED: bool = False
+    BUSINESS_EVENTS_PATH: str = ""
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
     ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
@@ -112,6 +114,8 @@ else:
     EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
     MODELING_STYLE: str = "entity_model"
     Bus_MATRIX_ENABLED: bool = False
+    BUSINESS_EVENTS_ENABLED: bool = False
+    BUSINESS_EVENTS_PATH: str = ""
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
     ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 
@@ -326,6 +330,38 @@ def _load_exposures_config(config: dict[str, Any]) -> tuple[bool, str]:
     return enabled, default_layout
 
 
+def _load_business_events_config(config: dict[str, Any]) -> bool:
+    """Load business events configuration."""
+    enabled = False
+
+    business_events_config = config.get("business_events")
+    if isinstance(business_events_config, dict):
+        enabled = bool(business_events_config.get("enabled", False))
+
+    return enabled
+
+
+def _resolve_business_events_path(
+    config_path: str, data_model_path: str, config: dict[str, Any]
+) -> str:
+    """Resolve business events path, defaulting to same directory as data_model.yml."""
+    business_events_config = config.get("business_events")
+    if isinstance(business_events_config, dict):
+        business_events_file = business_events_config.get("file")
+        if business_events_file:
+            base_dir = _resolve_base_path(config_path)
+            return _resolve_path(base_dir, business_events_file)
+
+    # Default: same directory as data_model.yml
+    if data_model_path:
+        data_model_dir = os.path.dirname(data_model_path)
+        return os.path.abspath(os.path.join(data_model_dir, "business_events.yml"))
+
+    return os.path.abspath(
+        os.path.join(_resolve_base_path(config_path), "business_events.yml")
+    )
+
+
 def _load_modeling_style(config: dict[str, Any]) -> str:
     """Load modeling style with validation."""
     modeling_style = config.get("modeling_style", "entity_model")
@@ -442,7 +478,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
     # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
@@ -516,6 +552,12 @@ def load_config(config_path: Optional[str] = None) -> None:
 
     # 14. Entity modeling configuration
     ENTITY_MODELING_CONFIG = _load_entity_modeling_config(MODELING_STYLE, config)
+
+    # 15. Business events configuration
+    BUSINESS_EVENTS_ENABLED = _load_business_events_config(config)
+    BUSINESS_EVENTS_PATH = _resolve_business_events_path(
+        CONFIG_PATH, DATA_MODEL_PATH, config
+    )
 
 
 def reload_config(config_path: Optional[str] = None) -> None:

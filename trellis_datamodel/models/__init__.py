@@ -4,10 +4,22 @@ from .schemas import (
     DbtSchemaRequest,
     ModelSchemaRequest,
 )
+from .business_event import (
+    Annotation,
+    BusinessEvent,
+    BusinessEventType,
+    BusinessEventsFile,
+    DerivedEntity,
+)
 
 __all__ = [
     "DataModelUpdate",
     "DbtSchemaRequest",
     "ModelSchemaRequest",
+    "Annotation",
+    "BusinessEvent",
+    "BusinessEventType",
+    "BusinessEventsFile",
+    "DerivedEntity",
 ]
 

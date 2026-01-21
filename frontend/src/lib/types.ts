@@ -150,6 +150,7 @@ export interface ConfigInfo {
     exposures_enabled?: boolean;
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
     bus_matrix_enabled?: boolean;
+    business_events_enabled?: boolean;
     modeling_style?: 'dimensional_model' | 'entity_model';
     entity_prefix?: string[];
     label_prefixes?: string[];
@@ -274,4 +275,46 @@ export interface ConfigUpdateResponse {
         mtime: number;
         hash: string;
     };
+}
+
+// Business Events types
+export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
+
+export interface Annotation {
+    text: string;
+    type: 'dimension' | 'fact';
+    start_pos: number;
+    end_pos: number;
+}
+
+export interface DerivedEntity {
+    entity_id: string;
+    created_at: string; // ISO timestamp
+}
+
+export interface BusinessEvent {
+    id: string; // e.g., "evt_YYYYMMDD_NNN"
+    text: string;
+    type: BusinessEventType;
+    created_at: string; // ISO timestamp
+    updated_at: string; // ISO timestamp
+    annotations: Annotation[];
+    derived_entities: DerivedEntity[];
+}
+
+export interface GeneratedEntitiesResult {
+    entities: Array<{
+        id: string;
+        label: string;
+        entity_type: 'fact' | 'dimension' | 'unclassified';
+        description?: string;
+        metadata?: Record<string, any>;
+    }>;
+    relationships: Array<{
+        source: string;
+        target: string;
+        type: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many';
+        label?: string;
+    }>;
+    errors: string[];
 }
