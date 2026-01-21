@@ -361,3 +361,35 @@ export async function validateConfig(config: Record<string, any>): Promise<{ val
         throw e;
     }
 }
+
+/**
+ * Fetch Bus Matrix data showing dimension-fact connections.
+ * 
+ * @param dimensionId - Optional filter by specific dimension entity ID
+ * @param factId - Optional filter by specific fact entity ID
+ * @param tag - Optional filter by tag (entities must have this tag)
+ * @returns Promise containing dimensions, facts, and their connections
+ */
+export async function getBusMatrix(
+    dimensionId?: string,
+    factId?: string,
+    tag?: string
+): Promise<{
+    dimensions: Array<{ id: string; label: string; tags?: string[] }>;
+    facts: Array<{ id: string; label: string; tags?: string[] }>;
+    connections: Array<{ dimension_id: string; fact_id: string }>;
+}> {
+    const params = new URLSearchParams();
+    if (dimensionId) params.append('dimension_id', dimensionId);
+    if (factId) params.append('fact_id', factId);
+    if (tag) params.append('tag', tag);
+
+    const queryString = params.toString();
+    const url = `${API_BASE}/bus-matrix${queryString ? `?${queryString}` : ''}`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+        throw new Error(`Failed to fetch bus matrix: ${res.statusText}`);
+    }
+    return await res.json();
+}
