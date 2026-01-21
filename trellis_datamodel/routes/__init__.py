@@ -1,6 +1,6 @@
 """API route modules."""
 from .manifest import router as manifest_router
-from .config import router as config_router
+from .config import config_router
 from .data_model import router as data_model_router
 from .schema import router as schema_router
 from .exposures import router as exposures_router

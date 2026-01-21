@@ -245,3 +245,118 @@ export async function getSourceSystemSuggestions(): Promise<string[]> {
         return [];
     }
 }
+
+// Config API
+export interface ConfigFieldMetadata {
+    type: string;
+    enum_values?: string[];
+    default: any;
+    required: boolean;
+    description: string;
+    beta: boolean;
+}
+
+export interface ConfigSchema {
+    fields: Record<string, ConfigFieldMetadata>;
+    beta_flags: string[];
+}
+
+export interface ConfigGetResponse {
+    config: Record<string, any>;
+    schema_metadata: ConfigSchema;
+    file_info?: {
+        path: string;
+        mtime: number;
+        hash: string;
+        backup_path?: string;
+    };
+    error?: string;
+}
+
+export interface ConfigUpdateResponse {
+    config: Record<string, any>;
+    file_info: {
+        path: string;
+        mtime: number;
+        hash: string;
+    };
+}
+
+export async function getConfig(): Promise<ConfigGetResponse> {
+    try {
+        const res = await fetch(`${API_BASE}/config`);
+        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching config:", e);
+        return {
+            config: {},
+            schema_metadata: { fields: {}, beta_flags: [] },
+            error: e instanceof Error ? e.message : "Failed to load config",
+        };
+    }
+}
+
+export async function getConfigSchema(): Promise<ConfigSchema> {
+    try {
+        const res = await fetch(`${API_BASE}/config/schema`);
+        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        console.error("Error fetching config schema:", e);
+        return { fields: {}, beta_flags: [] };
+    }
+}
+
+export async function updateConfig(
+    config: Record<string, any>,
+    expected_mtime?: number,
+    expected_hash?: string
+): Promise<ConfigUpdateResponse> {
+    const body: any = { config };
+    if (expected_mtime !== undefined) body.expected_mtime = expected_mtime;
+    if (expected_hash !== undefined) body.expected_hash = expected_hash;
+
+    const res = await fetch(`${API_BASE}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (res.status === 409) {
+        const error = await res.json();
+        throw new Error(`CONFLICT: ${JSON.stringify(error.detail)}`);
+    }
+
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail?.message || `Status: ${res.status}`);
+    }
+
+    return await res.json();
+}
+
+export async function validateConfig(config: Record<string, any>): Promise<{ valid: boolean; error?: string }> {
+    try {
+        const res = await fetch(`${API_BASE}/config/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail?.message || `Status: ${res.status}`);
+        }
+
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        // If it's not a CONFLICT, rethrow
+        if (!message.startsWith('CONFLICT:')) {
+            console.error("Error validating config:", e);
+            return { valid: false, error: message };
+        }
+        throw e;
+    }
+}
