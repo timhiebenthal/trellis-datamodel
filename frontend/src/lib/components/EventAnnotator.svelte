@@ -274,8 +274,18 @@
 <div class="event-annotator space-y-4">
     <div class="mb-4">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Annotate Event Text</h3>
-        <p class="text-sm text-gray-600">
-            Select text to tag as dimension or fact. Click on highlighted annotations to remove them.
+        <p class="text-sm text-gray-600 flex items-center gap-1 flex-wrap">
+            <span>Select text to tag as</span>
+            <span class="bg-green-200 text-green-900 px-1 rounded font-medium inline-flex items-center gap-1">
+                <Icon icon="lucide:list" class="w-3 h-3" />
+                dimension
+            </span>
+            <span>or</span>
+            <span class="bg-blue-200 text-blue-900 px-1 rounded font-medium inline-flex items-center gap-1">
+                <Icon icon="lucide:bar-chart-3" class="w-3 h-3" />
+                fact
+            </span>
+            <span>. Click on highlighted annotations to remove them.</span>
         </p>
     </div>
 
@@ -291,7 +301,7 @@
         {#each renderAnnotatedText() as part}
             {#if part.type === "dimension"}
                 <span
-                    class="bg-blue-200 text-blue-900 px-1 rounded font-medium cursor-pointer hover:bg-blue-300 transition-colors"
+                    class="bg-green-200 text-green-900 px-1 rounded font-medium cursor-pointer hover:bg-green-300 transition-colors"
                     title="Dimension: {part.text} (click to remove)"
                     onclick={(e) => handleAnnotationClick(e, part.annotationIndex!)}
                     data-annotation-index={part.annotationIndex}
@@ -300,7 +310,7 @@
                 </span>
             {:else if part.type === "fact"}
                 <span
-                    class="bg-green-200 text-green-900 px-1 rounded font-medium cursor-pointer hover:bg-green-300 transition-colors"
+                    class="bg-blue-200 text-blue-900 px-1 rounded font-medium cursor-pointer hover:bg-blue-300 transition-colors"
                     title="Fact: {part.text} (click to remove)"
                     onclick={(e) => handleAnnotationClick(e, part.annotationIndex!)}
                     data-annotation-index={part.annotationIndex}
@@ -322,20 +332,20 @@
         >
             <button
                 onclick={() => handleTagAs("dimension")}
-                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
-                role="menuitem"
-                disabled={isSaving}
-            >
-                <Icon icon="lucide:tag" class="w-4 h-4 text-blue-600" />
-                Tag as Dimension
-            </button>
-            <button
-                onclick={() => handleTagAs("fact")}
                 class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-2"
                 role="menuitem"
                 disabled={isSaving}
             >
-                <Icon icon="lucide:tag" class="w-4 h-4 text-green-600" />
+                <Icon icon="lucide:list" class="w-4 h-4 text-green-600" />
+                Tag as Dimension
+            </button>
+            <button
+                onclick={() => handleTagAs("fact")}
+                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+                role="menuitem"
+                disabled={isSaving}
+            >
+                <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
                 Tag as Fact
             </button>
             <div class="border-t border-gray-200 my-1"></div>

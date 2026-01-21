@@ -109,20 +109,20 @@
         <!-- Event text with annotations (flex-1 to take available space) -->
         <div class="flex-1 min-w-0 text-sm text-gray-700 leading-relaxed">
             {#each renderAnnotatedText() as part}
-                {#if part.type === "dimension"}
-                    <span
-                        class="bg-blue-200 text-blue-900 px-1 rounded font-medium"
-                        title="Dimension: {part.text}"
-                    >
-                        {part.text}
-                    </span>
-                {:else if part.type === "fact"}
-                    <span
-                        class="bg-green-200 text-green-900 px-1 rounded font-medium"
-                        title="Fact: {part.text}"
-                    >
-                        {part.text}
-                    </span>
+            {#if part.type === "dimension"}
+                <span
+                    class="bg-green-200 text-green-900 px-1 rounded font-medium"
+                    title="Dimension: {part.text}"
+                >
+                    {part.text}
+                </span>
+            {:else if part.type === "fact"}
+                <span
+                    class="bg-blue-200 text-blue-900 px-1 rounded font-medium"
+                    title="Fact: {part.text}"
+                >
+                    {part.text}
+                </span>
                 {:else}
                     {part.text}
                 {/if}
@@ -158,7 +158,7 @@
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                 title="Annotate text segments as dimensions or facts"
             >
-                <Icon icon="lucide:tag" class="w-4 h-4" />
+                <Icon icon="lucide:highlighter" class="w-4 h-4" />
             </button>
 
             <button
