@@ -874,11 +874,14 @@ import {
             <div class="h-6 w-px bg-gray-200 mx-1"></div>
 
             <button
-                onclick={handleOpenConfigInfo}
+                onclick={() => {
+                    // Directly navigate to config page
+                    window.location.href = '/config';
+                }}
                 class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-sm"
-                title="Show resolved config paths"
+                title="Go to configuration page"
             >
-                <Icon icon="lucide:info" class="w-3.5 h-3.5" />
+                <Icon icon="lucide:settings" class="w-3.5 h-3.5" />
                 Config info
             </button>
 
