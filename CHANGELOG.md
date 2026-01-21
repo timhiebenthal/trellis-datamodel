@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED]
+## [0.7.0]
 
 ### Added
 - Added configurable entity prefix support for entity modeling mode to maintain table naming conventions while keeping labels clean.
@@ -16,15 +16,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for multiple prefix patterns (e.g., `["tbl_", "entity_", "t_"]`) to handle legacy naming conventions.
 - Added preservation of bound dbt_model values to avoid re-prefixed entities that already have prefixes.
 - Added `/api/config-info` endpoint response field `entity_prefix` to expose configured prefixes to frontend.
+- Added web-based Configuration UI page (`/config`) for viewing and editing `trellis.yml` settings with form-based editing, real-time validation, automatic backups, and conflict detection.
+- Added `POST /api/config/reload` endpoint to reload configuration at runtime without server restart, clearing adapter inference cache when config changes.
+- Added entity source chips feature: entities now support a `sources` field (list of strings) persisted in `data_model.yml` for manual source tracking (e.g., "Salesforce", "ERP").
+- Added source visualization: sources displayed as colorful chips in entity node headers with configurable color mapping via `source_colors` in `canvas_layout.yml`.
+- Added lineage-derived source suggestions: source editor suggests values based on existing sources and technical lineage from bound dbt models (read-only hints).
+- Added distinct routes for main views (`/canvas`, `/exposures`, `/bus-matrix`) enabling bookmarking, reloading, and sharing specific views with browser history support.
+- Added interactive CLI wizard for `trellis init` command that guides users through configuring `trellis.yml` with sensible defaults and auto-detection capabilities.
+- Added dbt models header in sidebar with branded header section and favicon below filter divider.
+- Added entity type icons in sidebar: color-coded icons based on model type (green for dimensions, blue for facts, gray for unclassified) in dimensional modeling mode.
+- Added advanced filtering in sidebar for dimensional modeling mode: entity type filter (dimension/fact/unclassified) and model bound filter (bound/unbound).
+- Added unified `.inline-input` CSS class for consistent styling of tag and source editors across the app.
+- Added comprehensive E2E test helpers for config manipulation (`getConfig()`, `saveConfig()`, `reloadConfig()`) and test isolation utilities.
+- Added frontend unit tests for `inferRelationships` API function with Vitest.
 
 ### Changed
 - Extended Entity TypedDict in backend with prefix-aware model name generation via `_entity_to_model_name()` method.
 - Updated frontend label formatting to strip configured prefixes from entity names while preserving original casing of remaining text.
 - Entity prefix feature only activates when `modeling_style` is `entity_model` (default).
+- Refactored frontend configuration state management: switched from hardcoded/local state to context-based store pattern in `+layout.svelte` for reactive configuration values across components.
+- Changed default `modeling_style` to `entity_model` in `trellis.yml` for standardization.
+- Relocated "Apply Configuration" and "Reset Changes" buttons to top of Config page for better visibility and accessibility.
+- Updated schema API endpoints to use path parameters (`/models/{model}/schema`) instead of query params.
+- Changed header navigation to use standard anchor tags (`<a href="/canvas">`) instead of state-based button clicks for route-aware view switching.
+- Updated frontend to automatically synchronize `$viewMode` store with current route via `$effect` in shared layout.
+- Refactored backend architecture: created dedicated service layer (`trellis_datamodel/services/`) separating business logic from route handlers, with routes becoming thin validation/response marshaling layers.
+- Consolidated request/response/data models in `trellis_datamodel/models/schemas.py` for reuse across routes/services.
+- Extracted frontend business logic into focused service classes (AutoSave, EntityValidation, SchemaManager, PositionCalculator) with clear single responsibilities.
+- Reduced major component sizes: `+page.svelte` (~40% reduction), `EntityNode.svelte` (~30% reduction), `Canvas.svelte` (~20% reduction).
+- Updated sidebar to display color-coded icons based on modeling style and model type classification.
+- Made compact navbar buttons (reduced padding and text size) to create more screen real estate.
+- Updated CLI wizard to reorder sections in generated `trellis.yml` for better organization.
 
 ### Fixed
 - Added validation for prefix configuration to ensure it's a string or list of strings.
 - Added error handling for empty prefix lists to maintain backward compatibility.
+- Fixed lineage button in `EntityNode.svelte`: added `stopPropagation` to prevent unintended node selection/dragging when opening lineage modal.
+- Fixed exposures navigation: exposures button now properly navigates to `/exposures` route and sets view mode.
+- Fixed relationship inference logic: refined filtering to allow relationships where both ends are present in data model, even if one or both are unbound.
+- Updated `inferRelationships` API function to handle both array and object-wrapped payloads for improved robustness.
+- Fixed relationship inference to correctly handle entities defined in data model but not strictly "bound" to primary dbt model.
+- Fixed config reload to properly clear adapter inference cache when configuration changes.
+- Fixed schema API to use path parameters for better RESTful design.
+- Added proper error handling for config reload endpoint with user-friendly error messages.
+- Fixed exposures button visibility: now correctly hidden when `exposures.enabled: false` in `trellis.yml`.
+- Fixed canvas edge styling: lighter gray edges that don't compete with node colors, improved z-index handling for edge labels.
+- Fixed relationship test references in `dbt_company_dummy_kimball/models/3_core/dim_employee.yml`.
+- Fixed smart guidance toggle: automatically disables "push warning" setting when "entity creation guidance" is toggled off.
+- Added graceful fallbacks for route navigation: `/exposures` and `/bus-matrix` redirect to `/canvas` if features are disabled or no data exists.
 
 ## [0.6.0]
 
@@ -60,8 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added graceful handling for Bus Matrix endpoint errors (missing relationships, empty data model, invalid query parameters).
 - Added smooth CSS transitions for entity position changes to prevent jarring UI jumps.
 - Added debouncing to Bus Matrix filter inputs for improved performance with large datasets.
-
-tbd
 
 ## [0.5.0] - 2026-01-07
 
