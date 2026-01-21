@@ -5,6 +5,7 @@ import type {
     ConfigStatus,
     ConfigInfo,
     ModelSchema,
+    ModelSchemaColumn,
     Relationship,
     ExposuresResponse,
     LineageResponse,
@@ -190,7 +191,7 @@ export async function getLineage(modelId: string): Promise<LineageResponse | nul
 export async function getModelSchema(
     modelName: string,
     version?: number
-): Promise<ModelSchema> {
+): Promise<ModelSchema | null> {
     try {
         const url = version
             ? `${API_BASE}/schema?model_name=${modelName}&version=${version}`
