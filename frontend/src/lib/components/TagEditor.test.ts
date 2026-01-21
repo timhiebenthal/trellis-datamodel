@@ -20,7 +20,7 @@ describe('TagEditor Component', () => {
                 },
             });
 
-            expect(container.querySelector('.tag-editor')).toBeInTheDocument();
+            expect(container.querySelector('.tag-editor')).not.toBeNull();
             // Should only show add button
             expect(container.querySelectorAll('.tag')).toHaveLength(0);
         });
@@ -74,7 +74,7 @@ describe('TagEditor Component', () => {
             });
 
             // Should show tag but no remove buttons
-            expect(container.querySelector('.tag')).toBeInTheDocument();
+            expect(container.querySelector('.tag')).not.toBeNull();
             expect(container.querySelectorAll('.tag button')).toHaveLength(0);
 
             // Should not show add button
@@ -93,7 +93,7 @@ describe('TagEditor Component', () => {
             });
 
             const addButton = container.querySelector('button[title="Add tag"]');
-            expect(addButton).toBeInTheDocument();
+            expect(addButton).not.toBeNull();
         });
     });
 
@@ -325,7 +325,7 @@ describe('TagEditor Component', () => {
             expect(tag).not.toBeNull();
             // Remove button should exist but be hidden (opacity-0)
             expect(removeButton).not.toBeNull();
-            expect(removeButton).toHaveClass('opacity-0');
+            expect(removeButton?.className).toContain('opacity-0');
         });
     });
 

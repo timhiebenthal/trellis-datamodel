@@ -169,6 +169,55 @@ entity_modeling:
 
 Check out our [Full Tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) with video clips showing the core features in action.  Also [General Information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a) is available.
 
+### Configuration UI
+
+trellis provides a web-based configuration interface for editing `trellis.yml` settings.
+
+#### Accessing Configuration
+
+Navigate to `/config` in your browser (or click "Config" in the navigation bar) to access the configuration interface.
+
+#### Features
+
+- **Real-time Validation**: Backend validates all changes before saving, ensuring invalid values are rejected
+- **Atomic Writes**: All configuration changes create timestamped backups before overwriting the config file
+- **Conflict Detection**: If the config file is modified externally (e.g., by another editor), you'll be warned before overwriting
+- **Danger Zone**: Experimental features (lineage, exposures) require explicit acknowledgment before enabling
+- **Recovery UI**: Clear error messages and retry options if the config file is missing or unreadable
+
+#### Backup Behavior
+
+When you apply configuration changes:
+1. A backup is created with timestamp format: `trellis.yml.bak.YYYYMMDD-HHMMSS`
+2. The backup is saved in the same directory as `trellis.yml`
+3. The new configuration is written atomically (via temporary file + move operation)
+4. Multiple backups are preserved for safety
+
+#### Configuration Fields
+
+The config UI supports editing all user-facing fields:
+- Framework (dbt-core only, currently)
+- Modeling style (dimensional_model or entity_model)
+- Paths (dbt_project_path, dbt_manifest_path, dbt_catalog_path, data_model_file)
+- Entity creation guidance (wizard, warnings, description settings)
+- Dimensional modeling (dimension/fact prefixes)
+- Entity modeling (entity prefix)
+- Lineage (beta - layers configuration)
+- Exposures (beta - enabled status and layout)
+
+#### Validation Rules
+
+- Path fields validate that files exist (or provide clear warnings for optional paths like catalog)
+- Enum fields restrict values to valid options
+- Type checking ensures integers, booleans, and lists have correct formats
+- Backend validation is authoritative; frontend provides UX feedback but cannot bypass validation
+
+#### Normalization
+
+- Configuration is saved as normalized YAML for consistency
+- Comments in the original `trellis.yml` are not preserved (this is expected)
+- Formatting follows a standard pattern that the backend understands
+
 ## Vision
 
 trellis is currently designed and tested specifically for **dbt-core**, but the vision is to be tool-agnostic. As the saying goes: *"tools evolve, concepts don't"* — data modeling concepts persist regardless of the transformation framework you use.
