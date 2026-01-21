@@ -648,148 +648,162 @@
 
                     <!-- Danger Zone Section -->
                     <div class="bg-amber-50 border border-amber-200 rounded-lg p-6">
-                        <div class="flex items-start gap-2 mb-4">
+                        <div class="flex items-start gap-2 mb-6">
                             <Icon icon="lucide:alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                            <div>
+                            <div class="flex-1">
                                 <h2 class="text-lg font-semibold text-amber-900">Danger Zone</h2>
                                 <p class="text-sm text-amber-700 mt-1">
                                     These features are experimental and may change. Use with caution.
                                 </p>
                             </div>
-
-                            <div class="mb-4">
-                                <label class="flex items-start gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={dangerZoneAcknowledged}
-                                        onchange={(e) => dangerZoneAcknowledged = e.currentTarget.checked}
-                                        class="mt-1 w-4 h-4 text-primary-600 rounded-full border border-gray-300 focus:ring-0 focus:ring-primary-500 focus:ring-offset-0"
-                                    />
-                                    <span class="text-sm font-medium text-gray-900">
-                                        I understand these features are experimental and may change
-                                    </span>
-                                </label>
-                            </div>
                         </div>
 
-                        <div class="space-y-4 {isDangerZoneEnabled ? '' : 'opacity-50 pointer-events-none'}">
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <label class="block text-sm font-medium text-amber-900">
-                                            Lineage Enabled
-                                        </label>
-                                        {#if isBetaField('lineage.enabled')}
-                                            <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
-                                        {/if}
-                                        {#if getFieldMetadata('lineage.enabled')?.description}
-                                            <p class="text-xs text-amber-700">{getFieldMetadata('lineage.enabled')?.description}</p>
-                                        {/if}
-                                    </div>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={getFieldValue('lineage.enabled')}
-                                        onchange={(e) => handleNestedFieldChange('lineage.enabled', e.currentTarget.checked)}
-                                        disabled={!isDangerZoneEnabled}
-                                        class="sr-only peer focus:ring-0 focus:ring-offset-0"
-                                    />
-                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
-                                </label>
-                            </div>
+                        <div class="mb-6">
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={dangerZoneAcknowledged}
+                                    onchange={(e) => dangerZoneAcknowledged = e.currentTarget.checked}
+                                    class="mt-1 w-4 h-4 text-primary-600 rounded-full border border-gray-300 focus:ring-0 focus:ring-primary-500 focus:ring-offset-0"
+                                />
+                                <span class="text-sm font-medium text-gray-900">
+                                    I understand these features are experimental and may change
+                                </span>
+                            </label>
+                        </div>
 
-                            <div>
-                                <label class="block text-sm font-medium text-amber-900 mb-1.5">
-                                    Lineage Layers
-                                </label>
-                                {#each lineageLayers as layer, index (index)}
-                                    <div class="flex gap-2 mb-2">
-                                        <input
-                                            type="text"
-                                            value={layer}
-                                            oninput={(e) => {
-                                                const newLayers = [...lineageLayers];
-                                                newLayers[index] = e.currentTarget.value;
-                                                handleNestedFieldChange('lineage.layers', newLayers);
-                                            }}
-                                            placeholder="1_clean"
-                                            disabled={!isDangerZoneEnabled}
-                                            class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
+                        <div class="space-y-6 {isDangerZoneEnabled ? '' : 'opacity-50 pointer-events-none'}">
+                            <!-- Lineage Container -->
+                            <div class="bg-white border border-amber-200 rounded-lg p-4">
+                                <h3 class="text-base font-semibold text-amber-900 mb-4">Lineage</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <label class="block text-sm font-medium text-gray-700">
+                                                    Lineage Enabled
+                                                </label>
+                                                {#if isBetaField('lineage.enabled')}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
+                                                {/if}
+                                            </div>
+                                            {#if getFieldMetadata('lineage.enabled')?.description}
+                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('lineage.enabled')?.description}</p>
+                                            {/if}
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={getFieldValue('lineage.enabled')}
+                                                onchange={(e) => handleNestedFieldChange('lineage.enabled', e.currentTarget.checked)}
+                                                disabled={!isDangerZoneEnabled}
+                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
+                                            />
+                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Lineage Layers
+                                        </label>
+                                        {#each lineageLayers as layer, index (index)}
+                                            <div class="flex gap-2 mb-2">
+                                                <input
+                                                    type="text"
+                                                    value={layer}
+                                                    oninput={(e) => {
+                                                        const newLayers = [...lineageLayers];
+                                                        newLayers[index] = e.currentTarget.value;
+                                                        handleNestedFieldChange('lineage.layers', newLayers);
+                                                    }}
+                                                    placeholder="1_clean"
+                                                    disabled={!isDangerZoneEnabled}
+                                                    class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onclick={() => {
+                                                        const newLayers = [...lineageLayers];
+                                                        newLayers.splice(index, 1);
+                                                        handleNestedFieldChange('lineage.layers', newLayers);
+                                                    }}
+                                                    disabled={!isDangerZoneEnabled}
+                                                    class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium {isDangerZoneEnabled ? '' : 'opacity-50 cursor-not-allowed'}"
+                                                    title="Remove layer"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        {/each}
+                                        {#if lineageLayers.length === 0}
+                                            <p class="mt-1.5 text-xs text-gray-500">No layers configured</p>
+                                        {/if}
                                         <button
                                             type="button"
                                             onclick={() => {
                                                 const newLayers = [...lineageLayers];
-                                                newLayers.splice(index, 1);
+                                                newLayers.push('');
                                                 handleNestedFieldChange('lineage.layers', newLayers);
                                             }}
                                             disabled={!isDangerZoneEnabled}
-                                            class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium {isDangerZoneEnabled ? '' : 'opacity-50 cursor-not-allowed'}"
-                                            title="Remove layer"
+                                            class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md {isDangerZoneEnabled ? '' : 'opacity-50 cursor-not-allowed'}"
                                         >
-                                            ×
+                                            + Add Layer
                                         </button>
                                     </div>
-                                {/each}
-                                {#if lineageLayers.length === 0}
-                                    <p class="mt-1.5 text-xs text-amber-700">No layers configured</p>
-                                {/if}
-                                <button
-                                    type="button"
-                                    onclick={() => {
-                                        const newLayers = [...lineageLayers];
-                                        newLayers.push('');
-                                        handleNestedFieldChange('lineage.layers', newLayers);
-                                    }}
-                                    disabled={!isDangerZoneEnabled}
-                                    class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md {isDangerZoneEnabled ? '' : 'opacity-50 cursor-not-allowed'}"
-                                >
-                                    + Add Layer
-                                </button>
-                            </div>
-
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1">
-                                    <label class="block text-sm font-medium text-amber-900">
-                                        Exposures Enabled
-                                    </label>
-                                    {#if isBetaField('exposures.enabled')}
-                                        <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
-                                    {/if}
-                                    {#if getFieldMetadata('exposures.enabled')?.description}
-                                        <p class="text-xs text-amber-700">{getFieldMetadata('exposures.enabled')?.description}</p>
-                                    {/if}
                                 </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={getFieldValue('exposures.enabled')}
-                                        onchange={(e) => handleNestedFieldChange('exposures.enabled', e.currentTarget.checked)}
-                                        disabled={!isDangerZoneEnabled}
-                                        class="sr-only peer focus:ring-0 focus:ring-offset-0"
-                                    />
-                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
-                                </label>
                             </div>
 
-                            <div>
-                                <label class="block text-sm font-medium text-amber-900 mb-1.5">
-                                    Exposures Default Layout
-                                </label>
-                                <select
-                                    value={getFieldValue('exposures.default_layout')}
-                                    onchange={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
-                                    disabled={!isDangerZoneEnabled}
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                >
-                                    {#each getEnumOptions('exposures.default_layout', ['dashboards-as-rows', 'entities-as-rows']) as value}
-                                        <option value={value}>{value}</option>
-                                    {/each}
-                                </select>
-                                {#if getFieldMetadata('exposures.default_layout')?.description}
-                                    <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('exposures.default_layout')?.description}</p>
-                                {/if}
+                            <!-- Exposures Container -->
+                            <div class="bg-white border border-amber-200 rounded-lg p-4">
+                                <h3 class="text-base font-semibold text-amber-900 mb-4">Exposures</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <label class="block text-sm font-medium text-gray-700">
+                                                    Exposures Enabled
+                                                </label>
+                                                {#if isBetaField('exposures.enabled')}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
+                                                {/if}
+                                            </div>
+                                            {#if getFieldMetadata('exposures.enabled')?.description}
+                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('exposures.enabled')?.description}</p>
+                                            {/if}
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={getFieldValue('exposures.enabled')}
+                                                onchange={(e) => handleNestedFieldChange('exposures.enabled', e.currentTarget.checked)}
+                                                disabled={!isDangerZoneEnabled}
+                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
+                                            />
+                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Exposures Default Layout
+                                        </label>
+                                        <select
+                                            value={getFieldValue('exposures.default_layout')}
+                                            onchange={(e) => handleNestedFieldChange('exposures.default_layout', e.currentTarget.value)}
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        >
+                                            {#each getEnumOptions('exposures.default_layout', ['dashboards-as-rows', 'entities-as-rows']) as value}
+                                                <option value={value}>{value}</option>
+                                            {/each}
+                                        </select>
+                                        {#if getFieldMetadata('exposures.default_layout')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('exposures.default_layout')?.description}</p>
+                                        {/if}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
