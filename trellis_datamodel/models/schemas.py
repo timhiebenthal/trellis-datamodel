@@ -64,6 +64,12 @@ class ExposuresConfig(BaseModel):
     default_layout: ExposuresLayoutEnum = ExposuresLayoutEnum.DASHBOARDS_AS_ROWS
 
 
+class BusinessEventsConfig(BaseModel):
+    """Business events configuration (beta)."""
+    enabled: bool = False
+    file: str = Field(default="", description="Path to business events YAML file")
+
+
 # Main config models
 class ConfigSchema(BaseModel):
     """Complete trellis.yml configuration schema for validation."""
@@ -78,6 +84,7 @@ class ConfigSchema(BaseModel):
     lineage: LineageConfig = Field(default_factory=LineageConfig)
     entity_creation_guidance: EntityCreationGuidance = Field(default_factory=EntityCreationGuidance)
     exposures: ExposuresConfig = Field(default_factory=ExposuresConfig)
+    business_events: BusinessEventsConfig = Field(default_factory=BusinessEventsConfig)
     dimensional_modeling: Optional[DimensionalModelingConfig] = Field(default=None)
     entity_modeling: Optional[EntityModelingConfig] = Field(default=None)
 

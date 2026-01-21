@@ -126,6 +126,7 @@ async def get_config_info():
         "exposures_enabled": cfg.EXPOSURES_ENABLED,
         "exposures_default_layout": cfg.EXPOSURES_DEFAULT_LAYOUT,
         "bus_matrix_enabled": cfg.Bus_MATRIX_ENABLED,
+        "business_events_enabled": cfg.BUSINESS_EVENTS_ENABLED,
         "modeling_style": cfg.MODELING_STYLE,
         "entity_prefix": (
             cfg.ENTITY_MODELING_CONFIG.entity_prefix

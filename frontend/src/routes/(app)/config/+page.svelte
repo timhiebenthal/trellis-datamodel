@@ -920,6 +920,68 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Business Events Container (Dimensional Modeling only) -->
+                            {#if modelingStyle === 'dimensional_model'}
+                            <div class="bg-white border border-amber-200 rounded-lg p-4">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <h3 class="text-base font-semibold text-amber-900">Business Events</h3>
+                                    <Tooltip text="Model business events using BEAM* methodology. Annotate events with dimensions and facts to generate dimensional models. Only available for dimensional modeling style.">
+                                        <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
+                                    </Tooltip>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <label for="business-events-enabled-toggle" class="block text-sm font-medium text-gray-700">
+                                                    Business Events Enabled
+                                                </label>
+                                                {#if isBetaField('business_events.enabled')}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
+                                                {/if}
+                                            </div>
+                                            {#if getFieldMetadata('business_events.enabled')?.description}
+                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('business_events.enabled')?.description}</p>
+                                            {:else}
+                                                <p class="text-xs text-gray-500 mt-1">Enable business events modeling with BEAM* methodology</p>
+                                            {/if}
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                id="business-events-enabled-toggle"
+                                                type="checkbox"
+                                                checked={getFieldValue('business_events.enabled')}
+                                                onchange={(e) => handleNestedFieldChange('business_events.enabled', e.currentTarget.checked)}
+                                                disabled={!isDangerZoneEnabled}
+                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
+                                            />
+                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label for="business-events-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Business Events File
+                                        </label>
+                                        <input
+                                            id="business-events-file-input"
+                                            type="text"
+                                            value={getFieldValue('business_events.file') || ''}
+                                            oninput={(e) => handleNestedFieldChange('business_events.file', e.currentTarget.value || null)}
+                                            placeholder="business_events.yml (defaults to same directory as data_model.yml)"
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        />
+                                        {#if getFieldMetadata('business_events.file')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('business_events.file')?.description}</p>
+                                        {:else}
+                                            <p class="mt-1.5 text-xs text-gray-500">Path to business events YAML file (optional, defaults to business_events.yml in data model directory)</p>
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
+                            {/if}
                         </div>
                     </div>
 

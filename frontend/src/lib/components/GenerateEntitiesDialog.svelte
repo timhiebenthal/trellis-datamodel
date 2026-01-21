@@ -6,7 +6,6 @@
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
-    import { $effect } from 'svelte';
 
     type Props = {
         open: boolean;

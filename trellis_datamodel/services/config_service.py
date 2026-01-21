@@ -169,6 +169,20 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         description="Prefix for entity tables",
         beta=False,
     ),
+    "business_events.enabled": ConfigFieldMetadata(
+        type="boolean",
+        default=False,
+        required=False,
+        description="Enable business events modeling with BEAM* methodology",
+        beta=True,
+    ),
+    "business_events.file": ConfigFieldMetadata(
+        type="string",
+        default="",
+        required=False,
+        description="Path to business events YAML file (defaults to business_events.yml in data model directory)",
+        beta=True,
+    ),
 }
 
 # List of fields that are beta features
@@ -177,6 +191,8 @@ _BETA_FIELDS = [
     "lineage.layers",
     "exposures.enabled",
     "exposures.default_layout",
+    "business_events.enabled",
+    "business_events.file",
 ]
 
 
@@ -265,6 +281,15 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
             normalized["exposures"] = {
                 "enabled": bool(exposures.get("enabled", False)),
                 "default_layout": layout,
+            }
+
+    # Business Events
+    if "business_events" in config:
+        business_events = config["business_events"]
+        if isinstance(business_events, dict):
+            normalized["business_events"] = {
+                "enabled": bool(business_events.get("enabled", False)),
+                "file": business_events.get("file", ""),
             }
 
     # Dimensional modeling
