@@ -39,6 +39,9 @@ frontend/tests/.trellis-test/
 
 # Cursor MCP configuration (may contain secrets)
 .cursor/mcp.json
+# Cursor symlinks (point to .ai_agent, which is tracked)
+.cursor/commands
+.cursor/skills
 /specs/
 dbt_company_dummy_entity/logs/dbt.log
 dbt_company_dummy_entity/target/catalog.json
