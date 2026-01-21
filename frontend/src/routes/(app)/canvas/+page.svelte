@@ -5,26 +5,27 @@
     import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
 
-    // Get shared state from parent layout context
-    const guidanceConfig: GuidanceConfig = {
-        entity_wizard_enabled: true,
-        push_warning_enabled: true,
-        min_description_length: 10,
-        disabled_guidance: [],
-    };
+    const guidanceConfigStore =
+        getContext<Readable<GuidanceConfig>>('guidanceConfig') ??
+        readable({
+            entity_wizard_enabled: true,
+            push_warning_enabled: true,
+            min_description_length: 10,
+            disabled_guidance: [],
+        });
+    const guidanceConfig = $derived($guidanceConfigStore);
 
-    // These are set by the parent layout
     const lineageEnabledStore =
         getContext<Readable<boolean>>('lineageEnabled') ?? readable(false);
+    const lineageEnabled = $derived($lineageEnabledStore);
+
     const exposuresEnabledStore =
         getContext<Readable<boolean>>('exposuresEnabled') ?? readable(false);
+    const exposuresEnabled = $derived($exposuresEnabledStore);
+
     const hasExposuresDataStore =
         getContext<Readable<boolean>>('hasExposuresData') ?? readable(false);
-
-    const lineageEnabled = $derived($lineageEnabledStore);
-    const exposuresEnabled = $derived($exposuresEnabledStore);
     const hasExposuresData = $derived($hasExposuresDataStore);
-
 </script>
 
 <svelte:head>

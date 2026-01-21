@@ -4,6 +4,7 @@
     import logoHref from '$lib/assets/trellis_squared.svg?url';
     import { page } from '$app/stores';
     import { onMount, setContext, untrack } from 'svelte';
+    import { writable } from 'svelte/store';
     import {
     nodes,
     edges,
@@ -55,7 +56,6 @@ import {
     import Icon from "$lib/components/Icon.svelte";
     import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
-    import { writable } from "svelte/store";
     import { 
         getIncompleteEntities, 
         getEntitiesWithUndescribedAttributes,
@@ -99,19 +99,21 @@ import {
         min_description_length: 10,
         disabled_guidance: [],
     });
+    const guidanceConfigStore = writable(guidanceConfig);
+    const lineageEnabledStore = writable(lineageEnabled);
+    const exposuresEnabledStore = writable(exposuresEnabled);
+    const hasExposuresDataStore = writable(hasExposuresData);
+    setContext('guidanceConfig', guidanceConfigStore);
+    setContext('lineageEnabled', lineageEnabledStore);
+    setContext('exposuresEnabled', exposuresEnabledStore);
+    setContext('hasExposuresData', hasExposuresDataStore);
+
     let warningModalOpen = $state(false);
     let incompleteEntitiesForWarning = $state<Node[]>([]);
     let warningModalResolve: ((value: boolean) => void) | null = null;
     let undescribedAttributesModalOpen = $state(false);
     let entitiesWithUndescribedAttributes = $state<Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>>([]);
     let undescribedAttributesResolve: ((value: boolean) => void) | null = null;
-
-    const lineageEnabledStore = writable(lineageEnabled);
-    const exposuresEnabledStore = writable(exposuresEnabled);
-    const hasExposuresDataStore = writable(hasExposuresData);
-    setContext("lineageEnabled", lineageEnabledStore);
-    setContext("exposuresEnabled", exposuresEnabledStore);
-    setContext("hasExposuresData", hasExposuresDataStore);
 
     // Drive viewMode from current route on load
     $effect(() => {
@@ -141,6 +143,7 @@ import {
     });
 
     $effect(() => {
+        guidanceConfigStore.set(guidanceConfig);
         lineageEnabledStore.set(lineageEnabled);
         exposuresEnabledStore.set(exposuresEnabled);
         hasExposuresDataStore.set(hasExposuresData);
