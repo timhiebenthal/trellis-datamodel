@@ -78,6 +78,13 @@
         getContext<Readable<boolean>>("exposuresEnabled") ?? readable(false);
     let exposuresEnabled = $derived($exposuresEnabledStore);
 
+    function handleLineageClick(event: MouseEvent) {
+        event.stopPropagation();
+        if (boundModelName) {
+            openLineageModal(boundModelName);
+        }
+    }
+
     // Entity type controls only for dimensional modeling
     let isDimensionalModeling = $derived($modelingStyle === "dimensional_model");
 
@@ -1111,7 +1118,7 @@
                 ></div>
                 {#if lineageEnabled && boundModelName}
                     <button
-                        onclick={() => openLineageModal(boundModelName)}
+                        onclick={handleLineageClick}
                         aria-label="Show lineage for {boundModelName}"
                         class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
                         title="Show lineage"

@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { page } from '$app/stores';
+    import { getContext } from 'svelte';
+    import { readable, type Readable } from 'svelte/store';
     import { viewMode, nodes, edges } from '$lib/stores';
     import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
@@ -13,9 +14,17 @@
     };
 
     // These are set by the parent layout
-    const lineageEnabled = true;
-    const exposuresEnabled = true;
-    const hasExposuresData = false;
+    const lineageEnabledStore =
+        getContext<Readable<boolean>>('lineageEnabled') ?? readable(false);
+    const exposuresEnabledStore =
+        getContext<Readable<boolean>>('exposuresEnabled') ?? readable(false);
+    const hasExposuresDataStore =
+        getContext<Readable<boolean>>('hasExposuresData') ?? readable(false);
+
+    const lineageEnabled = $derived($lineageEnabledStore);
+    const exposuresEnabled = $derived($exposuresEnabledStore);
+    const hasExposuresData = $derived($hasExposuresDataStore);
+
 </script>
 
 <svelte:head>

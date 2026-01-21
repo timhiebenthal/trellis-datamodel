@@ -3,7 +3,7 @@
     import '../../app.css';
     import logoHref from '$lib/assets/trellis_squared.svg?url';
     import { page } from '$app/stores';
-    import { onMount, untrack } from 'svelte';
+    import { onMount, setContext, untrack } from 'svelte';
     import {
     nodes,
     edges,
@@ -55,6 +55,7 @@ import {
     import Icon from "$lib/components/Icon.svelte";
     import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
+    import { writable } from "svelte/store";
     import { 
         getIncompleteEntities, 
         getEntitiesWithUndescribedAttributes,
@@ -105,6 +106,13 @@ import {
     let entitiesWithUndescribedAttributes = $state<Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>>([]);
     let undescribedAttributesResolve: ((value: boolean) => void) | null = null;
 
+    const lineageEnabledStore = writable(lineageEnabled);
+    const exposuresEnabledStore = writable(exposuresEnabled);
+    const hasExposuresDataStore = writable(hasExposuresData);
+    setContext("lineageEnabled", lineageEnabledStore);
+    setContext("exposuresEnabled", exposuresEnabledStore);
+    setContext("hasExposuresData", hasExposuresDataStore);
+
     // Drive viewMode from current route on load
     $effect(() => {
         const currentPath = $page.url.pathname;
@@ -130,6 +138,12 @@ import {
         if (!exposuresEnabled || !hasExposuresData) {
             $viewMode = $viewMode === 'exposures' ? 'conceptual' : $viewMode;
         }
+    });
+
+    $effect(() => {
+        lineageEnabledStore.set(lineageEnabled);
+        exposuresEnabledStore.set(exposuresEnabled);
+        hasExposuresDataStore.set(hasExposuresData);
     });
 
     // Show warning modal for incomplete entities and wait for user decision
