@@ -127,17 +127,21 @@ async def update_config(request: ConfigUpdateRequest) -> Dict[str, Any]:
             current_mtime = _get_file_mtime(config_path)
             current_hash = _get_file_hash(config_path)
 
+            conflict_info = ConfigConflictInfo(
+                current_mtime=current_mtime,
+                current_hash=current_hash,
+                expected_mtime=request.expected_mtime,
+                expected_hash=request.expected_hash,
+            )
+            # Use dict() for Pydantic v1/v2 compatibility
+            conflict_dict = conflict_info.dict() if hasattr(conflict_info, 'dict') else conflict_info.model_dump()
+            
             raise HTTPException(
                 status_code=409,
                 detail={
                     "error": "conflict",
                     "message": conflict_message,
-                    "conflict": ConfigConflictInfo(
-                        current_mtime=current_mtime,
-                        current_hash=current_hash,
-                        expected_mtime=request.expected_mtime,
-                        expected_hash=request.expected_hash,
-                    ).model_dump(),
+                    "conflict": conflict_dict,
                 },
             )
 
