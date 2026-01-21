@@ -845,6 +845,20 @@ import {
 
         <!-- View Switcher -->
         <div class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60 gap-1">
+            {#if businessEventsEnabled && $modelingStyle === 'dimensional_model'}
+                <a
+                    href="/business-events"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class:bg-white={$page.url.pathname === '/business-events'}
+                    class:text-primary-600={$page.url.pathname === '/business-events'}
+                    class:shadow-sm={$page.url.pathname === '/business-events'}
+                    class:text-gray-500={$page.url.pathname !== '/business-events'}
+                    class:hover:text-gray-900={$page.url.pathname !== '/business-events'}
+                >
+                    <Icon icon="lucide:calendar-check" class="w-3.5 h-3.5" />
+                    Business Events
+                </a>
+            {/if}
             <a
                 href="/canvas"
                 class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
@@ -883,20 +897,6 @@ import {
                 >
                     <Icon icon="mdi:table-large" class="w-3.5 h-3.5" />
                     Bus Matrix
-                </a>
-            {/if}
-            {#if businessEventsEnabled && $modelingStyle === 'dimensional_model'}
-                <a
-                    href="/business-events"
-                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
-                    class:bg-white={$page.url.pathname === '/business-events'}
-                    class:text-primary-600={$page.url.pathname === '/business-events'}
-                    class:shadow-sm={$page.url.pathname === '/business-events'}
-                    class:text-gray-500={$page.url.pathname !== '/business-events'}
-                    class:hover:text-gray-900={$page.url.pathname !== '/business-events'}
-                >
-                    <Icon icon="lucide:calendar-check" class="w-3.5 h-3.5" />
-                    Business Events
                 </a>
             {/if}
         </div>
