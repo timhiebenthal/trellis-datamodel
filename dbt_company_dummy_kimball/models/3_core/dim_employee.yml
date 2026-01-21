@@ -17,7 +17,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('department')
+                to: ref('dim_department')
                 field: department_id
       - name: team
         data_type: text
@@ -27,7 +27,7 @@ models:
         data_tests:
           - relationships:
               arguments:
-                to: ref('employee')
+                to: ref('dim_employee')
                 field: employee_id
       - name: hire_date
         data_type: date
