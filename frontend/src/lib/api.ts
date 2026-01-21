@@ -161,7 +161,15 @@ export async function inferRelationships(): Promise<Relationship[]> {
     try {
         const res = await fetch(`${API_BASE}/infer-relationships`);
         if (!res.ok) {
-            throw new Error(`Failed to infer relationships: ${res.status}`);
+            if (res.status === 400) {
+                // Treat config/schema absence as a non-fatal case for the UI/tests
+                return [];
+            }
+            const errorText = await res.text();
+            const details = errorText ? ` - ${errorText}` : '';
+            throw new Error(
+                `Failed to infer relationships: ${res.status} ${res.statusText}${details}`,
+            );
         }
         return await res.json();
     } catch (e) {

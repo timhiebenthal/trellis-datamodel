@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/svelte';
 import type { DataModel } from '$lib/types';
-import { saveDataModel as apiSaveDataModel } from '$lib/api';
+import { getApiBase, saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
 import { get } from 'svelte/store';
 import { sourceColors as sourceColorsStore } from '$lib/stores';
@@ -132,7 +132,7 @@ export class AutoSaveService {
         const payload = JSON.stringify(
             this.buildDataModelFromState(currentNodes, currentEdges),
         );
-        const url = `${import.meta.env.VITE_API_BASE || ''}/data-model`;
+        const url = `${getApiBase()}/data-model`;
 
         try {
             const response = await fetch(url, {
