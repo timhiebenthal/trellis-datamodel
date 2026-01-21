@@ -211,11 +211,11 @@ class DbtCoreAdapter:
         model_to_entity: dict[str, str] = {}
         data_model = self._load_data_model()
         entities = data_model.get("entities", [])
-        
+
         # Load manifest once to look up model aliases
         manifest = self._load_manifest() if os.path.exists(self.manifest_path) else {}
         manifest_nodes = manifest.get("nodes", {})
-        
+
         for entity in entities:
             entity_id = entity.get("id")
             dbt_model = entity.get("dbt_model")
@@ -232,7 +232,7 @@ class DbtCoreAdapter:
                 model_to_entity[dbt_model] = entity_id
                 for key in self._build_model_keys(base_name, version_part):
                     model_to_entity[key] = entity_id
-                
+
                 # Also map the dbt YAML-documented model name (if different from unique_id)
                 # Read the YAML file to see if it documents a different model name
                 yml_path = self._get_model_yml_path(base_name)
@@ -275,10 +275,7 @@ class DbtCoreAdapter:
                         prefixed = f"{prefix}{entity_id}"
                         model_to_entity[prefixed] = entity_id
                         model_to_entity[prefixed.lower()] = entity_id
-                if (
-                    cfg.DIMENSIONAL_MODELING_CONFIG.enabled
-                    and not dbt_model
-                ):
+                if cfg.DIMENSIONAL_MODELING_CONFIG.enabled and not dbt_model:
                     # Add prefixed variants for dimensional modeling prefixes
                     for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
                         prefixed = f"{prefix}{entity_id}"
@@ -288,7 +285,7 @@ class DbtCoreAdapter:
                         prefixed = f"{prefix}{entity_id}"
                         model_to_entity[prefixed] = entity_id
                         model_to_entity[prefixed.lower()] = entity_id
-        
+
         # Second pass: Map YAML-documented model names to their file-based names
         # This handles cases where the YAML name differs from the SQL file name,
         # even for models not yet bound to entities in data_model.yml
@@ -316,12 +313,14 @@ class DbtCoreAdapter:
                             if yml_name != file_base:
                                 # Map yml_name -> file_base, so entity_procurement -> fact_procurement
                                 # If file_base is already in the map (bound to an entity), map yml_name to that entity
-                                target_entity = model_to_entity.get(file_base, file_base)
+                                target_entity = model_to_entity.get(
+                                    file_base, file_base
+                                )
                                 model_to_entity[yml_name] = target_entity
                                 model_to_entity[yml_name.lower()] = target_entity
                     except Exception:
                         pass  # Gracefully skip if YAML parsing fails
-        
+
         return model_to_entity
 
     def _get_model_yml_path(
@@ -847,7 +846,8 @@ class DbtCoreAdapter:
                                         if not include_unbound:
                                             if (
                                                 entity_id not in bound_entities
-                                                or target_entity_id not in bound_entities
+                                                or target_entity_id
+                                                not in bound_entities
                                             ):
                                                 allow_by_entity_presence = (
                                                     entity_id in data_model_entities
