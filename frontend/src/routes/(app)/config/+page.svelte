@@ -337,6 +337,30 @@
                 {/if}
 
                 <form onsubmit={handleApply} class="space-y-8">
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end gap-3 mb-6">
+                        <button
+                            type="button"
+                            onclick={handleReload}
+                            disabled={saving}
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                            Reset Changes
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            class="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {#if saving}
+                                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8 0 0 4 0 0 0 0 4 0 0 0 0 4 0 4 0 0 4 0 0 4 0 0 0 4 0 0 4 0 0 0 0 4 0 0 0 0z"></path>
+                                </svg>
+                            {/if}
+                            Apply Configuration
+                        </button>
+                    </div>
                     <!-- Framework Section -->
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
                         <div class="flex items-center gap-2 mb-4">
@@ -868,32 +892,7 @@
                         </div>
                     </div>
 
-                            <!-- Action Buttons -->
-                            <div class="flex items-center justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onclick={handleReload}
-                                    disabled={saving}
-                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                                >
-                                    Reset Changes
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    class="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {#if saving}
-                                        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8 0 0 4 0 0 0 0 4 0 0 0 0 4 0 4 0 0 4 0 0 4 0 0 0 4 0 0 4 0 0 0 0 4 0 0 0 0z"></path>
-                                        </svg>
-                                    {/if}
-                                    Apply Configuration
-                                </button>
-                            </div>
-
-                            {#if fileInfo}
+                    {#if fileInfo}
                                 <div class="mt-6 text-xs text-gray-500">
                                     <p>Config file: {fileInfo.path}</p>
                                     <p>Last modified: {new Date(fileInfo.mtime * 1000).toLocaleString()}</p>
