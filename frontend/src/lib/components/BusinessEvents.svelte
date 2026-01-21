@@ -3,6 +3,7 @@
     import type { BusinessEvent, BusinessEventType } from '$lib/types';
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
+    import CreateEventModal from './CreateEventModal.svelte';
 
     let events = $state<BusinessEvent[]>([]);
     let loading = $state(true);
@@ -234,21 +235,10 @@
         </div>
     {/if}
 
-    <!-- Create Event Modal placeholder (will be replaced by CreateEventModal component in Stream D) -->
-    {#if showCreateModal}
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={handleModalClose}>
-            <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick={(e) => e.stopPropagation()}>
-                <h3 class="text-lg font-bold mb-4">Create Event</h3>
-                <p class="text-sm text-gray-600 mb-4">
-                    CreateEventModal component will be implemented in Stream D.
-                </p>
-                <button
-                    onclick={handleModalClose}
-                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                    Close
-                </button>
-            </div>
-        </div>
-    {/if}
+    <!-- Create Event Modal -->
+    <CreateEventModal
+        open={showCreateModal}
+        onSave={handleModalClose}
+        onCancel={() => { showCreateModal = false; }}
+    />
 </div>

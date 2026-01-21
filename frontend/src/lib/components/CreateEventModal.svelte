@@ -24,7 +24,7 @@
     let remainingChars = $derived(MAX_TEXT_LENGTH - characterCount);
 
     // Validation
-    let textError = $derived(() => {
+    let textError = $derived.by(() => {
         if (eventText.trim().length === 0) {
             return "Event text is required";
         }
@@ -34,7 +34,7 @@
         return null;
     });
     let typeError = $derived(eventType ? null : "Event type is required");
-    let isValid = $derived(!textError() && !typeError && !loading);
+    let isValid = $derived(textError === null && !typeError && !loading);
 
     // Initialize form when modal opens or event changes
     $effect(() => {
@@ -159,13 +159,13 @@
                         class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="e.g., customer buys product"
                         disabled={loading}
-                    />
+                    ></textarea>
                     <div class="flex items-center justify-between mt-1">
                         <span class="text-xs text-gray-500">
                             {remainingChars} characters remaining
                         </span>
-                        {#if textError()}
-                            <span class="text-xs text-red-600">{textError()}</span>
+                        {#if textError}
+                            <span class="text-xs text-red-600">{textError}</span>
                         {/if}
                     </div>
                 </div>
