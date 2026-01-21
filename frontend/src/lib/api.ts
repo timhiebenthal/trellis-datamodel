@@ -171,7 +171,13 @@ export async function inferRelationships(): Promise<Relationship[]> {
                 `Failed to infer relationships: ${res.status} ${res.statusText}${details}`,
             );
         }
-        return await res.json();
+        const payload = await res.json();
+        const relationships = Array.isArray(payload)
+            ? payload
+            : Array.isArray((payload as any)?.relationships)
+              ? (payload as any).relationships
+              : [];
+        return relationships;
     } catch (e) {
         console.error("Error inferring relationships:", e);
         throw e;

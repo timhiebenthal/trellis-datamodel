@@ -695,21 +695,23 @@ class DbtCoreAdapter:
         """
         model_dirs = self.get_model_dirs()
         model_to_entity = self._get_model_to_entity_map()
-
         # Only keep relationships where both ends map to entities that are bound to
         # at least one dbt model (including additional_models). This prevents writing
         # relationships for unbound entities in large projects.
         # When include_unbound is True, skip filtering entirely - return all relationships
         # using raw model names so the frontend can map them to current canvas state.
         bound_entities: set[str] = set()
+        data_model_entities: set[str] = set()
         if not include_unbound:
             data_model = self._load_data_model()
+            data_model_entities = {
+                e.get("id") for e in data_model.get("entities", []) if e.get("id")
+            }
             bound_entities = {
                 e.get("id")
                 for e in data_model.get("entities", [])
                 if e.get("id") and (e.get("dbt_model") or e.get("additional_models"))
             }
-
         relationships: list[Relationship] = []
         yml_found = False
 
@@ -781,7 +783,6 @@ class DbtCoreAdapter:
                                 # If not found in map and include_unbound, fall back to raw name
                                 if not entity_id:
                                     entity_id = base_model_name
-
                                 for column in columns or []:
                                     test_blocks = []
                                     for key in ("tests", "data_tests"):
@@ -806,7 +807,6 @@ class DbtCoreAdapter:
                                         target_field = rel_test.get(
                                             "field", ""
                                         ) or args.get("field", "")
-
                                         # If either ref target or field is missing, skip
                                         if not to_ref or not target_field:
                                             continue
@@ -849,7 +849,13 @@ class DbtCoreAdapter:
                                                 entity_id not in bound_entities
                                                 or target_entity_id not in bound_entities
                                             ):
-                                                continue
+                                                allow_by_entity_presence = (
+                                                    entity_id in data_model_entities
+                                                    and target_entity_id
+                                                    in data_model_entities
+                                                )
+                                                if not allow_by_entity_presence:
+                                                    continue
 
                                         relationships.append(
                                             {
