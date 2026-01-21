@@ -1,4 +1,3 @@
-# Configuration for data model UI
 framework: dbt-core
 modeling_style: dimensional_model
 dbt_project_path: ./dbt_company_dummy_kimball
@@ -7,17 +6,6 @@ dbt_catalog_path: target/catalog.json
 data_model_file: data_model.yml
 dbt_model_paths:
 - 3_core
-
-# Source chips configuration
-# Enable/disable source chip display on entities
-sources_enabled: true
-
-# Control which sources are displayed on entities
-# - "manual": Only user-defined sources from entity edits
-# - "lineage": Only lineage-derived sources (read-only, for bound entities)
-# - "both": Both manual and lineage (manual sources take precedence for unbound)
-source_sources: "both"  # Options: "manual", "lineage", "both" (default: "both")
-
 lineage:
   enabled: true
   layers:
@@ -32,6 +20,9 @@ entity_creation_guidance:
 exposures:
   enabled: true
   default_layout: dashboards-as-rows
+business_events:
+  enabled: true
+  file: ''
 dimensional_modeling:
   inference_patterns:
     dimension_prefix: dim_

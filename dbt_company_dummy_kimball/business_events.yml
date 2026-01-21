@@ -1,0 +1,8 @@
+events:
+- id: evt_20260121_001
+  text: sales agent calls leads
+  type: discrete
+  created_at: '2026-01-21T23:14:19.346876'
+  updated_at: '2026-01-21T23:14:19.346876'
+  annotations: []
+  derived_entities: []

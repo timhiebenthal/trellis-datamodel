@@ -1,6 +1,6 @@
 framework: dbt-core
 modeling_style: dimensional_model
-dbt_project_path: /nonexistent/path
+dbt_project_path: ./dbt_company_dummy_kimball
 dbt_manifest_path: target/manifest.json
 dbt_catalog_path: target/catalog.json
 data_model_file: data_model.yml
@@ -20,6 +20,9 @@ entity_creation_guidance:
 exposures:
   enabled: true
   default_layout: dashboards-as-rows
+business_events:
+  enabled: false
+  file: ''
 dimensional_modeling:
   inference_patterns:
     dimension_prefix: dim_

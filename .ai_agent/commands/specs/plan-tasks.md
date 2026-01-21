@@ -22,6 +22,7 @@ Each task should be:
 - Appropriately sized
 - Testable/verifiable
 - Include brief implementation detail when useful (e.g., file, function, API)
+- **NEVER use placeholder implementations** - all components must be fully functional when marked complete
 
 Task types:
 - Setup: Environment, dependencies
@@ -30,6 +31,30 @@ Task types:
 - Testing: Unit, integration, E2E
 - Documentation: Comments, README
 - Polish: Error handling, edge cases, UX
+
+### ⚠️ Anti-Pattern: Placeholder Implementations
+
+**NEVER create placeholder/stub components that say "will be implemented later"**
+
+❌ **BAD - Placeholder modal:**
+```svelte
+{#if showModal}
+    <div class="modal">
+        <p>Modal component will be implemented in Stream D.</p>
+        <button onclick={close}>Close</button>
+    </div>
+{/if}
+```
+
+✅ **GOOD - Either skip or fully implement:**
+- Option 1: Don't create the component until its sprint/stream
+- Option 2: Fully implement the component when the task is marked complete
+
+**Why this matters:**
+- Placeholders create confusion about what's actually done
+- They break the user experience during development
+- They require double work (placeholder + real implementation)
+- Tasks marked `[x]` should mean "fully functional", not "stub created"
 
 ## Step 3: Organize into SPRINTS and STREAMS
 
@@ -112,6 +137,11 @@ Brief description (reference spec.md)
 
 ## Notes
 Implementation notes, edge cases, standards
+
+### Implementation Quality Standards
+- **No placeholder implementations**: All components fully functional when marked `[x]`
+- **Complete integration**: Components properly imported and wired together
+- **User-facing quality**: Every marked task should be demonstrable to users
 ```
 
 ## Guidelines
@@ -122,6 +152,7 @@ Implementation notes, edge cases, standards
 - Include file or symbol when it reduces ambiguity (e.g., `routes/data_model.py`, `load_config()`)
 - Include testing tasks
 - Order by: dependencies → logical flow → risk
+- **Verify no placeholders**: Before marking tasks complete, ensure all components are fully implemented and integrated
 
 ### SPRINT Guidelines
 - Clear milestones
@@ -133,6 +164,10 @@ Implementation notes, edge cases, standards
 - Assignable to one agent
 - Minimal cross-dependencies
 - Use dependency markers: `⚠️ Depends on: ...`
+- **No placeholders**: Components must be fully implemented when tasks are marked complete
+- If a component depends on another stream, either:
+  - Make it a dependency and implement in correct order
+  - Or don't reference it until it's ready
 
 ### Parallelization Strategy
 - Independent work areas (backend/frontend, API/UI, tests/docs)
