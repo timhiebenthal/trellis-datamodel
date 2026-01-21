@@ -192,7 +192,7 @@
                                     </div>
                                     <div>
                                         <strong class="text-yellow-300">Evolving:</strong> Events
-                                        that change over time (e.g., "customer status updates")
+                                        that change over time (e.g., "sales opportunity funnel")
                                     </div>
                                     <div>
                                         <strong class="text-purple-300">Recurring:</strong> Events
