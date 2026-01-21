@@ -22,11 +22,26 @@ install-uv:
 	@echo "Installing uv..."
 	pip install uv
 
-setup: install-uv
+setup: install-uv setup-cursor-symlink
 	@echo "Installing backend dependencies..."
 	uv sync
 	@echo "Installing frontend dependencies..."
 	cd frontend && npm install
+
+setup-cursor-symlink:
+	@echo "Setting up .cursor directory with symlinks to .ai_agent..."
+	@if [ -L .cursor ]; then \
+		echo "Warning: .cursor is a symlink, converting to directory..."; \
+		rm .cursor; \
+	fi
+	@mkdir -p .cursor
+	@if [ ! -L .cursor/commands ]; then \
+		ln -sf ../.ai_agent/commands .cursor/commands && echo "Created .cursor/commands symlink"; \
+	fi
+	@if [ ! -L .cursor/skills ]; then \
+		ln -sf ../.ai_agent/skills .cursor/skills && echo "Created .cursor/skills symlink"; \
+	fi
+	@echo ".cursor directory setup complete (mcp.json can be created here)"
 
 backend:
 	@echo "Starting backend server..."
