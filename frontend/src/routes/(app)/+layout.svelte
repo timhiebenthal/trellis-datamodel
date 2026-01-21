@@ -3,7 +3,8 @@
     import '../../app.css';
     import logoHref from '$lib/assets/trellis_squared.svg?url';
     import { page } from '$app/stores';
-    import { onMount, untrack } from 'svelte';
+    import { onMount, untrack, setContext } from 'svelte';
+    import { writable } from 'svelte/store';
     import {
     nodes,
     edges,
@@ -98,6 +99,14 @@ import {
         min_description_length: 10,
         disabled_guidance: [],
     });
+    const guidanceConfigStore = writable(guidanceConfig);
+    setContext('guidanceConfig', guidanceConfigStore);
+    const lineageEnabledStore = writable(lineageEnabled);
+    setContext('lineageEnabled', lineageEnabledStore);
+    const exposuresEnabledStore = writable(exposuresEnabled);
+    setContext('exposuresEnabled', exposuresEnabledStore);
+    const hasExposuresDataStore = writable(hasExposuresData);
+    setContext('hasExposuresData', hasExposuresDataStore);
     let warningModalOpen = $state(false);
     let incompleteEntitiesForWarning = $state<Node[]>([]);
     let warningModalResolve: ((value: boolean) => void) | null = null;
@@ -130,6 +139,13 @@ import {
         if (!exposuresEnabled || !hasExposuresData) {
             $viewMode = $viewMode === 'exposures' ? 'conceptual' : $viewMode;
         }
+    });
+
+    $effect(() => {
+        guidanceConfigStore.set(guidanceConfig);
+        lineageEnabledStore.set(lineageEnabled);
+        exposuresEnabledStore.set(exposuresEnabled);
+        hasExposuresDataStore.set(hasExposuresData);
     });
 
     // Show warning modal for incomplete entities and wait for user decision
