@@ -105,7 +105,7 @@ export async function saveDataModel(model: DataModel): Promise<void> {
 
 export async function getConfigStatus(): Promise<ConfigStatus> {
     try {
-        const res = await fetch(`${API_BASE}/config/status`);
+        const res = await fetch(`${API_BASE}/config-status`);
         if (!res.ok) {
             throw new Error(`Failed to fetch config status: ${res.status}`);
         }
@@ -118,7 +118,7 @@ export async function getConfigStatus(): Promise<ConfigStatus> {
 
 export async function getConfigInfo(): Promise<ConfigInfo> {
     try {
-        const res = await fetch(`${API_BASE}/config/info`);
+        const res = await fetch(`${API_BASE}/config-info`);
         if (!res.ok) {
             throw new Error(`Failed to fetch config info: ${res.status}`);
         }
