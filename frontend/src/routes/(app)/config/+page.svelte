@@ -3,6 +3,7 @@
     import { getConfig, getConfigSchema, updateConfig, validateConfig } from '$lib/api';
     import type { ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
     import Icon from '$lib/components/Icon.svelte';
+    import Tooltip from '$lib/components/Tooltip.svelte';
 
     let loading = true;
     let saving = false;
@@ -338,7 +339,12 @@
                 <form onsubmit={handleApply} class="space-y-8">
                     <!-- Framework Section -->
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Framework</h2>
+                        <div class="flex items-center gap-2 mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">Framework</h2>
+                            <Tooltip text="Select your transformation framework and modeling approach. This determines how trellis interprets and visualizes your data models.">
+                                <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </Tooltip>
+                        </div>
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -380,7 +386,12 @@
 
                     <!-- Paths Section -->
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Paths</h2>
+                        <div class="flex items-center gap-2 mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">Paths</h2>
+                            <Tooltip text="Configure file paths to your dbt project artifacts and data model files. These paths tell trellis where to find your transformation metadata.">
+                                <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </Tooltip>
+                        </div>
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -500,7 +511,12 @@
 
                     <!-- Entity Creation Guidance Section -->
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Entity Creation Guidance</h2>
+                        <div class="flex items-center gap-2 mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">Entity Creation Guidance</h2>
+                            <Tooltip text="Control the entity creation wizard behavior. Enable validation rules and warnings to ensure data quality when creating new entities.">
+                                <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </Tooltip>
+                        </div>
                         <div class="space-y-4">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
@@ -585,7 +601,12 @@
                     <!-- Dimensional Modeling Section -->
                     {#if modelingStyle === 'dimensional_model'}
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Dimensional Modeling</h2>
+                        <div class="flex items-center gap-2 mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">Dimensional Modeling</h2>
+                            <Tooltip text="Configure naming prefixes for dimensional models. trellis uses these patterns to automatically classify models as dimensions or facts.">
+                                <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </Tooltip>
+                        </div>
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -625,7 +646,12 @@
                     <!-- Entity Modeling Section -->
                     {#if modelingStyle === 'entity_model'}
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Entity Modeling</h2>
+                        <div class="flex items-center gap-2 mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">Entity Modeling</h2>
+                            <Tooltip text="Set the naming prefix for entity models. trellis uses this pattern to identify and classify entity models in your data model.">
+                                <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </Tooltip>
+                        </div>
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -651,7 +677,12 @@
                         <div class="flex items-start gap-2 mb-6">
                             <Icon icon="lucide:alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                             <div class="flex-1">
-                                <h2 class="text-lg font-semibold text-amber-900">Danger Zone</h2>
+                                <div class="flex items-center gap-2">
+                                    <h2 class="text-lg font-semibold text-amber-900">Danger Zone</h2>
+                                    <Tooltip text="Experimental features that may change or be removed. Enable these to access beta functionality like lineage visualization and exposure tracking.">
+                                        <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
+                                    </Tooltip>
+                                </div>
                                 <p class="text-sm text-amber-700 mt-1">
                                     These features are experimental and may change. Use with caution.
                                 </p>
@@ -675,7 +706,12 @@
                         <div class="space-y-6 {isDangerZoneEnabled ? '' : 'opacity-50 pointer-events-none'}">
                             <!-- Lineage Container -->
                             <div class="bg-white border border-amber-200 rounded-lg p-4">
-                                <h3 class="text-base font-semibold text-amber-900 mb-4">Lineage</h3>
+                                <div class="flex items-center gap-2 mb-4">
+                                    <h3 class="text-base font-semibold text-amber-900">Lineage</h3>
+                                    <Tooltip text="Visualize data lineage across your dbt models. Configure layers to organize models by transformation stages (e.g., staging, intermediate, marts).">
+                                        <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
+                                    </Tooltip>
+                                </div>
                                 <div class="space-y-4">
                                     <div class="flex items-center justify-between">
                                         <div class="flex-1">
@@ -757,7 +793,12 @@
 
                             <!-- Exposures Container -->
                             <div class="bg-white border border-amber-200 rounded-lg p-4">
-                                <h3 class="text-base font-semibold text-amber-900 mb-4">Exposures</h3>
+                                <div class="flex items-center gap-2 mb-4">
+                                    <h3 class="text-base font-semibold text-amber-900">Exposures</h3>
+                                    <Tooltip text="Track downstream consumption of your data models. Connect dashboards and reports to entities to understand data usage across your organization.">
+                                        <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
+                                    </Tooltip>
+                                </div>
                                 <div class="space-y-4">
                                     <div class="flex items-center justify-between">
                                         <div class="flex-1">
