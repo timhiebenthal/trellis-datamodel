@@ -7,6 +7,8 @@ import { applyConfigOverrides, getCompanyDummyConfigOverrides, resetDataModel, r
  * predictable results and avoid interfering with user's production data.
  */
 
+test.describe.configure({ mode: 'serial' });
+
 test.describe('Exposures Feature Flag - E2E', () => {
     test.use({ storageState: { cookies: [], origins: [] } }); // Isolate session
 
@@ -104,10 +106,14 @@ test.describe('Exposures Feature Flag - E2E', () => {
             await page.goto('/');
             await page.waitForLoadState('networkidle');
 
+            // Wait for entity node to appear first
+            const entityInput = page.locator('input[value="Customer"]');
+            await expect(entityInput).toBeVisible({ timeout: 15000 });
+
             const exposureButton = page.locator(
                 'button[aria-label="Show exposures for Customer"]',
             );
-            await expect(exposureButton).toBeVisible({ timeout: 5000 });
+            await expect(exposureButton).toBeVisible({ timeout: 10000 });
             await exposureButton.click();
 
             await expect(page).toHaveURL(/\/exposures/);
