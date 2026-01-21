@@ -30,6 +30,12 @@
 
     // Reactive modeling style for conditional rendering
     $: modelingStyle = config.modeling_style;
+
+    // Entity guidance toggle state for dependent fields
+    $: entityGuidanceEnabled = !!config?.entity_creation_guidance?.enabled;
+    $: if (!entityGuidanceEnabled && getFieldValue('entity_creation_guidance.push_warning_enabled')) {
+        handleNestedFieldChange('entity_creation_guidance.push_warning_enabled', false);
+    }
     
     // Reactive lineage layers for UI updates
     $: lineageLayers = config.lineage?.layers || [];
