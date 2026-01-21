@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { getConfig, getConfigSchema, updateConfig, validateConfig } from '$lib/api';
+    import { getConfig, getConfigSchema, updateConfig, validateConfig, reloadConfig } from '$lib/api';
     import type { ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
     import Icon from '$lib/components/Icon.svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
@@ -150,8 +150,20 @@
             // Update file info with new values
             fileInfo = response.file_info;
 
-            // Show success message
-            showSuccessToast();
+            // Reload backend config to apply changes
+            try {
+                await reloadConfig();
+                // Show success message and reload page to pick up new config values
+                showSuccessToast();
+                // Reload page after a short delay to allow toast to be visible
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } catch (reloadError) {
+                // Reload failed - show error but keep old runtime state
+                const reloadMessage = reloadError instanceof Error ? reloadError.message : String(reloadError);
+                showErrorToast(`Configuration saved but reload failed: ${reloadMessage}`);
+            }
 
             // Reset saving state after successful save
             saving = false;
@@ -179,13 +191,26 @@
         // Simple toast notification
         const toast = document.createElement('div');
         toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
-        toast.textContent = '✓ Configuration saved successfully';
+        toast.textContent = '✓ Configuration saved and reloaded successfully';
         document.body.appendChild(toast);
 
         setTimeout(() => {
             toast.classList.add('opacity-0');
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    }
+
+    function showErrorToast(message: string) {
+        // Error toast notification
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('opacity-0');
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
     }
 
     function handleReload() {

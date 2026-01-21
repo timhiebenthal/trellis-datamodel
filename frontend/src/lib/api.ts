@@ -406,6 +406,25 @@ export async function validateConfig(config: Record<string, any>): Promise<{ val
     }
 }
 
+export async function reloadConfig(): Promise<{ status: string; message: string }> {
+    try {
+        const res = await fetch(`${API_BASE}/config/reload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail?.message || `Status: ${res.status}`);
+        }
+
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(message);
+    }
+}
+
 /**
  * Fetch Bus Matrix data showing dimension-fact connections.
  * 
