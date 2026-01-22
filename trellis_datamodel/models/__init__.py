@@ -1,4 +1,5 @@
 """Pydantic models for API request/response schemas."""
+
 from .schemas import (
     DataModelUpdate,
     DbtSchemaRequest,
@@ -8,8 +9,11 @@ from .business_event import (
     Annotation,
     BusinessEvent,
     BusinessEventType,
+    BusinessEventSevenWs,
     BusinessEventsFile,
     DerivedEntity,
+    EntityDimensionMetadata,
+    SevenWsEntry,
 )
 
 __all__ = [
@@ -19,7 +23,9 @@ __all__ = [
     "Annotation",
     "BusinessEvent",
     "BusinessEventType",
+    "BusinessEventSevenWs",
     "BusinessEventsFile",
     "DerivedEntity",
+    "EntityDimensionMetadata",
+    "SevenWsEntry",
 ]
-

@@ -3,12 +3,14 @@ Business Events service for dimensional modeling.
 
 Handles CRUD operations for business events stored in YAML files.
 Business events capture business processes (e.g., "customer buys product")
-and can be annotated with dimensions and facts for entity generation.
+and can be structured with the 7 Ws framework (Who, What, When, Where, How, How Many, Why)
+or annotated with dimensions and facts for entity generation.
 
 This service:
 - Loads and saves business events from/to YAML files
 - Provides CRUD operations for events
-- Manages annotations within events
+- Manages 7 Ws entries within events (Who, What, When, Where, How, How Many, Why)
+- Manages legacy annotations within events (deprecated)
 - Validates event data and prevents overlapping annotations
 """
 
@@ -31,6 +33,8 @@ from trellis_datamodel.models.business_event import (
     BusinessEventType,
     Annotation,
     BusinessEventsFile,
+    SevenWsEntry,
+    BusinessEventSevenWs,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,7 +100,9 @@ def load_business_events(path: Optional[str] = None) -> List[BusinessEvent]:
         raise FileOperationError("Invalid business events file format")
 
 
-def save_business_events(events: List[BusinessEvent], path: Optional[str] = None) -> None:
+def save_business_events(
+    events: List[BusinessEvent], path: Optional[str] = None
+) -> None:
     """
     Save business events to YAML file.
 
@@ -143,16 +149,19 @@ def get_unique_domains() -> List[str]:
     return sorted(list(domains))
 
 
-def create_event(text: str, type: BusinessEventType, domain: Optional[str] = None) -> BusinessEvent:
+def create_event(
+    text: str, type: BusinessEventType, domain: Optional[str] = None
+) -> BusinessEvent:
     """
     Create a new business event with auto-generated ID.
 
     Args:
         text: Event description text
         type: Event type (discrete, evolving, recurring)
+        domain: Optional business domain
 
     Returns:
-        New BusinessEvent object
+        New BusinessEvent object with empty 7 Ws structure
 
     Raises:
         ValidationError: If text is invalid
@@ -185,6 +194,7 @@ def create_event(text: str, type: BusinessEventType, domain: Optional[str] = Non
         updated_at=now,
         annotations=[],
         derived_entities=[],
+        seven_ws=BusinessEventSevenWs(),
     )
 
     events.append(new_event)
@@ -199,7 +209,7 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
 
     Args:
         event_id: ID of event to update
-        updates: Dictionary with fields to update (text, type, annotations, derived_entities)
+        updates: Dictionary with fields to update (text, type, annotations, derived_entities, seven_ws)
 
     Returns:
         Updated BusinessEvent object
@@ -239,17 +249,27 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
     if "domain" in updates:
         domain_value = updates["domain"]
         # Allow setting to None/empty string to clear domain
-        if domain_value is None or (isinstance(domain_value, str) and not domain_value.strip()):
+        if domain_value is None or (
+            isinstance(domain_value, str) and not domain_value.strip()
+        ):
             event.domain = None
         else:
-            event.domain = domain_value.strip() if isinstance(domain_value, str) else domain_value
+            event.domain = (
+                domain_value.strip() if isinstance(domain_value, str) else domain_value
+            )
 
     if "annotations" in updates:
         event.annotations = [Annotation(**ann) for ann in updates["annotations"]]
 
     if "derived_entities" in updates:
         from trellis_datamodel.models.business_event import DerivedEntity
-        event.derived_entities = [DerivedEntity(**de) for de in updates["derived_entities"]]
+
+        event.derived_entities = [
+            DerivedEntity(**de) for de in updates["derived_entities"]
+        ]
+
+    if "seven_ws" in updates:
+        event.seven_ws = BusinessEventSevenWs(**updates["seven_ws"])
 
     event.updated_at = datetime.now()
 
@@ -293,6 +313,8 @@ def add_annotation(
     """
     Add an annotation to a business event.
 
+    DEPRECATED: Use 7 Ws structure (add_seven_ws_entry) instead.
+
     Args:
         event_id: ID of event to annotate
         text: Annotated text segment
@@ -334,7 +356,9 @@ def add_annotation(
 
     # Update event with new annotations
     try:
-        updated_event = update_event(event_id, {"annotations": [ann.model_dump() for ann in updated_annotations]})
+        updated_event = update_event(
+            event_id, {"annotations": [ann.model_dump() for ann in updated_annotations]}
+        )
     except Exception as e:
         if "overlap" in str(e).lower():
             raise ValidationError("Annotation overlaps with existing annotation") from e
@@ -346,6 +370,8 @@ def add_annotation(
 def remove_annotation(event_id: str, annotation_index: int) -> BusinessEvent:
     """
     Remove an annotation from a business event by index.
+
+    DEPRECATED: Use 7 Ws structure (remove_seven_ws_entry) instead.
 
     Args:
         event_id: ID of event
@@ -373,6 +399,250 @@ def remove_annotation(event_id: str, annotation_index: int) -> BusinessEvent:
     if annotation_index < 0 or annotation_index >= len(event.annotations):
         raise NotFoundError(f"Annotation index {annotation_index} out of bounds")
 
-    updated_annotations = [ann for i, ann in enumerate(event.annotations) if i != annotation_index]
-    updated_event = update_event(event_id, {"annotations": [ann.model_dump() for ann in updated_annotations]})
+    updated_annotations = [
+        ann for i, ann in enumerate(event.annotations) if i != annotation_index
+    ]
+    updated_event = update_event(
+        event_id, {"annotations": [ann.model_dump() for ann in updated_annotations]}
+    )
     return updated_event
+
+
+def update_event_seven_ws(event_id: str, seven_ws_data: dict) -> BusinessEvent:
+    """
+    Update the entire 7 Ws structure for a business event.
+
+    Args:
+        event_id: ID of event to update
+        seven_ws_data: Dictionary with 7 Ws structure (who, what, when, where, how, how_many, why)
+
+    Returns:
+        Updated BusinessEvent object
+
+    Raises:
+        NotFoundError: If event not found
+        ValidationError: If seven_ws data is invalid
+        FileOperationError: If file operations fail
+    """
+    return update_event(event_id, {"seven_ws": seven_ws_data})
+
+
+def add_seven_ws_entry(
+    event_id: str,
+    w_type: str,
+    text: str,
+    dimension_id: Optional[str] = None,
+    description: Optional[str] = None,
+    attributes: Optional[dict] = None,
+) -> BusinessEvent:
+    """
+    Add a new entry to a specific W list in a business event.
+
+    Args:
+        event_id: ID of event
+        w_type: Type of W ('who', 'what', 'when', 'where', 'how', 'how_many', 'why')
+        text: Entry text
+        dimension_id: Optional ID of existing dimension entity to link
+        description: Optional description
+        attributes: Optional additional attributes dict
+
+    Returns:
+        Updated BusinessEvent object
+
+    Raises:
+        NotFoundError: If event not found
+        ValidationError: If w_type is invalid or entry_id is not unique
+        FileOperationError: If file operations fail
+    """
+    valid_w_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+    if w_type not in valid_w_types:
+        raise ValidationError(
+            f"Invalid w_type: '{w_type}'. Must be one of: {', '.join(valid_w_types)}"
+        )
+
+    if not text or not text.strip():
+        raise ValidationError("Entry text is required")
+
+    events = load_business_events()
+    event_index = None
+    for i, event in enumerate(events):
+        if event.id == event_id:
+            event_index = i
+            break
+
+    if event_index is None:
+        raise NotFoundError(f"Business event '{event_id}' not found")
+
+    event = events[event_index]
+
+    # Ensure seven_ws exists
+    if event.seven_ws is None:
+        event.seven_ws = BusinessEventSevenWs()
+
+    # Generate unique entry_id
+    import uuid
+
+    entry_id = f"entry_{uuid.uuid4().hex[:12]}"
+
+    # Check uniqueness across all Ws
+    all_entry_ids = _collect_all_entry_ids(event.seven_ws)
+    if entry_id in all_entry_ids:
+        raise ValidationError(f"Entry ID '{entry_id}' already exists in event")
+
+    # Create new entry
+    new_entry = SevenWsEntry(
+        id=entry_id,
+        text=text.strip(),
+        dimension_id=dimension_id,
+        description=description,
+        attributes=attributes or {},
+    )
+
+    # Add to appropriate W list
+    current_seven_ws = event.seven_ws.model_dump()
+    w_list = current_seven_ws.get(w_type, [])
+    w_list.append(new_entry.model_dump())
+    current_seven_ws[w_type] = w_list
+
+    # Update event
+    updated_event = update_event(event_id, {"seven_ws": current_seven_ws})
+    return updated_event
+
+
+def remove_seven_ws_entry(event_id: str, entry_id: str) -> BusinessEvent:
+    """
+    Remove a 7 Ws entry by entry_id from a business event.
+
+    Args:
+        event_id: ID of event
+        entry_id: ID of entry to remove
+
+    Returns:
+        Updated BusinessEvent object
+
+    Raises:
+        NotFoundError: If event or entry not found
+        FileOperationError: If file operations fail
+    """
+    events = load_business_events()
+    event_index = None
+    for i, event in enumerate(events):
+        if event.id == event_id:
+            event_index = i
+            break
+
+    if event_index is None:
+        raise NotFoundError(f"Business event '{event_id}' not found")
+
+    event = events[event_index]
+
+    if event.seven_ws is None:
+        raise NotFoundError(f"Entry '{entry_id}' not found (event has no 7 Ws data)")
+
+    # Find and remove entry
+    current_seven_ws = event.seven_ws.model_dump()
+    entry_found = False
+
+    for w_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
+        w_list = current_seven_ws.get(w_type, [])
+        original_length = len(w_list)
+        w_list = [entry for entry in w_list if entry.get("id") != entry_id]
+        current_seven_ws[w_type] = w_list
+        if len(w_list) < original_length:
+            entry_found = True
+
+    if not entry_found:
+        raise NotFoundError(f"Entry '{entry_id}' not found in any W list")
+
+    updated_event = update_event(event_id, {"seven_ws": current_seven_ws})
+    return updated_event
+
+
+def update_seven_ws_entry(
+    event_id: str,
+    entry_id: str,
+    text: Optional[str] = None,
+    dimension_id: Optional[str] = None,
+    description: Optional[str] = None,
+    attributes: Optional[dict] = None,
+) -> BusinessEvent:
+    """
+    Update an existing 7 Ws entry in a business event.
+
+    Args:
+        event_id: ID of event
+        entry_id: ID of entry to update
+        text: New text (optional)
+        dimension_id: New dimension_id (optional)
+        description: New description (optional)
+        attributes: New attributes (optional)
+
+    Returns:
+        Updated BusinessEvent object
+
+    Raises:
+        NotFoundError: If event or entry not found
+        ValidationError: If text is invalid
+        FileOperationError: If file operations fail
+    """
+    if text is not None and (not text or not text.strip()):
+        raise ValidationError("Entry text cannot be empty")
+
+    events = load_business_events()
+    event_index = None
+    for i, event in enumerate(events):
+        if event.id == event_id:
+            event_index = i
+            break
+
+    if event_index is None:
+        raise NotFoundError(f"Business event '{event_id}' not found")
+
+    event = events[event_index]
+
+    if event.seven_ws is None:
+        raise NotFoundError(f"Entry '{entry_id}' not found (event has no 7 Ws data)")
+
+    # Find and update entry
+    current_seven_ws = event.seven_ws.model_dump()
+    entry_found = False
+
+    for w_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
+        w_list = current_seven_ws.get(w_type, [])
+        for entry in w_list:
+            if entry.get("id") == entry_id:
+                entry_found = True
+                if text is not None:
+                    entry["text"] = text.strip()
+                if dimension_id is not None:
+                    entry["dimension_id"] = dimension_id
+                if description is not None:
+                    entry["description"] = description
+                if attributes is not None:
+                    entry["attributes"] = attributes
+                break
+
+    if not entry_found:
+        raise NotFoundError(f"Entry '{entry_id}' not found in any W list")
+
+    updated_event = update_event(event_id, {"seven_ws": current_seven_ws})
+    return updated_event
+
+
+def _collect_all_entry_ids(seven_ws: BusinessEventSevenWs) -> set:
+    """
+    Collect all entry IDs from a 7 Ws structure.
+
+    Args:
+        seven_ws: BusinessEventSevenWs object
+
+    Returns:
+        Set of entry IDs
+    """
+    entry_ids = set()
+    for w_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
+        w_list = getattr(seven_ws, w_type, [])
+        for entry in w_list:
+            if hasattr(entry, "id"):
+                entry_ids.add(entry.id)
+    return entry_ids
