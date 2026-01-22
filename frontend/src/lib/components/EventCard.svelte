@@ -10,11 +10,39 @@
         onGenerateEntities: (event: BusinessEvent) => void;
         onEdit: (event: BusinessEvent) => void;
         onDelete: () => void;
+        onViewSevenWs?: (event: BusinessEvent) => void;
     };
 
-    let { event, onAnnotate, onGenerateEntities, onEdit, onDelete }: Props = $props();
+    let { event, onAnnotate, onGenerateEntities, onEdit, onDelete, onViewSevenWs }: Props = $props();
 
     let showDeleteConfirm = $state(false);
+
+    // 7 Ws calculation
+    const sevenWs = $derived(event.seven_ws || {
+        who: [],
+        what: [],
+        when: [],
+        where: [],
+        how: [],
+        how_many: [],
+        why: []
+    });
+
+    const sevenWsFilledCount = $derived(
+        Object.values(sevenWs).filter((entries) => entries.length > 0).length
+    );
+
+    const sevenWsBadgeColor = $derived(() => {
+        if (sevenWsFilledCount === 0) {
+            return "bg-gray-100 text-gray-700 border-gray-300";
+        } else if (sevenWsFilledCount === 7) {
+            return "bg-green-100 text-green-800 border-green-300";
+        } else {
+            return "bg-amber-100 text-amber-800 border-amber-300";
+        }
+    });
+
+    const hasHowManyEntries = $derived(sevenWs.how_many.length > 0);
 
     // Check if Generate Entities button should be enabled
     const hasAnnotations = $derived(event.annotations.length > 0);
@@ -37,8 +65,12 @@
         }
     });
 
-    // Render event text with highlighted annotations
+    // Render event text with highlighted annotations (only if using legacy annotations)
     function renderAnnotatedText(): Array<{ text: string; type?: "dimension" | "fact" }> {
+        // If 7 Ws data exists, show plain text (concise display)
+        if (event.seven_ws && Object.keys(event.seven_ws).some(key => event.seven_ws![key as keyof typeof event.seven_ws].length > 0)) {
+            return [{ text: event.text }];
+        }
         if (event.annotations.length === 0) {
             return [{ text: event.text }];
         }
@@ -124,7 +156,7 @@
                 >
                     {part.text}
                 </span>
-                {:else}
+            {:else}
                     {part.text}
                 {/if}
             {/each}
@@ -132,6 +164,19 @@
 
         <!-- Status badges -->
         <div class="flex items-center gap-2 flex-shrink-0">
+            {#if sevenWsFilledCount > 0}
+                <span
+                    class="px-2 py-1 rounded text-xs font-medium border {sevenWsBadgeColor()} flex items-center gap-1"
+                    title="7 Ws completion status"
+                >
+                    {sevenWsFilledCount}/7 Ws
+                    {#if !hasHowManyEntries}
+                        <span title="No 'How Many' entries - fact table incomplete" class="inline-flex items-center">
+                            <Icon icon="lucide:alert-triangle" class="w-3 h-3 text-amber-600" />
+                        </span>
+                    {/if}
+                </span>
+            {/if}
             {#if hasDerivedEntities}
                 <span
                     class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300 flex items-center gap-1"
@@ -157,10 +202,20 @@
 
         <!-- Action buttons -->
         <div class="flex items-center gap-1 flex-shrink-0">
+            {#if sevenWsFilledCount > 0 && onViewSevenWs}
+                <button
+                    onclick={() => onViewSevenWs(event)}
+                    class="p-1.5 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                    title="View 7 Ws structure"
+                >
+                    <Icon icon="lucide:list" class="w-4 h-4" />
+                </button>
+            {/if}
+
             <button
                 onclick={() => onAnnotate(event)}
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                title="Annotate text segments as dimensions or facts"
+                title={sevenWsFilledCount > 0 ? "Edit 7 Ws structure" : "Add 7 Ws structure (Who, What, When, Where, How, How Many, Why)"}
             >
                 <Icon icon="lucide:highlighter" class="w-4 h-4" />
             </button>
@@ -177,8 +232,12 @@
                 class:cursor-pointer={canGenerateEntities}
                 title={
                     canGenerateEntities
-                        ? "Generate dimensional entities from annotations"
-                        : "Add at least one dimension and one fact annotation to generate entities"
+                        ? "Generate dimensional entities from 7 Ws"
+                        : sevenWsFilledCount > 0 && !hasHowManyEntries
+                            ? "Add 'How Many' entries to generate fact table"
+                            : sevenWsFilledCount > 0
+                                ? "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
+                                : "Add 7 Ws structure or annotations to generate entities"
                 }
             >
                 <Icon icon="lucide:sparkles" class="w-4 h-4" />

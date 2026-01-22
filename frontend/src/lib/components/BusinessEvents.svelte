@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { getBusinessEvents, getBusinessEventDomains } from '$lib/api';
+    import { getBusinessEvents, getBusinessEventDomains, updateBusinessEvent } from '$lib/api';
     import type { BusinessEvent, BusinessEventType } from '$lib/types';
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
     import AnnotateEventModal from './AnnotateEventModal.svelte';
     import EventCard from './EventCard.svelte';
+    import SevenWsForm from './SevenWsForm.svelte';
 
     let events = $state<BusinessEvent[]>([]);
     let domains = $state<string[]>([]);
@@ -21,8 +22,11 @@
     let showCreateModal = $state(false);
     let showEditModal = $state(false);
     let showAnnotateModal = $state(false);
+    let showSevenWsForm = $state(false);
+    let showViewSevenWs = $state(false);
     let editingEvent = $state<BusinessEvent | null>(null);
     let annotatingEvent = $state<BusinessEvent | null>(null);
+    let sevenWsEvent = $state<BusinessEvent | null>(null);
 
     // Filter events based on selected type and domain (combined filters)
     let filteredEvents = $derived.by(() => {
@@ -148,14 +152,61 @@
     }
 
     function handleAnnotate(event: BusinessEvent) {
-        annotatingEvent = event;
-        showAnnotateModal = true;
+        // Use SevenWsForm for events with 7 Ws structure, fall back to old annotation modal
+        if (event.seven_ws && Object.keys(event.seven_ws).some(key => event.seven_ws![key as keyof typeof event.seven_ws].length > 0)) {
+            sevenWsEvent = event;
+            showSevenWsForm = true;
+        } else {
+            annotatingEvent = event;
+            showAnnotateModal = true;
+        }
+    }
+
+    function handleViewSevenWs(event: BusinessEvent) {
+        sevenWsEvent = event;
+        showViewSevenWs = true;
     }
 
     function handleAnnotateModalClose() {
         showAnnotateModal = false;
         annotatingEvent = null;
         reloadEvents();
+    }
+
+    async function handleSevenWsSave(updatedEvent: BusinessEvent) {
+        try {
+            error = null;
+            // Call updateBusinessEvent with seven_ws data
+            await updateBusinessEvent(updatedEvent.id, {
+                seven_ws: updatedEvent.seven_ws
+            });
+            showSevenWsForm = false;
+            sevenWsEvent = null;
+            reloadEvents();
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : "Failed to save 7 Ws";
+            // Handle 7 Ws specific errors
+            if (errorMessage.includes('seven_w_type') || errorMessage.includes('Invalid seven_w_type')) {
+                error = "Invalid 7 Ws category. Please check your entries.";
+            } else if (errorMessage.includes('Duplicate entry IDs') || errorMessage.includes('duplicate')) {
+                error = "Duplicate entries detected. Please check for duplicate entries.";
+            } else if (errorMessage.includes('400') || errorMessage.includes('validation')) {
+                error = "Invalid 7 Ws data. Please check your entries.";
+            } else {
+                error = errorMessage;
+            }
+            console.error('Error saving 7 Ws:', e);
+        }
+    }
+
+    function handleSevenWsCancel() {
+        showSevenWsForm = false;
+        sevenWsEvent = null;
+    }
+
+    function handleViewSevenWsClose() {
+        showViewSevenWs = false;
+        sevenWsEvent = null;
     }
 
     function handleGenerateEntities(event: BusinessEvent) {
@@ -284,6 +335,7 @@
                             onGenerateEntities={handleGenerateEntities}
                             onEdit={handleEdit}
                             onDelete={reloadEvents}
+                            onViewSevenWs={handleViewSevenWs}
                         />
                     {/each}
                 </div>
@@ -308,11 +360,29 @@
         />
     {/if}
 
-    <!-- Annotate Event Modal -->
+    <!-- Annotate Event Modal (Legacy) -->
     <AnnotateEventModal
         open={showAnnotateModal}
         event={annotatingEvent}
         onSave={handleAnnotateModalClose}
         onCancel={() => { showAnnotateModal = false; annotatingEvent = null; }}
     />
+
+    <!-- 7 Ws Form Modal (Edit) -->
+    {#if showSevenWsForm && sevenWsEvent}
+        <SevenWsForm
+            event={sevenWsEvent}
+            onSave={handleSevenWsSave}
+            onCancel={handleSevenWsCancel}
+        />
+    {/if}
+
+    <!-- 7 Ws Form Modal (View - Read-only) -->
+    {#if showViewSevenWs && sevenWsEvent}
+        <SevenWsForm
+            event={sevenWsEvent}
+            onSave={handleSevenWsSave}
+            onCancel={handleViewSevenWsClose}
+        />
+    {/if}
 </div>

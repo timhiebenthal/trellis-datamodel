@@ -280,6 +280,34 @@ export interface ConfigUpdateResponse {
 // Business Events types
 export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
 
+export type SevenWType = 'who' | 'what' | 'when' | 'where' | 'how' | 'how_many' | 'why';
+
+export interface SevenWsEntry {
+    id: string;
+    dimension_id?: string;
+    text: string;
+    description?: string;
+    attributes?: Record<string, any>;
+}
+
+export interface BusinessEventSevenWs {
+    who: SevenWsEntry[];
+    what: SevenWsEntry[];
+    when: SevenWsEntry[];
+    where: SevenWsEntry[];
+    how: SevenWsEntry[];
+    how_many: SevenWsEntry[];
+    why: SevenWsEntry[];
+}
+
+export interface Dimension {
+    id: string;
+    label: string;
+    entity_type: 'fact' | 'dimension' | 'unclassified';
+    seven_w_type?: SevenWType;
+    description?: string;
+}
+
 export interface Annotation {
     text: string;
     type: 'dimension' | 'fact';
@@ -299,7 +327,8 @@ export interface BusinessEvent {
     domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
-    annotations: Annotation[];
+    seven_ws?: BusinessEventSevenWs; // 7 Ws structure (Who, What, When, Where, How, How Many, Why)
+    annotations: Annotation[]; // [DEPRECATED] kept for backward compatibility
     derived_entities: DerivedEntity[];
 }
 

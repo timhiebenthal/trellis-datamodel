@@ -11,6 +11,10 @@ import type {
     LineageResponse,
     BusinessEvent,
     BusinessEventType,
+    BusinessEventSevenWs,
+    SevenWsEntry,
+    SevenWType,
+    Dimension,
     Annotation,
     GeneratedEntitiesResult,
 } from './types';
@@ -536,18 +540,25 @@ export async function getBusinessEventDomains(): Promise<string[]> {
  * @param text - Event description text
  * @param type - Event type (discrete, evolving, recurring)
  * @param domain - Optional business domain (e.g., "Sales", "Marketing")
+ * @param sevenWs - Optional 7 Ws structure for the event
  * @returns Promise containing the created BusinessEvent
  */
 export async function createBusinessEvent(
     text: string,
     type: BusinessEventType,
-    domain?: string
+    domain?: string,
+    sevenWs?: BusinessEventSevenWs
 ): Promise<BusinessEvent> {
     try {
+        const body: any = { text, type, domain: domain || null };
+        if (sevenWs) {
+            body.seven_ws = sevenWs;
+        }
+
         const res = await fetch(`${API_BASE}/business-events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, type, domain: domain || null }),
+            body: JSON.stringify(body),
         });
         if (!res.ok) {
             const error = await res.json();
@@ -563,7 +574,7 @@ export async function createBusinessEvent(
 /**
  * Update an existing business event.
  * @param id - Event ID to update
- * @param updates - Dictionary with fields to update (text, type, annotations, derived_entities)
+ * @param updates - Dictionary with fields to update (text, type, annotations, derived_entities, seven_ws)
  * @returns Promise containing the updated BusinessEvent
  */
 export async function updateBusinessEvent(
@@ -584,6 +595,174 @@ export async function updateBusinessEvent(
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         throw new Error(`Error updating business event: ${message}`);
+    }
+}
+
+/**
+ * Update the 7 Ws structure for a business event.
+ * @param id - Event ID to update
+ * @param sevenWs - Complete 7 Ws structure to replace existing
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function updateBusinessEventSevenWs(
+    id: string,
+    sevenWs: BusinessEventSevenWs
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ seven_ws: sevenWs }),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to update 7 Ws: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error updating 7 Ws: ${message}`);
+    }
+}
+
+/**
+ * Get dimensions from the data model (filtered by entity_type=dimension).
+ * @param filterByType - Optional W type filter (seven_w_type)
+ * @returns Promise containing array of Dimension objects
+ */
+export async function getDimensions(filterByType?: SevenWType): Promise<Dimension[]> {
+    try {
+        let url = `${API_BASE}/data-model`;
+        const params = new URLSearchParams();
+        if (filterByType) {
+            params.append('seven_w_type', filterByType);
+        }
+        const queryString = params.toString();
+        if (queryString) {
+            url += `?${queryString}`;
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            // Treat missing data model as empty result
+            if (res.status === 404) return [];
+            throw new Error(`Failed to fetch dimensions: ${res.status}`);
+        }
+
+        const data = await res.json();
+        // Filter entities to return only dimensions
+        const entities = data.entities || [];
+        return entities
+            .filter((e: Dimension) => e.entity_type === 'dimension')
+            .filter((e: Dimension) => {
+                // If seven_w_type filter specified, only return matching dimensions
+                if (filterByType) {
+                    return e.seven_w_type === filterByType;
+                }
+                return true;
+            });
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error fetching dimensions: ${message}`);
+    }
+}
+
+/**
+ * Add a new 7 Ws entry to a business event.
+ * @param eventId - Event ID to add entry to
+ * @param wType - W category ('who', 'what', 'when', 'where', 'how', 'how_many', 'why')
+ * @param text - Entry text
+ * @param description - Optional entry description
+ * @param dimensionId - Optional reference to existing dimension in data_model.yml
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function addSevenWsEntry(
+    eventId: string,
+    wType: SevenWType,
+    text: string,
+    description?: string,
+    dimensionId?: string
+): Promise<BusinessEvent> {
+    try {
+        const body: any = { w_type: wType, text };
+        if (description !== undefined) body.description = description;
+        if (dimensionId !== undefined) body.dimension_id = dimensionId;
+
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/seven-entries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to add 7 Ws entry: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error adding 7 Ws entry: ${message}`);
+    }
+}
+
+/**
+ * Update an existing 7 Ws entry in a business event.
+ * @param eventId - Event ID containing the entry
+ * @param entryId - Entry ID to update
+ * @param text - New entry text
+ * @param description - Optional new entry description
+ * @param dimensionId - Optional new dimension_id reference
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function updateSevenWsEntry(
+    eventId: string,
+    entryId: string,
+    text: string,
+    description?: string,
+    dimensionId?: string
+): Promise<BusinessEvent> {
+    try {
+        const body: any = { text };
+        if (description !== undefined) body.description = description;
+        if (dimensionId !== undefined) body.dimension_id = dimensionId;
+
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/seven-entries/${entryId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to update 7 Ws entry: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error updating 7 Ws entry: ${message}`);
+    }
+}
+
+/**
+ * Remove a 7 Ws entry from a business event.
+ * @param eventId - Event ID containing the entry
+ * @param entryId - Entry ID to remove
+ * @returns Promise containing the updated BusinessEvent
+ */
+export async function removeSevenWsEntry(
+    eventId: string,
+    entryId: string
+): Promise<BusinessEvent> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/${eventId}/seven-entries/${entryId}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to remove 7 Ws entry: ${res.statusText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error removing 7 Ws entry: ${message}`);
     }
 }
 
@@ -666,6 +845,7 @@ export async function removeAnnotation(
 
 /**
  * Generate entities from a business event.
+ * Supports both annotation-based and 7 Ws-based entity generation.
  * @param eventId - Event ID to generate entities from
  * @returns Promise containing GeneratedEntitiesResult
  */
@@ -680,7 +860,9 @@ export async function generateEntitiesFromEvent(
             const error = await res.json();
             throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
         }
-        return await res.json();
+        const data = await res.json();
+        // Handle both direct response and wrapped response formats
+        return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         throw new Error(`Error generating entities: ${message}`);
