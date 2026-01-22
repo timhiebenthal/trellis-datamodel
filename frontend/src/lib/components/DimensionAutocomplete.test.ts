@@ -1,0 +1,48 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import '@testing-library/jest-dom';
+import DimensionAutocomplete from './DimensionAutocomplete.svelte';
+import type { Dimension, SevenWType } from '$lib/types';
+
+describe('DimensionAutocomplete', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    const mockDimensions: Dimension[] = [
+        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension', seven_w_type: 'who', description: 'Customer dimension' },
+        { id: 'dim_product', label: 'Product', entity_type: 'dimension', seven_w_type: 'what', description: 'Product dimension' },
+        { id: 'dim_location', label: 'Location', entity_type: 'dimension', seven_w_type: 'where', description: 'Location dimension' },
+        { id: 'dim_campaign', label: 'Campaign', entity_type: 'dimension', seven_w_type: 'why', description: 'Campaign dimension' }
+    ];
+
+    it('renders input with placeholder', () => {
+        const onChange = vi.fn();
+
+        const { container } = render(DimensionAutocomplete, {
+            value: '',
+            onChange,
+            dimensions: mockDimensions,
+            placeholder: 'Select dimension...'
+        });
+
+        const input = container.querySelector('input');
+        expect(input).toBeInTheDocument();
+        expect(input).toHaveAttribute('placeholder', 'Select dimension...');
+    });
+
+    it('shows loading state when loading prop is true', () => {
+        const onChange = vi.fn();
+
+        const { container } = render(DimensionAutocomplete, {
+            value: '',
+            onChange,
+            dimensions: mockDimensions,
+            loading: true
+        });
+
+        const loadingIcon = container.querySelector('[data-icon="lucide:loader-2"]');
+        expect(loadingIcon).toBeInTheDocument();
+    });
+});

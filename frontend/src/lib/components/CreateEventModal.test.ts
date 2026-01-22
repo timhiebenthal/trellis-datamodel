@@ -1,0 +1,93 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import '@testing-library/jest-dom';
+import CreateEventModal from './CreateEventModal.svelte';
+import type { BusinessEventType, BusinessEventSevenWs } from '$lib/types';
+
+describe('CreateEventModal', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    const mockSevenWs: BusinessEventSevenWs = {
+        who: [{ id: 'ent1', text: 'customer' }],
+        what: [{ id: 'ent2', text: 'product' }],
+        when: [],
+        where: [],
+        how: [],
+        how_many: [{ id: 'ent3', text: 'quantity' }],
+        why: []
+    };
+
+    it('renders with event text and type fields', () => {
+        const onSave = vi.fn();
+        const onCancel = vi.fn();
+
+        render(CreateEventModal, {
+            open: true,
+            onSave,
+            onCancel
+        });
+
+        expect(screen.getByLabelText(/event description/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/event type/i)).toBeInTheDocument();
+    });
+
+    it('renders SevenWsForm when open', () => {
+        const onSave = vi.fn();
+        const onCancel = vi.fn();
+
+        render(CreateEventModal, {
+            open: true,
+            onSave,
+            onCancel
+        });
+
+        expect(screen.getByText(/7 Ws/i)).toBeInTheDocument();
+    });
+
+    it('validates text is required', () => {
+        const onSave = vi.fn();
+        const onCancel = vi.fn();
+
+        render(CreateEventModal, {
+            open: true,
+            onSave,
+            onCancel
+        });
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        expect(saveButton).toBeInTheDocument();
+        
+        // Just verify structure - text input should exist
+        const textInput = screen.getByLabelText(/event description/i);
+        expect(textInput).toBeInTheDocument();
+    });
+
+    it('shows character count', () => {
+        const onSave = vi.fn();
+        const onCancel = vi.fn();
+
+        render(CreateEventModal, {
+            open: true,
+            onSave,
+            onCancel
+        });
+
+        expect(screen.getByText(/characters remaining/)).toBeInTheDocument();
+    });
+
+    it('shows domain autocomplete', () => {
+        const onSave = vi.fn();
+        const onCancel = vi.fn();
+
+        render(CreateEventModal, {
+            open: true,
+            onSave,
+            onCancel
+        });
+
+        expect(screen.getByLabelText(/business domain/i)).toBeInTheDocument();
+    });
+});

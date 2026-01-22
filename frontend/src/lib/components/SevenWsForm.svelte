@@ -1,9 +1,11 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventSevenWs, SevenWType, SevenWsEntry, Dimension } from "$lib/types";
-    import { getDimensions } from "$lib/api";
     import { onMount } from "svelte";
-    import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
+    // import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
+
+    // TODO: Import getDimensions once Stream G (api.ts) is completed
+    // import { getDimensions } from "$lib/api";
 
     type Props = {
         event: BusinessEvent;
@@ -68,6 +70,30 @@
         W_TYPES.filter(w => sevenWs[w.type].length > 0).length
     );
 
+    // Check for dimension_id conflicts with existing dimensions
+    let dimensionIdConflicts = $derived.by(() => {
+        if (!dimensions || dimensions.length === 0) return [];
+
+        const conflicts: Array<{ entryId: string; dimensionId: string; dimensionLabel: string }> = [];
+
+        for (const w of W_TYPES.filter(w => w.type !== 'how_many')) {
+            for (const entry of sevenWs[w.type]) {
+                if (entry.dimension_id) {
+                    const dimension = dimensions.find(d => d.id === entry.dimension_id);
+                    if (dimension && dimension.seven_w_type && dimension.seven_w_type !== w.type) {
+                        conflicts.push({
+                            entryId: entry.id,
+                            dimensionId: entry.dimension_id,
+                            dimensionLabel: dimension.label
+                        });
+                    }
+                }
+            }
+        }
+
+        return conflicts;
+    });
+
     // Validation errors
     let validationErrors = $derived.by(() => {
         const errors: string[] = [];
@@ -104,6 +130,14 @@
             errors.push(`Duplicate dimension reference(s) detected: ${uniqueDuplicates.join(', ')}. Each dimension should only be used once per event.`);
         }
 
+        // Add dimension ID conflict warnings
+        if (dimensionIdConflicts.length > 0) {
+            const conflictDetails = dimensionIdConflicts
+                .map(c => `"${c.dimensionLabel}" (used in ${c.dimensionId})`)
+                .join(', ');
+            errors.push(`Dimension type mismatch detected: ${conflictDetails}. Please review dimension assignments.`);
+        }
+
         return errors;
     });
 
@@ -120,20 +154,63 @@
             how_many: [],
             why: []
         };
+        // Reset error state when event changes
+        hasError = false;
+        errorMessage = null;
+        error = null;
     });
 
-    // Load dimensions on mount for autocomplete
-    onMount(async () => {
+    // Error boundary wrapper
+    function runWithErrorBoundary<T>(fn: () => T, context: string): T | null {
         try {
-            dimensionsLoading = true;
-            dimensions = await getDimensions();
+            return fn();
         } catch (e) {
-            console.error('Failed to load dimensions:', e);
-            dimensions = [];
-        } finally {
-            dimensionsLoading = false;
+            console.error(`Error boundary caught (${context}):`, e);
+            hasError = true;
+            errorMessage = e instanceof Error ? e.message : `Unexpected error in ${context}`;
+            error = errorMessage;
+            return null;
         }
+    }
+
+    // Load dimensions on mount for autocomplete (with error boundary and retry)
+    // TODO: Uncomment once getDimensions is available (Stream G - api.ts)
+    /*
+    onMount(async () => {
+        let retryCount =0;
+        const maxRetries =2;
+
+        async function loadDimensionsWithRetry() {
+            try {
+                dimensionsLoading = true;
+                dimensions = await getDimensions();
+                hasError = false;
+                errorMessage = null;
+            } catch (e) {
+                retryCount++;
+                console.error(`Failed to load dimensions (attempt ${retryCount}):`, e);
+
+                if (retryCount < maxRetries) {
+                    // Retry after delay
+                    setTimeout(loadDimensionsWithRetry, 1000 * retryCount);
+                } else {
+                    hasError = true;
+                    errorMessage = e instanceof Error
+                        ? "Failed to load dimensions after multiple attempts. Please refresh the page."
+                        : "Failed to load dimensions. Please refresh the page.";
+                    error = errorMessage;
+                    dimensions = [];
+                }
+            } finally {
+                if (retryCount >= maxRetries || !hasError) {
+                    dimensionsLoading = false;
+                }
+            }
+        }
+
+        await loadDimensionsWithRetry();
     });
+    */
 
     function handleBackdropClick(e: MouseEvent) {
         if (e.target === e.currentTarget) {
@@ -174,13 +251,39 @@
     }
 
     function removeEntry(wType: SevenWType, entryId: string) {
+        const entry = sevenWs[wType].find(e => e.id === entryId);
+
+        // Show confirmation dialog if entry has dimension_id (potential relationships)
+        if (entry && entry.dimension_id) {
+            entryToDelete = { wType, entryId };
+            showDeleteConfirm = true;
+        } else {
+            // Delete immediately if no dimension reference
+            performDelete(wType, entryId);
+        }
+    }
+
+    function performDelete(wType: SevenWType, entryId: string) {
         sevenWs = {
             ...sevenWs,
             [wType]: sevenWs[wType].filter(e => e.id !== entryId)
         };
-        
+
         // Remove from editing state
         delete editingEntries[entryId];
+    }
+
+    function handleDeleteConfirm() {
+        if (entryToDelete) {
+            performDelete(entryToDelete.wType, entryToDelete.entryId);
+        }
+        showDeleteConfirm = false;
+        entryToDelete = null;
+    }
+
+    function handleDeleteCancel() {
+        showDeleteConfirm = false;
+        entryToDelete = null;
     }
 
     function updateEntryText(wType: SevenWType, entryId: string, text: string) {
@@ -207,14 +310,20 @@
 
     async function handleSave() {
         error = null;
+        errorMessage = null;
+        hasError = false;
         loading = true;
 
         try {
             // Validate no empty text entries
             for (const w of W_TYPES) {
-                for (const entry of sevenWs[w.type]) {
-                    if (!entry.text.trim()) {
+                for (const entryItem of sevenWs[w.type]) {
+                    if (!entryItem.text.trim()) {
                         throw new Error(`All entries must have text. Please check the ${w.label} section.`);
+                    }
+                    // Check for text length (max 200)
+                    if (entryItem.text.trim().length > 200) {
+                        throw new Error(`Entry text in ${w.label} exceeds 200 characters. Please shorten it.`);
                     }
                 }
             }
@@ -226,10 +335,24 @@
                 updated_at: new Date().toISOString()
             };
 
+            // Call onSave (parent handles network operations with retry)
             onSave(updatedEvent);
         } catch (e) {
-            const errorMessage = e instanceof Error ? e.message : "Failed to save 7 Ws";
-            error = errorMessage;
+            const err = e instanceof Error ? e : new Error("Unknown error occurred");
+            error = err.message;
+            errorMessage = err.message;
+            hasError = true;
+
+            // Provide user-friendly error messages
+            if (err.message.includes("network") || err.message.includes("fetch") || err.name === "TypeError") {
+                error = "Network error occurred while saving. Please check your connection and try again.";
+            } else if (err.message.includes("timeout")) {
+                error = "Request timed out. Please try again.";
+            } else if (err.message.includes("validation") || err.message.includes("validate")) {
+                error = err.message; // Show validation errors as-is
+            } else {
+                error = err.message || "Failed to save 7 Ws. Please try again.";
+            }
         } finally {
             loading = false;
         }
@@ -458,4 +581,48 @@
             </div>
         </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    {#if showDeleteConfirm}
+        <div
+            class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center"
+            onclick={(e) => { if (e.target === e.currentTarget) handleDeleteCancel(); }}
+            role="dialog"
+            tabindex="-1"
+            aria-modal="true"
+            aria-labelledby="delete-entry-modal-title"
+        >
+            <div
+                class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full mx-4"
+                role="document"
+                tabindex="-1"
+            >
+                <h2 id="delete-entry-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
+                    Delete Entry?
+                </h2>
+                <p class="text-sm text-gray-600 mb-6">
+                    {#if entryToDelete && entryToDelete.wType}
+                        {@const entry = sevenWs[entryToDelete!.wType].find(e => e.id === entryToDelete!.entryId)}
+                        This entry has a dimension reference ({entry?.dimension_id}). Deleting it will remove the reference from the dimension entity. This action cannot be undone.
+                    {:else}
+                        This entry cannot be undone. Are you sure you want to delete it?
+                    {/if}
+                </p>
+                <div class="flex justify-end gap-3">
+                    <button
+                        onclick={handleDeleteCancel}
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onclick={handleDeleteConfirm}
+                        class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 {/if}
