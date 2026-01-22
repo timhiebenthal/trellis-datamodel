@@ -19,7 +19,7 @@
     let loading = $state(false);
     let error = $state<string | null>(null);
     let previewData = $state<GeneratedEntitiesResult | null>(null);
-    let editedEntities = $state<Array<{ id: string; label: string; entity_type: string }>>([]);
+    let editedEntities = $state<Array<{ id: string; label: string; entity_type: string; tags?: string[] }>>([]);
     let validationErrors = $state<string[]>([]);
     let creating = $state(false);
     let success = $state(false);
@@ -47,11 +47,12 @@
             loading = true;
             error = null;
             previewData = await generateEntitiesFromEvent(event.id);
-            // Initialize edited entities with preview data
+            // Initialize edited entities with preview data (including tags)
             editedEntities = previewData.entities.map((e) => ({
                 id: e.id,
                 label: e.label,
                 entity_type: e.entity_type,
+                tags: e.tags || [],
             }));
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to generate preview';
@@ -160,7 +161,7 @@
                     };
                 }
 
-                // Create node
+                // Create node (include tags from preview data)
                 const newNode: Node = {
                     id,
                     type: 'entity',
@@ -169,6 +170,7 @@
                         label: edited.label.trim() || edited.id.trim(),
                         description: original.description || '',
                         entity_type: edited.entity_type,
+                        tags: original.tags || [],
                         width: 280,
                         panelHeight: 200,
                         collapsed: false,
@@ -336,6 +338,18 @@
                         </div>
                     {/if}
 
+                    <!-- Domain Tag Note -->
+                    {#if event?.domain}
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                            <div class="flex items-start gap-2">
+                                <Icon icon="lucide:info" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <p class="text-sm text-blue-800">
+                                    <strong>Domain Tag:</strong> All entities will inherit the "<span class="font-mono font-semibold">{event.domain}</span>" tag from this event.
+                                </p>
+                            </div>
+                        </div>
+                    {/if}
+
                     <!-- Entities Table -->
                     <div class="border border-gray-200 rounded-lg overflow-hidden">
                         <table class="w-full">
@@ -349,6 +363,9 @@
                                     </th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                                         Label
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                                        Tags
                                     </th>
                                 </tr>
                             </thead>
@@ -395,6 +412,22 @@
                                                 class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                                 placeholder="Display label"
                                             />
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {#if previewData.entities[index]?.tags && previewData.entities[index].tags!.length > 0}
+                                                <div class="flex flex-wrap gap-1">
+                                                    {#each previewData.entities[index].tags! as tag}
+                                                        <span
+                                                            class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded border border-blue-200 font-mono"
+                                                            title="Inherited tag from event domain"
+                                                        >
+                                                            {tag}
+                                                        </span>
+                                                    {/each}
+                                                </div>
+                                            {:else}
+                                                <span class="text-xs text-gray-400">—</span>
+                                            {/if}
                                         </td>
                                     </tr>
                                 {/each}

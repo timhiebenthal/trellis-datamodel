@@ -23,6 +23,7 @@ from trellis_datamodel.services.business_events_service import (
     delete_event,
     add_annotation,
     remove_annotation,
+    get_unique_domains,
 )
 from trellis_datamodel.services.entity_generator import generate_entities_from_event
 
@@ -34,6 +35,7 @@ class CreateEventRequest(BaseModel):
 
     text: str
     type: str
+    domain: str | None = None
 
 
 class UpdateEventRequest(BaseModel):
@@ -41,6 +43,7 @@ class UpdateEventRequest(BaseModel):
 
     text: str | None = None
     type: str | None = None
+    domain: str | None = None
     annotations: list[dict] | None = None
     derived_entities: list[dict] | None = None
 
@@ -58,6 +61,29 @@ def _check_feature_enabled():
     """Check if business events feature is enabled."""
     if not cfg.BUSINESS_EVENTS_ENABLED:
         raise FeatureDisabledError("Business events feature is disabled")
+
+
+@router.get("/business-events/domains", response_model=list[str])
+async def get_business_event_domains():
+    """
+    Return unique domain values from all business events for autocomplete.
+
+    Returns:
+        Sorted list of unique domain strings
+
+    Raises:
+        FeatureDisabledError: If business events feature is disabled
+        FileOperationError: If file cannot be read
+    """
+    _check_feature_enabled()
+
+    try:
+        domains = get_unique_domains()
+        return domains
+    except FileOperationError:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading business event domains: {str(e)}")
 
 
 @router.get("/business-events", response_model=list[BusinessEvent])
@@ -114,7 +140,7 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
                 detail=f"Invalid event type: {request.type}. Must be one of: discrete, evolving, recurring",
             )
 
-        event = create_event(request.text, event_type)
+        event = create_event(request.text, event_type, domain=request.domain)
         return event
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -150,6 +176,8 @@ async def update_business_event(event_id: str, request: UpdateEventRequest = Bod
             updates["text"] = request.text
         if request.type is not None:
             updates["type"] = request.type
+        if request.domain is not None:
+            updates["domain"] = request.domain
         if request.annotations is not None:
             updates["annotations"] = request.annotations
         if request.derived_entities is not None:

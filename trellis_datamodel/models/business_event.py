@@ -51,6 +51,7 @@ class BusinessEvent(BaseModel):
     id: str = Field(..., description="Unique event ID (e.g., evt_YYYYMMDD_NNN)")
     text: str = Field(..., description="Event description text")
     type: BusinessEventType = Field(..., description="Event type classification")
+    domain: Optional[str] = Field(None, description="Optional business domain (e.g., 'Sales', 'Marketing')")
     created_at: datetime = Field(..., description="When the event was created")
     updated_at: datetime = Field(..., description="When the event was last updated")
     annotations: List[Annotation] = Field(

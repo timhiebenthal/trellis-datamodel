@@ -473,14 +473,61 @@ export async function getBusinessEvents(): Promise<BusinessEvent[]> {
     try {
         const res = await fetch(`${API_BASE}/business-events`);
         if (!res.ok) {
-            throw new Error(`Failed to fetch business events: ${res.statusText}`);
+            // Try to get error detail from response
+            let errorDetail = res.statusText;
+            try {
+                const errorData = await res.json();
+                errorDetail = errorData.detail || errorData.message || errorDetail;
+            } catch {
+                // If JSON parsing fails, use statusText
+            }
+            const error = new Error(`Failed to fetch business events: ${errorDetail}`);
+            (error as any).status = res.status;
+            (error as any).statusText = res.statusText;
+            throw error;
         }
         const data = await res.json();
         // Handle both { events: [...] } and direct array response
         return Array.isArray(data) ? data : (data.events || []);
     } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
         const message = e instanceof Error ? e.message : String(e);
         throw new Error(`Error fetching business events: ${message}`);
+    }
+}
+
+/**
+ * Get unique domain values from all business events for autocomplete.
+ * @returns Promise containing array of unique domain strings
+ */
+export async function getBusinessEventDomains(): Promise<string[]> {
+    try {
+        const res = await fetch(`${API_BASE}/business-events/domains`);
+        if (!res.ok) {
+            // Try to get error detail from response
+            let errorDetail = res.statusText;
+            try {
+                const errorData = await res.json();
+                errorDetail = errorData.detail || errorData.message || errorDetail;
+            } catch {
+                // If JSON parsing fails, use statusText
+            }
+            const error = new Error(`Failed to fetch business event domains: ${errorDetail}`);
+            (error as any).status = res.status;
+            (error as any).statusText = res.statusText;
+            throw error;
+        }
+        return await res.json();
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error fetching business event domains: ${message}`);
     }
 }
 
@@ -488,17 +535,19 @@ export async function getBusinessEvents(): Promise<BusinessEvent[]> {
  * Create a new business event.
  * @param text - Event description text
  * @param type - Event type (discrete, evolving, recurring)
+ * @param domain - Optional business domain (e.g., "Sales", "Marketing")
  * @returns Promise containing the created BusinessEvent
  */
 export async function createBusinessEvent(
     text: string,
-    type: BusinessEventType
+    type: BusinessEventType,
+    domain?: string
 ): Promise<BusinessEvent> {
     try {
         const res = await fetch(`${API_BASE}/business-events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, type }),
+            body: JSON.stringify({ text, type, domain: domain || null }),
         });
         if (!res.ok) {
             const error = await res.json();

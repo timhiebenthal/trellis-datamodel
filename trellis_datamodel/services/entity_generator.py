@@ -8,13 +8,37 @@ labels, and relationships following dimensional modeling conventions.
 
 import logging
 import re
-from typing import List
+from typing import List, Optional
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.business_event import BusinessEvent, Annotation, GeneratedEntitiesResult
 
 logger = logging.getLogger(__name__)
+
+
+def slugify_domain(domain: str) -> str:
+    """
+    Convert domain string to slug format for use as tag.
+
+    Args:
+        domain: Domain string (e.g., "Sales Operations", "Finance")
+
+    Returns:
+        Slugified string (e.g., "sales-operations", "finance")
+    """
+    import re
+    # Convert to lowercase
+    slug = domain.lower()
+    # Replace spaces with hyphens
+    slug = slug.replace(" ", "-")
+    # Remove special characters except hyphens
+    slug = re.sub(r"[^a-z0-9\-]", "", slug)
+    # Remove multiple consecutive hyphens
+    slug = re.sub(r"-+", "-", slug)
+    # Remove leading/trailing hyphens
+    slug = slug.strip("-")
+    return slug
 
 
 def _text_to_snake_case(text: str) -> str:
@@ -56,16 +80,17 @@ def _text_to_title_case(text: str) -> str:
     return " ".join(title_words) if title_words else text
 
 
-def _create_dimension_entity(annotation: Annotation, prefixes: List[str]) -> dict:
+def _create_dimension_entity(annotation: Annotation, prefixes: List[str], domain_tag: Optional[str] = None) -> dict:
     """
     Create a dimension entity dictionary from an annotation.
 
     Args:
         annotation: Annotation marked as 'dimension'
         prefixes: List of dimension prefixes to apply (e.g., ['dim_'])
+        domain_tag: Optional domain tag to add to entity (slugified domain)
 
     Returns:
-        Entity dictionary with id, label, entity_type, etc.
+        Entity dictionary with id, label, entity_type, tags, etc.
     """
     base_name = _text_to_snake_case(annotation.text)
     label = _text_to_title_case(annotation.text)
@@ -79,15 +104,21 @@ def _create_dimension_entity(annotation: Annotation, prefixes: List[str]) -> dic
         if not has_prefix:
             entity_id = f"{prefix}{base_name}"
 
-    return {
+    entity = {
         "id": entity_id,
         "label": label,
         "entity_type": "dimension",
         "description": f"Dimension: {annotation.text}",
     }
 
+    # Add domain tag if provided
+    if domain_tag:
+        entity["tags"] = [domain_tag]
 
-def _create_fact_entity(annotation: Annotation, prefixes: List[str], event_type: str) -> dict:
+    return entity
+
+
+def _create_fact_entity(annotation: Annotation, prefixes: List[str], event_type: str, domain_tag: Optional[str] = None) -> dict:
     """
     Create a fact entity dictionary from an annotation.
 
@@ -95,9 +126,10 @@ def _create_fact_entity(annotation: Annotation, prefixes: List[str], event_type:
         annotation: Annotation marked as 'fact'
         prefixes: List of fact prefixes to apply (e.g., ['fct_'])
         event_type: Business event type (discrete, evolving, recurring)
+        domain_tag: Optional domain tag to add to entity (slugified domain)
 
     Returns:
-        Entity dictionary with id, label, entity_type, metadata, etc.
+        Entity dictionary with id, label, entity_type, metadata, tags, etc.
     """
     base_name = _text_to_snake_case(annotation.text)
     label = _text_to_title_case(annotation.text)
@@ -121,6 +153,10 @@ def _create_fact_entity(annotation: Annotation, prefixes: List[str], event_type:
     # Add event type as metadata
     if event_type:
         entity["metadata"] = {"event_type": event_type}
+
+    # Add domain tag if provided
+    if domain_tag:
+        entity["tags"] = [domain_tag]
 
     return entity
 
@@ -183,11 +219,16 @@ def generate_entities_from_event(event: BusinessEvent, config=None) -> Generated
         dim_prefixes = getattr(config, "dimension_prefix", []) or []
         fact_prefixes = getattr(config, "fact_prefix", []) or []
 
+    # Check if event has domain and slugify it for tag
+    domain_tag = None
+    if event.domain:
+        domain_tag = slugify_domain(event.domain)
+
     # Generate dimension entities
     dimension_entities = []
     dimension_ids = []
     for ann in dimensions:
-        entity = _create_dimension_entity(ann, dim_prefixes)
+        entity = _create_dimension_entity(ann, dim_prefixes, domain_tag=domain_tag)
         dimension_entities.append(entity)
         dimension_ids.append(entity["id"])
 
@@ -195,7 +236,7 @@ def generate_entities_from_event(event: BusinessEvent, config=None) -> Generated
     fact_entities = []
     fact_ids = []
     for ann in facts:
-        entity = _create_fact_entity(ann, fact_prefixes, event.type.value)
+        entity = _create_fact_entity(ann, fact_prefixes, event.type.value, domain_tag=domain_tag)
         fact_entities.append(entity)
         fact_ids.append(entity["id"])
 

@@ -128,7 +128,22 @@ def save_business_events(events: List[BusinessEvent], path: Optional[str] = None
         raise FileOperationError(f"Failed to write business events file: {e}")
 
 
-def create_event(text: str, type: BusinessEventType) -> BusinessEvent:
+def get_unique_domains() -> List[str]:
+    """
+    Get unique domain values from all business events.
+
+    Returns:
+        Sorted list of unique domain strings (excluding None/null values)
+    """
+    events = load_business_events()
+    domains = set()
+    for event in events:
+        if event.domain:
+            domains.add(event.domain)
+    return sorted(list(domains))
+
+
+def create_event(text: str, type: BusinessEventType, domain: Optional[str] = None) -> BusinessEvent:
     """
     Create a new business event with auto-generated ID.
 
@@ -165,6 +180,7 @@ def create_event(text: str, type: BusinessEventType) -> BusinessEvent:
         id=new_id,
         text=text.strip(),
         type=type,
+        domain=domain.strip() if domain else None,
         created_at=now,
         updated_at=now,
         annotations=[],
@@ -219,6 +235,14 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
             event.type = BusinessEventType(updates["type"])
         except ValueError:
             raise ValidationError(f"Invalid event type: {updates['type']}")
+
+    if "domain" in updates:
+        domain_value = updates["domain"]
+        # Allow setting to None/empty string to clear domain
+        if domain_value is None or (isinstance(domain_value, str) and not domain_value.strip()):
+            event.domain = None
+        else:
+            event.domain = domain_value.strip() if isinstance(domain_value, str) else domain_value
 
     if "annotations" in updates:
         event.annotations = [Annotation(**ann) for ann in updates["annotations"]]

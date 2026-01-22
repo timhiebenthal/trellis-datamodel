@@ -2,6 +2,7 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent } from "$lib/types";
     import { deleteBusinessEvent } from "$lib/api";
+    import DomainBadge from "./DomainBadge.svelte";
 
     type Props = {
         event: BusinessEvent;
@@ -142,8 +143,11 @@
             {/if}
         </div>
 
-        <!-- Type badge on the right -->
-        <div class="flex-shrink-0">
+        <!-- Domain and Type badges -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+            {#if event.domain}
+                <DomainBadge domain={event.domain} size="small" />
+            {/if}
             <span
                 class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}"
             >

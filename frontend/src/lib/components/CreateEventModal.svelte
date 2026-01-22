@@ -1,7 +1,8 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import { createBusinessEvent, updateBusinessEvent } from "$lib/api";
+    import { createBusinessEvent, updateBusinessEvent, getBusinessEventDomains } from "$lib/api";
     import type { BusinessEvent, BusinessEventType } from "$lib/types";
+    import { onMount } from "svelte";
 
     type Props = {
         open: boolean;
@@ -15,8 +16,24 @@
     // Form state
     let eventText = $state("");
     let eventType = $state<BusinessEventType>("discrete");
+    let domainInput = $state("");
     let loading = $state(false);
     let error = $state<string | null>(null);
+
+    // Domain autocomplete state
+    let domainSuggestions = $state<string[]>([]);
+    let showSuggestions = $state(false);
+    let activeSuggestionIndex = $state(0);
+    let filteredSuggestions = $derived(
+        domainSuggestions.filter((d) =>
+            d.toLowerCase().includes(domainInput.toLowerCase())
+        )
+    );
+
+    // Helper function to convert domain to title case
+    function toTitleCase(str: string): string {
+        return str.trim().charAt(0).toUpperCase() + str.trim().slice(1).toLowerCase();
+    }
 
     // Character limit
     const MAX_TEXT_LENGTH = 500;
@@ -36,6 +53,16 @@
     let typeError = $derived(eventType ? null : "Event type is required");
     let isValid = $derived(textError === null && !typeError && !loading);
 
+    // Load domain suggestions on mount
+    onMount(async () => {
+        try {
+            domainSuggestions = await getBusinessEventDomains();
+        } catch (e) {
+            console.error("Failed to load domain suggestions:", e);
+            domainSuggestions = [];
+        }
+    });
+
     // Initialize form when modal opens or event changes
     $effect(() => {
         if (open) {
@@ -43,20 +70,69 @@
                 // Edit mode: populate form with existing event data
                 eventText = event.text;
                 eventType = event.type;
+                domainInput = event.domain || "";
             } else {
                 // Create mode: reset form
                 eventText = "";
                 eventType = "discrete";
+                domainInput = "";
             }
             error = null;
             loading = false;
+            showSuggestions = false;
+            activeSuggestionIndex = 0;
         }
     });
 
     function handleKeydown(event: KeyboardEvent) {
         if (event.key === "Escape") {
-            onCancel();
+            if (showSuggestions) {
+                showSuggestions = false;
+                event.preventDefault();
+            } else {
+                onCancel();
+            }
+        } else if (event.key === "ArrowDown") {
+            if (showSuggestions && filteredSuggestions.length > 0) {
+                event.preventDefault();
+                activeSuggestionIndex = Math.min(
+                    activeSuggestionIndex + 1,
+                    filteredSuggestions.length - 1
+                );
+            }
+        } else if (event.key === "ArrowUp") {
+            if (showSuggestions) {
+                event.preventDefault();
+                activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
+            }
+        } else if (event.key === "Enter" || event.key === "Tab") {
+            if (showSuggestions && filteredSuggestions.length > 0) {
+                event.preventDefault();
+                selectSuggestion(filteredSuggestions[activeSuggestionIndex]);
+            }
         }
+    }
+
+    function handleDomainInputFocus() {
+        showSuggestions = true;
+        activeSuggestionIndex = 0;
+    }
+
+    function handleDomainInputBlur() {
+        // Delay hiding suggestions to allow click events
+        setTimeout(() => {
+            showSuggestions = false;
+        }, 200);
+    }
+
+    function handleDomainInput() {
+        showSuggestions = true;
+        activeSuggestionIndex = 0;
+    }
+
+    function selectSuggestion(suggestion: string) {
+        domainInput = suggestion;
+        showSuggestions = false;
     }
 
     function handleBackdropClick(event: MouseEvent) {
@@ -78,15 +154,17 @@
         loading = true;
 
         try {
+            const domainValue = domainInput.trim() || undefined;
             if (event) {
                 // Update existing event
                 await updateBusinessEvent(event.id, {
                     text: eventText.trim(),
                     type: eventType,
+                    domain: domainValue,
                 });
             } else {
                 // Create new event
-                await createBusinessEvent(eventText.trim(), eventType);
+                await createBusinessEvent(eventText.trim(), eventType, domainValue);
             }
             // Success: close modal and refresh list
             onSave();
@@ -168,6 +246,45 @@
                             <span class="text-xs text-red-600">{textError}</span>
                         {/if}
                     </div>
+                </div>
+
+                <!-- Domain (Optional) -->
+                <div>
+                    <label for="event-domain" class="block text-sm font-medium text-gray-700 mb-2">
+                        Business Domain <span class="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <div class="relative">
+                        <input
+                            id="event-domain"
+                            type="text"
+                            bind:value={domainInput}
+                            onfocus={handleDomainInputFocus}
+                            onblur={handleDomainInputBlur}
+                            oninput={handleDomainInput}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="e.g., Sales, Marketing, Finance"
+                            disabled={loading}
+                        />
+                        <!-- Suggestions Dropdown -->
+                        {#if showSuggestions && filteredSuggestions.length > 0}
+                            <div class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {#each filteredSuggestions as suggestion, index}
+                                    <button
+                                        type="button"
+                                        class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none {index === activeSuggestionIndex ? 'bg-blue-50' : ''}"
+                                        onmousedown={(e) => e.preventDefault()}
+                                        onclick={() => selectSuggestion(suggestion)}
+                                        aria-label="Select domain {toTitleCase(suggestion)}"
+                                    >
+                                        {toTitleCase(suggestion)}
+                                    </button>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Type to search existing domains or enter a new one
+                    </p>
                 </div>
 
                 <!-- Event Type -->

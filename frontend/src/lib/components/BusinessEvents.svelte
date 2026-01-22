@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getBusinessEvents } from '$lib/api';
+    import { getBusinessEvents, getBusinessEventDomains } from '$lib/api';
     import type { BusinessEvent, BusinessEventType } from '$lib/types';
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
@@ -8,38 +8,87 @@
     import EventCard from './EventCard.svelte';
 
     let events = $state<BusinessEvent[]>([]);
+    let domains = $state<string[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
     let selectedFilter = $state<BusinessEventType | 'all'>('all');
+    let selectedDomain = $state<string | null>(null);
+
+    // Helper function to convert domain to title case
+    function toTitleCase(str: string): string {
+        return str.trim().charAt(0).toUpperCase() + str.trim().slice(1).toLowerCase();
+    }
     let showCreateModal = $state(false);
     let showEditModal = $state(false);
     let showAnnotateModal = $state(false);
     let editingEvent = $state<BusinessEvent | null>(null);
     let annotatingEvent = $state<BusinessEvent | null>(null);
 
-    // Filter events based on selected type
-    let filteredEvents = $derived(
-        selectedFilter === 'all'
-            ? events
-            : events.filter((event) => event.type === selectedFilter)
-    );
+    // Filter events based on selected type and domain (combined filters)
+    let filteredEvents = $derived.by(() => {
+        let result = events;
+
+        // Apply type filter
+        if (selectedFilter !== 'all') {
+            result = result.filter((event) => event.type === selectedFilter);
+        }
+
+        // Apply domain filter
+        if (selectedDomain !== null) {
+            if (selectedDomain === 'unassigned') {
+                result = result.filter((event) => !event.domain);
+            } else {
+                result = result.filter((event) => event.domain === selectedDomain);
+            }
+        }
+
+        return result;
+    });
 
     onMount(async () => {
         try {
             loading = true;
             error = null;
-            events = await getBusinessEvents();
-        } catch (e) {
-            const errorMessage = e instanceof Error ? e.message : 'Failed to load business events';
-            // Provide user-friendly error message
-            if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-                error = 'Business events file not found. Create your first event to get started.';
-            } else if (errorMessage.includes('500') || errorMessage.includes('parse') || errorMessage.includes('YAML')) {
-                error = 'Invalid business events file format. Please check the file or contact support.';
-            } else {
-                error = 'Failed to load business events. Please try again later.';
+            // Load events and domains separately to handle partial failures gracefully
+            try {
+                events = await getBusinessEvents();
+            } catch (e) {
+                const errorMessage = e instanceof Error ? e.message : String(e);
+                const statusCode = (e as any)?.status;
+                
+                // Check for specific error types by status code first, then message
+                if (statusCode === 403 || errorMessage.includes('403') || errorMessage.includes('feature_disabled') || errorMessage.includes('disabled')) {
+                    error = 'Business events feature is disabled. Enable it in trellis.yml by setting business_events.enabled: true';
+                } else if (statusCode === 400 || errorMessage.includes('400') || errorMessage.includes('configuration')) {
+                    error = 'Configuration error. Please check your trellis.yml file.';
+                } else if (statusCode === 404 || errorMessage.includes('404') || errorMessage.includes('not found')) {
+                    error = 'Business events file not found. Create your first event to get started.';
+                } else if (statusCode === 500 || errorMessage.includes('500') || errorMessage.includes('parse') || errorMessage.includes('YAML')) {
+                    error = 'Invalid business events file format. Please check the file or contact support.';
+                } else {
+                    error = 'Failed to load business events. Please try again later.';
+                }
+                console.error('Error loading business events:', e);
+                // Still try to load domains even if events fail
+                events = [];
             }
+
+            // Load domains separately - if this fails, we can still show events
+            try {
+                domains = await getBusinessEventDomains();
+            } catch (e) {
+                console.warn('Failed to load domain suggestions:', e);
+                domains = []; // Continue without domain suggestions
+            }
+        } catch (e) {
+            // Fallback error handling
+            const errorMessage = e instanceof Error ? e.message : 'Failed to load business events';
+            error = errorMessage.includes('403') || errorMessage.includes('disabled')
+                ? 'Business events feature is disabled. Enable it in trellis.yml by setting business_events.enabled: true'
+                : 'Failed to load business events. Please try again later.';
             console.error('Error loading business events:', e);
+            events = [];
+            domains = [];
         } finally {
             loading = false;
         }
@@ -48,16 +97,44 @@
     async function reloadEvents() {
         try {
             error = null;
-            events = await getBusinessEvents();
+            // Load events and domains separately to handle partial failures
+            try {
+                events = await getBusinessEvents();
+            } catch (e) {
+                const errorMessage = e instanceof Error ? e.message : String(e);
+                const statusCode = (e as any)?.status;
+                
+                // Check for specific error types
+                if (statusCode === 403 || errorMessage.includes('403') || errorMessage.includes('feature_disabled') || errorMessage.includes('disabled')) {
+                    error = 'Business events feature is disabled. Enable it in trellis.yml by setting business_events.enabled: true';
+                } else if (statusCode === 400 || errorMessage.includes('400') || errorMessage.includes('configuration')) {
+                    error = 'Configuration error. Please check your trellis.yml file.';
+                } else if (statusCode === 404 || errorMessage.includes('404') || errorMessage.includes('not found')) {
+                    error = 'Business events file not found. Create your first event to get started.';
+                } else if (statusCode === 500 || errorMessage.includes('500') || errorMessage.includes('parse') || errorMessage.includes('YAML')) {
+                    error = 'Invalid business events file format. Please check the file or contact support.';
+                } else {
+                    error = 'Failed to reload events. Please try again.';
+                }
+                console.error('Error reloading events:', e);
+                events = [];
+            }
+
+            // Load domains separately
+            try {
+                domains = await getBusinessEventDomains();
+            } catch (e) {
+                console.warn('Failed to reload domain suggestions:', e);
+                domains = [];
+            }
         } catch (e) {
             console.error('Error reloading events:', e);
             const errorMessage = e instanceof Error ? e.message : 'Failed to reload events';
-            // Provide user-friendly error message
-            if (errorMessage.includes('500') || errorMessage.includes('parse') || errorMessage.includes('YAML')) {
-                error = 'Invalid business events file format. Please check the file or contact support.';
-            } else {
-                error = 'Failed to reload events. Please try again.';
-            }
+            error = errorMessage.includes('403') || errorMessage.includes('disabled')
+                ? 'Business events feature is disabled. Enable it in trellis.yml by setting business_events.enabled: true'
+                : 'Failed to reload events. Please try again.';
+            events = [];
+            domains = [];
         }
     }
 
@@ -140,7 +217,7 @@
 
             <!-- Filter Controls -->
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4 flex-wrap">
                     <div class="flex items-center gap-2">
                         <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
                         <span class="text-sm font-medium text-gray-700">Filter by type:</span>
@@ -153,6 +230,20 @@
                         <option value="discrete">Discrete</option>
                         <option value="evolving">Evolving</option>
                         <option value="recurring">Recurring</option>
+                    </select>
+
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-gray-700">Filter by domain:</span>
+                    </div>
+                    <select
+                        bind:value={selectedDomain}
+                        class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    >
+                        <option value={null}>All Domains</option>
+                        {#each domains as domain}
+                            <option value={domain}>{toTitleCase(domain)}</option>
+                        {/each}
+                        <option value="unassigned">Unassigned</option>
                     </select>
                 </div>
             </div>

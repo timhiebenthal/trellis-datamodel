@@ -296,6 +296,7 @@ export interface BusinessEvent {
     id: string; // e.g., "evt_YYYYMMDD_NNN"
     text: string;
     type: BusinessEventType;
+    domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
     annotations: Annotation[];
@@ -309,6 +310,7 @@ export interface GeneratedEntitiesResult {
         entity_type: 'fact' | 'dimension' | 'unclassified';
         description?: string;
         metadata?: Record<string, any>;
+        tags?: string[]; // Tags including inherited domain tags
     }>;
     relationships: Array<{
         source: string;
