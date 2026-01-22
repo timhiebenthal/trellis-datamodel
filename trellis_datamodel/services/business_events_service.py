@@ -38,6 +38,7 @@ from trellis_datamodel.models.business_event import (
 )
 
 logger = logging.getLogger(__name__)
+_ANNOTATIONS_DEPRECATION_LOGGED = False
 
 
 def _get_business_events_path() -> str:
@@ -94,7 +95,17 @@ def load_business_events(path: Optional[str] = None) -> List[BusinessEvent]:
     # Parse file structure
     try:
         events_file = BusinessEventsFile(**data)
-        return events_file.events
+        events = events_file.events
+        global _ANNOTATIONS_DEPRECATION_LOGGED
+        if not _ANNOTATIONS_DEPRECATION_LOGGED and any(
+            event.annotations for event in events
+        ):
+            logger.warning(
+                "Detected legacy annotations in business_events.yml. "
+                "Annotations are deprecated; prefer seven_ws entries."
+            )
+            _ANNOTATIONS_DEPRECATION_LOGGED = True
+        return events
     except Exception as e:
         logger.error(f"Invalid business events file structure in {path}: {e}")
         raise FileOperationError("Invalid business events file format")
@@ -330,6 +341,9 @@ def add_annotation(
         ValidationError: If annotation is invalid or overlaps existing annotations
         FileOperationError: If file operations fail
     """
+    logger.warning(
+        "add_annotation is deprecated. Use seven_ws entries instead of annotations."
+    )
     events = load_business_events()
     event_index = None
     for i, event in enumerate(events):
@@ -384,6 +398,9 @@ def remove_annotation(event_id: str, annotation_index: int) -> BusinessEvent:
         NotFoundError: If event not found or annotation index out of bounds
         FileOperationError: If file operations fail
     """
+    logger.warning(
+        "remove_annotation is deprecated. Use seven_ws entries instead of annotations."
+    )
     events = load_business_events()
     event_index = None
     for i, event in enumerate(events):

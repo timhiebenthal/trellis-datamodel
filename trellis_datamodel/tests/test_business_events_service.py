@@ -284,7 +284,7 @@ class TestLoadAndSaveBusinessEvents:
         with open(events_path, "w") as f:
             f.write("invalid: yaml: content: [unclosed")
 
-        with pytest.raises(FileOperationError, match="Failed to parse"):
+        with pytest.raises(FileOperationError, match="Invalid business events file format"):
             business_events_service.load_business_events()
 
     def test_handles_missing_events_key(self, temp_dir, monkeypatch):
