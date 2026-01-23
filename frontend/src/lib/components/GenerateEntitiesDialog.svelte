@@ -112,14 +112,6 @@
             }
         }
 
-        // Check against existing canvas entities
-        const existingIds = $nodes.filter((n) => n.type === 'entity').map((n) => n.id);
-        for (let i = 0; i < editedEntities.length; i++) {
-            const name = editedEntities[i].id.trim();
-            if (name && existingIds.includes(name)) {
-                validationErrors.push(`Entity name "${name}" already exists on canvas. Please rename it (e.g., "${name}_v2")`);
-            }
-        }
     }
 
     async function handleCreateAll() {
@@ -134,8 +126,12 @@
             creating = true;
             error = null;
 
-            // Create entities on canvas
+            // Create entities on canvas (skip ones that already exist)
             const createdEntityIds: string[] = [];
+            const entityIdByIndex: string[] = [];
+            const existingEntityIds = new Set(
+                $nodes.filter((n) => n.type === 'entity').map((n) => n.id)
+            );
             const maxZIndex = Math.max(
                 ...$nodes.map((n) => n.zIndex || (n.type === 'group' ? 1 : 10)),
                 10
@@ -144,9 +140,15 @@
             for (let i = 0; i < editedEntities.length; i++) {
                 const edited = editedEntities[i];
                 const original = previewData.entities[i];
+                const trimmedId = edited.id.trim();
+
+                if (existingEntityIds.has(trimmedId)) {
+                    entityIdByIndex.push(trimmedId);
+                    continue;
+                }
 
                 // Generate unique ID
-                const id = generateSlug(edited.id.trim(), [
+                const id = generateSlug(trimmedId, [
                     ...$nodes.map((n) => n.id),
                     ...createdEntityIds,
                 ]);
@@ -185,6 +187,7 @@
 
                 $nodes = [...$nodes, newNode];
                 createdEntityIds.push(id);
+                entityIdByIndex.push(id);
             }
 
             // Create relationships
@@ -193,9 +196,12 @@
                 const idMapping = new Map<string, string>();
                 for (let i = 0; i < previewData.entities.length; i++) {
                     const originalId = previewData.entities[i].id;
-                    const createdId = createdEntityIds[i];
-                    idMapping.set(originalId, createdId);
+                    const mappedId = entityIdByIndex[i] || createdEntityIds[i];
+                    if (mappedId) {
+                        idMapping.set(originalId, mappedId);
+                    }
                 }
+                const allEntityIds = new Set([...existingEntityIds, ...createdEntityIds]);
 
                 // Create edges for relationships
                 for (const rel of previewData.relationships) {
@@ -204,8 +210,8 @@
 
                     // Only create relationship if both entities exist
                     if (
-                        createdEntityIds.includes(sourceId) &&
-                        createdEntityIds.includes(targetId)
+                        allEntityIds.has(sourceId) &&
+                        allEntityIds.has(targetId)
                     ) {
                         const relationship = {
                             source: sourceId,
@@ -219,7 +225,10 @@
             }
 
             // Update event's derived_entities list
-            const derivedEntities = createdEntityIds.map((id) => ({
+            const uniqueDerivedIds = Array.from(
+                new Set([...entityIdByIndex, ...createdEntityIds].filter(Boolean))
+            );
+            const derivedEntities = uniqueDerivedIds.map((id) => ({
                 entity_id: id,
                 created_at: new Date().toISOString(),
             }));
@@ -334,6 +343,20 @@
                 }
             }),
         };
+    }
+
+    function getPreviewDisplayId(originalId: string): string {
+        if (!previewData || editedEntities.length === 0) {
+            return originalId;
+        }
+
+        const index = previewData.entities.findIndex((entity) => entity.id === originalId);
+        if (index === -1) {
+            return originalId;
+        }
+
+        const editedId = editedEntities[index]?.id?.trim();
+        return editedId || originalId;
     }
 
     function handleKeydown(event: KeyboardEvent) {
@@ -546,9 +569,9 @@
                             <div class="space-y-1">
                                 {#each previewData.relationships as rel}
                                     <p class="text-sm text-gray-600">
-                                        <span class="font-mono">{rel.source}</span>
+                                        <span class="font-mono">{getPreviewDisplayId(rel.source)}</span>
                                         <span class="mx-2">→</span>
-                                        <span class="font-mono">{rel.target}</span>
+                                        <span class="font-mono">{getPreviewDisplayId(rel.target)}</span>
                                         {#if rel.label}
                                             <span class="text-gray-500 ml-2">({rel.label})</span>
                                         {/if}

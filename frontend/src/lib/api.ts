@@ -551,7 +551,7 @@ export async function createBusinessEvent(
 ): Promise<BusinessEvent> {
     try {
         const body: any = { text, type, domain: domain || null };
-        if (sevenWs) {
+        if (annotations) {
             body.annotations = annotations;
         }
 

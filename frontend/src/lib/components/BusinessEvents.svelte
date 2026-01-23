@@ -224,7 +224,7 @@
                         <h2 class="text-xl font-bold text-gray-800">Business Events</h2>
                         <p class="text-sm text-gray-600 mt-1">
                             Document business events during the conception phase of dimensional data modeling.
-                            Capture events like "customer buys product" and annotate them with Who, What, When, Where, How, How Many, and Why.
+                            Capture events like "Customer buys Product" and annotate them with analytical relevant information answering "Who, What, When, Where, How, Why and How Many".
                         </p>
                     </div>
                     <button
