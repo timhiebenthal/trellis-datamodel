@@ -320,10 +320,21 @@
         updateNodeData(id, { label });
     }
 
+    let labelBeforeEdit: string | null = null;
+
+    function handleLabelFocus() {
+        labelBeforeEdit = (data.label || "").trim();
+    }
+
     function updateIdFromLabel(e: Event) {
         // Called on blur - update the ID based on final label
         // Convert label to title-case before updating
         const rawLabel = (e.target as HTMLInputElement).value.trim();
+        if (labelBeforeEdit !== null && rawLabel === labelBeforeEdit) {
+            // Reset so future edits can be detected
+            labelBeforeEdit = null;
+            return;
+        }
         const label = toTitleCase(rawLabel);
         const newId = generateSlug(label, $nodes.map((n) => n.id), id);
 
@@ -1102,6 +1113,7 @@
             <input
                 type="text"
                 value={data.label}
+                onfocus={handleLabelFocus}
                 oninput={updateLabel}
                 onblur={updateIdFromLabel}
                 onclick={(e) => e.stopPropagation()}

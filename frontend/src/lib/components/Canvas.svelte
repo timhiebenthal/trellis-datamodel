@@ -103,11 +103,20 @@
     // This ensures drag operations and other changes are persisted
     $effect(() => {
         if (filteredEntityIds && filteredEntityIds.length > 0) {
+            let updatedCount = 0;
+            let missingCount = 0;
+            const updatedIds: string[] = [];
             // In filtered mode, update the corresponding nodes in the store
             displayNodes.forEach(displayNode => {
                 const storeNodeIndex = $nodes.findIndex(n => n.id === displayNode.id);
                 if (storeNodeIndex >= 0 && $nodes[storeNodeIndex] !== displayNode) {
                     $nodes[storeNodeIndex] = displayNode;
+                    updatedCount += 1;
+                    if (updatedIds.length < 5) {
+                        updatedIds.push(displayNode.id);
+                    }
+                } else if (storeNodeIndex < 0) {
+                    missingCount += 1;
                 }
             });
         }
