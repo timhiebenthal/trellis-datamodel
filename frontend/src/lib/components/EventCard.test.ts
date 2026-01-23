@@ -31,21 +31,27 @@ describe('EventCard', () => {
     };
 
     it('shows 7 Ws completion badge with correct count', () => {
-        const onAnnotate = vi.fn();
+        const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
+        const onEdit = vi.fn();
+        const onDelete = vi.fn();
 
         render(EventCard, {
             event: mockEventWith7Ws,
-            onAnnotate,
-            onGenerateEntities
+            onEditSevenWs,
+            onGenerateEntities,
+            onEdit,
+            onDelete
         });
 
         expect(screen.getByText('3/7 Ws')).toBeInTheDocument();
     });
 
     it('shows green badge when all Ws are filled', () => {
-        const onAnnotate = vi.fn();
+        const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
+        const onEdit = vi.fn();
+        const onDelete = vi.fn();
 
         const eventFull: BusinessEvent = {
             ...mockEventWith7Ws,
@@ -62,8 +68,10 @@ describe('EventCard', () => {
 
         render(EventCard, {
             event: eventFull,
-            onAnnotate,
-            onGenerateEntities
+            onEditSevenWs,
+            onGenerateEntities,
+            onEdit,
+            onDelete
         });
 
         const badge = screen.getByText('7/7 Ws');
@@ -71,13 +79,17 @@ describe('EventCard', () => {
     });
 
     it('shows amber badge when partial Ws are filled', () => {
-        const onAnnotate = vi.fn();
+        const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
+        const onEdit = vi.fn();
+        const onDelete = vi.fn();
 
         render(EventCard, {
             event: mockEventWith7Ws,
-            onAnnotate,
-            onGenerateEntities
+            onEditSevenWs,
+            onGenerateEntities,
+            onEdit,
+            onDelete
         });
 
         const badge = screen.getByText('3/7 Ws');
@@ -85,8 +97,10 @@ describe('EventCard', () => {
     });
 
     it('shows gray badge when no Ws are filled', () => {
-        const onAnnotate = vi.fn();
+        const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
+        const onEdit = vi.fn();
+        const onDelete = vi.fn();
 
         const mockEventEmpty7Ws: BusinessEvent = {
             id: 'evt_20250122_002',
@@ -110,8 +124,10 @@ describe('EventCard', () => {
 
         render(EventCard, {
             event: mockEventEmpty7Ws,
-            onAnnotate,
-            onGenerateEntities
+            onEditSevenWs,
+            onGenerateEntities,
+            onEdit,
+            onDelete
         });
 
         const badge = screen.getByText('0/7 Ws');
@@ -119,21 +135,27 @@ describe('EventCard', () => {
     });
 
     it('shows domain badge when domain exists', () => {
-        const onAnnotate = vi.fn();
+        const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
+        const onEdit = vi.fn();
+        const onDelete = vi.fn();
 
         render(EventCard, {
             event: mockEventWith7Ws,
-            onAnnotate,
-            onGenerateEntities
+            onEditSevenWs,
+            onGenerateEntities,
+            onEdit,
+            onDelete
         });
 
         expect(screen.getByText('Sales')).toBeInTheDocument();
     });
 
     it('does not show domain badge when domain is null', () => {
-        const onAnnotate = vi.fn();
+        const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
+        const onEdit = vi.fn();
+        const onDelete = vi.fn();
 
         const mockEventNoDomain: BusinessEvent = {
             ...mockEventWith7Ws,
@@ -142,8 +164,10 @@ describe('EventCard', () => {
 
         render(EventCard, {
             event: mockEventNoDomain,
-            onAnnotate,
-            onGenerateEntities
+            onEditSevenWs,
+            onGenerateEntities,
+            onEdit,
+            onDelete
         });
 
         expect(screen.queryByText(/domain/i)).not.toBeInTheDocument();

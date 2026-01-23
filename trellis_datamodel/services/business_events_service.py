@@ -4,14 +4,13 @@ Business Events service for dimensional modeling.
 Handles CRUD operations for business events stored in YAML files.
 Business events capture business processes (e.g., "customer buys product")
 and can be structured with the 7 Ws framework (Who, What, When, Where, How, How Many, Why)
-or annotated with dimensions and facts for entity generation.
+for entity generation.
 
 This service:
 - Loads and saves business events from/to YAML files
 - Provides CRUD operations for events
 - Manages 7 Ws entries within events (Who, What, When, Where, How, How Many, Why)
-- Manages legacy annotations within events (deprecated)
-- Validates event data and prevents overlapping annotations
+- Validates event data
 """
 
 import logging
@@ -31,14 +30,12 @@ from trellis_datamodel.exceptions import (
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
-    Annotation,
     BusinessEventsFile,
     SevenWsEntry,
     BusinessEventSevenWs,
 )
 
 logger = logging.getLogger(__name__)
-_ANNOTATIONS_DEPRECATION_LOGGED = False
 
 
 def _get_business_events_path() -> str:
@@ -95,17 +92,7 @@ def load_business_events(path: Optional[str] = None) -> List[BusinessEvent]:
     # Parse file structure
     try:
         events_file = BusinessEventsFile(**data)
-        events = events_file.events
-        global _ANNOTATIONS_DEPRECATION_LOGGED
-        if not _ANNOTATIONS_DEPRECATION_LOGGED and any(
-            event.annotations for event in events
-        ):
-            logger.warning(
-                "Detected legacy annotations in business_events.yml. "
-                "Annotations are deprecated; prefer seven_ws entries."
-            )
-            _ANNOTATIONS_DEPRECATION_LOGGED = True
-        return events
+        return events_file.events
     except Exception as e:
         logger.error(f"Invalid business events file structure in {path}: {e}")
         raise FileOperationError("Invalid business events file format")
@@ -248,8 +235,6 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
         if not text or not text.strip():
             raise ValidationError("Event text cannot be empty")
         event.text = text.strip()
-        # Clear annotations if text changed (simpler than position tracking)
-        event.annotations = []
 
     if "type" in updates:
         try:
@@ -268,9 +253,6 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
             event.domain = (
                 domain_value.strip() if isinstance(domain_value, str) else domain_value
             )
-
-    if "annotations" in updates:
-        event.annotations = [Annotation(**ann) for ann in updates["annotations"]]
 
     if "derived_entities" in updates:
         from trellis_datamodel.models.business_event import DerivedEntity
@@ -316,113 +298,6 @@ def delete_event(event_id: str) -> None:
 
     save_business_events(events)
     logger.info(f"Deleted business event: {event_id}")
-
-
-def add_annotation(
-    event_id: str, text: str, type: str, start_pos: int, end_pos: int
-) -> BusinessEvent:
-    """
-    Add an annotation to a business event.
-
-    DEPRECATED: Use 7 Ws structure (add_seven_ws_entry) instead.
-
-    Args:
-        event_id: ID of event to annotate
-        text: Annotated text segment
-        type: Annotation type ('dimension' or 'fact')
-        start_pos: Start position in event text
-        end_pos: End position in event text
-
-    Returns:
-        Updated BusinessEvent object
-
-    Raises:
-        NotFoundError: If event not found
-        ValidationError: If annotation is invalid or overlaps existing annotations
-        FileOperationError: If file operations fail
-    """
-    logger.warning(
-        "add_annotation is deprecated. Use seven_ws entries instead of annotations."
-    )
-    events = load_business_events()
-    event_index = None
-    for i, event in enumerate(events):
-        if event.id == event_id:
-            event_index = i
-            break
-
-    if event_index is None:
-        raise NotFoundError(f"Business event '{event_id}' not found")
-
-    event = events[event_index]
-
-    # Validate positions are within event text bounds
-    if start_pos < 0 or end_pos > len(event.text):
-        raise ValidationError("Annotation positions are out of bounds")
-
-    # Create new annotation
-    new_annotation = Annotation(
-        text=text, type=type, start_pos=start_pos, end_pos=end_pos
-    )
-
-    # Add to annotations list (validation will check for overlaps)
-    updated_annotations = list(event.annotations) + [new_annotation]
-
-    # Update event with new annotations
-    try:
-        updated_event = update_event(
-            event_id, {"annotations": [ann.model_dump() for ann in updated_annotations]}
-        )
-    except Exception as e:
-        if "overlap" in str(e).lower():
-            raise ValidationError("Annotation overlaps with existing annotation") from e
-        raise
-
-    return updated_event
-
-
-def remove_annotation(event_id: str, annotation_index: int) -> BusinessEvent:
-    """
-    Remove an annotation from a business event by index.
-
-    DEPRECATED: Use 7 Ws structure (remove_seven_ws_entry) instead.
-
-    Args:
-        event_id: ID of event
-        annotation_index: Index of annotation to remove
-
-    Returns:
-        Updated BusinessEvent object
-
-    Raises:
-        NotFoundError: If event not found or annotation index out of bounds
-        FileOperationError: If file operations fail
-    """
-    logger.warning(
-        "remove_annotation is deprecated. Use seven_ws entries instead of annotations."
-    )
-    events = load_business_events()
-    event_index = None
-    for i, event in enumerate(events):
-        if event.id == event_id:
-            event_index = i
-            break
-
-    if event_index is None:
-        raise NotFoundError(f"Business event '{event_id}' not found")
-
-    event = events[event_index]
-
-    if annotation_index < 0 or annotation_index >= len(event.annotations):
-        raise NotFoundError(f"Annotation index {annotation_index} out of bounds")
-
-    updated_annotations = [
-        ann for i, ann in enumerate(event.annotations) if i != annotation_index
-    ]
-    updated_event = update_event(
-        event_id, {"annotations": [ann.model_dump() for ann in updated_annotations]}
-    )
-    return updated_event
 
 
 def update_event_seven_ws(event_id: str, seven_ws_data: dict) -> BusinessEvent:

@@ -308,13 +308,6 @@ export interface Dimension {
     description?: string;
 }
 
-export interface Annotation {
-    text: string;
-    type: 'dimension' | 'fact';
-    start_pos: number;
-    end_pos: number;
-}
-
 export interface DerivedEntity {
     entity_id: string;
     created_at: string; // ISO timestamp
@@ -328,7 +321,6 @@ export interface BusinessEvent {
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
     seven_ws?: BusinessEventSevenWs; // 7 Ws structure (Who, What, When, Where, How, How Many, Why)
-    annotations: Annotation[]; // [DEPRECATED] kept for backward compatibility
     derived_entities: DerivedEntity[];
 }
 

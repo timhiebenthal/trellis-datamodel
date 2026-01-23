@@ -18,26 +18,15 @@ test.describe('Business Events - E2E', () => {
             type: 'discrete',
             created_at: '2026-01-21T10:30:00Z',
             updated_at: '2026-01-21T10:30:00Z',
-            annotations: [
-                {
-                    text: 'customer',
-                    type: 'dimension',
-                    start_pos: 0,
-                    end_pos: 8,
-                },
-                {
-                    text: 'buys',
-                    type: 'fact',
-                    start_pos: 9,
-                    end_pos: 13,
-                },
-                {
-                    text: 'product',
-                    type: 'dimension',
-                    start_pos: 14,
-                    end_pos: 21,
-                },
-            ],
+            seven_ws: {
+                who: [{ id: 'ent1', text: 'customer' }],
+                what: [{ id: 'ent2', text: 'product' }],
+                when: [],
+                where: [],
+                how: [],
+                how_many: [{ id: 'ent3', text: 'buys' }],
+                why: []
+            },
             derived_entities: [],
         },
         {
@@ -46,7 +35,15 @@ test.describe('Business Events - E2E', () => {
             type: 'recurring',
             created_at: '2026-01-21T11:00:00Z',
             updated_at: '2026-01-21T11:00:00Z',
-            annotations: [],
+            seven_ws: {
+                who: [],
+                what: [],
+                when: [],
+                where: [],
+                how: [],
+                how_many: [],
+                why: []
+            },
             derived_entities: [],
         },
     ];
@@ -101,7 +98,15 @@ test.describe('Business Events - E2E', () => {
                     type: body.type,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
-                    annotations: [],
+                    seven_ws: {
+                        who: [],
+                        what: [],
+                        when: [],
+                        where: [],
+                        how: [],
+                        how_many: [],
+                        why: []
+                    },
                     derived_entities: [],
                 };
                 await route.fulfill({
@@ -366,72 +371,6 @@ test.describe('Business Events - E2E', () => {
         await expect(deletedEvent).not.toBeVisible({ timeout: 3000 });
     });
 
-    test.skip('should annotate event text', async ({ page }) => {
-        // Skip: Annotation UI requires complex text selection handling
-        await page.goto('/business-events').catch(() => {
-            test.skip();
-        });
-        await page.waitForLoadState('networkidle');
-
-        // Click "Annotate" button
-        const annotateButton = page.getByRole('button', { name: /annotate/i }).first();
-        await annotateButton.click();
-
-        // Wait for annotation mode
-        await page.waitForTimeout(500);
-
-        // Select text (this is complex - would need to simulate text selection)
-        // For now, just verify annotation mode is active
-        const eventText = page.getByText('customer buys product');
-        await expect(eventText).toBeVisible();
-    });
-
-    test.skip('should generate entities from event', async ({ page }) => {
-        // Skip: Requires full entity creation flow on canvas
-        await page.goto('/business-events').catch(() => {
-            test.skip();
-        });
-        await page.waitForLoadState('networkidle');
-
-        // Click "Generate Entities" button (should be disabled if no annotations)
-        const generateButton = page.getByRole('button', { name: /generate entities/i }).first();
-        const buttonExists = await generateButton.isVisible({ timeout: 3000 }).catch(() => false);
-
-        if (!buttonExists) {
-            test.skip();
-            return;
-        }
-
-        // Button should be disabled if event has no annotations
-        const isDisabled = await generateButton.isDisabled().catch(() => false);
-        if (isDisabled) {
-            // Event needs annotations first - skip for now
-            test.skip();
-            return;
-        }
-
-        await generateButton.click();
-
-        // Wait for preview dialog
-        const dialog = page.getByRole('dialog').filter({ hasText: /generate entities/i });
-        await expect(dialog).toBeVisible({ timeout: 5000 });
-
-        // Verify preview table shows entities
-        const entityTable = page.locator('table');
-        await expect(entityTable).toBeVisible();
-
-        // Verify entities are listed
-        await expect(page.getByText('dim_customer')).toBeVisible();
-        await expect(page.getByText('fct_buys')).toBeVisible();
-        await expect(page.getByText('dim_product')).toBeVisible();
-
-        // Click "Create All" button
-        const createButton = page.getByRole('button', { name: /create all/i });
-        await createButton.click();
-
-        // Wait for success message
-        await expect(page.getByText(/entities created successfully/i)).toBeVisible({ timeout: 5000 });
-    });
 
     /**
      * 7 Ws E2E Tests
@@ -684,7 +623,6 @@ test.describe('Business Events - E2E', () => {
                             how_many: [{ id: 'ent3', text: '200 units' }],
                             why: []
                         },
-                        annotations: [],
                         derived_entities: [],
                         created_at: '2025-01-22T10:00:00Z',
                         updated_at: new Date().toISOString()
@@ -699,7 +637,7 @@ test.describe('Business Events - E2E', () => {
         await page.goto('/business-events').catch(() => {});
         await page.waitForLoadState('networkidle');
 
-        const editButton = page.getByRole('button', { name: /edit|annotate/i }).first();
+        const editButton = page.getByRole('button', { name: /7 ws|highlighter/i }).first();
         const editExists = await editButton.isVisible({ timeout: 3000 }).catch(() => false);
 
         if (editExists) {
@@ -730,72 +668,4 @@ test.describe('Business Events - E2E', () => {
         }
     });
 
-    test('should view annotation-based event as read-only', async ({ page }) => {
-        // Mock events API with annotation-based event
-        await page.route('**/api/business-events', async (route) => {
-            if (route.request().method() === 'GET') {
-                await route.fulfill({
-                    status: 200,
-                    contentType: 'application/json',
-                    body: JSON.stringify([
-                        {
-                            id: 'evt_old_001',
-                            text: 'customer buys product',
-                            type: 'discrete',
-                            created_at: '2025-01-22T10:00:00Z',
-                            updated_at: '2025-01-22T10:00:00Z',
-                            annotations: [
-                                {
-                                    text: 'customer',
-                                    type: 'dimension',
-                                    start_pos: 0,
-                                    end_pos: 8,
-                                },
-                                {
-                                    text: 'product',
-                                    type: 'dimension',
-                                    start_pos: 14,
-                                    end_pos: 21,
-                                },
-                            ],
-                            derived_entities: []
-                        }
-                    ]),
-                });
-            } else {
-                await route.continue();
-            }
-        });
-
-        // Navigate to business events
-        await page.goto('/business-events').catch(() => {});
-        await page.waitForLoadState('networkidle');
-
-        // Click view/annotate button
-        const viewButton = page.getByRole('button', { name: /view|annotate/i }).first();
-        const buttonExists = await viewButton.isVisible({ timeout: 3000 }).catch(() => false);
-
-        if (buttonExists) {
-            await viewButton.click();
-
-            // Wait for modal to appear
-            const modal = page.getByRole('dialog');
-            await expect(modal).toBeVisible({ timeout: 5000 });
-
-            // Should show deprecation notice for annotation-based events
-            const deprecationNotice = page.getByText(/deprecated|read-only|old format/i);
-            const deprecationVisible = await deprecationNotice.isVisible({ timeout: 3000 }).catch(() => false);
-
-            if (deprecationVisible) {
-                // Verify annotations are shown as read-only
-                await expect(page.getByText('customer')).toBeVisible();
-                await expect(page.getByText('product')).toBeVisible();
-
-                // Annotations should not be editable
-                const annotationTextInputs = page.locator('input').filter({ hasText: /customer|product/i });
-                const hasEditableInputs = await annotationTextInputs.count() > 0;
-                await expect(hasEditableInputs).toBeFalsy();
-            }
-        }
-    });
 });

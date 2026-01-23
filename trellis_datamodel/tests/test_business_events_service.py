@@ -6,7 +6,7 @@ import pytest
 from datetime import datetime
 
 from trellis_datamodel.services import business_events_service
-from trellis_datamodel.models.business_event import BusinessEvent, BusinessEventType, Annotation
+from trellis_datamodel.models.business_event import BusinessEvent, BusinessEventType
 from trellis_datamodel.exceptions import ValidationError, NotFoundError, FileOperationError
 
 
@@ -49,14 +49,13 @@ class TestCreateEvent:
         assert before <= event.updated_at <= after
         assert event.created_at == event.updated_at
 
-    def test_defaults_to_empty_annotations(self, temp_dir, monkeypatch):
-        """Test that new events have empty annotations list."""
+    def test_defaults_to_empty_derived_entities(self, temp_dir, monkeypatch):
+        """Test that new events have empty derived_entities list."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
 
-        assert event.annotations == []
         assert event.derived_entities == []
 
     def test_strips_text_whitespace(self, temp_dir, monkeypatch):
@@ -104,18 +103,6 @@ class TestUpdateEvent:
 
         assert updated.type == BusinessEventType.RECURRING
 
-    def test_clears_annotations_when_text_changes(self, temp_dir, monkeypatch):
-        """Test that annotations are cleared when text is updated."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("customer buys product", BusinessEventType.DISCRETE)
-        # Add an annotation
-        business_events_service.add_annotation(event.id, "customer", "dimension", 0, 8)
-        # Update text
-        updated = business_events_service.update_event(event.id, {"text": "new text"})
-
-        assert updated.annotations == []
 
     def test_raises_validation_error_for_invalid_type(self, temp_dir, monkeypatch):
         """Test that invalid event type raises ValidationError."""
@@ -134,107 +121,6 @@ class TestUpdateEvent:
 
         with pytest.raises(NotFoundError, match="not found"):
             business_events_service.update_event("evt_20260101_999", {"text": "test"})
-
-
-class TestAddAnnotation:
-    """Test add_annotation() function."""
-
-    def test_adds_annotation_successfully(self, temp_dir, monkeypatch):
-        """Test adding a valid annotation."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("customer buys product", BusinessEventType.DISCRETE)
-        updated = business_events_service.add_annotation(event.id, "customer", "dimension", 0, 8)
-
-        assert len(updated.annotations) == 1
-        assert updated.annotations[0].text == "customer"
-        assert updated.annotations[0].type == "dimension"
-        assert updated.annotations[0].start_pos == 0
-        assert updated.annotations[0].end_pos == 8
-
-    def test_detects_overlapping_annotations(self, temp_dir, monkeypatch):
-        """Test that overlapping annotations raise ValidationError."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("customer buys product", BusinessEventType.DISCRETE)
-        business_events_service.add_annotation(event.id, "customer", "dimension", 0, 8)
-
-        # Try to add overlapping annotation
-        with pytest.raises(ValidationError, match="overlap"):
-            business_events_service.add_annotation(event.id, "stomer bu", "fact", 2, 10)
-
-    def test_validates_position_bounds(self, temp_dir, monkeypatch):
-        """Test that out-of-bounds positions raise ValidationError."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("test", BusinessEventType.DISCRETE)
-
-        with pytest.raises(ValidationError, match="out of bounds"):
-            business_events_service.add_annotation(event.id, "test", "dimension", -1, 4)
-
-        with pytest.raises(ValidationError, match="out of bounds"):
-            business_events_service.add_annotation(event.id, "test", "dimension", 0, 10)  # end_pos > len(text)
-
-    def test_allows_non_overlapping_adjacent_annotations(self, temp_dir, monkeypatch):
-        """Test that adjacent (non-overlapping) annotations are allowed."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("customer buys product", BusinessEventType.DISCRETE)
-        business_events_service.add_annotation(event.id, "customer", "dimension", 0, 8)
-        updated = business_events_service.add_annotation(event.id, "product", "dimension", 14, 21)
-
-        assert len(updated.annotations) == 2
-
-    def test_raises_not_found_error_for_missing_event(self, temp_dir, monkeypatch):
-        """Test that annotating non-existent event raises NotFoundError."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        with pytest.raises(NotFoundError, match="not found"):
-            business_events_service.add_annotation("evt_20260101_999", "test", "dimension", 0, 4)
-
-
-class TestRemoveAnnotation:
-    """Test remove_annotation() function."""
-
-    def test_removes_annotation_by_index(self, temp_dir, monkeypatch):
-        """Test removing annotation by index."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("customer buys product", BusinessEventType.DISCRETE)
-        business_events_service.add_annotation(event.id, "customer", "dimension", 0, 8)
-        business_events_service.add_annotation(event.id, "product", "dimension", 14, 21)
-
-        updated = business_events_service.remove_annotation(event.id, 0)
-
-        assert len(updated.annotations) == 1
-        assert updated.annotations[0].text == "product"
-
-    def test_raises_not_found_error_for_out_of_bounds_index(self, temp_dir, monkeypatch):
-        """Test that out-of-bounds index raises NotFoundError."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        event = business_events_service.create_event("test", BusinessEventType.DISCRETE)
-
-        with pytest.raises(NotFoundError, match="out of bounds"):
-            business_events_service.remove_annotation(event.id, 0)
-
-        with pytest.raises(NotFoundError, match="out of bounds"):
-            business_events_service.remove_annotation(event.id, -1)
-
-    def test_raises_not_found_error_for_missing_event(self, temp_dir, monkeypatch):
-        """Test that removing annotation from non-existent event raises NotFoundError."""
-        events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-
-        with pytest.raises(NotFoundError, match="not found"):
-            business_events_service.remove_annotation("evt_20260101_999", 0)
 
 
 class TestLoadAndSaveBusinessEvents:

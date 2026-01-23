@@ -6,14 +6,14 @@
 
     type Props = {
         event: BusinessEvent;
-        onAnnotate: (event: BusinessEvent) => void;
+        onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
         onEdit: (event: BusinessEvent) => void;
         onDelete: () => void;
         onViewSevenWs?: (event: BusinessEvent) => void;
     };
 
-    let { event, onAnnotate, onGenerateEntities, onEdit, onDelete, onViewSevenWs }: Props = $props();
+    let { event, onEditSevenWs, onGenerateEntities, onEdit, onDelete, onViewSevenWs }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -44,11 +44,16 @@
 
     const hasHowManyEntries = $derived(sevenWs.how_many.length > 0);
 
-    // Check if Generate Entities button should be enabled
-    const hasAnnotations = $derived(event.annotations.length > 0);
-    const hasDimensions = $derived(event.annotations.some((a) => a.type === "dimension"));
-    const hasFacts = $derived(event.annotations.some((a) => a.type === "fact"));
-    const canGenerateEntities = $derived(hasAnnotations && hasDimensions && hasFacts);
+    // Check if Generate Entities button should be enabled (based on 7 Ws only)
+    const hasDimensionEntries = $derived(
+        sevenWs.who.length > 0 || 
+        sevenWs.what.length > 0 || 
+        sevenWs.when.length > 0 || 
+        sevenWs.where.length > 0 || 
+        sevenWs.how.length > 0 || 
+        sevenWs.why.length > 0
+    );
+    const canGenerateEntities = $derived(hasDimensionEntries && hasHowManyEntries);
     const hasDerivedEntities = $derived(event.derived_entities.length > 0);
 
     // Type badge colors
@@ -65,41 +70,6 @@
         }
     });
 
-    // Render event text with highlighted annotations (only if using legacy annotations)
-    function renderAnnotatedText(): Array<{ text: string; type?: "dimension" | "fact" }> {
-        // If 7 Ws data exists, show plain text (concise display)
-        if (event.seven_ws && Object.keys(event.seven_ws).some(key => event.seven_ws![key as keyof typeof event.seven_ws].length > 0)) {
-            return [{ text: event.text }];
-        }
-        if (event.annotations.length === 0) {
-            return [{ text: event.text }];
-        }
-
-        // Sort annotations by start position
-        const sortedAnnotations = [...event.annotations].sort((a, b) => a.start_pos - b.start_pos);
-        const parts: Array<{ text: string; type?: "dimension" | "fact" }> = [];
-        let lastPos = 0;
-
-        for (const ann of sortedAnnotations) {
-            // Add text before annotation
-            if (ann.start_pos > lastPos) {
-                parts.push({ text: event.text.slice(lastPos, ann.start_pos) });
-            }
-            // Add annotated text
-            parts.push({
-                text: event.text.slice(ann.start_pos, ann.end_pos),
-                type: ann.type,
-            });
-            lastPos = ann.end_pos;
-        }
-
-        // Add remaining text after last annotation
-        if (lastPos < event.text.length) {
-            parts.push({ text: event.text.slice(lastPos) });
-        }
-
-        return parts;
-    }
 
     function handleDelete() {
         showDeleteConfirm = true;
@@ -139,27 +109,9 @@
 >
     <!-- List-like row layout -->
     <div class="flex items-center gap-4">
-        <!-- Event text with annotations (flex-1 to take available space) -->
+        <!-- Event text (flex-1 to take available space) -->
         <div class="flex-1 min-w-0 text-sm text-gray-700 leading-relaxed">
-            {#each renderAnnotatedText() as part}
-            {#if part.type === "dimension"}
-                <span
-                    class="bg-green-200 text-green-900 px-1 rounded font-medium"
-                    title="Dimension: {part.text}"
-                >
-                    {part.text}
-                </span>
-            {:else if part.type === "fact"}
-                <span
-                    class="bg-blue-200 text-blue-900 px-1 rounded font-medium"
-                    title="Fact: {part.text}"
-                >
-                    {part.text}
-                </span>
-            {:else}
-                    {part.text}
-                {/if}
-            {/each}
+            {event.text}
         </div>
 
         <!-- Status badges -->
@@ -213,7 +165,7 @@
             {/if}
 
             <button
-                onclick={() => onAnnotate(event)}
+                onclick={() => onEditSevenWs(event)}
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                 title={sevenWsFilledCount > 0 ? "Edit 7 Ws structure" : "Add 7 Ws structure (Who, What, When, Where, How, How Many, Why)"}
             >
@@ -233,11 +185,9 @@
                 title={
                     canGenerateEntities
                         ? "Generate dimensional entities from 7 Ws"
-                        : sevenWsFilledCount > 0 && !hasHowManyEntries
+                        : !hasHowManyEntries
                             ? "Add 'How Many' entries to generate fact table"
-                            : sevenWsFilledCount > 0
-                                ? "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
-                                : "Add 7 Ws structure or annotations to generate entities"
+                            : "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
                 }
             >
                 <Icon icon="lucide:sparkles" class="w-4 h-4" />

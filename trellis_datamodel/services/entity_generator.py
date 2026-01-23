@@ -1,10 +1,9 @@
 """
 Entity Generator service for business events.
 
-Generates dimensional entities (dimensions and facts) from annotated business events
-or 7 Ws structured entries. This service converts text annotations or 7 Ws
-entries into entity definitions with proper naming, labels, and relationships
-following dimensional modeling conventions.
+Generates dimensional entities (dimensions and facts) from business events with
+7 Ws structured entries. This service converts 7 Ws entries into entity definitions
+with proper naming, labels, and relationships following dimensional modeling conventions.
 """
 
 import logging
@@ -19,7 +18,6 @@ from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
     SevenWsEntry,
-    Annotation,
     GeneratedEntitiesResult,
 )
 
@@ -88,94 +86,6 @@ def _text_to_title_case(text: str) -> str:
     # Capitalize first letter of each word, lowercase the rest
     title_words = [word.capitalize() if word else "" for word in words if word]
     return " ".join(title_words) if title_words else text
-
-
-def _create_dimension_entity(
-    annotation: Annotation, prefixes: List[str], domain_tag: Optional[str] = None
-) -> dict:
-    """
-    Create a dimension entity dictionary from an annotation.
-
-    Args:
-        annotation: Annotation marked as 'dimension'
-        prefixes: List of dimension prefixes to apply (e.g., ['dim_'])
-        domain_tag: Optional domain tag to add to entity (slugified domain)
-
-    Returns:
-        Entity dictionary with id, label, entity_type, tags, etc.
-    """
-    base_name = _text_to_snake_case(annotation.text)
-    label = _text_to_title_case(annotation.text)
-
-    # Apply prefix if configured and not already present
-    entity_id = base_name
-    if prefixes:
-        prefix = prefixes[0]  # Use first prefix
-        # Check if already has a prefix (case-insensitive)
-        has_prefix = any(base_name.lower().startswith(p.lower()) for p in prefixes)
-        if not has_prefix:
-            entity_id = f"{prefix}{base_name}"
-
-    entity = {
-        "id": entity_id,
-        "label": label,
-        "entity_type": "dimension",
-        "description": f"Dimension: {annotation.text}",
-    }
-
-    # Add domain tag if provided
-    if domain_tag:
-        entity["tags"] = [domain_tag]
-
-    return entity
-
-
-def _create_fact_entity(
-    annotation: Annotation,
-    prefixes: List[str],
-    event_type: str,
-    domain_tag: Optional[str] = None,
-) -> dict:
-    """
-    Create a fact entity dictionary from an annotation.
-
-    Args:
-        annotation: Annotation marked as 'fact'
-        prefixes: List of fact prefixes to apply (e.g., ['fct_'])
-        event_type: Business event type (discrete, evolving, recurring)
-        domain_tag: Optional domain tag to add to entity (slugified domain)
-
-    Returns:
-        Entity dictionary with id, label, entity_type, metadata, tags, etc.
-    """
-    base_name = _text_to_snake_case(annotation.text)
-    label = _text_to_title_case(annotation.text)
-
-    # Apply prefix if configured and not already present
-    entity_id = base_name
-    if prefixes:
-        prefix = prefixes[0]  # Use first prefix
-        # Check if already has a prefix (case-insensitive)
-        has_prefix = any(base_name.lower().startswith(p.lower()) for p in prefixes)
-        if not has_prefix:
-            entity_id = f"{prefix}{base_name}"
-
-    entity = {
-        "id": entity_id,
-        "label": label,
-        "entity_type": "fact",
-        "description": f"Fact: {annotation.text}",
-    }
-
-    # Add event type as metadata
-    if event_type:
-        entity["metadata"] = {"event_type": event_type}
-
-    # Add domain tag if provided
-    if domain_tag:
-        entity["tags"] = [domain_tag]
-
-    return entity
 
 
 def _create_relationships(fact_id: str, dimension_ids: List[str]) -> List[dict]:
@@ -367,12 +277,10 @@ def generate_entities_from_event(
     """
     Generate dimensional entities from a business event.
 
-    Supports two modes:
-    1. 7 Ws structured entries (Who, What, When, Where, How, How Many, Why)
-    2. Legacy text annotations (dimensions/facts) for backward compatibility
+    Uses 7 Ws structured entries (Who, What, When, Where, How, How Many, Why).
 
     Args:
-        event: BusinessEvent with seven_ws or annotations
+        event: BusinessEvent with seven_ws
         config: Optional config object (uses global config if not provided)
 
     Returns:
@@ -383,7 +291,7 @@ def generate_entities_from_event(
     """
     errors = []
 
-    # Check if event has 7 Ws data or legacy annotations
+    # Check if event has 7 Ws data
     has_seven_ws = event.seven_ws and any(
         [
             event.seven_ws.who,
@@ -396,100 +304,11 @@ def generate_entities_from_event(
         ]
     )
 
-    has_annotations = bool(event.annotations)
-
     if has_seven_ws:
         return _generate_from_seven_ws(event, config)
-    elif has_annotations:
-        return _generate_from_annotations(event, config)
     else:
-        errors.append("Event must have either seven_ws entries or annotations")
+        errors.append("Event must have seven_ws entries")
         return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
-
-
-def _generate_from_annotations(
-    event: BusinessEvent, config=None
-) -> GeneratedEntitiesResult:
-    """
-    Generate entities from legacy text annotations.
-
-    Args:
-        event: BusinessEvent with annotations
-        config: Optional config object
-
-    Returns:
-        GeneratedEntitiesResult
-    """
-    errors = []
-
-    # Validate: require at least 1 dimension and 1 fact annotation
-    dimensions = [ann for ann in event.annotations if ann.type == "dimension"]
-    facts = [ann for ann in event.annotations if ann.type == "fact"]
-
-    if not dimensions:
-        errors.append("At least one dimension annotation is required")
-    if not facts:
-        errors.append("At least one fact annotation is required")
-
-    if errors:
-        return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
-
-    # Get prefixes from config
-    if config is None:
-        dim_prefixes = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix or []
-        fact_prefixes = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix or []
-    else:
-        dim_prefixes = getattr(config, "dimension_prefix", []) or []
-        fact_prefixes = getattr(config, "fact_prefix", []) or []
-
-    # Check if event has domain and slugify it for tag
-    domain_tag = None
-    if event.domain:
-        domain_tag = slugify_domain(event.domain)
-
-    # Generate dimension entities
-    dimension_entities = []
-    dimension_ids = []
-    for ann in dimensions:
-        entity = _create_dimension_entity(ann, dim_prefixes, domain_tag=domain_tag)
-        dimension_entities.append(entity)
-        dimension_ids.append(entity["id"])
-
-    # Generate fact entities (typically one fact per event)
-    fact_entities = []
-    fact_ids = []
-    for ann in facts:
-        entity = _create_fact_entity(
-            ann, fact_prefixes, event.type.value, domain_tag=domain_tag
-        )
-        fact_entities.append(entity)
-        fact_ids.append(entity["id"])
-
-    # Check for duplicate entity names
-    all_entity_ids = [e["id"] for e in dimension_entities + fact_entities]
-    duplicates = [eid for eid in all_entity_ids if all_entity_ids.count(eid) > 1]
-    if duplicates:
-        errors.append(f"Duplicate entity names detected: {', '.join(set(duplicates))}")
-
-    # Create relationships: each dimension connects to each fact
-    relationships = []
-    for fact_id in fact_ids:
-        fact_rels = _create_relationships(fact_id, dimension_ids)
-        relationships.extend(fact_rels)
-
-    result = GeneratedEntitiesResult(
-        entities=dimension_entities + fact_entities,
-        relationships=relationships,
-        errors=errors,
-    )
-
-    logger.info(
-        f"Generated entities from annotations for event {event.id}: "
-        f"{len(dimension_entities)} dimensions, {len(fact_entities)} facts, "
-        f"{len(relationships)} relationships"
-    )
-
-    return result
 
 
 def _generate_from_seven_ws(

@@ -6,7 +6,6 @@ from .schemas import (
     ModelSchemaRequest,
 )
 from .business_event import (
-    Annotation,
     BusinessEvent,
     BusinessEventType,
     BusinessEventSevenWs,
@@ -20,7 +19,6 @@ __all__ = [
     "DataModelUpdate",
     "DbtSchemaRequest",
     "ModelSchemaRequest",
-    "Annotation",
     "BusinessEvent",
     "BusinessEventType",
     "BusinessEventSevenWs",

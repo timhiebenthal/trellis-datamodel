@@ -4,9 +4,9 @@
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
-    import AnnotateEventModal from './AnnotateEventModal.svelte';
     import EventCard from './EventCard.svelte';
     import SevenWsForm from './SevenWsForm.svelte';
+    import GenerateEntitiesDialog from './GenerateEntitiesDialog.svelte';
 
     let events = $state<BusinessEvent[]>([]);
     let domains = $state<string[]>([]);
@@ -21,12 +21,12 @@
     }
     let showCreateModal = $state(false);
     let showEditModal = $state(false);
-    let showAnnotateModal = $state(false);
     let showSevenWsForm = $state(false);
     let showViewSevenWs = $state(false);
+    let showGenerateEntitiesDialog = $state(false);
     let editingEvent = $state<BusinessEvent | null>(null);
-    let annotatingEvent = $state<BusinessEvent | null>(null);
     let sevenWsEvent = $state<BusinessEvent | null>(null);
+    let generateEntitiesEvent = $state<BusinessEvent | null>(null);
 
     // Filter events based on selected type and domain (combined filters)
     let filteredEvents = $derived.by(() => {
@@ -151,26 +151,14 @@
         reloadEvents();
     }
 
-    function handleAnnotate(event: BusinessEvent) {
-        // Use SevenWsForm for events with 7 Ws structure, fall back to old annotation modal
-        if (event.seven_ws && Object.keys(event.seven_ws).some(key => event.seven_ws![key as keyof typeof event.seven_ws].length > 0)) {
-            sevenWsEvent = event;
-            showSevenWsForm = true;
-        } else {
-            annotatingEvent = event;
-            showAnnotateModal = true;
-        }
+    function handleEditSevenWs(event: BusinessEvent) {
+        sevenWsEvent = event;
+        showSevenWsForm = true;
     }
 
     function handleViewSevenWs(event: BusinessEvent) {
         sevenWsEvent = event;
         showViewSevenWs = true;
-    }
-
-    function handleAnnotateModalClose() {
-        showAnnotateModal = false;
-        annotatingEvent = null;
-        reloadEvents();
     }
 
     async function handleSevenWsSave(updatedEvent: BusinessEvent) {
@@ -210,8 +198,14 @@
     }
 
     function handleGenerateEntities(event: BusinessEvent) {
-        console.log('Generate entities for event:', event);
-        // TODO: Implement entity generation
+        generateEntitiesEvent = event;
+        showGenerateEntitiesDialog = true;
+    }
+
+    function handleGenerateEntitiesClose() {
+        showGenerateEntitiesDialog = false;
+        generateEntitiesEvent = null;
+        reloadEvents();
     }
 
     function handleEdit(event: BusinessEvent) {
@@ -252,7 +246,7 @@
                     <div>
                         <h2 class="text-xl font-bold text-gray-800">Business Events</h2>
                         <p class="text-sm text-gray-600 mt-1">
-                            Document and annotate business events during the conception phase of dimensional data modeling.
+                            Document business events during the conception phase of dimensional data modeling.
                             Capture events like "customer buys product" and classify them using BEAM* methodology.
                         </p>
                     </div>
@@ -314,8 +308,8 @@
                         <div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800 text-left mt-4">
                             <strong class="block mb-1">Example event:</strong>
                             <p class="text-amber-900">
-                                "customer buys product" - a discrete event that can be annotated with dimensions
-                                (customer, product) and facts (buys) to generate dimensional entities.
+                                "customer buys product" - a discrete event that can be structured with 7 Ws
+                                (Who, What, When, Where, How, How Many, Why) to generate dimensional entities.
                             </p>
                         </div>
                         <button
@@ -331,7 +325,7 @@
                     {#each filteredEvents as event (event.id)}
                         <EventCard
                             {event}
-                            onAnnotate={handleAnnotate}
+                            onEditSevenWs={handleEditSevenWs}
                             onGenerateEntities={handleGenerateEntities}
                             onEdit={handleEdit}
                             onDelete={reloadEvents}
@@ -360,14 +354,6 @@
         />
     {/if}
 
-    <!-- Annotate Event Modal (Legacy) -->
-    <AnnotateEventModal
-        open={showAnnotateModal}
-        event={annotatingEvent}
-        onSave={handleAnnotateModalClose}
-        onCancel={() => { showAnnotateModal = false; annotatingEvent = null; }}
-    />
-
     <!-- 7 Ws Form Modal (Edit) -->
     {#if showSevenWsForm && sevenWsEvent}
         <SevenWsForm
@@ -385,4 +371,12 @@
             onCancel={handleViewSevenWsClose}
         />
     {/if}
+
+    <!-- Generate Entities Dialog -->
+    <GenerateEntitiesDialog
+        open={showGenerateEntitiesDialog}
+        event={generateEntitiesEvent}
+        onConfirm={handleGenerateEntitiesClose}
+        onCancel={handleGenerateEntitiesClose}
+    />
 </div>
