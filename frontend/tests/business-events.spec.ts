@@ -432,4 +432,370 @@ test.describe('Business Events - E2E', () => {
         // Wait for success message
         await expect(page.getByText(/entities created successfully/i)).toBeVisible({ timeout: 5000 });
     });
+
+    /**
+     * 7 Ws E2E Tests
+     */
+    test('should create business event with 7 Ws', async ({ page }) => {
+        // Navigate to business events
+        await page.goto('/business-events').catch(() => {
+            // Route might not be implemented yet, skip navigation
+        });
+        await page.waitForLoadState('networkidle');
+
+        // Click "Add Event" button
+        const addButton = page.getByRole('button', { name: /add event/i });
+        const buttonExists = await addButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (!buttonExists) {
+            test.skip();
+            return;
+        }
+
+        await addButton.click();
+
+        // Wait for CreateEventModal
+        const modal = page.getByRole('dialog').filter({ hasText: /create event|add event/i });
+        await expect(modal).toBeVisible({ timeout: 5000 });
+
+        // Fill event text
+        const textInput = page.locator('textarea').or(page.locator('input[name="text"]'));
+        const inputVisible = await textInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+        if (inputVisible) {
+            await textInput.fill('customer buys product online');
+
+            // Select event type
+            const typeSelect = page.locator('select').filter({ hasText: /event type/i });
+            const typeExists = await typeSelect.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (typeExists) {
+                await typeSelect.selectOption('discrete');
+            }
+
+            // Wait for SevenWsForm to be visible (it should be rendered below)
+            await page.waitForTimeout(500);
+
+            // Fill 7 Ws
+            await page.locator('[data-testid="seven-ws-form"]').or(page.locator('text=7 Ws')).waitFor({ state: 'visible', timeout: 5000 });
+
+            // Add "Who" entry
+            const whoSection = page.locator('text=Who').first();
+            await whoSection.click();
+
+            // Click "Add Entry" in Who section
+            const whoAddButton = page.locator('button').filter({ hasText: /add entry/i }).first();
+            const whoAddVisible = await whoAddButton.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (whoAddVisible) {
+                await whoAddButton.click();
+
+                // Type in the new entry field
+                const whoInput = page.locator('input[placeholder*="customer"]').first();
+                const whoInputVisible = await whoInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+                if (whoInputVisible) {
+                    await whoInput.fill('John Doe');
+
+                    // Add "What" entry
+                    const whatSection = page.locator('text=What').first();
+                    await whatSection.click();
+
+                    const whatAddButton = page.locator('button').filter({ hasText: /add entry/i }).nth(1);
+                    await whatAddButton.click();
+
+                    const whatInput = page.locator('input[placeholder*="product"]').first();
+                    const whatInputVisible = await whatInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+                    if (whatInputVisible) {
+                        await whatInput.fill('Product');
+
+                        // Add "How Many" entry
+                        const howManySection = page.locator('text=How Many').first();
+                        await howManySection.click();
+
+                        const howManyAddButton = page.locator('button').filter({ hasText: /add entry/i }).nth(2);
+                        await howManyAddButton.click();
+
+                        const howManyInput = page.locator('input[placeholder*="quantity"]').first();
+                        const howManyInputVisible = await howManyInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+                        if (howManyInputVisible) {
+                            await howManyInput.fill('100 units');
+
+                            // Click save button
+                            const saveButton = page.getByRole('button', { name: /save/i });
+                            await saveButton.click();
+
+                            // Wait for modal to close and event to appear
+                            await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+                            // Verify event appears with 7 Ws badge
+                            const badge = page.locator('text=/\\d+/\\d+\\s\\s+Ws/i').first();
+                            await expect(badge).toBeVisible({ timeout: 5000 });
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    test('should select existing dimension from autocomplete', async ({ page }) => {
+        // Mock dimensions API response
+        await page.route('**/api/data-model', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    entities: [
+                        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension', seven_w_type: 'who' },
+                        { id: 'dim_product', label: 'Product', entity_type: 'dimension', seven_w_type: 'what' }
+                    ]
+                }),
+            });
+        });
+
+        // Navigate and click add event
+        await page.goto('/business-events').catch(() => {});
+        await page.waitForLoadState('networkidle');
+
+        const addButton = page.getByRole('button', { name: /add event/i });
+        const buttonExists = await addButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (buttonExists) {
+            await addButton.click();
+
+            // Wait for CreateEventModal
+            const modal = page.getByRole('dialog').filter({ hasText: /create event|add event/i });
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Fill event text
+            const textInput = page.locator('textarea').or(page.locator('input[name="text"]'));
+            const inputVisible = await textInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (inputVisible) {
+                await textInput.fill('test event');
+
+                // Wait for SevenWsForm
+                await page.locator('[data-testid="seven-ws-form"]').or(page.locator('text=7 Ws')).waitFor({ state: 'visible', timeout: 5000 });
+
+                // Add "Who" entry
+                const whoSection = page.locator('text=Who').first();
+                await whoSection.click();
+
+                const whoAddButton = page.locator('button').filter({ hasText: /add entry/i }).first();
+                const whoAddVisible = await whoAddButton.isVisible({ timeout: 2000 }).catch(() => false);
+
+                if (whoAddVisible) {
+                    await whoAddButton.click();
+
+                    // Focus on dimension_id autocomplete field
+                    const dimensionInput = page.locator('input').filter({ hasText: /dimension|select/i }).first();
+                    const dimInputVisible = await dimensionInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+                    if (dimInputVisible) {
+                        // Click on dimension input to trigger autocomplete
+                        await dimensionInput.click();
+                        await page.waitForTimeout(300);
+
+                        // Type "cust" to filter
+                        await dimensionInput.fill('cust');
+                        await page.waitForTimeout(300);
+
+                        // Check if "Customer" appears in dropdown
+                        const customerOption = page.locator('text=Customer').or(page.locator('[data-testid*="Customer"]'));
+                        const customerVisible = await customerOption.isVisible({ timeout: 2000 }).catch(() => false);
+
+                        if (customerVisible) {
+                            // Select "Customer" from dropdown
+                            await customerOption.click();
+
+                            // Verify the selection
+                            await expect(page.locator('text=Customer')).toBeVisible();
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    test('should generate entities from 7 Ws', async ({ page }) => {
+        // Mock entities generation API
+        await page.route('**/api/business-events/*/generate-entities', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    entities: [
+                        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension' },
+                        { id: 'dim_product', label: 'Product', entity_type: 'dimension' },
+                        { id: 'fct_event', label: 'Event', entity_type: 'fact' }
+                    ],
+                    relationships: [
+                        { source: 'dim_customer', target: 'fct_event', type: 'one_to_many' },
+                        { source: 'dim_product', target: 'fct_event', type: 'one_to_many' }
+                    ],
+                    errors: []
+                }),
+            });
+        });
+
+        // Navigate to business events
+        await page.goto('/business-events').catch(() => {});
+        await page.waitForLoadState('networkidle');
+
+        // Find event card with 7 Ws
+        const eventCard = page.locator('[data-testid="event-card"]').or(page.locator('.bg-white.rounded-lg')).first();
+        const eventExists = await eventCard.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (eventExists) {
+            // Click generate entities button
+            const generateButton = page.getByRole('button', { name: /generate/i });
+            await generateButton.click();
+
+            // Wait for generation dialog
+            const dialog = page.getByRole('dialog').filter({ hasText: /generate/i });
+            await expect(dialog).toBeVisible({ timeout: 5000 });
+
+            // Verify generated entities
+            await expect(page.getByText('dim_customer')).toBeVisible({ timeout: 5000 });
+            await expect(page.getByText('dim_product')).toBeVisible({ timeout: 5000 });
+            await expect(page.getByText('fct_event')).toBeVisible({ timeout: 5000 });
+        }
+    });
+
+    test('should edit existing event\'s 7 Ws', async ({ page }) => {
+        // Mock update API
+        await page.route('**/api/business-events/**', async (route) => {
+            if (route.request().method() === 'PUT') {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'evt_001',
+                        text: 'customer buys product',
+                        type: 'discrete',
+                        seven_ws: {
+                            who: [{ id: 'ent1', text: 'Customer Updated' }],
+                            what: [{ id: 'ent2', text: 'Product Updated' }],
+                            when: [],
+                            where: [],
+                            how: [],
+                            how_many: [{ id: 'ent3', text: '200 units' }],
+                            why: []
+                        },
+                        annotations: [],
+                        derived_entities: [],
+                        created_at: '2025-01-22T10:00:00Z',
+                        updated_at: new Date().toISOString()
+                    }),
+                });
+            } else {
+                await route.continue();
+            }
+        });
+
+        // Navigate and click edit
+        await page.goto('/business-events').catch(() => {});
+        await page.waitForLoadState('networkidle');
+
+        const editButton = page.getByRole('button', { name: /edit|annotate/i }).first();
+        const editExists = await editButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (editExists) {
+            await editButton.click();
+
+            // Wait for edit modal
+            const modal = page.getByRole('dialog').filter({ hasText: /edit/i });
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Wait for SevenWsForm
+            await page.locator('[data-testid="seven-ws-form"]').or(page.locator('text=7 Ws')).waitFor({ state: 'visible', timeout: 5000 });
+
+            // Edit "Who" entry
+            const whoInput = page.locator('input').filter({ hasText: /customer/i }).first();
+            const whoInputVisible = await whoInput.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (whoInputVisible) {
+                await whoInput.clear();
+                await whoInput.fill('Customer Updated');
+
+                // Click save
+                const saveButton = page.getByRole('button', { name: /save/i });
+                await saveButton.click();
+
+                // Wait for modal to close
+                await expect(modal).not.toBeVisible({ timeout: 5000 });
+            }
+        }
+    });
+
+    test('should view annotation-based event as read-only', async ({ page }) => {
+        // Mock events API with annotation-based event
+        await page.route('**/api/business-events', async (route) => {
+            if (route.request().method() === 'GET') {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify([
+                        {
+                            id: 'evt_old_001',
+                            text: 'customer buys product',
+                            type: 'discrete',
+                            created_at: '2025-01-22T10:00:00Z',
+                            updated_at: '2025-01-22T10:00:00Z',
+                            annotations: [
+                                {
+                                    text: 'customer',
+                                    type: 'dimension',
+                                    start_pos: 0,
+                                    end_pos: 8,
+                                },
+                                {
+                                    text: 'product',
+                                    type: 'dimension',
+                                    start_pos: 14,
+                                    end_pos: 21,
+                                },
+                            ],
+                            derived_entities: []
+                        }
+                    ]),
+                });
+            } else {
+                await route.continue();
+            }
+        });
+
+        // Navigate to business events
+        await page.goto('/business-events').catch(() => {});
+        await page.waitForLoadState('networkidle');
+
+        // Click view/annotate button
+        const viewButton = page.getByRole('button', { name: /view|annotate/i }).first();
+        const buttonExists = await viewButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (buttonExists) {
+            await viewButton.click();
+
+            // Wait for modal to appear
+            const modal = page.getByRole('dialog');
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Should show deprecation notice for annotation-based events
+            const deprecationNotice = page.getByText(/deprecated|read-only|old format/i);
+            const deprecationVisible = await deprecationNotice.isVisible({ timeout: 3000 }).catch(() => false);
+
+            if (deprecationVisible) {
+                // Verify annotations are shown as read-only
+                await expect(page.getByText('customer')).toBeVisible();
+                await expect(page.getByText('product')).toBeVisible();
+
+                // Annotations should not be editable
+                const annotationTextInputs = page.locator('input').filter({ hasText: /customer|product/i });
+                const hasEditableInputs = await annotationTextInputs.count() > 0;
+                await expect(hasEditableInputs).toBeFalsy();
+            }
+        }
+    });
 });

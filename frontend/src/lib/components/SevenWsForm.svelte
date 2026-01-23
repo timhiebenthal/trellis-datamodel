@@ -51,6 +51,9 @@
     let showDeleteConfirm = $state(false);
     let entryToDelete = $state<{ wType: SevenWType; entryId: string } | null>(null);
 
+    // Success notification state
+    let showSuccessNotification = $state(false);
+
     // Collapsed state for each W section
     let collapsedState = $state<Record<SevenWType, boolean>>({
         who: false,
@@ -337,6 +340,14 @@
 
             // Call onSave (parent handles network operations with retry)
             onSave(updatedEvent);
+
+            // Show success notification
+            showSuccessNotification = true;
+
+            // Auto-hide success notification after 3 seconds
+            setTimeout(() => {
+                showSuccessNotification = false;
+            }, 3000);
         } catch (e) {
             const err = e instanceof Error ? e : new Error("Unknown error occurred");
             error = err.message;
@@ -461,11 +472,22 @@
                             </div>
                         </button>
 
-                        <!-- Section Content -->
+                                 <!-- Section Content -->
                         {#if !collapsedState[wType.type]}
                             <div id={`section-${wType.type}`} class="p-4 space-y-3">
                                 <!-- Entries List -->
-                                {#if sevenWs[wType.type].length > 0}
+                                {#if dimensionsLoading && sevenWs[wType.type].length === 0}
+                                    <!-- Skeleton Loader -->
+                                    <div class="space-y-3">
+                                        <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
+                                            <div class="flex-1 space-y-2">
+                                                <div class="h-10 bg-gray-200 rounded animate-pulse"></div>
+                                                <div class="h-6 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                                            </div>
+                                            <div class="w-8 h-8 bg-gray-200 rounded-md animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                {:else if sevenWs[wType.type].length > 0}
                                     {#each sevenWs[wType.type] as entry}
                                         <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
                                             <div class="flex-1 space-y-2">
@@ -624,5 +646,45 @@
                 </div>
             </div>
         </div>
+
+        <!-- Success Notification -->
+        {#if showSuccessNotification}
+            <div
+                class="fixed top-4 right-4 z-[70] bg-green-100 border border-green-300 rounded-lg px-6 py-4 shadow-xl flex items-center gap-3 animate-slide-in"
+                role="alert"
+                aria-live="polite"
+            >
+                <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
+                <span class="text-sm font-medium text-green-800">7 Ws saved successfully!</span>
+            </div>
+        {/if}
     {/if}
 {/if}
+
+<style>
+    @keyframes slide-in {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 0.4;
+        }
+        50% {
+            opacity: 0.8;
+        }
+    }
+    .animate-pulse {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+</style>

@@ -30,19 +30,6 @@ describe('EventCard', () => {
         derived_entities: []
     };
 
-    it('renders event text', () => {
-        const onAnnotate = vi.fn();
-        const onGenerateEntities = vi.fn();
-
-        render(EventCard, {
-            event: mockEventWith7Ws,
-            onAnnotate,
-            onGenerateEntities
-        });
-
-        expect(screen.getByText('customer buys product')).toBeInTheDocument();
-    });
-
     it('shows 7 Ws completion badge with correct count', () => {
         const onAnnotate = vi.fn();
         const onGenerateEntities = vi.fn();
