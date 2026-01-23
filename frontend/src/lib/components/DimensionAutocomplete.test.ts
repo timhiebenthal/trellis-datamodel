@@ -11,10 +11,10 @@ describe('DimensionAutocomplete', () => {
     });
 
     const mockDimensions: Dimension[] = [
-        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension', seven_w_type: 'who', description: 'Customer dimension' },
-        { id: 'dim_product', label: 'Product', entity_type: 'dimension', seven_w_type: 'what', description: 'Product dimension' },
-        { id: 'dim_location', label: 'Location', entity_type: 'dimension', seven_w_type: 'where', description: 'Location dimension' },
-        { id: 'dim_campaign', label: 'Campaign', entity_type: 'dimension', seven_w_type: 'why', description: 'Campaign dimension' }
+        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension', annotation_type: 'who', description: 'Customer dimension' },
+        { id: 'dim_product', label: 'Product', entity_type: 'dimension', annotation_type: 'what', description: 'Product dimension' },
+        { id: 'dim_location', label: 'Location', entity_type: 'dimension', annotation_type: 'where', description: 'Location dimension' },
+        { id: 'dim_campaign', label: 'Campaign', entity_type: 'dimension', annotation_type: 'why', description: 'Campaign dimension' }
     ];
 
     it('renders input with placeholder', () => {

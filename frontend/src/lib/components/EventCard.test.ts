@@ -17,7 +17,7 @@ describe('EventCard', () => {
         domain: 'Sales',
         created_at: '2025-01-22T10:00:00Z',
         updated_at: '2025-01-22T10:00:00Z',
-        seven_ws: {
+        annotations: {
             who: [{ id: 'ent1', text: 'customer' }],
             what: [{ id: 'ent2', text: 'product' }],
             when: [],
@@ -55,7 +55,7 @@ describe('EventCard', () => {
 
         const eventFull: BusinessEvent = {
             ...mockEventWith7Ws,
-            seven_ws: {
+            annotations: {
                 who: [{ id: 'ent1', text: 'customer' }],
                 what: [{ id: 'ent2', text: 'product' }],
                 when: [{ id: 'ent3', text: '2025-01-22' }],
@@ -109,7 +109,7 @@ describe('EventCard', () => {
             domain: null,
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T10:00:00Z',
-            seven_ws: {
+            annotations: {
                 who: [],
                 what: [],
                 when: [],

@@ -18,7 +18,7 @@ test.describe('Business Events - E2E', () => {
             type: 'discrete',
             created_at: '2026-01-21T10:30:00Z',
             updated_at: '2026-01-21T10:30:00Z',
-            seven_ws: {
+            annotations: {
                 who: [{ id: 'ent1', text: 'customer' }],
                 what: [{ id: 'ent2', text: 'product' }],
                 when: [],
@@ -35,7 +35,7 @@ test.describe('Business Events - E2E', () => {
             type: 'recurring',
             created_at: '2026-01-21T11:00:00Z',
             updated_at: '2026-01-21T11:00:00Z',
-            seven_ws: {
+            annotations: {
                 who: [],
                 what: [],
                 when: [],
@@ -98,7 +98,7 @@ test.describe('Business Events - E2E', () => {
                     type: body.type,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
-                    seven_ws: {
+                    annotations: {
                         who: [],
                         what: [],
                         when: [],
@@ -487,8 +487,8 @@ test.describe('Business Events - E2E', () => {
                 contentType: 'application/json',
                 body: JSON.stringify({
                     entities: [
-                        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension', seven_w_type: 'who' },
-                        { id: 'dim_product', label: 'Product', entity_type: 'dimension', seven_w_type: 'what' }
+                        { id: 'dim_customer', label: 'Customer', entity_type: 'dimension', annotation_type: 'who' },
+                        { id: 'dim_product', label: 'Product', entity_type: 'dimension', annotation_type: 'what' }
                     ]
                 }),
             });
@@ -614,7 +614,7 @@ test.describe('Business Events - E2E', () => {
                         id: 'evt_001',
                         text: 'customer buys product',
                         type: 'discrete',
-                        seven_ws: {
+                        annotations: {
                             who: [{ id: 'ent1', text: 'Customer Updated' }],
                             what: [{ id: 'ent2', text: 'Product Updated' }],
                             when: [],

@@ -19,7 +19,7 @@ events:
   type: discrete
   domain: Sales
   created_at: '2026-01-22T00:07:15.211092'
-  updated_at: '2026-01-23T15:39:06.561535'
+  updated_at: '2026-01-23T16:19:35.951621'
   annotations:
     who:
     - id: new_1769121444615_u05zplq3f
@@ -85,21 +85,21 @@ events:
       attributes: {}
   derived_entities:
   - entity_id: dim_customer
-    created_at: '2026-01-23T14:39:06.529000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: dim_product
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: dim_order_date
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: dim_country
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: dim_store
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: dim_marketing_campaign
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: dim_promo_code
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
   - entity_id: fact_customer_buys_product
-    created_at: '2026-01-23T14:39:06.530000Z'
+    created_at: '2026-01-23T15:19:35.923000Z'
 - id: evt_20260122_003
   text: order gets invoiced
   type: discrete

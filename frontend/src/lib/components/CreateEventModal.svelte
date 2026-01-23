@@ -117,7 +117,7 @@
                 // Edit mode: populate form with existing event data
                 eventText = event.text;
                 eventType = event.type;
-                sevenWs = event.seven_ws || {
+                sevenWs = event.annotations || {
                     who: [],
                     what: [],
                     when: [],
@@ -126,7 +126,7 @@
                     how_many: [],
                     why: []
                 };
-                showSevenWs = !!event.seven_ws && (event.seven_ws.who.length > 0 || event.seven_ws.what.length > 0 || event.seven_ws.how_many.length > 0);
+                showSevenWs = !!event.annotations && (event.annotations.who.length > 0 || event.annotations.what.length > 0 || event.annotations.how_many.length > 0);
             } else {
                 // Create mode: reset form
                 eventText = "";
@@ -252,9 +252,9 @@
                     type: eventType
                 };
 
-                // Include seven_ws in request if 7 Ws is shown and has data
+                // Include annotations in request if 7 Ws is shown and has data
                 if (showSevenWs && filledWsCount > 0) {
-                    updates.seven_ws = sevenWs;
+                    updates.annotations = sevenWs;
                 }
 
                 await updateBusinessEvent(event.id, updates);
@@ -277,8 +277,8 @@
                 error = "Invalid event data. Please check your input and try again.";
             } else if (errorMessage.includes("500") || errorMessage.includes("server")) {
                 error = "Server error. Please try again later.";
-            } else if (errorMessage.includes("seven_w_type")) {
-                error = "Invalid 7 Ws data. Please check your entries and try again.";
+            } else if (errorMessage.includes("annotation_type")) {
+                error = "Invalid annotation data. Please check your entries and try again.";
             } else {
                 error = errorMessage;
             }

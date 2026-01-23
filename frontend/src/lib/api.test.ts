@@ -41,7 +41,7 @@ describe('addSevenWsEntry', () => {
             id: 'evt_001',
             text: 'test event',
             type: 'discrete',
-            seven_ws: {
+            annotations: {
                 who: [{ id: 'ent1', text: 'customer', dimension_id: 'dim_customer' }],
                 what: [],
                 when: [],
@@ -101,7 +101,7 @@ describe('removeSevenWsEntry', () => {
             id: 'evt_001',
             text: 'test event',
             type: 'discrete',
-            seven_ws: {
+            annotations: {
                 who: [],
                 what: [],
                 when: [],
@@ -160,7 +160,7 @@ describe('updateSevenWsEntry', () => {
             id: 'evt_001',
             text: 'test event',
             type: 'discrete',
-            seven_ws: {
+            annotations: {
                 who: [{ id: 'ent1', text: 'customer updated', description: 'Updated description' }],
                 what: [],
                 when: [],
@@ -218,8 +218,8 @@ describe('getDimensions', () => {
     it('fetches dimensions from data model', async () => {
         const mockResponse = {
             entities: [
-                { id: 'dim1', label: 'Customer', entity_type: 'dimension', seven_w_type: 'who' },
-                { id: 'dim2', label: 'Product', entity_type: 'dimension', seven_w_type: 'what' }
+                { id: 'dim1', label: 'Customer', entity_type: 'dimension', annotation_type: 'who' },
+                { id: 'dim2', label: 'Product', entity_type: 'dimension', annotation_type: 'what' }
             ]
         };
 
@@ -238,11 +238,11 @@ describe('getDimensions', () => {
         expect(global.fetch).toHaveBeenCalledWith('/api/data-model');
     });
 
-    it('filters dimensions by seven_w_type when specified', async () => {
+    it('filters dimensions by annotation_type when specified', async () => {
         const mockResponse = {
             entities: [
-                { id: 'dim1', label: 'Customer', entity_type: 'dimension', seven_w_type: 'who' },
-                { id: 'dim2', label: 'Product', entity_type: 'dimension', seven_w_type: 'what' }
+                { id: 'dim1', label: 'Customer', entity_type: 'dimension', annotation_type: 'who' },
+                { id: 'dim2', label: 'Product', entity_type: 'dimension', annotation_type: 'what' }
             ]
         };
 
@@ -257,8 +257,8 @@ describe('getDimensions', () => {
         const result = await getDimensions('who');
 
         expect(result).toHaveLength(1);
-        expect(result[0].seven_w_type).toBe('who');
-        expect(global.fetch).toHaveBeenCalledWith('/api/data-model?seven_w_type=who');
+        expect(result[0].annotation_type).toBe('who');
+        expect(global.fetch).toHaveBeenCalledWith('/api/data-model?annotation_type=who');
     });
 
     it('returns empty array on 404 error', async () => {
@@ -276,13 +276,13 @@ describe('getDimensions', () => {
     });
 });
 
-describe('createBusinessEvent with seven_ws', () => {
+describe('createBusinessEvent with annotations', () => {
     afterEach(() => {
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
 
-    it('creates event with seven_ws data', async () => {
+    it('creates event with annotations data', async () => {
         const mockSevenWs: BusinessEventSevenWs = {
             who: [{ id: 'ent1', text: 'customer' }],
             what: [{ id: 'ent2', text: 'product' }],
@@ -297,7 +297,7 @@ describe('createBusinessEvent with seven_ws', () => {
             id: 'evt_new',
             text: 'customer buys product',
             type: 'discrete',
-            seven_ws: mockSevenWs,
+            annotations: mockSevenWs,
             annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
@@ -319,19 +319,19 @@ describe('createBusinessEvent with seven_ws', () => {
             '/api/business-events',
             expect.objectContaining({
                 method: 'POST',
-                body: expect.stringContaining('"seven_ws"')
+                body: expect.stringContaining('"annotations"')
             })
         );
     });
 });
 
-describe('updateBusinessEvent with seven_ws', () => {
+describe('updateBusinessEvent with annotations', () => {
     afterEach(() => {
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
 
-    it('updates event with seven_ws data', async () => {
+    it('updates event with annotations data', async () => {
         const mockSevenWs: BusinessEventSevenWs = {
             who: [{ id: 'ent1', text: 'customer updated' }],
             what: [],
@@ -346,7 +346,7 @@ describe('updateBusinessEvent with seven_ws', () => {
             id: 'evt_001',
             text: 'customer buys product',
             type: 'discrete',
-            seven_ws: mockSevenWs,
+            annotations: mockSevenWs,
             annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
@@ -361,14 +361,14 @@ describe('updateBusinessEvent with seven_ws', () => {
             })
         );
 
-        const result = await updateBusinessEvent('evt_001', { seven_ws: mockSevenWs });
+        const result = await updateBusinessEvent('evt_001', { annotations: mockSevenWs });
 
         expect(result).toEqual(mockResponse);
         expect(global.fetch).toHaveBeenCalledWith(
             '/api/business-events/evt_001',
             expect.objectContaining({
                 method: 'PUT',
-                body: expect.stringContaining('"seven_ws"')
+                body: expect.stringContaining('"annotations"')
             })
         );
     });

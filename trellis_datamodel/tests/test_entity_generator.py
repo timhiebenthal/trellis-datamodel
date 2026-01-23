@@ -9,8 +9,8 @@ from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
     GeneratedEntitiesResult,
-    BusinessEventSevenWs,
-    SevenWsEntry,
+    BusinessEventAnnotations,
+    AnnotationEntry,
 )
 
 
@@ -102,7 +102,7 @@ class TestTextToTitleCase:
 class TestGenerateEntitiesFromSevenWs:
     """Test generate_entities_from_event() with 7 Ws entries."""
 
-    def test_generates_entities_from_seven_ws(self, monkeypatch):
+    def test_generates_entities_from_annotations(self, monkeypatch):
         """Test that dimensions and fact are generated correctly from 7 Ws."""
         mock_config = Mock()
         mock_config.dimension_prefix = ["dim_"]
@@ -116,11 +116,11 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
-                when=[SevenWsEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
-                how_many=[SevenWsEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                when=[AnnotationEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -134,9 +134,9 @@ class TestGenerateEntitiesFromSevenWs:
         dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
         assert len(dim_entities) == 2
         assert dim_entities[0]["id"] == "dim_customer"
-        assert dim_entities[0]["metadata"]["seven_w_type"] == "who"
+        assert dim_entities[0]["metadata"]["annotation_type"] == "who"
         assert dim_entities[1]["id"] == "dim_product"
-        assert dim_entities[1]["metadata"]["seven_w_type"] == "what"
+        assert dim_entities[1]["metadata"]["annotation_type"] == "what"
 
         # Check fact
         fact_entities = [e for e in result.entities if e["entity_type"] == "fact"]
@@ -146,7 +146,7 @@ class TestGenerateEntitiesFromSevenWs:
         assert "drafted_fields" in fact_entities[0]
         assert fact_entities[0]["drafted_fields"][0]["name"] == "quantity"
 
-    def test_creates_relationships_from_seven_ws(self, monkeypatch):
+    def test_creates_relationships_from_annotations(self, monkeypatch):
         """Test that all dimensions connect to fact."""
         mock_config = Mock()
         mock_config.dimension_prefix = ["dim_"]
@@ -160,11 +160,11 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
-                when=[SevenWsEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
-                how_many=[SevenWsEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                when=[AnnotationEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -193,8 +193,8 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                how_many=[SevenWsEntry(id="w1", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                how_many=[AnnotationEntry(id="w1", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -219,8 +219,8 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -245,12 +245,12 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
                 how_many=[
-                    SevenWsEntry(id="w3", text="quantity", description="Items purchased", attributes={}),
-                    SevenWsEntry(id="w4", text="amount", description="Total sales amount", attributes={}),
+                    AnnotationEntry(id="w3", text="quantity", description="Items purchased", attributes={}),
+                    AnnotationEntry(id="w4", text="amount", description="Total sales amount", attributes={}),
                 ],
             ),
             derived_entities=[],
@@ -283,14 +283,14 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
-                when=[SevenWsEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
-                where=[SevenWsEntry(id="w4", text="store", dimension_id=None, description=None, attributes={})],
-                how=[SevenWsEntry(id="w5", text="online", dimension_id=None, description=None, attributes={})],
-                why=[SevenWsEntry(id="w6", text="promotion", dimension_id=None, description=None, attributes={})],
-                how_many=[SevenWsEntry(id="w7", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                when=[AnnotationEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
+                where=[AnnotationEntry(id="w4", text="store", dimension_id=None, description=None, attributes={})],
+                how=[AnnotationEntry(id="w5", text="online", dimension_id=None, description=None, attributes={})],
+                why=[AnnotationEntry(id="w6", text="promotion", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w7", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -303,12 +303,12 @@ class TestGenerateEntitiesFromSevenWs:
         dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
         assert len(dim_entities) == 6
 
-        # Check seven_w_type metadata is set correctly
-        w_types = [e["metadata"]["seven_w_type"] for e in dim_entities]
+        # Check annotation_type metadata is set correctly
+        w_types = [e["metadata"]["annotation_type"] for e in dim_entities]
         assert set(w_types) == {"who", "what", "when", "where", "how", "why"}
 
-    def test_detects_no_data_without_seven_ws(self, monkeypatch):
-        """Test that event without seven_ws returns error."""
+    def test_detects_no_data_without_annotations(self, monkeypatch):
+        """Test that event without annotations returns error."""
         mock_config = Mock()
         mock_config.dimension_prefix = ["dim_"]
         mock_config.fact_prefix = ["fct_"]
@@ -321,7 +321,7 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(),
+            annotations=BusinessEventAnnotations(),
             derived_entities=[],
         )
 
@@ -329,13 +329,13 @@ class TestGenerateEntitiesFromSevenWs:
 
         assert len(result.entities) == 0
         assert len(result.errors) == 1
-        assert "seven_ws" in result.errors[0].lower()
+        assert "annotation" in result.errors[0].lower()
 
 
 class TestGenerateEntitiesFromSevenWs:
     """Test generate_entities_from_event() with 7 Ws entries."""
 
-    def test_generates_entities_from_seven_ws(self, monkeypatch):
+    def test_generates_entities_from_annotations(self, monkeypatch):
         """Test that dimensions and fact are generated correctly from 7 Ws."""
         mock_config = Mock()
         mock_config.dimension_prefix = ["dim_"]
@@ -349,11 +349,11 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
-                when=[SevenWsEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
-                how_many=[SevenWsEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                when=[AnnotationEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -366,11 +366,11 @@ class TestGenerateEntitiesFromSevenWs:
         dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
         assert len(dim_entities) == 3
         assert dim_entities[0]["id"] == "dim_customer"
-        assert dim_entities[0]["metadata"]["seven_w_type"] == "who"
+        assert dim_entities[0]["metadata"]["annotation_type"] == "who"
         assert dim_entities[1]["id"] == "dim_product"
-        assert dim_entities[1]["metadata"]["seven_w_type"] == "what"
+        assert dim_entities[1]["metadata"]["annotation_type"] == "what"
         assert dim_entities[2]["id"] == "dim_date"
-        assert dim_entities[2]["metadata"]["seven_w_type"] == "when"
+        assert dim_entities[2]["metadata"]["annotation_type"] == "when"
 
         fact_entities = [e for e in result.entities if e["entity_type"] == "fact"]
         assert len(fact_entities) == 1
@@ -379,7 +379,7 @@ class TestGenerateEntitiesFromSevenWs:
         assert "drafted_fields" in fact_entities[0]
         assert fact_entities[0]["drafted_fields"][0]["name"] == "quantity"
 
-    def test_creates_relationships_from_seven_ws(self, monkeypatch):
+    def test_creates_relationships_from_annotations(self, monkeypatch):
         """Test that all dimensions connect to fact."""
         mock_config = Mock()
         mock_config.dimension_prefix = ["dim_"]
@@ -393,11 +393,11 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
-                when=[SevenWsEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
-                how_many=[SevenWsEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                when=[AnnotationEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w4", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -429,8 +429,8 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                how_many=[SevenWsEntry(id="w1", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                how_many=[AnnotationEntry(id="w1", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -455,8 +455,8 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -481,12 +481,12 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
                 how_many=[
-                    SevenWsEntry(id="w3", text="quantity", description="Items purchased", attributes={}),
-                    SevenWsEntry(id="w4", text="amount", description="Total sales amount", attributes={}),
+                    AnnotationEntry(id="w3", text="quantity", description="Items purchased", attributes={}),
+                    AnnotationEntry(id="w4", text="amount", description="Total sales amount", attributes={}),
                 ],
             ),
             derived_entities=[],
@@ -518,14 +518,14 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(
-                who=[SevenWsEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
-                what=[SevenWsEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
-                when=[SevenWsEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
-                where=[SevenWsEntry(id="w4", text="store", dimension_id=None, description=None, attributes={})],
-                how=[SevenWsEntry(id="w5", text="online", dimension_id=None, description=None, attributes={})],
-                why=[SevenWsEntry(id="w6", text="promotion", dimension_id=None, description=None, attributes={})],
-                how_many=[SevenWsEntry(id="w7", text="quantity", dimension_id=None, description=None, attributes={})],
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                when=[AnnotationEntry(id="w3", text="date", dimension_id=None, description=None, attributes={})],
+                where=[AnnotationEntry(id="w4", text="store", dimension_id=None, description=None, attributes={})],
+                how=[AnnotationEntry(id="w5", text="online", dimension_id=None, description=None, attributes={})],
+                why=[AnnotationEntry(id="w6", text="promotion", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w7", text="quantity", dimension_id=None, description=None, attributes={})],
             ),
             derived_entities=[],
         )
@@ -537,11 +537,11 @@ class TestGenerateEntitiesFromSevenWs:
         dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
         assert len(dim_entities) == 6
 
-        w_types = [e["metadata"]["seven_w_type"] for e in dim_entities]
+        w_types = [e["metadata"]["annotation_type"] for e in dim_entities]
         assert set(w_types) == {"who", "what", "when", "where", "how", "why"}
 
-    def test_detects_no_data_without_seven_ws(self, monkeypatch):
-        """Test that event without seven_ws returns error."""
+    def test_detects_no_data_without_annotations(self, monkeypatch):
+        """Test that event without annotations returns error."""
         mock_config = Mock()
         mock_config.dimension_prefix = ["dim_"]
         mock_config.fact_prefix = ["fct_"]
@@ -554,7 +554,7 @@ class TestGenerateEntitiesFromSevenWs:
             type=BusinessEventType.DISCRETE,
             created_at=now,
             updated_at=now,
-            seven_ws=BusinessEventSevenWs(),
+            annotations=BusinessEventAnnotations(),
             derived_entities=[],
         )
 
@@ -562,4 +562,4 @@ class TestGenerateEntitiesFromSevenWs:
 
         assert len(result.entities) == 0
         assert len(result.errors) == 1
-        assert "seven_ws" in result.errors[0].lower()
+        assert "annotation" in result.errors[0].lower()

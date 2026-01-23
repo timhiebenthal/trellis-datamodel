@@ -134,17 +134,17 @@ def _load_existing_entities() -> Dict[str, dict]:
 
 def _create_dimension_from_annotation_entry(
     entry: AnnotationEntry,
-    w_type: str,
+    annotation_type: str,
     prefixes: List[str],
     domain_tag: Optional[str] = None,
     existing_entities: Optional[Dict[str, dict]] = None,
 ) -> dict:
     """
-    Create a dimension entity dictionary from a 7 Ws entry.
+    Create a dimension entity dictionary from an annotation entry.
 
     Args:
         entry: AnnotationEntry object
-        w_type: The W category (who, what, when, where, how, why)
+        annotation_type: The annotation category (who, what, when, where, how, why)
         prefixes: List of dimension prefixes to apply (e.g., ['dim_'])
         domain_tag: Optional domain tag to add to entity (slugified domain)
         existing_entities: Dictionary of existing entities from data_model.yml
@@ -187,8 +187,8 @@ def _create_dimension_from_annotation_entry(
         "entity_type": "dimension",
         "description": entry.description or f"Dimension: {entry.text}",
         "metadata": {
-            "seven_w_type": w_type
-        },  # Track which W type this dimension represents
+            "annotation_type": annotation_type
+        },  # Track which annotation category this dimension represents
     }
 
     # Add domain tag if provided
@@ -280,7 +280,7 @@ def generate_entities_from_event(
     Uses 7 Ws structured entries (Who, What, When, Where, How, How Many, Why).
 
     Args:
-        event: BusinessEvent with seven_ws
+        event: BusinessEvent with annotations
         config: Optional config object (uses global config if not provided)
 
     Returns:
@@ -291,34 +291,34 @@ def generate_entities_from_event(
     """
     errors = []
 
-    # Check if event has 7 Ws data
-    has_seven_ws = event.seven_ws and any(
+    # Check if event has annotations
+    has_annotations = event.annotations and any(
         [
-            event.seven_ws.who,
-            event.seven_ws.what,
-            event.seven_ws.when,
-            event.seven_ws.where,
-            event.seven_ws.how,
-            event.seven_ws.how_many,
-            event.seven_ws.why,
+            event.annotations.who,
+            event.annotations.what,
+            event.annotations.when,
+            event.annotations.where,
+            event.annotations.how,
+            event.annotations.how_many,
+            event.annotations.why,
         ]
     )
 
-    if has_seven_ws:
-        return _generate_from_seven_ws(event, config)
+    if has_annotations:
+        return _generate_from_annotations(event, config)
     else:
-        errors.append("Event must have seven_ws entries")
+        errors.append("Event must have annotation entries")
         return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
 
 
-def _generate_from_seven_ws(
+def _generate_from_annotations(
     event: BusinessEvent, config=None
 ) -> GeneratedEntitiesResult:
     """
-    Generate entities from 7 Ws structured entries.
+    Generate entities from annotation entries.
 
     Args:
-        event: BusinessEvent with seven_ws
+        event: BusinessEvent with annotations
         config: Optional config object
 
     Returns:
@@ -326,18 +326,18 @@ def _generate_from_seven_ws(
     """
     errors = []
 
-    # Collect dimension entries from all W categories except how_many
+    # Collect dimension entries from all annotation categories except how_many
     dimension_entries = []
-    for w_type, entries in [
-        ("who", event.seven_ws.who),
-        ("what", event.seven_ws.what),
-        ("when", event.seven_ws.when),
-        ("where", event.seven_ws.where),
-        ("how", event.seven_ws.how),
-        ("why", event.seven_ws.why),
+    for annotation_type, entries in [
+        ("who", event.annotations.who),
+        ("what", event.annotations.what),
+        ("when", event.annotations.when),
+        ("where", event.annotations.where),
+        ("how", event.annotations.how),
+        ("why", event.annotations.why),
     ]:
         for entry in entries:
-            dimension_entries.append((w_type, entry))
+            dimension_entries.append((annotation_type, entry))
 
     # Validate: require at least 1 dimension entry
     if not dimension_entries:
@@ -372,10 +372,10 @@ def _generate_from_seven_ws(
     # Generate dimension entities from all dimension entries
     dimension_entities = []
     dimension_ids = []
-    for w_type, entry in dimension_entries:
+    for annotation_type, entry in dimension_entries:
         entity = _create_dimension_from_annotation_entry(
             entry,
-            w_type=w_type,
+            annotation_type=annotation_type,
             prefixes=dim_prefixes,
             domain_tag=domain_tag,
             existing_entities=existing_entities,

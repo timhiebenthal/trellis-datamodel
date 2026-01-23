@@ -24,8 +24,8 @@
     // Computed filtered dimensions
     let filteredDimensions = $derived.by(() => {
         return dimensions.filter((d) => {
-            // Filter by seven_w_type if specified
-            if (filterBy && d.seven_w_type !== filterBy) {
+            // Filter by annotation_type if specified
+            if (filterBy && d.annotation_type !== filterBy) {
                 return false;
             }
             // Filter by search text
@@ -207,9 +207,9 @@
                             <span class="font-medium text-gray-900">{dimension.label}</span>
                             <span class="text-xs text-gray-500 font-mono">{dimension.id}</span>
                         </div>
-                        {#if dimension.seven_w_type}
+                        {#if dimension.annotation_type}
                             <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                {dimension.seven_w_type}
+                                {dimension.annotation_type}
                             </span>
                         {/if}
                     </div>

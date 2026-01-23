@@ -17,7 +17,7 @@ describe('SevenWsForm', () => {
         domain: 'Sales',
         created_at: '2025-01-22T10:00:00Z',
         updated_at: '2025-01-22T10:00:00Z',
-        seven_ws: {
+        annotations: {
             who: [{ id: 'ent1', text: 'customer' }],
             what: [],
             when: [],
@@ -82,7 +82,7 @@ describe('SevenWsForm', () => {
 
         const eventNoEntries: BusinessEvent = {
             ...mockEvent,
-            seven_ws: {
+            annotations: {
                 who: [],
                 what: [],
                 when: [],
@@ -147,7 +147,7 @@ describe('SevenWsForm', () => {
 
         const eventAllFilled: BusinessEvent = {
             ...mockEvent,
-            seven_ws: {
+            annotations: {
                 who: [{ id: 'ent1', text: 'customer' }],
                 what: [{ id: 'ent2', text: 'product' }],
                 when: [{ id: 'ent3', text: '2025-01-22' }],

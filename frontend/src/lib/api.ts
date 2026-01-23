@@ -599,43 +599,43 @@ export async function updateBusinessEvent(
 }
 
 /**
- * Update the 7 Ws structure for a business event.
+ * Update the annotations structure for a business event.
  * @param id - Event ID to update
- * @param sevenWs - Complete 7 Ws structure to replace existing
+ * @param annotations - Complete annotations structure to replace existing
  * @returns Promise containing the updated BusinessEvent
  */
-export async function updateBusinessEventSevenWs(
+export async function updateBusinessEventAnnotations(
     id: string,
-    sevenWs: BusinessEventSevenWs
+    annotations: BusinessEventAnnotations
 ): Promise<BusinessEvent> {
     try {
         const res = await fetch(`${API_BASE}/business-events/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ seven_ws: sevenWs }),
+            body: JSON.stringify({ annotations: annotations }),
         });
         if (!res.ok) {
             const error = await res.json();
-            throw new Error(error.detail || `Failed to update 7 Ws: ${res.statusText}`);
+            throw new Error(error.detail || `Failed to update annotations: ${res.statusText}`);
         }
         return await res.json();
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error updating 7 Ws: ${message}`);
+        throw new Error(`Error updating annotations: ${message}`);
     }
 }
 
 /**
  * Get dimensions from the data model (filtered by entity_type=dimension).
- * @param filterByType - Optional W type filter (seven_w_type)
+ * @param filterByType - Optional annotation type filter (annotation_type)
  * @returns Promise containing array of Dimension objects
  */
-export async function getDimensions(filterByType?: SevenWType): Promise<Dimension[]> {
+export async function getDimensions(filterByType?: AnnotationType): Promise<Dimension[]> {
     try {
         let url = `${API_BASE}/data-model`;
         const params = new URLSearchParams();
         if (filterByType) {
-            params.append('seven_w_type', filterByType);
+            params.append('annotation_type', filterByType);
         }
         const queryString = params.toString();
         if (queryString) {
@@ -655,9 +655,9 @@ export async function getDimensions(filterByType?: SevenWType): Promise<Dimensio
         return entities
             .filter((e: Dimension) => e.entity_type === 'dimension')
             .filter((e: Dimension) => {
-                // If seven_w_type filter specified, only return matching dimensions
+                // If annotation_type filter specified, only return matching dimensions
                 if (filterByType) {
-                    return e.seven_w_type === filterByType;
+                    return e.annotation_type === filterByType;
                 }
                 return true;
             });
