@@ -21,7 +21,6 @@
     }
     let showCreateModal = $state(false);
     let showSevenWsForm = $state(false);
-    let showViewSevenWs = $state(false);
     let showGenerateEntitiesDialog = $state(false);
     let sevenWsEvent = $state<BusinessEvent | null>(null);
     let generateEntitiesEvent = $state<BusinessEvent | null>(null);
@@ -154,11 +153,6 @@
         showSevenWsForm = true;
     }
 
-    function handleViewSevenWs(event: BusinessEvent) {
-        sevenWsEvent = event;
-        showViewSevenWs = true;
-    }
-
     async function handleSevenWsSave(updatedEvent: BusinessEvent) {
         try {
             error = null;
@@ -187,11 +181,6 @@
 
     function handleSevenWsCancel() {
         showSevenWsForm = false;
-        sevenWsEvent = null;
-    }
-
-    function handleViewSevenWsClose() {
-        showViewSevenWs = false;
         sevenWsEvent = null;
     }
 
@@ -316,7 +305,6 @@
                             onEditSevenWs={handleEditSevenWs}
                             onGenerateEntities={handleGenerateEntities}
                             onDelete={reloadEvents}
-                            onViewSevenWs={handleViewSevenWs}
                         />
                     {/each}
                 </div>
@@ -332,21 +320,12 @@
     />
 
 
-    <!-- Annotations Form Modal (Edit) -->
+    <!-- Annotations Form Modal -->
     {#if showSevenWsForm && sevenWsEvent}
         <SevenWsForm
             event={sevenWsEvent}
             onSave={handleSevenWsSave}
             onCancel={handleSevenWsCancel}
-        />
-    {/if}
-
-    <!-- Annotations Form Modal (View - Read-only) -->
-    {#if showViewSevenWs && sevenWsEvent}
-        <SevenWsForm
-            event={sevenWsEvent}
-            onSave={handleSevenWsSave}
-            onCancel={handleViewSevenWsClose}
         />
     {/if}
 

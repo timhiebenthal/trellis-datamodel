@@ -1,4 +1,81 @@
 version: 0.1
-entities: {}
-relationships: {}
+entities:
+  dim_customer:
+    position:
+      x: 1076.798057219592
+      y: 436.7462765234496
+    width: 280
+    panel_height: 200
+    collapsed: false
+  dim_product:
+    position:
+      x: 1053.7144044896788
+      y: -134.90473979057657
+    width: 280
+    panel_height: 200
+    collapsed: false
+  dim_order_date:
+    position:
+      x: 457.5514147941594
+      y: 52.248898243794784
+    width: 280
+    panel_height: 200
+    collapsed: false
+  dim_country:
+    position:
+      x: 1089.426122857841
+      y: -263.726501280768
+    width: 280
+    panel_height: 200
+    collapsed: false
+  dim_store:
+    position:
+      x: 186.07397967402267
+      y: 192.5944568982112
+    width: 280
+    panel_height: 200
+    collapsed: false
+  dim_marketing_campaign:
+    position:
+      x: 546.3064910124195
+      y: 684.3906026457838
+    width: 280
+    panel_height: 200
+    collapsed: false
+  dim_promo_code:
+    position:
+      x: 108.68465521751364
+      y: 317.9095149822938
+    width: 280
+    panel_height: 200
+    collapsed: false
+  fact_customer_buys_product:
+    position:
+      x: 640.7185975395967
+      y: 136.02812509492037
+    width: 280
+    panel_height: 200
+    collapsed: false
+relationships:
+  dim_customer-fact_customer_buys_product-0:
+    label_dx: 0
+    label_dy: 0
+  dim_product-fact_customer_buys_product-1:
+    label_dx: 0
+    label_dy: 0
+  dim_order_date-fact_customer_buys_product-2:
+    label_dx: 0
+    label_dy: 0
+  dim_country-fact_customer_buys_product-3:
+    label_dx: 0
+    label_dy: 0
+  dim_store-fact_customer_buys_product-4:
+    label_dx: 0
+    label_dy: 0
+  dim_marketing_campaign-fact_customer_buys_product-5:
+    label_dx: 0
+    label_dy: 0
+  dim_promo_code-fact_customer_buys_product-6:
+    label_dx: 0
+    label_dy: 0
 source_colors: {}

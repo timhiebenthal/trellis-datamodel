@@ -1,3 +1,79 @@
 version: 0.1
-entities: []
-relationships: []
+entities:
+  - id: dim_customer
+    label: Customer
+    description: 'Dimension: Customer'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_product
+    label: Product
+    description: 'Dimension: product'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_order_date
+    label: Order Date
+    description: 'Dimension: order date'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_country
+    label: Country
+    description: 'Dimension: country'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_store
+    label: Store
+    description: 'Dimension: store'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_marketing_campaign
+    label: Marketing Campaign
+    description: 'Dimension: marketing_campaign'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_promo_code
+    label: Promo Code
+    description: 'Dimension: promo_code'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: fact_customer_buys_product
+    label: Sales Activity
+    description: 'Fact: Customer Buys Product'
+    tags:
+      - sales
+    entity_type: fact
+relationships:
+  - source: dim_customer
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_product
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_order_date
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_country
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_store
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_marketing_campaign
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_promo_code
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many

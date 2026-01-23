@@ -15,6 +15,7 @@
         type Edge,
     } from "@xyflow/svelte";
     import { setContext } from "svelte";
+    import { goto } from "$app/navigation";
     import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import { DimensionalModelPositioner, GroupSizeCalculator } from "$lib/services/position-calculator";
@@ -22,6 +23,7 @@
     import GroupNode from "./GroupNode.svelte";
     import CustomEdge from "./CustomEdge.svelte";
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
+    import EventFilterBanner from "./EventFilterBanner.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
     import { writable } from "svelte/store";
@@ -41,7 +43,16 @@
         lineageEnabled = false,
         exposuresEnabled = false,
         hasExposuresData = false,
-    }: { guidanceConfig: GuidanceConfig; lineageEnabled?: boolean; exposuresEnabled?: boolean; hasExposuresData?: boolean } = $props();
+        filteredEntityIds = null,
+        filterEventText = null,
+    }: {
+        guidanceConfig: GuidanceConfig;
+        lineageEnabled?: boolean;
+        exposuresEnabled?: boolean;
+        hasExposuresData?: boolean;
+        filteredEntityIds?: string[] | null;
+        filterEventText?: string | null;
+    } = $props();
 
     const lineageEnabledStore = writable(lineageEnabled);
     setContext("lineageEnabled", lineageEnabledStore);
@@ -63,6 +74,77 @@
     $effect(() => {
         hasExposuresDataStore.set(hasExposuresData);
     });
+
+    // Entity filtering logic
+    // Filter nodes to show only entities with IDs in filteredEntityIds
+    const filteredNodes = $derived(() => {
+        if (!filteredEntityIds || filteredEntityIds.length === 0) {
+            return $nodes;
+        }
+
+        // Filter out entity IDs that don't exist in $nodes (handle deleted entities)
+        // Keep group nodes visible to maintain canvas structure
+        return $nodes.filter(node =>
+            node.type === 'group' || filteredEntityIds.includes(node.id)
+        );
+    });
+
+    // Create a reactive local nodes variable for binding
+    // This syncs with either filtered or all nodes based on filter state
+    let displayNodes = $state<Node[]>([]);
+
+    // Sync filtered nodes to displayNodes
+    $effect(() => {
+        displayNodes = filteredNodes();
+    });
+
+
+    // Sync changes from displayNodes back to $nodes store when users interact
+    // This ensures drag operations and other changes are persisted
+    $effect(() => {
+        if (filteredEntityIds && filteredEntityIds.length > 0) {
+            // In filtered mode, update the corresponding nodes in the store
+            displayNodes.forEach(displayNode => {
+                const storeNodeIndex = $nodes.findIndex(n => n.id === displayNode.id);
+                if (storeNodeIndex >= 0 && $nodes[storeNodeIndex] !== displayNode) {
+                    $nodes[storeNodeIndex] = displayNode;
+                }
+            });
+        }
+    });
+
+    // Filter edges to only show connections between filtered entities
+    const displayEdges = $derived(() => {
+        if (!filteredEntityIds || filteredEntityIds.length === 0) {
+            return $edges;
+        }
+
+        // Get set of visible node IDs for efficient lookup
+        const visibleNodeIds = new Set(displayNodes.map(n => n.id));
+
+        // Only show edges where both source and target are visible
+        return $edges.filter(edge =>
+            visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+        );
+    });
+
+    // Calculate filtered entity count (exclude group nodes)
+    const filteredEntityCount = $derived(() => {
+        if (!filteredEntityIds || filteredEntityIds.length === 0) {
+            return 0;
+        }
+        return displayNodes.filter(node => node.type === 'entity').length;
+    });
+
+    // Detect if all filtered entities have been deleted
+    const allFilteredEntitiesDeleted = $derived(() => {
+        return filteredEntityIds && filteredEntityIds.length > 0 && filteredEntityCount() === 0;
+    });
+
+    // Clear filter handler - navigates back to canvas without URL params
+    function handleClearFilter() {
+        goto('/canvas');
+    }
 
     // Wizard state
     let wizardOpen = $state(false);
@@ -287,8 +369,8 @@
 
 <div class="flex-1 h-full relative w-full">
     <SvelteFlow
-        bind:nodes={$nodes}
-        edges={$edges}
+        bind:nodes={displayNodes}
+        edges={displayEdges()}
         {nodeTypes}
         {edgeTypes}
         onconnect={onConnect}
@@ -315,7 +397,37 @@
             </button>
         </div>
 
-        {#if $nodes.length === 0}
+        {#if allFilteredEntitiesDeleted()}
+            <div
+                class="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+            >
+                <div
+                    class="bg-white/90 backdrop-blur-sm p-8 rounded-xl border border-slate-200 shadow-xl text-center max-w-md mx-4"
+                >
+                    <div
+                        class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"
+                    >
+                        <Icon
+                            icon="lucide:filter-x"
+                            class="w-8 h-8 text-blue-600"
+                        />
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">
+                        No Entities Found
+                    </h3>
+                    <p class="text-slate-600 mb-6">
+                        All entities from the filtered business event have been deleted or are no longer available.
+                    </p>
+                    <button
+                        class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md pointer-events-auto flex items-center justify-center gap-2 mx-auto"
+                        onclick={handleClearFilter}
+                    >
+                        <Icon icon="lucide:x" class="w-4 h-4" />
+                        Clear Filter and View All Entities
+                    </button>
+                </div>
+            </div>
+        {:else if $nodes.length === 0}
             <div
                 class="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
             >
@@ -348,6 +460,15 @@
             </div>
         {/if}
     </SvelteFlow>
+
+    <!-- Event Filter Banner - Show when filtering by business event -->
+    {#if filteredEntityIds && filteredEntityIds.length > 0 && filterEventText}
+        <EventFilterBanner
+            eventText={filterEventText}
+            entityCount={filteredEntityCount()}
+            onClear={handleClearFilter}
+        />
+    {/if}
 
     <!-- Floating View Mode Switcher - Only show on canvas (conceptual/logical views) -->
     {#if $viewMode === "conceptual" || $viewMode === "logical"}

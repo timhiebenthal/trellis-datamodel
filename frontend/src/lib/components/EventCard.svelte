@@ -9,10 +9,9 @@
         onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
         onDelete: () => void;
-        onViewSevenWs?: (event: BusinessEvent) => void;
     };
 
-    let { event, onEditSevenWs, onGenerateEntities, onDelete, onViewSevenWs }: Props = $props();
+    let { event, onEditSevenWs, onGenerateEntities, onDelete }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -101,6 +100,14 @@
             handleDeleteCancel();
         }
     }
+
+    function getDerivedEntityIds() {
+        const derivedEntities = event.derived_entities ?? [];
+        return derivedEntities
+            .map((entry) => (typeof entry === "string" ? entry : entry.entity_id))
+            .filter((id) => !!id);
+    }
+
 </script>
 
 <div
@@ -130,11 +137,10 @@
             {/if}
             {#if hasDerivedEntities}
                 <span
-                    class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300 flex items-center gap-1"
+                    class="p-1 rounded bg-green-100 text-green-800 border border-green-300 flex items-center"
                     title="Entities have been generated from this event"
                 >
-                    <Icon icon="lucide:check-circle" class="w-3 h-3" />
-                    Generated
+                    <Icon icon="lucide:check-circle" class="w-3.5 h-3.5" />
                 </span>
             {/if}
         </div>
@@ -153,16 +159,6 @@
 
         <!-- Action buttons -->
         <div class="flex items-center gap-1 flex-shrink-0">
-            {#if annotationsFilledCount > 0 && onViewSevenWs}
-                <button
-                    onclick={() => onViewSevenWs(event)}
-                    class="p-1.5 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                    title="View annotations"
-                >
-                    <Icon icon="lucide:list" class="w-4 h-4" />
-                </button>
-            {/if}
-
             <button
                 onclick={() => onEditSevenWs(event)}
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -191,6 +187,16 @@
             >
                 <Icon icon="lucide:sparkles" class="w-4 h-4" />
             </button>
+
+            {#if hasDerivedEntities}
+                <a
+                    href="/canvas?entities={getDerivedEntityIds().join(',')}&eventText={encodeURIComponent(event.text)}"
+                    class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    title="View entities on canvas"
+                >
+                    <Icon icon="lucide:layout-dashboard" class="w-4 h-4" />
+                </a>
+            {/if}
 
             <button
                 onclick={handleDelete}
