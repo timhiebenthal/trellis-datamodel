@@ -3,29 +3,47 @@
     import type { Dimension, SevenWType } from "$lib/types";
 
     type Props = {
-        value: string;
-        onChange: (value: string) => void;
+        textValue: string;
+        onTextChange: (value: string) => void;
+        onSelectDimension?: (dimension: Dimension) => void;
         dimensions: Dimension[];
         filterBy?: SevenWType;
+        allowedIds?: Set<string> | null;
         onCreateNew?: (text: string) => void;
         disabled?: boolean;
         placeholder?: string;
         loading?: boolean;
     };
 
-    let { value, onChange, dimensions, filterBy, onCreateNew, disabled = false, placeholder = "Select or create dimension...", loading = false }: Props = $props();
+    let {
+        textValue,
+        onTextChange,
+        onSelectDimension,
+        dimensions,
+        filterBy,
+        allowedIds = null,
+        onCreateNew,
+        disabled = false,
+        placeholder = "Select or create dimension...",
+        loading = false,
+    }: Props = $props();
 
     let showDropdown = $state(false);
     let searchInput = $state("");
     let activeIndex = $state(0);
     let containerRef = $state<HTMLDivElement>();
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let inputRef = $state<HTMLInputElement>();
+    let dropdownStyle = $state("");
 
     // Computed filtered dimensions
     let filteredDimensions = $derived.by(() => {
         return dimensions.filter((d) => {
-            // Filter by annotation_type if specified
-            if (filterBy && d.annotation_type !== filterBy) {
+            if (allowedIds && !allowedIds.has(d.id)) {
+                return false;
+            }
+            // Filter by annotation_type if specified.
+            // If dimension lacks annotation_type, allow it (backwards compatibility).
+            if (filterBy && d.annotation_type && d.annotation_type !== filterBy) {
                 return false;
             }
             // Filter by search text
@@ -64,21 +82,15 @@
     function handleInput() {
         showDropdown = true;
         activeIndex = 0;
-
-        // Debounce search with 300ms delay
-        if (debounceTimer) {
-            clearTimeout(debounceTimer);
-        }
-
-        debounceTimer = setTimeout(() => {
-            // Update parent value as user types (after debounce)
-            onChange(searchInput);
-        }, 300);
+        onTextChange(searchInput);
     }
 
     function selectDimension(dimension: Dimension) {
-        onChange(dimension.id);
         searchInput = dimension.label;
+        onTextChange(dimension.label);
+        if (onSelectDimension) {
+            onSelectDimension(dimension);
+        }
         showDropdown = false;
     }
 
@@ -141,39 +153,38 @@
         };
     });
 
-    // Cleanup debounce timer on unmount
+    function updateDropdownPosition() {
+        if (!inputRef) return;
+        const rect = inputRef.getBoundingClientRect();
+        dropdownStyle = `position:fixed;left:${rect.left}px;top:${rect.bottom + 4}px;width:${rect.width}px;z-index:60;`;
+    }
+
     $effect(() => {
+        if (!showDropdown) return;
+        updateDropdownPosition();
+        const handleReposition = () => updateDropdownPosition();
+        window.addEventListener("resize", handleReposition);
+        window.addEventListener("scroll", handleReposition, true);
         return () => {
-            if (debounceTimer) {
-                clearTimeout(debounceTimer);
-            }
+            window.removeEventListener("resize", handleReposition);
+            window.removeEventListener("scroll", handleReposition, true);
         };
     });
 
-    // Initialize searchInput with current value's label if dimension exists
-    $effect(() => {
-        if (value) {
-            const dimension = dimensions.find((d) => d.id === value);
-            if (dimension && !searchInput) {
-                searchInput = dimension.label;
-            }
-        }
-    });
 
-    // Reset searchInput when value changes externally
+    // Keep internal input in sync with parent value.
     $effect(() => {
-        if (value !== searchInput && !showDropdown) {
-            const dimension = dimensions.find((d) => d.id === value);
-            searchInput = dimension?.label || value || "";
+        if (!showDropdown && textValue !== searchInput) {
+            searchInput = textValue || "";
         }
     });
 </script>
 
-<div class="relative">
 <div class="relative" bind:this={containerRef}>
         <input
             type="text"
             bind:value={searchInput}
+            bind:this={inputRef}
             onfocus={handleInputFocus}
             onblur={handleInputBlur}
             oninput={handleInput}
@@ -187,11 +198,10 @@
         {:else}
             <Icon icon="lucide:search" class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         {/if}
-    </div>
-
     {#if shouldShowDropdown}
         <div
-            class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+            class="bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+            style={dropdownStyle}
             onmousedown={(e) => e.preventDefault()}
         >
             <!-- Existing dimensions -->
@@ -232,4 +242,4 @@
             {/if}
         </div>
     {/if}
-</div>
+    </div>

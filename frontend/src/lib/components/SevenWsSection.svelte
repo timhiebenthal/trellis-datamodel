@@ -222,10 +222,17 @@
                                     Link to Existing Dimension <span class="text-gray-400 font-normal">(optional)</span>
                                 </label>
                                 <DimensionAutocomplete
-                                    value={newEntryDimensionId}
-                                    onChange={(val) => newEntryDimensionId = val}
+                                    textValue={newEntryDimensionId}
+                                    onTextChange={(val) => newEntryDimensionId = val}
+                                    onSelectDimension={(dimension) => {
+                                        newEntryDimensionId = dimension.id;
+                                        if (!newEntryText) {
+                                            newEntryText = dimension.label;
+                                        }
+                                    }}
                                     {dimensions}
                                     filterBy={w_type === 'how_many' ? undefined : w_type}
+                                    allowedIds={null}
                                     placeholder="Select existing dimension or leave blank to create new"
                                 />
                             </div>

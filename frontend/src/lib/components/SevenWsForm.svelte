@@ -2,10 +2,8 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
     import { onMount } from "svelte";
-    // import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
-
-    // TODO: Import getDimensions once Stream G (api.ts) is completed
-    // import { getDimensions } from "$lib/api";
+    import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
+    import { getBusinessEvents, getDimensions } from "$lib/api";
 
     type Props = {
         event: BusinessEvent;
@@ -46,6 +44,8 @@
     // Dimensions for autocomplete
     let dimensions = $state<Dimension[]>([]);
     let dimensionsLoading = $state(false);
+    let businessEventsLoading = $state(false);
+    let allowedDimensionIdsByType = $state<Record<AnnotationType, Set<string>> | null>(null);
 
     // Delete confirmation state
     let showDeleteConfirm = $state(false);
@@ -177,16 +177,61 @@
     }
 
     // Load dimensions on mount for autocomplete (with error boundary and retry)
-    // TODO: Uncomment once getDimensions is available (Stream G - api.ts)
-    /*
     onMount(async () => {
-        let retryCount =0;
-        const maxRetries =2;
+        let retryCount = 0;
+        const maxRetries = 2;
+        const normalizeText = (value: string) =>
+            value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
         async function loadDimensionsWithRetry() {
             try {
                 dimensionsLoading = true;
                 dimensions = await getDimensions();
+                businessEventsLoading = true;
+                const events = await getBusinessEvents();
+                const dimensionLookup = new Map<string, Dimension>();
+                dimensions.forEach((dimension) => {
+                    dimensionLookup.set(dimension.id, dimension);
+                });
+                const normalizeDimension = (dimension: Dimension) =>
+                    normalizeText(dimension.label || dimension.id);
+                const matchDimensionId = (text: string) => {
+                    const normalized = normalizeText(text);
+                    for (const dimension of dimensions) {
+                        if (normalizeDimension(dimension) === normalized) {
+                            return dimension.id;
+                        }
+                    }
+                    return null;
+                };
+                const allowedMap: Record<AnnotationType, Set<string>> = {
+                    who: new Set(),
+                    what: new Set(),
+                    when: new Set(),
+                    where: new Set(),
+                    how: new Set(),
+                    how_many: new Set(),
+                    why: new Set(),
+                };
+                for (const businessEvent of events) {
+                    const annotations = businessEvent.annotations;
+                    if (!annotations) continue;
+                    for (const annotationType of Object.keys(allowedMap) as AnnotationType[]) {
+                        for (const entry of annotations[annotationType] || []) {
+                            if (entry.dimension_id && dimensionLookup.has(entry.dimension_id)) {
+                                allowedMap[annotationType].add(entry.dimension_id);
+                                continue;
+                            }
+                            if (entry.text) {
+                                const matchedId = matchDimensionId(entry.text);
+                                if (matchedId) {
+                                    allowedMap[annotationType].add(matchedId);
+                                }
+                            }
+                        }
+                    }
+                }
+                allowedDimensionIdsByType = allowedMap;
                 hasError = false;
                 errorMessage = null;
             } catch (e) {
@@ -207,13 +252,13 @@
             } finally {
                 if (retryCount >= maxRetries || !hasError) {
                     dimensionsLoading = false;
+                    businessEventsLoading = false;
                 }
             }
         }
 
         await loadDimensionsWithRetry();
     });
-    */
 
     function handleBackdropClick(e: MouseEvent) {
         if (e.target === e.currentTarget) {
@@ -289,13 +334,24 @@
         entryToDelete = null;
     }
 
-    function updateEntryText(annotationType: AnnotationType, entryId: string, text: string) {
+    function updateEntryText(
+        annotationType: AnnotationType,
+        entryId: string,
+        text: string,
+        clearDimensionId: boolean = true,
+    ) {
         editingEntries[entryId] = { ...editingEntries[entryId], text };
         
         annotations = {
             ...annotations,
             [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId ? { ...e, text } : e
+                e.id === entryId
+                    ? {
+                        ...e,
+                        text,
+                        dimension_id: clearDimensionId ? undefined : e.dimension_id,
+                    }
+                    : e
             )
         };
     }
@@ -309,6 +365,21 @@
                 e.id === entryId ? { ...e, description } : e
             )
         };
+    }
+
+    function updateEntryDimensionId(annotationType: AnnotationType, entryId: string, dimension_id: string) {
+        editingEntries[entryId] = { ...editingEntries[entryId], dimension_id };
+        
+        annotations = {
+            ...annotations,
+            [annotationType]: annotations[annotationType].map(e => 
+                e.id === entryId ? { ...e, dimension_id: dimension_id || undefined } : e
+            )
+        };
+    }
+
+    function handleEntryTextChange(annotationType: AnnotationType, entryId: string, text: string) {
+        updateEntryText(annotationType, entryId, text, true);
     }
 
     async function handleSave() {
@@ -491,16 +562,55 @@
                                     {#each annotations[annotationType.type] as entry}
                                         <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
                                             <div class="flex-1 space-y-2">
-                                                <!-- Text Input -->
-                                                <input
-                                                    type="text"
-                                                    value={entry.text}
-                                                    oninput={(e) => updateEntryText(annotationType.type, entry.id, e.currentTarget.value)}
-                                                    placeholder={annotationType.placeholder}
-                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                    maxlength={200}
-                                                    disabled={loading}
-                                                />
+                                                {#if annotationType.type === 'how_many'}
+                                                    <!-- Text Input -->
+                                                    <input
+                                                        type="text"
+                                                        value={entry.text}
+                                                        oninput={(e) =>
+                                                            updateEntryText(
+                                                                annotationType.type,
+                                                                entry.id,
+                                                                e.currentTarget.value,
+                                                            )
+                                                        }
+                                                        placeholder={annotationType.placeholder}
+                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        maxlength={200}
+                                                        disabled={loading}
+                                                    />
+                                                {:else}
+                                                    <!-- Text Input + Autocomplete -->
+                                                    <DimensionAutocomplete
+                                                        textValue={entry.text}
+                                                        onTextChange={(val) =>
+                                                            handleEntryTextChange(
+                                                                annotationType.type,
+                                                                entry.id,
+                                                                val,
+                                                            )
+                                                        }
+                                                        onSelectDimension={(dimension) => {
+                                                            updateEntryText(
+                                                                annotationType.type,
+                                                                entry.id,
+                                                                dimension.label,
+                                                                false,
+                                                            );
+                                                            updateEntryDimensionId(
+                                                                annotationType.type,
+                                                                entry.id,
+                                                                dimension.id,
+                                                            );
+                                                        }}
+                                                        dimensions={dimensions}
+                                                        filterBy={annotationType.type}
+                                                        allowedIds={allowedDimensionIdsByType ? allowedDimensionIdsByType[annotationType.type] : null}
+                                                        placeholder={annotationType.placeholder}
+                                                        disabled={loading}
+                                                        loading={dimensionsLoading || businessEventsLoading}
+                                                    />
+                                                {/if}
                                                 <!-- Description Input -->
                                                 <input
                                                     type="text"

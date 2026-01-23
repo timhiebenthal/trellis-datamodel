@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { generateEntitiesFromEvent, updateBusinessEvent } from '$lib/api';
+    import { generateEntitiesFromEvent, updateBusinessEvent, saveDataModel } from '$lib/api';
     import type { BusinessEvent, GeneratedEntitiesResult } from '$lib/types';
-    import { nodes, edges, modelingStyle } from '$lib/stores';
-    import { generateSlug, mergeRelationshipIntoEdges } from '$lib/utils';
+    import { nodes, edges, modelingStyle, sourceColors } from '$lib/stores';
+    import { generateSlug, mergeRelationshipIntoEdges, normalizeTags } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
     import { untrack } from 'svelte';
+    import { get } from 'svelte/store';
 
     type Props = {
         open: boolean;
@@ -164,7 +165,7 @@
                     };
                 }
 
-                // Create node (include tags from preview data)
+                // Create node (include tags and annotation_type from preview data)
                 const newNode: Node = {
                     id,
                     type: 'entity',
@@ -173,6 +174,7 @@
                         label: edited.label.trim() || edited.id.trim(),
                         description: original.description || '',
                         entity_type: edited.entity_type,
+                        annotation_type: (original as any).annotation_type || undefined,
                         tags: original.tags || [],
                         width: 280,
                         panelHeight: 200,
@@ -226,6 +228,10 @@
                 derived_entities: derivedEntities,
             });
 
+            // Save the data model to persist entities to data_model.yml
+            const dataModel = buildDataModelFromState($nodes, $edges);
+            await saveDataModel(dataModel);
+
             success = true;
             // Close dialog after a short delay
             setTimeout(() => {
@@ -237,6 +243,97 @@
         } finally {
             creating = false;
         }
+    }
+
+    /**
+     * Build data model from node/edge state
+     * (Copied from AutoSaveService to avoid circular dependencies)
+     */
+    function buildDataModelFromState(currentNodes: Node[], currentEdges: Edge[]) {
+        const sourceColorsValue = get(sourceColors);
+
+        return {
+            version: 0.1,
+            source_colors: Object.keys(sourceColorsValue).length > 0 ? sourceColorsValue : undefined,
+            entities: currentNodes
+                .filter((n) => n.type === 'entity')
+                .map((n) => {
+                    const displayTags = normalizeTags(n.data?.tags);
+                    const schemaTags = normalizeTags((n.data as any)?._schemaTags);
+                    const isBound = Boolean(n.data?.dbt_model);
+
+                    const tagsToPersist = isBound
+                        ? schemaTags.length > 0
+                            ? schemaTags
+                            : undefined
+                        : displayTags.length > 0
+                            ? displayTags
+                            : undefined;
+
+                    const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
+                    const source_system = ((n.data as any)?.source_system) as string[] | undefined;
+                    const entity: any = {
+                        id: n.id,
+                        label: ((n.data.label as string) || '').trim() || 'Entity',
+                        description: n.data.description as string | undefined,
+                        dbt_model: n.data.dbt_model as string | undefined,
+                        additional_models: n.data?.additional_models as string[] | undefined,
+                        drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                        position: n.position,
+                        width: n.data?.width as number | undefined,
+                        panel_height: n.data?.panelHeight as number | undefined,
+                        collapsed: (n.data?.collapsed as boolean) ?? false,
+                        tags: tagsToPersist,
+                        entity_type: entity_type,
+                    };
+                    
+                    if (!isBound && source_system && source_system.length > 0) {
+                        entity.source_system = source_system;
+                    }
+                    
+                    return entity;
+                }),
+            relationships: currentEdges.flatMap((e) => {
+                const models = (e.data?.models as any[]) || [];
+                if (models.length > 0) {
+                    return models.map((m) => ({
+                        source: e.source,
+                        target: e.target,
+                        label: (e.data?.label as string) || '',
+                        type:
+                            (e.data?.type as
+                                | 'one_to_many'
+                                | 'many_to_one'
+                                | 'one_to_one'
+                                | 'many_to_many') || 'one_to_many',
+                        source_field: m.source_field as string | undefined,
+                        target_field: m.target_field as string | undefined,
+                        source_model_name: m.source_model_name as string | undefined,
+                        source_model_version: m.source_model_version as number | null | undefined,
+                        target_model_name: m.target_model_name as string | undefined,
+                        target_model_version: m.target_model_version as number | null | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
+                    }));
+                } else {
+                    return [{
+                        source: e.source,
+                        target: e.target,
+                        label: (e.data?.label as string) || '',
+                        type:
+                            (e.data?.type as
+                                | 'one_to_many'
+                                | 'many_to_one'
+                                | 'one_to_one'
+                                | 'many_to_many') || 'one_to_many',
+                        source_field: e.data?.source_field as string | undefined,
+                        target_field: e.data?.target_field as string | undefined,
+                        label_dx: e.data?.label_dx as number | undefined,
+                        label_dy: e.data?.label_dy as number | undefined,
+                    }];
+                }
+            }),
+        };
     }
 
     function handleKeydown(event: KeyboardEvent) {

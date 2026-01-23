@@ -147,6 +147,7 @@
         }
     });
 
+
     function handleKeydown(event: KeyboardEvent) {
         if (event.key === "Escape") {
             onCancel();
@@ -213,6 +214,7 @@
             )
         };
     }
+
 
     async function handleSave() {
         // Validate text length before API call

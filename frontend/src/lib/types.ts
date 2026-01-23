@@ -48,6 +48,7 @@ export interface EntityData {
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
+    annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
@@ -71,6 +72,7 @@ export interface Entity {
     collapsed?: boolean;
     tags?: string[];
     entity_type?: "fact" | "dimension" | "unclassified";
+    annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Only for unbound entities (mock sources)
 }
 

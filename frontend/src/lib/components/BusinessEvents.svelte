@@ -20,11 +20,9 @@
         return str.trim().charAt(0).toUpperCase() + str.trim().slice(1).toLowerCase();
     }
     let showCreateModal = $state(false);
-    let showEditModal = $state(false);
     let showSevenWsForm = $state(false);
     let showViewSevenWs = $state(false);
     let showGenerateEntitiesDialog = $state(false);
-    let editingEvent = $state<BusinessEvent | null>(null);
     let sevenWsEvent = $state<BusinessEvent | null>(null);
     let generateEntitiesEvent = $state<BusinessEvent | null>(null);
 
@@ -208,16 +206,6 @@
         reloadEvents();
     }
 
-    function handleEdit(event: BusinessEvent) {
-        editingEvent = event;
-        showEditModal = true;
-    }
-
-    function handleEditModalClose() {
-        showEditModal = false;
-        editingEvent = null;
-        reloadEvents();
-    }
 </script>
 
 <div class="h-full w-full overflow-auto bg-gray-50">
@@ -327,7 +315,6 @@
                             {event}
                             onEditSevenWs={handleEditSevenWs}
                             onGenerateEntities={handleGenerateEntities}
-                            onEdit={handleEdit}
                             onDelete={reloadEvents}
                             onViewSevenWs={handleViewSevenWs}
                         />
@@ -344,15 +331,6 @@
         onCancel={() => { showCreateModal = false; }}
     />
 
-    <!-- Edit Event Modal -->
-    {#if showEditModal && editingEvent}
-        <CreateEventModal
-            open={showEditModal}
-            onSave={handleEditModalClose}
-            onCancel={() => { showEditModal = false; editingEvent = null; }}
-            event={editingEvent}
-        />
-    {/if}
 
     <!-- Annotations Form Modal (Edit) -->
     {#if showSevenWsForm && sevenWsEvent}

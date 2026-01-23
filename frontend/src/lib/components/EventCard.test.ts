@@ -33,14 +33,12 @@ describe('EventCard', () => {
     it('shows 7 Ws completion badge with correct count', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
-        const onEdit = vi.fn();
         const onDelete = vi.fn();
 
         render(EventCard, {
             event: mockEventWith7Ws,
             onEditSevenWs,
             onGenerateEntities,
-            onEdit,
             onDelete
         });
 
@@ -50,7 +48,6 @@ describe('EventCard', () => {
     it('shows green badge when all Ws are filled', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
-        const onEdit = vi.fn();
         const onDelete = vi.fn();
 
         const eventFull: BusinessEvent = {
@@ -70,7 +67,6 @@ describe('EventCard', () => {
             event: eventFull,
             onEditSevenWs,
             onGenerateEntities,
-            onEdit,
             onDelete
         });
 
@@ -81,14 +77,12 @@ describe('EventCard', () => {
     it('shows amber badge when partial Ws are filled', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
-        const onEdit = vi.fn();
         const onDelete = vi.fn();
 
         render(EventCard, {
             event: mockEventWith7Ws,
             onEditSevenWs,
             onGenerateEntities,
-            onEdit,
             onDelete
         });
 
@@ -99,7 +93,6 @@ describe('EventCard', () => {
     it('shows gray badge when no Ws are filled', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
-        const onEdit = vi.fn();
         const onDelete = vi.fn();
 
         const mockEventEmpty7Ws: BusinessEvent = {
@@ -126,7 +119,6 @@ describe('EventCard', () => {
             event: mockEventEmpty7Ws,
             onEditSevenWs,
             onGenerateEntities,
-            onEdit,
             onDelete
         });
 
@@ -137,14 +129,12 @@ describe('EventCard', () => {
     it('shows domain badge when domain exists', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
-        const onEdit = vi.fn();
         const onDelete = vi.fn();
 
         render(EventCard, {
             event: mockEventWith7Ws,
             onEditSevenWs,
             onGenerateEntities,
-            onEdit,
             onDelete
         });
 
@@ -154,7 +144,6 @@ describe('EventCard', () => {
     it('does not show domain badge when domain is null', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
-        const onEdit = vi.fn();
         const onDelete = vi.fn();
 
         const mockEventNoDomain: BusinessEvent = {
@@ -166,7 +155,6 @@ describe('EventCard', () => {
             event: mockEventNoDomain,
             onEditSevenWs,
             onGenerateEntities,
-            onEdit,
             onDelete
         });
 

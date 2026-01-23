@@ -8,12 +8,11 @@
         event: BusinessEvent;
         onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
-        onEdit: (event: BusinessEvent) => void;
         onDelete: () => void;
         onViewSevenWs?: (event: BusinessEvent) => void;
     };
 
-    let { event, onEditSevenWs, onGenerateEntities, onEdit, onDelete, onViewSevenWs }: Props = $props();
+    let { event, onEditSevenWs, onGenerateEntities, onDelete, onViewSevenWs }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -191,14 +190,6 @@
                 }
             >
                 <Icon icon="lucide:sparkles" class="w-4 h-4" />
-            </button>
-
-            <button
-                onclick={() => onEdit(event)}
-                class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                title="Edit event text or type"
-            >
-                <Icon icon="lucide:pencil" class="w-4 h-4" />
             </button>
 
             <button

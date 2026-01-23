@@ -18,11 +18,13 @@ describe('DimensionAutocomplete', () => {
     ];
 
     it('renders input with placeholder', () => {
-        const onChange = vi.fn();
+        const onTextChange = vi.fn();
+        const onSelectDimension = vi.fn();
 
         const { container } = render(DimensionAutocomplete, {
-            value: '',
-            onChange,
+            textValue: '',
+            onTextChange,
+            onSelectDimension,
             dimensions: mockDimensions,
             placeholder: 'Select dimension...'
         });
@@ -33,11 +35,13 @@ describe('DimensionAutocomplete', () => {
     });
 
     it('shows loading state when loading prop is true', () => {
-        const onChange = vi.fn();
+        const onTextChange = vi.fn();
+        const onSelectDimension = vi.fn();
 
         const { container } = render(DimensionAutocomplete, {
-            value: '',
-            onChange,
+            textValue: '',
+            onTextChange,
+            onSelectDimension,
             dimensions: mockDimensions,
             loading: true
         });
