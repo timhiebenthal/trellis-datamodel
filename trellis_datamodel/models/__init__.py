@@ -8,11 +8,11 @@ from .schemas import (
 from .business_event import (
     BusinessEvent,
     BusinessEventType,
-    BusinessEventSevenWs,
+    BusinessEventAnnotations,
     BusinessEventsFile,
     DerivedEntity,
     EntityDimensionMetadata,
-    SevenWsEntry,
+    AnnotationEntry,
 )
 
 __all__ = [
@@ -21,9 +21,9 @@ __all__ = [
     "ModelSchemaRequest",
     "BusinessEvent",
     "BusinessEventType",
-    "BusinessEventSevenWs",
+    "BusinessEventAnnotations",
     "BusinessEventsFile",
     "DerivedEntity",
     "EntityDimensionMetadata",
-    "SevenWsEntry",
+    "AnnotationEntry",
 ]

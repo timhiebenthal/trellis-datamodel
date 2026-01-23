@@ -280,9 +280,9 @@ export interface ConfigUpdateResponse {
 // Business Events types
 export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
 
-export type SevenWType = 'who' | 'what' | 'when' | 'where' | 'how' | 'how_many' | 'why';
+export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'how_many' | 'why';
 
-export interface SevenWsEntry {
+export interface AnnotationEntry {
     id: string;
     dimension_id?: string;
     text: string;
@@ -290,21 +290,21 @@ export interface SevenWsEntry {
     attributes?: Record<string, any>;
 }
 
-export interface BusinessEventSevenWs {
-    who: SevenWsEntry[];
-    what: SevenWsEntry[];
-    when: SevenWsEntry[];
-    where: SevenWsEntry[];
-    how: SevenWsEntry[];
-    how_many: SevenWsEntry[];
-    why: SevenWsEntry[];
+export interface BusinessEventAnnotations {
+    who: AnnotationEntry[];
+    what: AnnotationEntry[];
+    when: AnnotationEntry[];
+    where: AnnotationEntry[];
+    how: AnnotationEntry[];
+    how_many: AnnotationEntry[];
+    why: AnnotationEntry[];
 }
 
 export interface Dimension {
     id: string;
     label: string;
     entity_type: 'fact' | 'dimension' | 'unclassified';
-    seven_w_type?: SevenWType;
+    annotation_type?: AnnotationType;
     description?: string;
 }
 
@@ -320,7 +320,7 @@ export interface BusinessEvent {
     domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
-    seven_ws?: BusinessEventSevenWs; // 7 Ws structure (Who, What, When, Where, How, How Many, Why)
+    annotations?: BusinessEventAnnotations; // Event annotations (Who, What, When, Where, How, How Many, Why)
     derived_entities: DerivedEntity[];
 }
 

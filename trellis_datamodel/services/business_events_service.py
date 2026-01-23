@@ -3,13 +3,13 @@ Business Events service for dimensional modeling.
 
 Handles CRUD operations for business events stored in YAML files.
 Business events capture business processes (e.g., "customer buys product")
-and can be structured with the 7 Ws framework (Who, What, When, Where, How, How Many, Why)
+and can be annotated with categories (Who, What, When, Where, How, How Many, Why)
 for entity generation.
 
 This service:
 - Loads and saves business events from/to YAML files
 - Provides CRUD operations for events
-- Manages 7 Ws entries within events (Who, What, When, Where, How, How Many, Why)
+- Manages annotation entries within events (Who, What, When, Where, How, How Many, Why)
 - Validates event data
 """
 
@@ -31,8 +31,8 @@ from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
     BusinessEventsFile,
-    SevenWsEntry,
-    BusinessEventSevenWs,
+    AnnotationEntry,
+    BusinessEventAnnotations,
 )
 
 logger = logging.getLogger(__name__)
@@ -190,9 +190,8 @@ def create_event(
         domain=domain.strip() if domain else None,
         created_at=now,
         updated_at=now,
-        annotations=[],
+        annotations=BusinessEventAnnotations(),
         derived_entities=[],
-        seven_ws=BusinessEventSevenWs(),
     )
 
     events.append(new_event)
@@ -207,7 +206,7 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
 
     Args:
         event_id: ID of event to update
-        updates: Dictionary with fields to update (text, type, annotations, derived_entities, seven_ws)
+        updates: Dictionary with fields to update (text, type, domain, annotations, derived_entities)
 
     Returns:
         Updated BusinessEvent object
@@ -261,8 +260,8 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
             DerivedEntity(**de) for de in updates["derived_entities"]
         ]
 
-    if "seven_ws" in updates:
-        event.seven_ws = BusinessEventSevenWs(**updates["seven_ws"])
+    if "annotations" in updates:
+        event.annotations = BusinessEventAnnotations(**updates["annotations"])
 
     event.updated_at = datetime.now()
 
@@ -300,39 +299,39 @@ def delete_event(event_id: str) -> None:
     logger.info(f"Deleted business event: {event_id}")
 
 
-def update_event_seven_ws(event_id: str, seven_ws_data: dict) -> BusinessEvent:
+def update_event_annotations(event_id: str, annotations_data: dict) -> BusinessEvent:
     """
-    Update the entire 7 Ws structure for a business event.
+    Update the entire annotations structure for a business event.
 
     Args:
         event_id: ID of event to update
-        seven_ws_data: Dictionary with 7 Ws structure (who, what, when, where, how, how_many, why)
+        annotations_data: Dictionary with annotation structure (who, what, when, where, how, how_many, why)
 
     Returns:
         Updated BusinessEvent object
 
     Raises:
         NotFoundError: If event not found
-        ValidationError: If seven_ws data is invalid
+        ValidationError: If annotations data is invalid
         FileOperationError: If file operations fail
     """
-    return update_event(event_id, {"seven_ws": seven_ws_data})
+    return update_event(event_id, {"annotations": annotations_data})
 
 
-def add_seven_ws_entry(
+def add_annotation_entry(
     event_id: str,
-    w_type: str,
+    annotation_type: str,
     text: str,
     dimension_id: Optional[str] = None,
     description: Optional[str] = None,
     attributes: Optional[dict] = None,
 ) -> BusinessEvent:
     """
-    Add a new entry to a specific W list in a business event.
+    Add a new entry to a specific annotation category in a business event.
 
     Args:
         event_id: ID of event
-        w_type: Type of W ('who', 'what', 'when', 'where', 'how', 'how_many', 'why')
+        annotation_type: Type of annotation ('who', 'what', 'when', 'where', 'how', 'how_many', 'why')
         text: Entry text
         dimension_id: Optional ID of existing dimension entity to link
         description: Optional description
@@ -343,13 +342,13 @@ def add_seven_ws_entry(
 
     Raises:
         NotFoundError: If event not found
-        ValidationError: If w_type is invalid or entry_id is not unique
+        ValidationError: If annotation_type is invalid or entry_id is not unique
         FileOperationError: If file operations fail
     """
-    valid_w_types = ["who", "what", "when", "where", "how", "how_many", "why"]
-    if w_type not in valid_w_types:
+    valid_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+    if annotation_type not in valid_types:
         raise ValidationError(
-            f"Invalid w_type: '{w_type}'. Must be one of: {', '.join(valid_w_types)}"
+            f"Invalid annotation_type: '{annotation_type}'. Must be one of: {', '.join(valid_types)}"
         )
 
     if not text or not text.strip():
@@ -367,22 +366,22 @@ def add_seven_ws_entry(
 
     event = events[event_index]
 
-    # Ensure seven_ws exists
-    if event.seven_ws is None:
-        event.seven_ws = BusinessEventSevenWs()
+    # Ensure annotations exists
+    if event.annotations is None:
+        event.annotations = BusinessEventAnnotations()
 
     # Generate unique entry_id
     import uuid
 
     entry_id = f"entry_{uuid.uuid4().hex[:12]}"
 
-    # Check uniqueness across all Ws
-    all_entry_ids = _collect_all_entry_ids(event.seven_ws)
+    # Check uniqueness across all annotation categories
+    all_entry_ids = _collect_all_entry_ids(event.annotations)
     if entry_id in all_entry_ids:
         raise ValidationError(f"Entry ID '{entry_id}' already exists in event")
 
     # Create new entry
-    new_entry = SevenWsEntry(
+    new_entry = AnnotationEntry(
         id=entry_id,
         text=text.strip(),
         dimension_id=dimension_id,
@@ -390,20 +389,20 @@ def add_seven_ws_entry(
         attributes=attributes or {},
     )
 
-    # Add to appropriate W list
-    current_seven_ws = event.seven_ws.model_dump()
-    w_list = current_seven_ws.get(w_type, [])
-    w_list.append(new_entry.model_dump())
-    current_seven_ws[w_type] = w_list
+    # Add to appropriate annotation category
+    current_annotations = event.annotations.model_dump()
+    category_list = current_annotations.get(annotation_type, [])
+    category_list.append(new_entry.model_dump())
+    current_annotations[annotation_type] = category_list
 
     # Update event
-    updated_event = update_event(event_id, {"seven_ws": current_seven_ws})
+    updated_event = update_event(event_id, {"annotations": current_annotations})
     return updated_event
 
 
-def remove_seven_ws_entry(event_id: str, entry_id: str) -> BusinessEvent:
+def remove_annotation_entry(event_id: str, entry_id: str) -> BusinessEvent:
     """
-    Remove a 7 Ws entry by entry_id from a business event.
+    Remove an annotation entry by entry_id from a business event.
 
     Args:
         event_id: ID of event
@@ -428,29 +427,29 @@ def remove_seven_ws_entry(event_id: str, entry_id: str) -> BusinessEvent:
 
     event = events[event_index]
 
-    if event.seven_ws is None:
-        raise NotFoundError(f"Entry '{entry_id}' not found (event has no 7 Ws data)")
+    if event.annotations is None:
+        raise NotFoundError(f"Entry '{entry_id}' not found (event has no annotations)")
 
     # Find and remove entry
-    current_seven_ws = event.seven_ws.model_dump()
+    current_annotations = event.annotations.model_dump()
     entry_found = False
 
-    for w_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
-        w_list = current_seven_ws.get(w_type, [])
-        original_length = len(w_list)
-        w_list = [entry for entry in w_list if entry.get("id") != entry_id]
-        current_seven_ws[w_type] = w_list
-        if len(w_list) < original_length:
+    for annotation_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
+        category_list = current_annotations.get(annotation_type, [])
+        original_length = len(category_list)
+        category_list = [entry for entry in category_list if entry.get("id") != entry_id]
+        current_annotations[annotation_type] = category_list
+        if len(category_list) < original_length:
             entry_found = True
 
     if not entry_found:
-        raise NotFoundError(f"Entry '{entry_id}' not found in any W list")
+        raise NotFoundError(f"Entry '{entry_id}' not found in any annotation category")
 
-    updated_event = update_event(event_id, {"seven_ws": current_seven_ws})
+    updated_event = update_event(event_id, {"annotations": current_annotations})
     return updated_event
 
 
-def update_seven_ws_entry(
+def update_annotation_entry(
     event_id: str,
     entry_id: str,
     text: Optional[str] = None,
@@ -459,7 +458,7 @@ def update_seven_ws_entry(
     attributes: Optional[dict] = None,
 ) -> BusinessEvent:
     """
-    Update an existing 7 Ws entry in a business event.
+    Update an existing annotation entry in a business event.
 
     Args:
         event_id: ID of event
@@ -492,16 +491,16 @@ def update_seven_ws_entry(
 
     event = events[event_index]
 
-    if event.seven_ws is None:
-        raise NotFoundError(f"Entry '{entry_id}' not found (event has no 7 Ws data)")
+    if event.annotations is None:
+        raise NotFoundError(f"Entry '{entry_id}' not found (event has no annotations)")
 
     # Find and update entry
-    current_seven_ws = event.seven_ws.model_dump()
+    current_annotations = event.annotations.model_dump()
     entry_found = False
 
-    for w_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
-        w_list = current_seven_ws.get(w_type, [])
-        for entry in w_list:
+    for annotation_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
+        category_list = current_annotations.get(annotation_type, [])
+        for entry in category_list:
             if entry.get("id") == entry_id:
                 entry_found = True
                 if text is not None:
@@ -515,26 +514,26 @@ def update_seven_ws_entry(
                 break
 
     if not entry_found:
-        raise NotFoundError(f"Entry '{entry_id}' not found in any W list")
+        raise NotFoundError(f"Entry '{entry_id}' not found in any annotation category")
 
-    updated_event = update_event(event_id, {"seven_ws": current_seven_ws})
+    updated_event = update_event(event_id, {"annotations": current_annotations})
     return updated_event
 
 
-def _collect_all_entry_ids(seven_ws: BusinessEventSevenWs) -> set:
+def _collect_all_entry_ids(annotations: BusinessEventAnnotations) -> set:
     """
-    Collect all entry IDs from a 7 Ws structure.
+    Collect all entry IDs from an annotations structure.
 
     Args:
-        seven_ws: BusinessEventSevenWs object
+        annotations: BusinessEventAnnotations object
 
     Returns:
         Set of entry IDs
     """
     entry_ids = set()
-    for w_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
-        w_list = getattr(seven_ws, w_type, [])
-        for entry in w_list:
+    for annotation_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
+        category_list = getattr(annotations, annotation_type, [])
+        for entry in category_list:
             if hasattr(entry, "id"):
                 entry_ids.add(entry.id)
     return entry_ids

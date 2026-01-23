@@ -11,8 +11,8 @@ import type {
     LineageResponse,
     BusinessEvent,
     BusinessEventType,
-    BusinessEventSevenWs,
-    SevenWsEntry,
+    BusinessEventAnnotations,
+    AnnotationEntry,
     SevenWType,
     Dimension,
     Annotation,
@@ -547,12 +547,12 @@ export async function createBusinessEvent(
     text: string,
     type: BusinessEventType,
     domain?: string,
-    sevenWs?: BusinessEventSevenWs
+    annotations?: BusinessEventAnnotations
 ): Promise<BusinessEvent> {
     try {
         const body: any = { text, type, domain: domain || null };
         if (sevenWs) {
-            body.seven_ws = sevenWs;
+            body.annotations = annotations;
         }
 
         const res = await fetch(`${API_BASE}/business-events`, {
@@ -574,7 +574,7 @@ export async function createBusinessEvent(
 /**
  * Update an existing business event.
  * @param id - Event ID to update
- * @param updates - Dictionary with fields to update (text, type, annotations, derived_entities, seven_ws)
+ * @param updates - Dictionary with fields to update (text, type, domain, annotations, derived_entities)
  * @returns Promise containing the updated BusinessEvent
  */
 export async function updateBusinessEvent(
@@ -676,7 +676,7 @@ export async function getDimensions(filterByType?: SevenWType): Promise<Dimensio
  * @param dimensionId - Optional reference to existing dimension in data_model.yml
  * @returns Promise containing the updated BusinessEvent
  */
-export async function addSevenWsEntry(
+export async function addAnnotationEntry(
     eventId: string,
     wType: SevenWType,
     text: string,
@@ -713,7 +713,7 @@ export async function addSevenWsEntry(
  * @param dimensionId - Optional new dimension_id reference
  * @returns Promise containing the updated BusinessEvent
  */
-export async function updateSevenWsEntry(
+export async function updateAnnotationEntry(
     eventId: string,
     entryId: string,
     text: string,
@@ -747,7 +747,7 @@ export async function updateSevenWsEntry(
  * @param entryId - Entry ID to remove
  * @returns Promise containing the updated BusinessEvent
  */
-export async function removeSevenWsEntry(
+export async function removeAnnotationEntry(
     eventId: string,
     entryId: string
 ): Promise<BusinessEvent> {

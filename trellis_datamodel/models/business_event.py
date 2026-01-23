@@ -15,8 +15,8 @@ class BusinessEventType(str, Enum):
     RECURRING = "recurring"
 
 
-class SevenWsEntry(BaseModel):
-    """Single entry in a 7 Ws category for a business event."""
+class AnnotationEntry(BaseModel):
+    """Single entry in an annotation category for a business event."""
 
     id: str = Field(..., description="Unique ID for this entry within the event")
     dimension_id: Optional[str] = Field(
@@ -31,23 +31,23 @@ class SevenWsEntry(BaseModel):
     )
 
 
-class BusinessEventSevenWs(BaseModel):
-    """7 Ws structure for a business event (BEAM* methodology)."""
+class BusinessEventAnnotations(BaseModel):
+    """Annotation structure for a business event (7 Ws from BEAM* methodology)."""
 
-    who: List[SevenWsEntry] = Field(default_factory=list, description="Who entries")
-    what: List[SevenWsEntry] = Field(default_factory=list, description="What entries")
-    when: List[SevenWsEntry] = Field(default_factory=list, description="When entries")
-    where: List[SevenWsEntry] = Field(default_factory=list, description="Where entries")
-    how: List[SevenWsEntry] = Field(default_factory=list, description="How entries")
-    how_many: List[SevenWsEntry] = Field(
+    who: List[AnnotationEntry] = Field(default_factory=list, description="Who entries")
+    what: List[AnnotationEntry] = Field(default_factory=list, description="What entries")
+    when: List[AnnotationEntry] = Field(default_factory=list, description="When entries")
+    where: List[AnnotationEntry] = Field(default_factory=list, description="Where entries")
+    how: List[AnnotationEntry] = Field(default_factory=list, description="How entries")
+    how_many: List[AnnotationEntry] = Field(
         default_factory=list, description="How Many entries (becomes fact table)"
     )
-    why: List[SevenWsEntry] = Field(default_factory=list, description="Why entries")
+    why: List[AnnotationEntry] = Field(default_factory=list, description="Why entries")
 
     @model_validator(mode="after")
-    def validate_unique_entry_ids(self) -> "BusinessEventSevenWs":
-        """Validate that all entry IDs are unique across all Ws."""
-        all_entries: List[SevenWsEntry] = []
+    def validate_unique_entry_ids(self) -> "BusinessEventAnnotations":
+        """Validate that all entry IDs are unique across all annotation categories."""
+        all_entries: List[AnnotationEntry] = []
         for w_list in [
             self.who,
             self.what,
@@ -65,7 +65,7 @@ class BusinessEventSevenWs(BaseModel):
         if len(entry_ids) != len(unique_ids):
             duplicates = [eid for eid in unique_ids if entry_ids.count(eid) > 1]
             raise ValueError(
-                f"Duplicate entry IDs found in seven_ws structure: {', '.join(duplicates)}"
+                f"Duplicate entry IDs found in annotations structure: {', '.join(duplicates)}"
             )
 
         return self
@@ -81,22 +81,22 @@ class EntityDimensionMetadata(BaseModel):
     business_event_sources: List[str] = Field(
         default_factory=list, description="List of event IDs using this dimension"
     )
-    seven_w_type: Optional[str] = Field(
+    annotation_type: Optional[str] = Field(
         None,
-        description="7 Ws category: 'who', 'what', 'when', 'where', 'how', 'how_many', 'why'",
+        description="Annotation category: 'who', 'what', 'when', 'where', 'how', 'how_many', 'why'",
     )
 
-    @field_validator("seven_w_type")
+    @field_validator("annotation_type")
     @classmethod
-    def validate_seven_w_type(cls, v: Optional[str]) -> Optional[str]:
-        """Validate that seven_w_type is one of the valid 7 Ws values."""
+    def validate_annotation_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that annotation_type is one of the valid annotation values."""
         if v is None:
             return v
 
         valid_types = {"who", "what", "when", "where", "how", "how_many", "why"}
         if v not in valid_types:
             raise ValueError(
-                f"Invalid seven_w_type '{v}'. Must be one of: {', '.join(sorted(valid_types))}"
+                f"Invalid annotation_type '{v}'. Must be one of: {', '.join(sorted(valid_types))}"
             )
 
         return v
@@ -110,7 +110,7 @@ class DerivedEntity(BaseModel):
 
 
 class BusinessEvent(BaseModel):
-    """A business event with 7 Ws structure and derived entities."""
+    """A business event with annotations and derived entities."""
 
     id: str = Field(..., description="Unique event ID (e.g., evt_YYYYMMDD_NNN)")
     text: str = Field(..., description="Event description text")
@@ -120,9 +120,9 @@ class BusinessEvent(BaseModel):
     )
     created_at: datetime = Field(..., description="When the event was created")
     updated_at: datetime = Field(..., description="When the event was last updated")
-    seven_ws: BusinessEventSevenWs = Field(
-        default_factory=BusinessEventSevenWs,
-        description="7 Ws structure (Who, What, When, Where, How, How Many, Why)",
+    annotations: BusinessEventAnnotations = Field(
+        default_factory=BusinessEventAnnotations,
+        description="Event annotations (Who, What, When, Where, How, How Many, Why)",
     )
     derived_entities: List[DerivedEntity] = Field(
         default_factory=list, description="Entities generated from this event"

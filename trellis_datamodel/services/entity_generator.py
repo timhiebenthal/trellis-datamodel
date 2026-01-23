@@ -2,7 +2,7 @@
 Entity Generator service for business events.
 
 Generates dimensional entities (dimensions and facts) from business events with
-7 Ws structured entries. This service converts 7 Ws entries into entity definitions
+annotation entries. This service converts annotation entries into entity definitions
 with proper naming, labels, and relationships following dimensional modeling conventions.
 """
 
@@ -17,7 +17,7 @@ from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
-    SevenWsEntry,
+    AnnotationEntry,
     GeneratedEntitiesResult,
 )
 
@@ -132,8 +132,8 @@ def _load_existing_entities() -> Dict[str, dict]:
         return {}
 
 
-def _create_dimension_from_seven_ws_entry(
-    entry: SevenWsEntry,
+def _create_dimension_from_annotation_entry(
+    entry: AnnotationEntry,
     w_type: str,
     prefixes: List[str],
     domain_tag: Optional[str] = None,
@@ -143,7 +143,7 @@ def _create_dimension_from_seven_ws_entry(
     Create a dimension entity dictionary from a 7 Ws entry.
 
     Args:
-        entry: SevenWsEntry object
+        entry: AnnotationEntry object
         w_type: The W category (who, what, when, where, how, why)
         prefixes: List of dimension prefixes to apply (e.g., ['dim_'])
         domain_tag: Optional domain tag to add to entity (slugified domain)
@@ -198,8 +198,8 @@ def _create_dimension_from_seven_ws_entry(
     return entity
 
 
-def _create_fact_from_seven_ws_entries(
-    entries: List[SevenWsEntry],
+def _create_fact_from_annotation_entries(
+    entries: List[AnnotationEntry],
     prefixes: List[str],
     event_type: str,
     domain_tag: Optional[str] = None,
@@ -211,7 +211,7 @@ def _create_fact_from_seven_ws_entries(
     All how_many entries become attributes/columns in the fact table.
 
     Args:
-        entries: List of SevenWsEntry objects (how_many category)
+        entries: List of AnnotationEntry objects (how_many category)
         prefixes: List of fact prefixes to apply (e.g., ['fct_'])
         event_type: Business event type (discrete, evolving, recurring)
         domain_tag: Optional domain tag to add to entity (slugified domain)
@@ -346,7 +346,7 @@ def _generate_from_seven_ws(
         )
 
     # Validate: require at least 1 how_many entry (fact)
-    how_many_entries = event.seven_ws.how_many
+    how_many_entries = event.annotations.how_many
     if not how_many_entries:
         errors.append("At least one 'How Many' entry is required for fact table")
 
@@ -373,7 +373,7 @@ def _generate_from_seven_ws(
     dimension_entities = []
     dimension_ids = []
     for w_type, entry in dimension_entries:
-        entity = _create_dimension_from_seven_ws_entry(
+        entity = _create_dimension_from_annotation_entry(
             entry,
             w_type=w_type,
             prefixes=dim_prefixes,
@@ -386,7 +386,7 @@ def _generate_from_seven_ws(
             dimension_ids.append(entity["id"])
 
     # Generate fact entity from how_many entries
-    fact_entity = _create_fact_from_seven_ws_entries(
+    fact_entity = _create_fact_from_annotation_entries(
         entries=how_many_entries,
         prefixes=fact_prefixes,
         event_type=event.type.value,

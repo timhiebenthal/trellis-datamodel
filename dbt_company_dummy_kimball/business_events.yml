@@ -5,7 +5,7 @@ events:
   domain: null
   created_at: '2026-01-21T23:14:19.346876'
   updated_at: '2026-01-21T23:20:43.397808'
-  seven_ws:
+  annotations:
     who: []
     what: []
     when: []
@@ -20,7 +20,7 @@ events:
   domain: Sales
   created_at: '2026-01-22T00:07:15.211092'
   updated_at: '2026-01-23T15:39:06.561535'
-  seven_ws:
+  annotations:
     who:
     - id: new_1769121444615_u05zplq3f
       dimension_id: null
@@ -106,7 +106,7 @@ events:
   domain: finance
   created_at: '2026-01-22T08:40:04.196757'
   updated_at: '2026-01-22T08:50:16.177326'
-  seven_ws:
+  annotations:
     who: []
     what: []
     when: []
@@ -121,7 +121,7 @@ events:
   domain: marketing
   created_at: '2026-01-22T08:49:28.698219'
   updated_at: '2026-01-22T08:49:28.698219'
-  seven_ws:
+  annotations:
     who: []
     what: []
     when: []

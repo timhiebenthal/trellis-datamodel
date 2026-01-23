@@ -17,8 +17,8 @@
 
     let showDeleteConfirm = $state(false);
 
-    // 7 Ws calculation
-    const sevenWs = $derived(event.seven_ws || {
+    // Annotations calculation
+    const annotations = $derived(event.annotations || {
         who: [],
         what: [],
         when: [],
@@ -28,30 +28,30 @@
         why: []
     });
 
-    const sevenWsFilledCount = $derived(
-        Object.values(sevenWs).filter((entries) => entries.length > 0).length
+    const annotationsFilledCount = $derived(
+        Object.values(annotations).filter((entries) => entries.length > 0).length
     );
 
-    const sevenWsBadgeColor = $derived(() => {
-        if (sevenWsFilledCount === 0) {
+    const annotationsBadgeColor = $derived(() => {
+        if (annotationsFilledCount === 0) {
             return "bg-gray-100 text-gray-700 border-gray-300";
-        } else if (sevenWsFilledCount === 7) {
+        } else if (annotationsFilledCount === 7) {
             return "bg-green-100 text-green-800 border-green-300";
         } else {
             return "bg-amber-100 text-amber-800 border-amber-300";
         }
     });
 
-    const hasHowManyEntries = $derived(sevenWs.how_many.length > 0);
+    const hasHowManyEntries = $derived(annotations.how_many.length > 0);
 
-    // Check if Generate Entities button should be enabled (based on 7 Ws only)
+    // Check if Generate Entities button should be enabled (based on annotations only)
     const hasDimensionEntries = $derived(
-        sevenWs.who.length > 0 || 
-        sevenWs.what.length > 0 || 
-        sevenWs.when.length > 0 || 
-        sevenWs.where.length > 0 || 
-        sevenWs.how.length > 0 || 
-        sevenWs.why.length > 0
+        annotations.who.length > 0 || 
+        annotations.what.length > 0 || 
+        annotations.when.length > 0 || 
+        annotations.where.length > 0 || 
+        annotations.how.length > 0 || 
+        annotations.why.length > 0
     );
     const canGenerateEntities = $derived(hasDimensionEntries && hasHowManyEntries);
     const hasDerivedEntities = $derived(event.derived_entities.length > 0);
@@ -116,12 +116,12 @@
 
         <!-- Status badges -->
         <div class="flex items-center gap-2 flex-shrink-0">
-            {#if sevenWsFilledCount > 0}
+            {#if annotationsFilledCount > 0}
                 <span
-                    class="px-2 py-1 rounded text-xs font-medium border {sevenWsBadgeColor()} flex items-center gap-1"
-                    title="7 Ws completion status"
+                    class="px-2 py-1 rounded text-xs font-medium border {annotationsBadgeColor()} flex items-center gap-1"
+                    title="Annotations completion status"
                 >
-                    {sevenWsFilledCount}/7 Ws
+                    {annotationsFilledCount}/7
                     {#if !hasHowManyEntries}
                         <span title="No 'How Many' entries - fact table incomplete" class="inline-flex items-center">
                             <Icon icon="lucide:alert-triangle" class="w-3 h-3 text-amber-600" />
@@ -154,11 +154,11 @@
 
         <!-- Action buttons -->
         <div class="flex items-center gap-1 flex-shrink-0">
-            {#if sevenWsFilledCount > 0 && onViewSevenWs}
+            {#if annotationsFilledCount > 0 && onViewSevenWs}
                 <button
                     onclick={() => onViewSevenWs(event)}
                     class="p-1.5 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                    title="View 7 Ws structure"
+                    title="View annotations"
                 >
                     <Icon icon="lucide:list" class="w-4 h-4" />
                 </button>
@@ -167,7 +167,7 @@
             <button
                 onclick={() => onEditSevenWs(event)}
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                title={sevenWsFilledCount > 0 ? "Edit 7 Ws structure" : "Add 7 Ws structure (Who, What, When, Where, How, How Many, Why)"}
+                title={annotationsFilledCount > 0 ? "Edit annotations" : "Add annotations (Who, What, When, Where, How, How Many, Why)"}
             >
                 <Icon icon="lucide:highlighter" class="w-4 h-4" />
             </button>
@@ -184,7 +184,7 @@
                 class:cursor-pointer={canGenerateEntities}
                 title={
                     canGenerateEntities
-                        ? "Generate dimensional entities from 7 Ws"
+                        ? "Generate dimensional entities from annotations"
                         : !hasHowManyEntries
                             ? "Add 'How Many' entries to generate fact table"
                             : "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"

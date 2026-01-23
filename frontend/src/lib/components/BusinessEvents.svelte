@@ -164,26 +164,26 @@
     async function handleSevenWsSave(updatedEvent: BusinessEvent) {
         try {
             error = null;
-            // Call updateBusinessEvent with seven_ws data
+            // Call updateBusinessEvent with annotations data
             await updateBusinessEvent(updatedEvent.id, {
-                seven_ws: updatedEvent.seven_ws
+                annotations: updatedEvent.annotations
             });
             showSevenWsForm = false;
             sevenWsEvent = null;
             reloadEvents();
         } catch (e) {
-            const errorMessage = e instanceof Error ? e.message : "Failed to save 7 Ws";
-            // Handle 7 Ws specific errors
-            if (errorMessage.includes('seven_w_type') || errorMessage.includes('Invalid seven_w_type')) {
-                error = "Invalid 7 Ws category. Please check your entries.";
+            const errorMessage = e instanceof Error ? e.message : "Failed to save annotations";
+            // Handle annotation specific errors
+            if (errorMessage.includes('annotation_type') || errorMessage.includes('Invalid annotation_type')) {
+                error = "Invalid annotation category. Please check your entries.";
             } else if (errorMessage.includes('Duplicate entry IDs') || errorMessage.includes('duplicate')) {
                 error = "Duplicate entries detected. Please check for duplicate entries.";
             } else if (errorMessage.includes('400') || errorMessage.includes('validation')) {
-                error = "Invalid 7 Ws data. Please check your entries.";
+                error = "Invalid annotation data. Please check your entries.";
             } else {
                 error = errorMessage;
             }
-            console.error('Error saving 7 Ws:', e);
+            console.error('Error saving annotations:', e);
         }
     }
 
@@ -247,7 +247,7 @@
                         <h2 class="text-xl font-bold text-gray-800">Business Events</h2>
                         <p class="text-sm text-gray-600 mt-1">
                             Document business events during the conception phase of dimensional data modeling.
-                            Capture events like "customer buys product" and classify them using BEAM* methodology.
+                            Capture events like "customer buys product" and annotate them with Who, What, When, Where, How, How Many, and Why.
                         </p>
                     </div>
                     <button
@@ -308,8 +308,8 @@
                         <div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800 text-left mt-4">
                             <strong class="block mb-1">Example event:</strong>
                             <p class="text-amber-900">
-                                "customer buys product" - a discrete event that can be structured with 7 Ws
-                                (Who, What, When, Where, How, How Many, Why) to generate dimensional entities.
+                                "customer buys product" - a discrete event that can be annotated with
+                                Who, What, When, Where, How, How Many, and Why to generate dimensional entities.
                             </p>
                         </div>
                         <button
@@ -354,7 +354,7 @@
         />
     {/if}
 
-    <!-- 7 Ws Form Modal (Edit) -->
+    <!-- Annotations Form Modal (Edit) -->
     {#if showSevenWsForm && sevenWsEvent}
         <SevenWsForm
             event={sevenWsEvent}
@@ -363,7 +363,7 @@
         />
     {/if}
 
-    <!-- 7 Ws Form Modal (View - Read-only) -->
+    <!-- Annotations Form Modal (View - Read-only) -->
     {#if showViewSevenWs && sevenWsEvent}
         <SevenWsForm
             event={sevenWsEvent}

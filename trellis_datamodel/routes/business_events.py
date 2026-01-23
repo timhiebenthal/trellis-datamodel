@@ -15,7 +15,7 @@ from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
     GeneratedEntitiesResult,
-    BusinessEventSevenWs,
+    BusinessEventAnnotations,
 )
 from trellis_datamodel.services.business_events_service import (
     load_business_events,
@@ -23,9 +23,9 @@ from trellis_datamodel.services.business_events_service import (
     update_event,
     delete_event,
     get_unique_domains,
-    add_seven_ws_entry,
-    remove_seven_ws_entry,
-    update_seven_ws_entry,
+    add_annotation_entry,
+    remove_annotation_entry,
+    update_annotation_entry,
 )
 from trellis_datamodel.services.entity_generator import generate_entities_from_event
 
@@ -38,7 +38,7 @@ class CreateEventRequest(BaseModel):
     text: str
     type: str
     domain: str | None = None
-    seven_ws: BusinessEventSevenWs | None = None
+    annotations: BusinessEventAnnotations | None = None
 
 
 class UpdateEventRequest(BaseModel):
@@ -48,27 +48,27 @@ class UpdateEventRequest(BaseModel):
     type: str | None = None
     domain: str | None = None
     derived_entities: list[dict] | None = None
-    seven_ws: BusinessEventSevenWs | dict | None = None
+    annotations: BusinessEventAnnotations | dict | None = None
 
 
-class UpdateEventSevenWsRequest(BaseModel):
-    """Request model for updating 7 Ws structure of a business event."""
+class UpdateEventAnnotationsRequest(BaseModel):
+    """Request model for updating annotations of a business event."""
 
-    seven_ws: BusinessEventSevenWs | None = None
+    annotations: BusinessEventAnnotations | None = None
 
 
-class AddSevenWsEntryRequest(BaseModel):
-    """Request model for adding a 7 Ws entry to a business event."""
+class AddAnnotationEntryRequest(BaseModel):
+    """Request model for adding an annotation entry to a business event."""
 
-    w_type: str
+    annotation_type: str
     text: str
     dimension_id: str | None = None
     description: str | None = None
     attributes: dict | None = None
 
 
-class UpdateSevenWsEntryRequest(BaseModel):
-    """Request model for updating a 7 Ws entry in a business event."""
+class UpdateAnnotationEntryRequest(BaseModel):
+    """Request model for updating an annotation entry in a business event."""
 
     text: str | None = None
     dimension_id: str | None = None
@@ -141,7 +141,7 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
     Create a new business event.
 
     Args:
-        request: CreateEventRequest with text, type, and optional seven_ws
+        request: CreateEventRequest with text, type, and optional annotations
 
     Returns:
         Created BusinessEvent object
@@ -165,9 +165,9 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
 
         event = create_event(request.text, event_type, domain=request.domain)
 
-        # If seven_ws provided, update the event with it
-        if request.seven_ws is not None:
-            event = update_event(event.id, {"seven_ws": request.seven_ws.model_dump()})
+        # If annotations provided, update the event with it
+        if request.annotations is not None:
+            event = update_event(event.id, {"annotations": request.annotations.model_dump()})
 
         return event
     except ValidationError as e:
@@ -210,12 +210,12 @@ async def update_business_event(event_id: str, request: UpdateEventRequest = Bod
             updates["domain"] = request.domain
         if request.derived_entities is not None:
             updates["derived_entities"] = request.derived_entities
-        if request.seven_ws is not None:
-            # Convert to dict if it's a BusinessEventSevenWs object
-            if isinstance(request.seven_ws, BusinessEventSevenWs):
-                updates["seven_ws"] = request.seven_ws.model_dump()
+        if request.annotations is not None:
+            # Convert to dict if it's a BusinessEventAnnotations object
+            if isinstance(request.annotations, BusinessEventAnnotations):
+                updates["annotations"] = request.annotations.model_dump()
             else:
-                updates["seven_ws"] = request.seven_ws
+                updates["annotations"] = request.annotations
 
         event = update_event(event_id, updates)
         return event
@@ -260,18 +260,18 @@ async def delete_business_event(event_id: str):
 
 
 @router.post(
-    "/business-events/{event_id}/seven-entries",
+    "/business-events/{event_id}/annotations",
     response_model=BusinessEvent,
 )
-async def add_event_seven_ws_entry(
-    event_id: str, request: AddSevenWsEntryRequest = Body(...)
+async def add_event_annotation_entry(
+    event_id: str, request: AddAnnotationEntryRequest = Body(...)
 ):
     """
-    Add a new entry to a 7 Ws category in a business event.
+    Add a new entry to an annotation category in a business event.
 
     Args:
         event_id: ID of event
-        request: AddSevenWsEntryRequest with w_type, text, dimension_id, description
+        request: AddAnnotationEntryRequest with annotation_type, text, dimension_id, description
 
     Returns:
         Updated BusinessEvent object
@@ -279,23 +279,23 @@ async def add_event_seven_ws_entry(
     Raises:
         FeatureDisabledError: If business events feature is disabled
         NotFoundError: If event not found
-        ValidationError: If w_type is invalid or text is empty
+        ValidationError: If annotation_type is invalid or text is empty
         FileOperationError: If file operations fail
     """
     _check_feature_enabled()
 
-    # Validate w_type
-    valid_w_types = ["who", "what", "when", "where", "how", "how_many", "why"]
-    if request.w_type not in valid_w_types:
+    # Validate annotation_type
+    valid_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+    if request.annotation_type not in valid_types:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid w_type: '{request.w_type}'. Must be one of: {', '.join(valid_w_types)}",
+            detail=f"Invalid annotation_type: '{request.annotation_type}'. Must be one of: {', '.join(valid_types)}",
         )
 
     try:
-        event = add_seven_ws_entry(
+        event = add_annotation_entry(
             event_id,
-            request.w_type,
+            request.annotation_type,
             request.text,
             dimension_id=request.dimension_id,
             description=request.description,
@@ -310,17 +310,17 @@ async def add_event_seven_ws_entry(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error adding 7 Ws entry: {str(e)}"
+            status_code=500, detail=f"Error adding annotation entry: {str(e)}"
         )
 
 
 @router.delete(
-    "/business-events/{event_id}/seven-entries/{entry_id}",
+    "/business-events/{event_id}/annotations/{entry_id}",
     response_model=BusinessEvent,
 )
-async def remove_event_seven_ws_entry(event_id: str, entry_id: str):
+async def remove_event_annotation_entry(event_id: str, entry_id: str):
     """
-    Remove a 7 Ws entry from a business event.
+    Remove an annotation entry from a business event.
 
     Args:
         event_id: ID of event
@@ -337,7 +337,7 @@ async def remove_event_seven_ws_entry(event_id: str, entry_id: str):
     _check_feature_enabled()
 
     try:
-        event = remove_seven_ws_entry(event_id, entry_id)
+        event = remove_annotation_entry(event_id, entry_id)
         return event
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -345,24 +345,24 @@ async def remove_event_seven_ws_entry(event_id: str, entry_id: str):
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error removing 7 Ws entry: {str(e)}"
+            status_code=500, detail=f"Error removing annotation entry: {str(e)}"
         )
 
 
 @router.put(
-    "/business-events/{event_id}/seven-entries/{entry_id}",
+    "/business-events/{event_id}/annotations/{entry_id}",
     response_model=BusinessEvent,
 )
-async def update_event_seven_ws_entry(
-    event_id: str, entry_id: str, request: UpdateSevenWsEntryRequest = Body(...)
+async def update_event_annotation_entry(
+    event_id: str, entry_id: str, request: UpdateAnnotationEntryRequest = Body(...)
 ):
     """
-    Update an existing 7 Ws entry in a business event.
+    Update an existing annotation entry in a business event.
 
     Args:
         event_id: ID of event
         entry_id: ID of entry to update
-        request: UpdateSevenWsEntryRequest with fields to update
+        request: UpdateAnnotationEntryRequest with fields to update
 
     Returns:
         Updated BusinessEvent object
@@ -376,7 +376,7 @@ async def update_event_seven_ws_entry(
     _check_feature_enabled()
 
     try:
-        event = update_seven_ws_entry(
+        event = update_annotation_entry(
             event_id,
             entry_id,
             text=request.text,
@@ -393,7 +393,7 @@ async def update_event_seven_ws_entry(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error updating 7 Ws entry: {str(e)}"
+            status_code=500, detail=f"Error updating annotation entry: {str(e)}"
         )
 
 
@@ -403,7 +403,7 @@ async def update_event_seven_ws_entry(
 )
 async def generate_entities_from_business_event(event_id: str):
     """
-    Generate dimensional entities from a business event with 7 Ws structure.
+    Generate dimensional entities from a business event with annotations.
 
     Args:
         event_id: ID of event to generate entities from
@@ -414,7 +414,7 @@ async def generate_entities_from_business_event(event_id: str):
     Raises:
         FeatureDisabledError: If business events feature is disabled
         NotFoundError: If event not found
-        ValidationError: If event doesn't have required 7 Ws data
+        ValidationError: If event doesn't have required annotations
         FileOperationError: If file operations fail
     """
     _check_feature_enabled()

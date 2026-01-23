@@ -1,6 +1,6 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { BusinessEvent, BusinessEventSevenWs, SevenWType, SevenWsEntry, Dimension } from "$lib/types";
+    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
     import { onMount } from "svelte";
     // import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
 
@@ -15,8 +15,8 @@
 
     let { event, onSave, onCancel }: Props = $props();
 
-    // W type configuration
-    const W_TYPES: Array<{ type: SevenWType; label: string; icon: string; placeholder: string; tooltip: string }> = [
+    // Annotation type configuration
+    const ANNOTATION_TYPES: Array<{ type: AnnotationType; label: string; icon: string; placeholder: string; tooltip: string }> = [
         { type: 'who', label: 'Who', icon: 'lucide:user', placeholder: 'e.g., customer, employee, supplier', tooltip: 'Who performed or participated in the event?' },
         { type: 'what', label: 'What', icon: 'lucide:box', placeholder: 'e.g., product, service, order', tooltip: 'What was involved in the event?' },
         { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', tooltip: 'When did the event occur?' },
@@ -27,7 +27,7 @@
     ];
 
     // Form state
-    let sevenWs = $state<BusinessEventSevenWs>(event.seven_ws || {
+    let annotations = $state<BusinessEventAnnotations>(event.annotations || {
         who: [],
         what: [],
         when: [],
@@ -49,13 +49,13 @@
 
     // Delete confirmation state
     let showDeleteConfirm = $state(false);
-    let entryToDelete = $state<{ wType: SevenWType; entryId: string } | null>(null);
+    let entryToDelete = $state<{ annotationType: AnnotationType; entryId: string } | null>(null);
 
     // Success notification state
     let showSuccessNotification = $state(false);
 
-    // Collapsed state for each W section
-    let collapsedState = $state<Record<SevenWType, boolean>>({
+    // Collapsed state for each annotation section
+    let collapsedState = $state<Record<AnnotationType, boolean>>({
         who: false,
         what: false,
         when: false,
@@ -68,9 +68,9 @@
     // Entry editing state
     let editingEntries = $state<Record<string, { text: string; description?: string; dimension_id?: string }>>({});
 
-    // Calculate filled Ws count
-    let filledWsCount = $derived(
-        W_TYPES.filter(w => sevenWs[w.type].length > 0).length
+    // Calculate filled annotations count
+    let filledAnnotationsCount = $derived(
+        ANNOTATION_TYPES.filter(a => annotations[a.type].length > 0).length
     );
 
     // Check for dimension_id conflicts with existing dimensions
@@ -79,11 +79,11 @@
 
         const conflicts: Array<{ entryId: string; dimensionId: string; dimensionLabel: string }> = [];
 
-        for (const w of W_TYPES.filter(w => w.type !== 'how_many')) {
-            for (const entry of sevenWs[w.type]) {
+        for (const a of ANNOTATION_TYPES.filter(a => a.type !== 'how_many')) {
+            for (const entry of annotations[a.type]) {
                 if (entry.dimension_id) {
                     const dimension = dimensions.find(d => d.id === entry.dimension_id);
-                    if (dimension && dimension.seven_w_type && dimension.seven_w_type !== w.type) {
+                    if (dimension && dimension.annotation_type && dimension.annotation_type !== a.type) {
                         conflicts.push({
                             entryId: entry.id,
                             dimensionId: entry.dimension_id,
@@ -102,12 +102,12 @@
         const errors: string[] = [];
 
         // Count dimension entries (all except how_many)
-        const dimensionEntries = W_TYPES
-            .filter(w => w.type !== 'how_many')
-            .reduce((sum, w) => sum + sevenWs[w.type].length, 0);
+        const dimensionEntries = ANNOTATION_TYPES
+            .filter(a => a.type !== 'how_many')
+            .reduce((sum, a) => sum + annotations[a.type].length, 0);
 
         // Count how_many entries
-        const howManyEntries = sevenWs.how_many.length;
+        const howManyEntries = annotations.how_many.length;
 
         if (dimensionEntries === 0) {
             errors.push("At least one dimension entry (Who, What, When, Where, How, or Why) is required for entity generation");
@@ -118,9 +118,9 @@
         }
 
         // Check for duplicate dimension_id references
-        const allDimensionIds = W_TYPES
-            .filter(w => w.type !== 'how_many')
-            .flatMap(w => sevenWs[w.type].map(e => e.dimension_id))
+        const allDimensionIds = ANNOTATION_TYPES
+            .filter(a => a.type !== 'how_many')
+            .flatMap(a => annotations[a.type].map(e => e.dimension_id))
             .filter((id): id is string => id !== undefined);
 
         const uniqueIds = new Set(allDimensionIds);
@@ -148,7 +148,7 @@
 
     // Initialize on mount
     $effect(() => {
-        sevenWs = event.seven_ws || {
+        annotations = event.annotations || {
             who: [],
             what: [],
             when: [],
@@ -229,47 +229,47 @@
         }
     }
 
-    function toggleCollapse(wType: SevenWType) {
-        collapsedState[wType] = !collapsedState[wType];
+    function toggleCollapse(annotationType: AnnotationType) {
+        collapsedState[annotationType] = !collapsedState[annotationType];
     }
 
-    function addEntry(wType: SevenWType) {
-        const newEntry: SevenWsEntry = {
+    function addEntry(annotationType: AnnotationType) {
+        const newEntry: AnnotationEntry = {
             id: `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             text: "",
             description: "",
             dimension_id: undefined
         };
         
-        sevenWs = {
-            ...sevenWs,
-            [wType]: [...sevenWs[wType], newEntry]
+        annotations = {
+            ...annotations,
+            [annotationType]: [...annotations[annotationType], newEntry]
         };
         
         // Initialize editing state for new entry
         editingEntries[newEntry.id] = { text: "", description: "" };
         
         // Expand section when adding entry
-        collapsedState[wType] = false;
+        collapsedState[annotationType] = false;
     }
 
-    function removeEntry(wType: SevenWType, entryId: string) {
-        const entry = sevenWs[wType].find(e => e.id === entryId);
+    function removeEntry(annotationType: AnnotationType, entryId: string) {
+        const entry = annotations[annotationType].find(e => e.id === entryId);
 
         // Show confirmation dialog if entry has dimension_id (potential relationships)
         if (entry && entry.dimension_id) {
-            entryToDelete = { wType, entryId };
+            entryToDelete = { annotationType, entryId };
             showDeleteConfirm = true;
         } else {
             // Delete immediately if no dimension reference
-            performDelete(wType, entryId);
+            performDelete(annotationType, entryId);
         }
     }
 
-    function performDelete(wType: SevenWType, entryId: string) {
-        sevenWs = {
-            ...sevenWs,
-            [wType]: sevenWs[wType].filter(e => e.id !== entryId)
+    function performDelete(annotationType: AnnotationType, entryId: string) {
+        annotations = {
+            ...annotations,
+            [annotationType]: annotations[annotationType].filter(e => e.id !== entryId)
         };
 
         // Remove from editing state
@@ -278,7 +278,7 @@
 
     function handleDeleteConfirm() {
         if (entryToDelete) {
-            performDelete(entryToDelete.wType, entryToDelete.entryId);
+            performDelete(entryToDelete.annotationType, entryToDelete.entryId);
         }
         showDeleteConfirm = false;
         entryToDelete = null;
@@ -289,23 +289,23 @@
         entryToDelete = null;
     }
 
-    function updateEntryText(wType: SevenWType, entryId: string, text: string) {
+    function updateEntryText(annotationType: AnnotationType, entryId: string, text: string) {
         editingEntries[entryId] = { ...editingEntries[entryId], text };
         
-        sevenWs = {
-            ...sevenWs,
-            [wType]: sevenWs[wType].map(e => 
+        annotations = {
+            ...annotations,
+            [annotationType]: annotations[annotationType].map(e => 
                 e.id === entryId ? { ...e, text } : e
             )
         };
     }
 
-    function updateEntryDescription(wType: SevenWType, entryId: string, description: string) {
+    function updateEntryDescription(annotationType: AnnotationType, entryId: string, description: string) {
         editingEntries[entryId] = { ...editingEntries[entryId], description };
         
-        sevenWs = {
-            ...sevenWs,
-            [wType]: sevenWs[wType].map(e => 
+        annotations = {
+            ...annotations,
+            [annotationType]: annotations[annotationType].map(e => 
                 e.id === entryId ? { ...e, description } : e
             )
         };
@@ -319,14 +319,14 @@
 
         try {
             // Validate no empty text entries
-            for (const w of W_TYPES) {
-                for (const entryItem of sevenWs[w.type]) {
+            for (const a of ANNOTATION_TYPES) {
+                for (const entryItem of annotations[a.type]) {
                     if (!entryItem.text.trim()) {
-                        throw new Error(`All entries must have text. Please check the ${w.label} section.`);
+                        throw new Error(`All entries must have text. Please check the ${a.label} section.`);
                     }
                     // Check for text length (max 200)
                     if (entryItem.text.trim().length > 200) {
-                        throw new Error(`Entry text in ${w.label} exceeds 200 characters. Please shorten it.`);
+                        throw new Error(`Entry text in ${a.label} exceeds 200 characters. Please shorten it.`);
                     }
                 }
             }
@@ -334,7 +334,7 @@
             // Create updated event
             const updatedEvent: BusinessEvent = {
                 ...event,
-                seven_ws: sevenWs,
+                annotations: annotations,
                 updated_at: new Date().toISOString()
             };
 
@@ -398,7 +398,7 @@
                 <div class="flex items-center gap-3">
                     <div>
                         <h2 id="seven-ws-modal-title" class="text-xl font-semibold text-gray-900">
-                            7 Ws - Business Event
+                            Annotations - Business Event
                         </h2>
                         <p class="text-sm text-gray-500 mt-1">
                             {event.text}
@@ -410,7 +410,7 @@
                     <div
                         class="px-3 py-1 rounded-full text-sm font-medium {isValid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}"
                     >
-                        {filledWsCount}/7 Ws completed
+                        {filledAnnotationsCount}/7 completed
                     </div>
                     <button
                         class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
@@ -425,32 +425,32 @@
 
             <!-- Form -->
             <div class="p-6 space-y-4">
-                <!-- 7 Ws Sections -->
-                {#each W_TYPES as wType}
+                <!-- Annotation Sections -->
+                {#each ANNOTATION_TYPES as annotationType}
                     <div class="border border-gray-200 rounded-lg overflow-hidden">
                         <!-- Section Header -->
                         <button
                             class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                            onclick={() => toggleCollapse(wType.type)}
-                            aria-expanded={!collapsedState[wType.type]}
-                            aria-controls={`section-${wType.type}`}
+                            onclick={() => toggleCollapse(annotationType.type)}
+                            aria-expanded={!collapsedState[annotationType.type]}
+                            aria-controls={`section-${annotationType.type}`}
                         >
                             <div class="flex items-center gap-3">
                                 <div
-                                    class="p-2 rounded-md {wType.type === 'how_many' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'}"
+                                    class="p-2 rounded-md {annotationType.type === 'how_many' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'}"
                                 >
-                                    <Icon icon={wType.icon} class="w-5 h-5" />
+                                    <Icon icon={annotationType.icon} class="w-5 h-5" />
                                 </div>
                                 <div class="text-left">
                                     <div class="flex items-center gap-2">
-                                        <span class="font-medium text-gray-900">{wType.label}</span>
-                                        {#if sevenWs[wType.type].length > 0}
+                                        <span class="font-medium text-gray-900">{annotationType.label}</span>
+                                        {#if annotations[annotationType.type].length > 0}
                                             <span class="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                                                {sevenWs[wType.type].length}
+                                                {annotations[annotationType.type].length}
                                             </span>
                                         {/if}
                                     </div>
-                                    <p class="text-xs text-gray-500">{wType.tooltip}</p>
+                                    <p class="text-xs text-gray-500">{annotationType.tooltip}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -461,22 +461,22 @@
                                         class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
                                     />
                                     <div class="absolute right-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
-                                        {wType.tooltip}
+                                        {annotationType.tooltip}
                                         <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                                     </div>
                                 </div>
                                 <Icon
-                                    icon={collapsedState[wType.type] ? 'lucide:chevron-down' : 'lucide:chevron-up'}
+                                    icon={collapsedState[annotationType.type] ? 'lucide:chevron-down' : 'lucide:chevron-up'}
                                     class="w-5 h-5 text-gray-500 transition-transform"
                                 />
                             </div>
                         </button>
 
                                  <!-- Section Content -->
-                        {#if !collapsedState[wType.type]}
-                            <div id={`section-${wType.type}`} class="p-4 space-y-3">
+                        {#if !collapsedState[annotationType.type]}
+                            <div id={`section-${annotationType.type}`} class="p-4 space-y-3">
                                 <!-- Entries List -->
-                                {#if dimensionsLoading && sevenWs[wType.type].length === 0}
+                                {#if dimensionsLoading && annotations[annotationType.type].length === 0}
                                     <!-- Skeleton Loader -->
                                     <div class="space-y-3">
                                         <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
@@ -487,16 +487,16 @@
                                             <div class="w-8 h-8 bg-gray-200 rounded-md animate-pulse"></div>
                                         </div>
                                     </div>
-                                {:else if sevenWs[wType.type].length > 0}
-                                    {#each sevenWs[wType.type] as entry}
+                                {:else if annotations[annotationType.type].length > 0}
+                                    {#each annotations[annotationType.type] as entry}
                                         <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
                                             <div class="flex-1 space-y-2">
                                                 <!-- Text Input -->
                                                 <input
                                                     type="text"
                                                     value={entry.text}
-                                                    oninput={(e) => updateEntryText(wType.type, entry.id, e.currentTarget.value)}
-                                                    placeholder={wType.placeholder}
+                                                    oninput={(e) => updateEntryText(annotationType.type, entry.id, e.currentTarget.value)}
+                                                    placeholder={annotationType.placeholder}
                                                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                                     maxlength={200}
                                                     disabled={loading}
@@ -505,7 +505,7 @@
                                                 <input
                                                     type="text"
                                                     value={entry.description || ''}
-                                                    oninput={(e) => updateEntryDescription(wType.type, entry.id, e.currentTarget.value)}
+                                                    oninput={(e) => updateEntryDescription(annotationType.type, entry.id, e.currentTarget.value)}
                                                     placeholder="Optional description..."
                                                     class="w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs text-gray-600"
                                                     maxlength={500}
@@ -514,7 +514,7 @@
                                             </div>
                                             <button
                                                 class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors mt-1"
-                                                onclick={() => removeEntry(wType.type, entry.id)}
+                                                onclick={() => removeEntry(annotationType.type, entry.id)}
                                                 aria-label="Remove entry"
                                                 disabled={loading}
                                                 title="Remove entry"
@@ -532,7 +532,7 @@
                                 <!-- Add Entry Button -->
                                 <button
                                     type="button"
-                                    onclick={() => addEntry(wType.type)}
+                                    onclick={() => addEntry(annotationType.type)}
                                     class="w-full py-2 px-4 border-2 border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
                                     disabled={loading}
                                 >
@@ -595,7 +595,7 @@
                                 <span>Saving...</span>
                             {:else}
                                 <Icon icon="lucide:save" class="w-4 h-4" />
-                                <span>Save 7 Ws</span>
+                                <span>Save Annotations</span>
                             {/if}
                         </button>
                     </div>
@@ -623,8 +623,8 @@
                     Delete Entry?
                 </h2>
                 <p class="text-sm text-gray-600 mb-6">
-                    {#if entryToDelete && entryToDelete.wType}
-                        {@const entry = sevenWs[entryToDelete!.wType].find(e => e.id === entryToDelete!.entryId)}
+                    {#if entryToDelete && entryToDelete.annotationType}
+                        {@const entry = annotations[entryToDelete!.annotationType].find(e => e.id === entryToDelete!.entryId)}
                         This entry has a dimension reference ({entry?.dimension_id}). Deleting it will remove the reference from the dimension entity. This action cannot be undone.
                     {:else}
                         This entry cannot be undone. Are you sure you want to delete it?
@@ -655,7 +655,7 @@
                 aria-live="polite"
             >
                 <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
-                <span class="text-sm font-medium text-green-800">7 Ws saved successfully!</span>
+                <span class="text-sm font-medium text-green-800">Annotations saved successfully!</span>
             </div>
         {/if}
     {/if}
