@@ -123,9 +123,17 @@
         const visibleNodeIds = new Set(displayNodes.map(n => n.id));
 
         // Only show edges where both source and target are visible
-        return $edges.filter(edge =>
+        return $edges
+            .filter(edge =>
             visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
-        );
+            )
+            .map(edge => ({
+                ...edge,
+                data: {
+                    ...(edge.data || {}),
+                    layout: "straight",
+                },
+            }));
     });
 
     // Calculate filtered entity count (exclude group nodes)
@@ -153,6 +161,111 @@
     // Position calculator services
     const positioner = new DimensionalModelPositioner();
     const groupSizeCalculator = new GroupSizeCalculator();
+
+    const isEventFiltered = $derived(
+        !!filteredEntityIds && filteredEntityIds.length > 0
+    );
+
+    function getNodeSize(node: Node): { width: number; height: number } {
+        const width =
+            (node.measured?.width as number | undefined) ??
+            (node.data?.width as number | undefined) ??
+            280;
+        const height =
+            (node.measured?.height as number | undefined) ??
+            (node.data?.panelHeight as number | undefined) ??
+            (node.data?.height as number | undefined) ??
+            220;
+        return { width, height };
+    }
+
+    function applyStarSchemaLayout(nodesToLayout: Node[]): Node[] {
+        const entityNodes = nodesToLayout.filter((node) => node.type === "entity");
+        if (entityNodes.length === 0) {
+            return nodesToLayout;
+        }
+
+        const factNodes = entityNodes.filter(
+            (node) => node.data?.entity_type === "fact",
+        );
+        const dimensionNodes = entityNodes.filter(
+            (node) => node.data?.entity_type !== "fact",
+        );
+
+        const center = positioner.calculateCenter([]);
+
+        const factSizes = factNodes.map(getNodeSize);
+        const dimSizes = dimensionNodes.map(getNodeSize);
+        const maxFactWidth = Math.max(...factSizes.map((s) => s.width), 0);
+        const maxDimWidth = Math.max(...dimSizes.map((s) => s.width), 0);
+        const maxDimHeight = Math.max(...dimSizes.map((s) => s.height), 0);
+
+        const dimCount = dimensionNodes.length;
+        const minSpacing = Math.max(maxDimWidth, maxDimHeight) + 140;
+        const ringRadiusFromCount =
+            dimCount > 0 ? (dimCount * minSpacing) / (2 * Math.PI) : 0;
+        const ringRadiusFromFacts =
+            (maxFactWidth / 2) + (maxDimWidth / 2) + 200;
+        const dimensionRingRadius = Math.max(380, ringRadiusFromCount, ringRadiusFromFacts);
+
+        const factRingRadius = factNodes.length > 1 ? 140 : 0;
+
+        const positioned = new Map<string, { x: number; y: number }>();
+
+        factNodes.forEach((node, index) => {
+            const size = getNodeSize(node);
+            const angle =
+                factNodes.length > 1
+                    ? (index / factNodes.length) * Math.PI * 2
+                    : 0;
+            const x = center.x + Math.cos(angle) * factRingRadius - size.width / 2;
+            const y = center.y + Math.sin(angle) * factRingRadius - size.height / 2;
+            positioned.set(node.id, { x, y });
+        });
+
+        dimensionNodes.forEach((node, index) => {
+            const size = getNodeSize(node);
+            const angle =
+                dimCount > 0
+                    ? (index / dimCount) * Math.PI * 2 - Math.PI / 2
+                    : 0;
+            const x = center.x + Math.cos(angle) * dimensionRingRadius - size.width / 2;
+            const y = center.y + Math.sin(angle) * dimensionRingRadius - size.height / 2;
+            positioned.set(node.id, { x, y });
+        });
+
+        return nodesToLayout.map((node) => {
+            const nextPosition = positioned.get(node.id);
+            if (!nextPosition) {
+                return node;
+            }
+            return {
+                ...node,
+                position: nextPosition,
+            };
+        });
+    }
+
+    let lastLayoutKey = $state<string | null>(null);
+
+    $effect(() => {
+        if (!isEventFiltered) {
+            lastLayoutKey = null;
+            return;
+        }
+
+        if (isDragging) {
+            return;
+        }
+
+        const key = `${filterEventText ?? ""}::${filteredEntityIds?.slice().sort().join(",") ?? ""}`;
+        if (lastLayoutKey === key) {
+            return;
+        }
+
+        lastLayoutKey = key;
+        displayNodes = applyStarSchemaLayout(displayNodes);
+    });
 
     function onConnect(connection: Connection) {
         const connectionKey = `${connection.source}-${connection.target}`;
