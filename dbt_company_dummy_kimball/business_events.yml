@@ -19,7 +19,7 @@ events:
   type: discrete
   domain: Sales
   created_at: '2026-01-22T00:07:15.211092'
-  updated_at: '2026-01-22T23:41:25.019673'
+  updated_at: '2026-01-23T15:39:06.561535'
   seven_ws:
     who:
     - id: new_1769121444615_u05zplq3f
@@ -83,7 +83,23 @@ events:
       text: promo_code
       description: ''
       attributes: {}
-  derived_entities: []
+  derived_entities:
+  - entity_id: dim_customer
+    created_at: '2026-01-23T14:39:06.529000Z'
+  - entity_id: dim_product
+    created_at: '2026-01-23T14:39:06.530000Z'
+  - entity_id: dim_order_date
+    created_at: '2026-01-23T14:39:06.530000Z'
+  - entity_id: dim_country
+    created_at: '2026-01-23T14:39:06.530000Z'
+  - entity_id: dim_store
+    created_at: '2026-01-23T14:39:06.530000Z'
+  - entity_id: dim_marketing_campaign
+    created_at: '2026-01-23T14:39:06.530000Z'
+  - entity_id: dim_promo_code
+    created_at: '2026-01-23T14:39:06.530000Z'
+  - entity_id: fact_customer_buys_product
+    created_at: '2026-01-23T14:39:06.530000Z'
 - id: evt_20260122_003
   text: order gets invoiced
   type: discrete

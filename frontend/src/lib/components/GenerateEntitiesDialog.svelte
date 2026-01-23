@@ -6,6 +6,7 @@
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
+    import { untrack } from 'svelte';
 
     type Props = {
         open: boolean;
@@ -30,13 +31,15 @@
     $effect(() => {
         if (open && event) {
             loadPreview();
-        } else {
-            // Reset state when dialog closes
-            previewData = null;
-            editedEntities = [];
-            validationErrors = [];
-            error = null;
-            success = false;
+        } else if (!open) {
+            // Reset state when dialog closes - use untrack to avoid triggering validation effect
+            untrack(() => {
+                previewData = null;
+                editedEntities = [];
+                validationErrors = [];
+                error = null;
+                success = false;
+            });
         }
     });
 
@@ -248,10 +251,14 @@
         }
     }
 
-    // Validate on entity changes
+    // Validate on entity changes - only when dialog is open to prevent infinite loops
     $effect(() => {
-        if (editedEntities.length > 0) {
-            validateEntities();
+        // Only validate when dialog is open and entities exist
+        if (open && editedEntities.length > 0) {
+            // Use untrack to prevent reading $nodes from triggering this effect
+            untrack(() => {
+                validateEntities();
+            });
         }
     });
 </script>

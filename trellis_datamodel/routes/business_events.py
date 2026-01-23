@@ -208,8 +208,6 @@ async def update_business_event(event_id: str, request: UpdateEventRequest = Bod
             updates["type"] = request.type
         if request.domain is not None:
             updates["domain"] = request.domain
-        if request.annotations is not None:
-            updates["annotations"] = request.annotations
         if request.derived_entities is not None:
             updates["derived_entities"] = request.derived_entities
         if request.seven_ws is not None:
