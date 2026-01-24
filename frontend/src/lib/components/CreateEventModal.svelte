@@ -178,7 +178,7 @@
         }
     }
 
-    // 7 Ws helper functions
+    // Annotations helper functions
     function toggleSevenWsCollapse(wType: SevenWType) {
         collapsedState[wType] = !collapsedState[wType];
     }
@@ -457,7 +457,7 @@
                     </select>
                 </div>
 
-                <!-- Annotations Toggle -->
+                <!-- 7 Ws Toggle -->
                 <div class="flex items-center justify-between pt-4 border-t border-gray-200">
                     <div class="flex items-center gap-2">
                         <button
@@ -467,7 +467,7 @@
                             disabled={loading}
                         >
                             <Icon icon={showSevenWs ? "lucide:chevron-up" : "lucide:chevron-down"} class="w-4 h-4" />
-                            <span>{showSevenWs ? "Hide Annotations" : "Add Annotations (optional)"}</span>
+                            <span>{showSevenWs ? "Hide 7 Ws" : "Add 7 Ws (optional)"}</span>
                         </button>
                         {#if filledWsCount > 0}
                             <span class="text-xs text-gray-500">({filledWsCount}/7 filled)</span>
@@ -475,10 +475,10 @@
                     </div>
                 </div>
 
-                <!-- Annotations Form -->
+                <!-- 7 Ws Form -->
                 {#if showSevenWs}
                     <div class="pt-4">
-                        <!-- Annotations Sections -->
+                        <!-- 7 Ws Sections -->
                         {#each W_TYPES as wType}
                             <div class="border border-gray-200 rounded-lg overflow-hidden mb-3">
                                 <!-- Section Header -->
@@ -585,7 +585,7 @@
                             </div>
                         {/each}
 
-                        <!-- 7 Ws Validation Errors -->
+                        <!-- Annotations Validation Errors -->
                         {#if sevenWsValidationErrors.length > 0}
                             <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
                                 <div class="flex items-center gap-2 text-amber-800 font-medium">
