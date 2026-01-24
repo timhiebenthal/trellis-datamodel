@@ -1,10 +1,22 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import '@testing-library/jest-dom';
 import SevenWsForm from './SevenWsForm.svelte';
 import type { BusinessEvent, BusinessEventSevenWs } from '$lib/types';
 
 describe('SevenWsForm', () => {
+    beforeEach(() => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: vi.fn().mockResolvedValue({
+                    entities: [],
+                    relationships: []
+                })
+            })
+        );
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
@@ -26,7 +38,6 @@ describe('SevenWsForm', () => {
             how_many: [],
             why: []
         },
-        annotations: [],
         derived_entities: []
     };
 

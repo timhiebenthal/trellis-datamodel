@@ -14,6 +14,7 @@ import type {
     BusinessEventAnnotations,
     AnnotationEntry,
     SevenWType,
+    AnnotationType,
     Dimension,
     Annotation,
     GeneratedEntitiesResult,
@@ -765,6 +766,10 @@ export async function removeAnnotationEntry(
         throw new Error(`Error removing 7 Ws entry: ${message}`);
     }
 }
+
+export const addSevenWsEntry = addAnnotationEntry;
+export const updateSevenWsEntry = updateAnnotationEntry;
+export const removeSevenWsEntry = removeAnnotationEntry;
 
 /**
  * Delete a business event.

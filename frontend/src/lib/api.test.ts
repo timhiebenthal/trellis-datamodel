@@ -50,7 +50,6 @@ describe('addSevenWsEntry', () => {
                 how_many: [],
                 why: []
             },
-            annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T10:00:00Z'
@@ -85,7 +84,7 @@ describe('addSevenWsEntry', () => {
             })
         );
 
-        await expect(addSevenWsEntry('evt_001', 'invalid', 'text'))
+        await expect(addSevenWsEntry('evt_001', 'invalid' as any, 'text'))
             .rejects.toThrow('Invalid w_type');
     });
 });
@@ -110,7 +109,6 @@ describe('removeSevenWsEntry', () => {
                 how_many: [],
                 why: []
             },
-            annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T10:00:00Z'
@@ -169,7 +167,6 @@ describe('updateSevenWsEntry', () => {
                 how_many: [],
                 why: []
             },
-            annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T10:00:00Z'
@@ -235,7 +232,7 @@ describe('getDimensions', () => {
 
         expect(result).toHaveLength(2);
         expect(result[0]).toMatchObject(mockResponse.entities[0]);
-        expect(global.fetch).toHaveBeenCalledWith('/api/data-model');
+        expect(global.fetch).toHaveBeenCalledWith('http://localhost:8089/api/data-model');
     });
 
     it('filters dimensions by annotation_type when specified', async () => {
@@ -258,7 +255,7 @@ describe('getDimensions', () => {
 
         expect(result).toHaveLength(1);
         expect(result[0].annotation_type).toBe('who');
-        expect(global.fetch).toHaveBeenCalledWith('/api/data-model?annotation_type=who');
+        expect(global.fetch).toHaveBeenCalledWith('http://localhost:8089/api/data-model?annotation_type=who');
     });
 
     it('returns empty array on 404 error', async () => {
@@ -298,7 +295,6 @@ describe('createBusinessEvent with annotations', () => {
             text: 'customer buys product',
             type: 'discrete',
             annotations: mockSevenWs,
-            annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T10:00:00Z'
@@ -316,7 +312,7 @@ describe('createBusinessEvent with annotations', () => {
 
         expect(result).toEqual(mockResponse);
         expect(global.fetch).toHaveBeenCalledWith(
-            '/api/business-events',
+            'http://localhost:8089/api/business-events',
             expect.objectContaining({
                 method: 'POST',
                 body: expect.stringContaining('"annotations"')
@@ -347,7 +343,6 @@ describe('updateBusinessEvent with annotations', () => {
             text: 'customer buys product',
             type: 'discrete',
             annotations: mockSevenWs,
-            annotations: [],
             derived_entities: [],
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T11:00:00Z'
@@ -365,7 +360,7 @@ describe('updateBusinessEvent with annotations', () => {
 
         expect(result).toEqual(mockResponse);
         expect(global.fetch).toHaveBeenCalledWith(
-            '/api/business-events/evt_001',
+            'http://localhost:8089/api/business-events/evt_001',
             expect.objectContaining({
                 method: 'PUT',
                 body: expect.stringContaining('"annotations"')
@@ -374,6 +369,11 @@ describe('updateBusinessEvent with annotations', () => {
     });
 });
 
+describe('inferRelationships error handling', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
 
     it('returns empty array on 400 response', async () => {
         vi.stubGlobal(

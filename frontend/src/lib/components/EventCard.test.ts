@@ -1,10 +1,22 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import '@testing-library/jest-dom';
 import EventCard from './EventCard.svelte';
 import type { BusinessEvent, BusinessEventSevenWs } from '$lib/types';
 
 describe('EventCard', () => {
+    beforeEach(() => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: vi.fn().mockResolvedValue({
+                    entities: [],
+                    relationships: []
+                })
+            })
+        );
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
@@ -26,7 +38,6 @@ describe('EventCard', () => {
             how_many: [{ id: 'ent3', text: 'quantity' }],
             why: []
         },
-        annotations: [],
         derived_entities: []
     };
 
@@ -99,7 +110,7 @@ describe('EventCard', () => {
             id: 'evt_20250122_002',
             text: 'event without 7 Ws',
             type: 'discrete',
-            domain: null,
+            domain: undefined,
             created_at: '2025-01-22T10:00:00Z',
             updated_at: '2025-01-22T10:00:00Z',
             annotations: {
@@ -111,7 +122,6 @@ describe('EventCard', () => {
                 how_many: [],
                 why: []
             },
-            annotations: [],
             derived_entities: []
         };
 
@@ -148,7 +158,7 @@ describe('EventCard', () => {
 
         const mockEventNoDomain: BusinessEvent = {
             ...mockEventWith7Ws,
-            domain: null
+            domain: undefined
         };
 
         render(EventCard, {
