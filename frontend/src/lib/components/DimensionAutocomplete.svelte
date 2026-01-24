@@ -203,6 +203,7 @@
             class="bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
             style={dropdownStyle}
             onmousedown={(e) => e.preventDefault()}
+            role="listbox"
         >
             <!-- Existing dimensions -->
             {#each filteredDimensions as dimension, index}
