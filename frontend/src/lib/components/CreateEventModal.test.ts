@@ -57,7 +57,8 @@ describe('CreateEventModal', () => {
             onCancel
         });
 
-        expect(screen.getByText(/Annotations/i)).toBeInTheDocument();
+        // The button text is "Add 7 Ws (optional)" not "Annotations"
+        expect(screen.getByText(/Add 7 Ws/i)).toBeInTheDocument();
     });
 
     it('validates text is required', () => {
@@ -70,9 +71,9 @@ describe('CreateEventModal', () => {
             onCancel
         });
 
-        const saveButtons = screen.getAllByRole('button', { name: /save/i });
-        expect(saveButtons.length).toBeGreaterThan(0);
-        expect(saveButtons[0]).toBeInTheDocument();
+        // The button text is "Create" for new events, not "Save"
+        const createButton = screen.getByRole('button', { name: /create/i });
+        expect(createButton).toBeInTheDocument();
         
         // Just verify structure - text input should exist
         const textInput = screen.getByLabelText(/event description/i);

@@ -16,6 +16,7 @@
     // Form state
     let eventText = $state("");
     let eventType = $state<BusinessEventType>("discrete");
+    let eventDomain = $state<string | null>(null);
     let sevenWs = $state<BusinessEventSevenWs>({
         who: [],
         what: [],
@@ -28,8 +29,9 @@
     let showSevenWs = $state(false);
     let loading = $state(false);
     let error = $state<string | null>(null);
+    let domains = $state<string[]>([]);
 
-    // 7 Ws configuration
+    // Annotations configuration (7 Ws: Who, What, When, Where, How, How Many, Why)
     const W_TYPES: Array<{ type: SevenWType; label: string; icon: string; placeholder: string; tooltip: string }> = [
         { type: 'who', label: 'Who', icon: 'lucide:user', placeholder: 'e.g., customer, employee, supplier', tooltip: 'Who performed or participated in event?' },
         { type: 'what', label: 'What', icon: 'lucide:box', placeholder: 'e.g., product, service, order', tooltip: 'What was involved in the event?' },
@@ -40,7 +42,7 @@
         { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', tooltip: 'Why did the event occur?' }
     ];
 
-    // 7 Ws collapsed state
+    // Annotations collapsed state
     let collapsedState = $state<Record<SevenWType, boolean>>({
         who: false,
         what: false,
@@ -51,10 +53,10 @@
         why: false
     });
 
-    // 7 Ws editing state
+    // Annotations editing state
     let editingEntries = $state<Record<string, { text: string; description?: string }>>({});
 
-    // Calculate filled Ws count
+    // Calculate filled annotations count
     let filledWsCount = $derived(
         W_TYPES.filter(w => sevenWs[w.type].length > 0).length
     );
@@ -69,7 +71,7 @@
     let characterCount = $derived(eventText.length);
     let remainingChars = $derived(MAX_TEXT_LENGTH - characterCount);
 
-    // 7 Ws validation errors
+    // Annotations validation errors
     let sevenWsValidationErrors = $derived.by(() => {
         const errors: string[] = [];
 
@@ -98,7 +100,7 @@
         if (!eventType) return false;
         if (loading) return false;
 
-        // If 7 Ws is shown and has entries, validate them
+        // If annotations are shown and have entries, validate them
         if (showSevenWs && filledWsCount > 0) {
             for (const w of W_TYPES) {
                 for (const entry of sevenWs[w.type]) {
@@ -110,13 +112,26 @@
         return true;
     });
 
-    // Initialize form when modal opens or event changes
+    // Load domains when modal opens
     $effect(() => {
         if (open) {
+            async function loadDomains() {
+                try {
+                    domains = await getBusinessEventDomains();
+                } catch (e) {
+                    console.warn('Failed to load domains:', e);
+                    domains = [];
+                }
+            }
+            
+            loadDomains();
+            
+            // Initialize form
             if (event) {
                 // Edit mode: populate form with existing event data
                 eventText = event.text;
                 eventType = event.type;
+                eventDomain = event.domain || null;
                 sevenWs = event.annotations || {
                     who: [],
                     what: [],
@@ -131,6 +146,7 @@
                 // Create mode: reset form
                 eventText = "";
                 eventType = "discrete";
+                eventDomain = null;
                 sevenWs = {
                     who: [],
                     what: [],
@@ -225,18 +241,18 @@
 
         if (!isValid) return;
 
-        // Validate 7 Ws entries if shown and has data
+        // Validate annotations entries if shown and have data
         if (showSevenWs && filledWsCount > 0) {
             for (const w of W_TYPES) {
                 for (const entry of sevenWs[w.type]) {
                     if (!entry.text.trim()) {
-                        error = `All 7 Ws entries must have text. Please check ${w.label} section.`;
+                        error = `All annotation entries must have text. Please check ${w.label} section.`;
                         return;
                     }
                 }
             }
 
-            // Validate 7 Ws requirements for entity generation
+            // Validate annotations requirements for entity generation
             if (sevenWsValidationErrors.length > 0) {
                 error = sevenWsValidationErrors[0];
                 return;
@@ -251,10 +267,11 @@
                 // Update existing event
                 const updates: Partial<BusinessEvent> = {
                     text: eventText.trim(),
-                    type: eventType
+                    type: eventType,
+                    domain: eventDomain
                 };
 
-                // Include annotations in request if 7 Ws is shown and has data
+                // Include annotations in request if annotations are shown and have data
                 if (showSevenWs && filledWsCount > 0) {
                     updates.annotations = sevenWs;
                 }
@@ -264,10 +281,11 @@
                 // Create new event
                 await createBusinessEvent(
                     eventText.trim(),
-                    eventType
+                    eventType,
+                    eventDomain
                 );
-                // Note: 7 Ws can be added in a separate edit flow after creation
-                // This allows users to create basic events first, then add 7 Ws later
+                // Note: Annotations can be added in a separate edit flow after creation
+                // This allows users to create basic events first, then add annotations later
             }
 
             // Success: close modal and refresh list
@@ -401,7 +419,45 @@
                     </select>
                 </div>
 
-                <!-- 7 Ws Toggle -->
+                <!-- Business Domain -->
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <label for="event-domain" class="block text-sm font-medium text-gray-700">
+                            Business Domain
+                        </label>
+                        <div class="group relative">
+                            <Icon
+                                icon="lucide:help-circle"
+                                class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
+                            />
+                            <!-- Tooltip -->
+                            <div
+                                class="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10"
+                            >
+                                <div class="space-y-2">
+                                    <div>
+                                        Optional business domain classification (e.g., Sales, Marketing, Finance).
+                                        Helps organize and filter events.
+                                    </div>
+                                </div>
+                                <div class="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <select
+                        id="event-domain"
+                        bind:value={eventDomain}
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={loading}
+                    >
+                        <option value={null}>No Domain</option>
+                        {#each domains as domain}
+                            <option value={domain}>{toTitleCase(domain)}</option>
+                        {/each}
+                    </select>
+                </div>
+
+                <!-- Annotations Toggle -->
                 <div class="flex items-center justify-between pt-4 border-t border-gray-200">
                     <div class="flex items-center gap-2">
                         <button
@@ -411,7 +467,7 @@
                             disabled={loading}
                         >
                             <Icon icon={showSevenWs ? "lucide:chevron-up" : "lucide:chevron-down"} class="w-4 h-4" />
-                            <span>{showSevenWs ? "Hide 7 Ws" : "Add 7 Ws (optional)"}</span>
+                            <span>{showSevenWs ? "Hide Annotations" : "Add Annotations (optional)"}</span>
                         </button>
                         {#if filledWsCount > 0}
                             <span class="text-xs text-gray-500">({filledWsCount}/7 filled)</span>
@@ -419,10 +475,10 @@
                     </div>
                 </div>
 
-                <!-- 7 Ws Form -->
+                <!-- Annotations Form -->
                 {#if showSevenWs}
                     <div class="pt-4">
-                        <!-- 7 Ws Sections -->
+                        <!-- Annotations Sections -->
                         {#each W_TYPES as wType}
                             <div class="border border-gray-200 rounded-lg overflow-hidden mb-3">
                                 <!-- Section Header -->
