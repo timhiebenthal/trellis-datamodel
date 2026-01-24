@@ -91,6 +91,9 @@ def load_business_events(path: Optional[str] = None) -> List[BusinessEvent]:
 
     # Parse file structure
     try:
+        if "events" not in data:
+            logger.error(f"Missing 'events' key in business events file {path}")
+            raise FileOperationError("Invalid business events file format")
         events_file = BusinessEventsFile(**data)
         return events_file.events
     except Exception as e:
@@ -437,7 +440,9 @@ def remove_annotation_entry(event_id: str, entry_id: str) -> BusinessEvent:
     for annotation_type in ["who", "what", "when", "where", "how", "how_many", "why"]:
         category_list = current_annotations.get(annotation_type, [])
         original_length = len(category_list)
-        category_list = [entry for entry in category_list if entry.get("id") != entry_id]
+        category_list = [
+            entry for entry in category_list if entry.get("id") != entry_id
+        ]
         current_annotations[annotation_type] = category_list
         if len(category_list) < original_length:
             entry_found = True

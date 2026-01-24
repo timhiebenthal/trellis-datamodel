@@ -186,7 +186,9 @@ def _create_dimension_from_annotation_entry(
         "label": label,
         "entity_type": "dimension",
         "description": entry.description or f"Dimension: {entry.text}",
-        "annotation_type": annotation_type,  # Track which annotation category this dimension represents
+        "metadata": {
+            "annotation_type": annotation_type
+        },  # Track which annotation category this dimension represents
     }
 
     # Add domain tag if provided
