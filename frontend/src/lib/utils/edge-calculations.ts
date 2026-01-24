@@ -195,6 +195,67 @@ export function buildEdgePath(
 }
 
 /**
+ * Build straight edge path string for SVG
+ * Uses a direct line (with parallel offset support) for regular edges
+ */
+export function buildStraightEdgePath(
+  sourcePoint: Point,
+  targetPoint: Point,
+  sourceSide: Side,
+  targetSide: Side,
+  baseOffset: number,
+  isSelfEdge: boolean
+): string {
+  if (isSelfEdge) {
+    // Keep self-edge behavior consistent with orthogonal edges
+    return buildEdgePath(
+      sourcePoint,
+      targetPoint,
+      sourceSide,
+      targetSide,
+      baseOffset,
+      true,
+      0,
+      0
+    );
+  }
+
+  let sX = sourcePoint.x;
+  let sY = sourcePoint.y;
+  let tX = targetPoint.x;
+  let tY = targetPoint.y;
+
+  if (baseOffset !== 0) {
+    const dx = tX - sX;
+    const dy = tY - sY;
+    const length = Math.hypot(dx, dy) || 1;
+    const normX = -dy / length;
+    const normY = dx / length;
+    sX += normX * baseOffset;
+    sY += normY * baseOffset;
+    tX += normX * baseOffset;
+    tY += normY * baseOffset;
+  }
+
+  return `M ${sX} ${sY} L ${tX} ${tY}`;
+}
+
+/**
+ * Build straight edge path using EdgeCalculationContext
+ * Convenience wrapper for easier component integration
+ */
+export function buildStraightEdgePathWithContext(context: EdgeCalculationContext): string {
+  return buildStraightEdgePath(
+    context.sourcePoint,
+    context.targetPoint,
+    context.sourceSide,
+    context.targetSide,
+    calculateBaseOffset(context.parallelIndex, context.totalParallel),
+    context.isSelfEdge
+  );
+}
+
+/**
  * Build edge path using EdgeCalculationContext
  * Convenience wrapper for easier component integration
  */

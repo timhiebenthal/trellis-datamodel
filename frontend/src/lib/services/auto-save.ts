@@ -45,13 +45,12 @@ export class AutoSaveService {
             nodes: currentNodes,
             edges: currentEdges,
         });
+        const matchLast = state === this.lastSavedState;
+        const matchQueued = state === this.queuedState;
+        const matchInFlight = state === this.inFlightState;
 
         // Skip if state hasn't changed or is already queued/in-flight
-        if (
-            state === this.lastSavedState ||
-            state === this.queuedState ||
-            state === this.inFlightState
-        ) {
+        if (matchLast || matchQueued || matchInFlight) {
             return;
         }
 
@@ -62,8 +61,17 @@ export class AutoSaveService {
         }
 
         // Set up new debounced save
-        const nodesSnapshot = structuredClone(currentNodes);
-        const edgesSnapshot = structuredClone(currentEdges);
+        let nodesSnapshot: Node[];
+        let edgesSnapshot: Edge[];
+        try {
+            // structuredClone can fail on non-serializable values in nodes/edges.
+            // JSON clone drops functions and complex types but is safe for payloads.
+            nodesSnapshot = JSON.parse(JSON.stringify(currentNodes)) as Node[];
+            edgesSnapshot = JSON.parse(JSON.stringify(currentEdges)) as Edge[];
+        } catch (e) {
+            console.error('Save snapshot failed', e);
+            return;
+        }
         this.queuedState = state;
         this.setSaving(true);
         this.pendingSaveTimeout = setTimeout(() => {
@@ -245,6 +253,7 @@ export class AutoSaveService {
 
                     const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
+                    const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -261,6 +270,11 @@ export class AutoSaveService {
                         // Include entity_type with default "unclassified" if not set
                         entity_type: entity_type,
                     };
+                    
+                    // Include annotation_type if present (for dimensions created from business events)
+                    if (annotation_type) {
+                        entity.annotation_type = annotation_type;
+                    }
                     
                     // Only persist source_system for unbound entities
                     // Bound entities get source_system from lineage
@@ -330,6 +344,8 @@ export class AutoSaveService {
     ): Promise<void> {
         try {
             const dataModel = this.buildDataModelFromState(nodesSnapshot, edgesSnapshot);
+            const draftedCounts = (dataModel.entities ?? [])
+                .map((e) => (Array.isArray((e as any).drafted_fields) ? (e as any).drafted_fields.length : 0));
             await apiSaveDataModel(dataModel);
             this.lastSavedState = stateString;
             this.inFlightState = null;

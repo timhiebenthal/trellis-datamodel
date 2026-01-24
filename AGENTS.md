@@ -15,6 +15,7 @@
 - Python: target 3.11+, 4-space indents, type hints, and small focused functions; keep module and test names `snake_case`. Follow existing FastAPI/Typer patterns for routers and CLI commands.
 - Frontend: Svelte components in PascalCase (`Component.svelte`), colocate helpers in the same folder, prefer TypeScript types over `any`, and use Tailwind utility classes consistently. Run `npm run check` before committing to catch TS/Svelte issues.
 - Config: `trellis.yml` uses snake_case keys (`dbt_project_path`, `dbt_manifest_path`, etc.); keep secrets and environment-specific paths out of version control.
+- **Dimension & Fact Styling**: Consistently use green for dimensions (`bg-green-200`, `text-green-900`, icon `lucide:list`) and blue for facts (`bg-blue-200`, `text-blue-900`, icon `lucide:bar-chart-3`) across all UI components (canvas, annotations, badges, etc.).
 
 ## Testing Guidelines
 - Add or update pytest cases in `trellis_datamodel/tests/test_*.py` alongside the feature you touch; mirror fixtures in `conftest.py` when possible.

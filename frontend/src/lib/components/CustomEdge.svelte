@@ -20,6 +20,7 @@
     calculateBaseOffset,
     calculateLabelPositionWithContext,
     buildEdgePathWithContext,
+    buildStraightEdgePathWithContext,
     MARKER_PADDING,
     type EdgeCalculationContext
   } from '$lib/utils/edge-calculations';
@@ -78,6 +79,7 @@
   });
 
   const isSelfEdge = $derived(source === target);
+  const useStraightPath = $derived((data?.layout as string) === 'straight');
 
   // Build the edge path
   const edgePath = $derived.by(() => {
@@ -94,7 +96,7 @@
       dragOffsetX,
       dragOffsetY
     };
-    return buildEdgePathWithContext(context);
+    return useStraightPath ? buildStraightEdgePathWithContext(context) : buildEdgePathWithContext(context);
   });
 
 

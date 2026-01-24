@@ -1,6 +1,7 @@
 <script lang="ts">
     import { getContext } from 'svelte';
     import { readable, type Readable } from 'svelte/store';
+    import { page } from '$app/stores';
     import { viewMode, nodes, edges } from '$lib/stores';
     import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
@@ -26,6 +27,19 @@
     const hasExposuresDataStore =
         getContext<Readable<boolean>>('hasExposuresData') ?? readable(false);
     const hasExposuresData = $derived($hasExposuresDataStore);
+
+    // Read URL parameters for entity filtering
+    const entitiesParam = $derived($page.url.searchParams.get('entities'));
+    const eventTextParam = $derived($page.url.searchParams.get('eventText'));
+
+    // Parse comma-separated entity IDs from URL parameter
+    const filteredEntityIds = $derived(
+        entitiesParam ? entitiesParam.split(',').filter(id => id.trim()) : null
+    );
+
+    // Pass event text for banner display
+    const filterEventText = $derived(eventTextParam || null);
+
 </script>
 
 <svelte:head>
@@ -33,9 +47,11 @@
     <meta name="description" content="Visual data modeling canvas - design and document your data models" />
 </svelte:head>
 
-<Canvas 
-    guidanceConfig={guidanceConfig} 
-    lineageEnabled={lineageEnabled} 
-    exposuresEnabled={exposuresEnabled} 
-    hasExposuresData={hasExposuresData} 
+<Canvas
+    guidanceConfig={guidanceConfig}
+    lineageEnabled={lineageEnabled}
+    exposuresEnabled={exposuresEnabled}
+    hasExposuresData={hasExposuresData}
+    filteredEntityIds={filteredEntityIds}
+    filterEventText={filterEventText}
 />

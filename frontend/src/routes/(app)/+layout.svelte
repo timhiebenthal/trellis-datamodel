@@ -92,6 +92,7 @@ import {
     let exposuresEnabled = $state(false);
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
     let busMatrixEnabled = $state(false);
+    let businessEventsEnabled = $state(false);
     let hasExposuresData = $state(false);
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
@@ -129,6 +130,10 @@ import {
         } else if (currentPath === '/bus-matrix') {
             if ($viewMode !== 'bus_matrix') {
                 $viewMode = 'bus_matrix';
+            }
+        } else if (currentPath === '/business-events') {
+            if ($viewMode !== 'business_events') {
+                $viewMode = 'business_events';
             }
         }
     });
@@ -468,6 +473,7 @@ import {
         }
     });
 
+
     // Watch for nodes changes and apply persisted state once when nodes are first loaded
     $effect(() => {
         const currentNodes = $nodes;
@@ -520,6 +526,7 @@ import {
                 exposuresEnabled = info?.exposures_enabled ?? false;
                 exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
                 busMatrixEnabled = info?.bus_matrix_enabled ?? false;
+                businessEventsEnabled = info?.business_events_enabled ?? false;
                 $modelingStyle = info?.modeling_style ?? 'entity_model';
                 $labelPrefixes = getLabelPrefixesFromConfig(info ?? null);
                 dimensionPrefixes.set(info?.dimension_prefix ?? []);
@@ -749,7 +756,6 @@ import {
         
         const currentNodes = $nodes;
         const currentEdges = $edges;
-        
         autoSaveService.save(currentNodes, currentEdges);
         
         pushHistory();
@@ -839,6 +845,20 @@ import {
 
         <!-- View Switcher -->
         <div class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60 gap-1">
+            {#if businessEventsEnabled && $modelingStyle === 'dimensional_model'}
+                <a
+                    href="/business-events"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class:bg-white={$page.url.pathname === '/business-events'}
+                    class:text-primary-600={$page.url.pathname === '/business-events'}
+                    class:shadow-sm={$page.url.pathname === '/business-events'}
+                    class:text-gray-500={$page.url.pathname !== '/business-events'}
+                    class:hover:text-gray-900={$page.url.pathname !== '/business-events'}
+                >
+                    <Icon icon="lucide:calendar-check" class="w-3.5 h-3.5" />
+                    Business Events
+                </a>
+            {/if}
             <a
                 href="/canvas"
                 class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"

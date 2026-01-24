@@ -22,6 +22,7 @@ from trellis_datamodel.exceptions import (
 )
 from trellis_datamodel.routes import (
     bus_matrix_router,
+    business_events_router,
     config_router,
     data_model_router,
     exposures_router,
@@ -156,6 +157,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(exposures_router)
     app.include_router(lineage_router)
     app.include_router(bus_matrix_router)
+    app.include_router(business_events_router)
 
 
 def create_app() -> FastAPI:

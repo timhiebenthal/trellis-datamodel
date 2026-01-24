@@ -50,6 +50,11 @@ def clean_test_files():
     if os.path.exists(manifest_path):
         os.remove(manifest_path)
 
+    # Clean business_events.yml file
+    business_events_path = os.path.join(_TEST_TEMP_DIR, "business_events.yml")
+    if os.path.exists(business_events_path):
+        os.remove(business_events_path)
+
     # Clean model yml files (recursively) to avoid cross-test leakage
     models_dir = os.path.join(_TEST_TEMP_DIR, "models", "3_core")
     if os.path.exists(models_dir):

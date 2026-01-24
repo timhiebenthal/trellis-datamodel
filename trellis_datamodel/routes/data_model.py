@@ -268,6 +268,8 @@ def _split_model_and_layout(
             model_entity["tags"] = entity["tags"]
         if "entity_type" in entity:
             model_entity["entity_type"] = entity["entity_type"]
+        if "annotation_type" in entity:
+            model_entity["annotation_type"] = entity["annotation_type"]
         # Only persist source_system for unbound entities (not for bound entities)
         if "source_system" in entity and not entity.get("dbt_model"):
             model_entity["source_system"] = entity["source_system"]

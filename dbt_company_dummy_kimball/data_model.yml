@@ -1,93 +1,79 @@
 version: 0.1
 entities:
-  - id: procurement
-    label: Procurement
-    description: Procurement records at purchase-order-item grain with enriched purchase order information
-    dbt_model: model.company_dummy_kimball.fact_procurement
-    entity_type: fact
-  - id: customer
+  - id: dim_customer
     label: Customer
-    description: Customer records
-    dbt_model:
+    description: 'Dimension: Customer'
+    tags:
+      - sales
     entity_type: dimension
-    source_system:
-      - mock_csv
-  - id: product
+  - id: dim_product
     label: Product
-    description: Product catalog
-    dbt_model: model.company_dummy_kimball.dim_product
+    description: 'Dimension: product'
+    tags:
+      - sales
     entity_type: dimension
-  - id: supplier
-    label: Supplier
-    description: Supplier records
-    dbt_model: model.company_dummy_kimball.dim_supplier
+  - id: dim_order_date
+    label: Order Date
+    description: 'Dimension: order date'
+    tags:
+      - sales
     entity_type: dimension
-  - id: sale
-    label: Sale
-    description: Sale records at order-item grain with enriched order information
-    dbt_model: model.company_dummy_kimball.fact_sale
+  - id: dim_country
+    label: Country
+    description: 'Dimension: country'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_store
+    label: Store
+    description: 'Dimension: store'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_marketing_campaign
+    label: Marketing Campaign
+    description: 'Dimension: marketing_campaign'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_promo_code
+    label: Promo Code
+    description: 'Dimension: promo_code'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: fact_customer_buys_product
+    label: Sales Activity
+    description: 'Fact: Customer Buys Product'
+    tags:
+      - sales
     entity_type: fact
-  - id: inventory
-    label: Inventory
-    description: Product inventory levels
-    dbt_model: model.company_dummy_kimball.dim_inventory
-    entity_type: dimension
-  - id: customer_invoice
-    label: Customer Invoice
-    description: Customer invoices for sales orders
-    dbt_model: model.company_dummy_kimball.dim_customer_invoice
-    entity_type: dimension
-  - id: department
-    label: Department
-    description: Company departments
-    dbt_model: model.company_dummy_kimball.dim_department
-    entity_type: dimension
-  - id: employee
-    label: Employee
-    description: Employee records
-    dbt_model: model.company_dummy_kimball.dim_employee
-    additional_models:
-      - model.company_dummy_kimball.dim_employee_history
-    entity_type: dimension
-  - id: lead
-    label: Lead
-    description: Sales leads
-    dbt_model: model.company_dummy_kimball.dim_lead
-    entity_type: dimension
 relationships:
-  - source: product
-    target: procurement
+  - source: dim_customer
+    target: fact_customer_buys_product
     label: ''
     type: one_to_many
-    source_field: product_id
-    target_field: product_id
-  - source: supplier
-    target: procurement
+  - source: dim_product
+    target: fact_customer_buys_product
     label: ''
     type: one_to_many
-    source_field: supplier_id
-    target_field: supplier_id
-  - source: product
-    target: sale
+  - source: dim_order_date
+    target: fact_customer_buys_product
     label: ''
     type: one_to_many
-    source_field: product_id
-    target_field: product_id
-  - source: product
-    target: inventory
+  - source: dim_country
+    target: fact_customer_buys_product
     label: ''
     type: one_to_many
-    source_field: product_id
-    target_field: product_id
-  - source: department
-    target: employee
+  - source: dim_store
+    target: fact_customer_buys_product
     label: ''
     type: one_to_many
-    source_field: department_id
-    target_field: department_id
-  - source: employee
-    target: employee
+  - source: dim_marketing_campaign
+    target: fact_customer_buys_product
     label: ''
     type: one_to_many
-    source_field: employee_id
-    target_field: supervisor_id
+  - source: dim_promo_code
+    target: fact_customer_buys_product
+    label: ''
+    type: one_to_many

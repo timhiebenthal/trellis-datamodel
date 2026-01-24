@@ -48,6 +48,7 @@ export interface EntityData {
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
+    annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
@@ -71,6 +72,7 @@ export interface Entity {
     collapsed?: boolean;
     tags?: string[];
     entity_type?: "fact" | "dimension" | "unclassified";
+    annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Only for unbound entities (mock sources)
 }
 
@@ -150,6 +152,7 @@ export interface ConfigInfo {
     exposures_enabled?: boolean;
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
     bus_matrix_enabled?: boolean;
+    business_events_enabled?: boolean;
     modeling_style?: 'dimensional_model' | 'entity_model';
     entity_prefix?: string[];
     label_prefixes?: string[];
@@ -274,4 +277,77 @@ export interface ConfigUpdateResponse {
         mtime: number;
         hash: string;
     };
+}
+
+// Business Events types
+export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
+
+export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'how_many' | 'why';
+
+export type SevenWType = AnnotationType;
+
+export type SevenWsEntry = AnnotationEntry;
+
+export type BusinessEventSevenWs = BusinessEventAnnotations;
+
+export type Annotation = AnnotationEntry;
+
+export interface AnnotationEntry {
+    id: string;
+    dimension_id?: string;
+    text: string;
+    description?: string;
+    attributes?: Record<string, any>;
+}
+
+export interface BusinessEventAnnotations {
+    who: AnnotationEntry[];
+    what: AnnotationEntry[];
+    when: AnnotationEntry[];
+    where: AnnotationEntry[];
+    how: AnnotationEntry[];
+    how_many: AnnotationEntry[];
+    why: AnnotationEntry[];
+}
+
+export interface Dimension {
+    id: string;
+    label: string;
+    entity_type: 'fact' | 'dimension' | 'unclassified';
+    annotation_type?: AnnotationType;
+    description?: string;
+}
+
+export interface DerivedEntity {
+    entity_id: string;
+    created_at: string; // ISO timestamp
+}
+
+export interface BusinessEvent {
+    id: string; // e.g., "evt_YYYYMMDD_NNN"
+    text: string;
+    type: BusinessEventType;
+    domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
+    created_at: string; // ISO timestamp
+    updated_at: string; // ISO timestamp
+    annotations?: BusinessEventAnnotations; // Event annotations (Who, What, When, Where, How, How Many, Why)
+    derived_entities: DerivedEntity[];
+}
+
+export interface GeneratedEntitiesResult {
+    entities: Array<{
+        id: string;
+        label: string;
+        entity_type: 'fact' | 'dimension' | 'unclassified';
+        description?: string;
+        metadata?: Record<string, any>;
+        tags?: string[]; // Tags including inherited domain tags
+    }>;
+    relationships: Array<{
+        source: string;
+        target: string;
+        type: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many';
+        label?: string;
+    }>;
+    errors: string[];
 }

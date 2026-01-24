@@ -1,98 +1,81 @@
 version: 0.1
 entities:
-  procurement:
+  dim_customer:
     position:
-      x: 379.8634640072285
-      y: -101.96964254627386
+      x: 1076.798057219592
+      y: 436.7462765234496
     width: 280
     panel_height: 200
     collapsed: false
-  customer:
+  dim_product:
     position:
-      x: 1171.4766641754989
-      y: 99.97957447858295
+      x: 1053.7144044896788
+      y: -134.90473979057657
     width: 280
     panel_height: 200
     collapsed: false
-  product:
+  dim_order_date:
     position:
-      x: 1025.0300547687725
-      y: 453.5329650718567
+      x: 457.5514147941594
+      y: 52.248898243794784
     width: 280
     panel_height: 200
     collapsed: false
-  supplier:
+  dim_country:
     position:
-      x: 671.4766641754989
-      y: 599.9795744785829
-    width: 334
-    panel_height: 200
-    collapsed: false
-  sale:
-    position:
-      x: 798.1757707911919
-      y: -82.4774722977057
+      x: 1089.426122857841
+      y: -263.726501280768
     width: 280
     panel_height: 200
     collapsed: false
-  inventory:
+  dim_store:
     position:
-      x: 317.92327358222514
-      y: 453.5329650718567
+      x: 186.07397967402267
+      y: 192.5944568982112
     width: 280
     panel_height: 200
     collapsed: false
-  customer_invoice:
+  dim_marketing_campaign:
     position:
-      x: 56.472859708946686
-      y: 101.92879150343981
+      x: 546.3064910124195
+      y: 684.3906026457838
     width: 280
     panel_height: 200
     collapsed: false
-  department:
+  dim_promo_code:
     position:
-      x: 87.91566464912071
-      y: -352.9838843823884
+      x: 108.68465521751364
+      y: 317.9095149822938
     width: 280
     panel_height: 200
     collapsed: false
-  employee:
+  fact_customer_buys_product:
     position:
-      x: 671.4766641754987
-      y: -400.02042552141705
-    width: 280
-    panel_height: 200
-    collapsed: false
-  lead:
-    position:
-      x: 1025.0300547687725
-      y: -253.57381611469089
+      x: 640.7185975395967
+      y: 136.02812509492037
     width: 280
     panel_height: 200
     collapsed: false
 relationships:
-  product-procurement-0:
+  dim_customer-fact_customer_buys_product-0:
     label_dx: 0
     label_dy: 0
-  supplier-procurement-1:
+  dim_product-fact_customer_buys_product-1:
     label_dx: 0
     label_dy: 0
-  product-sale-2:
+  dim_order_date-fact_customer_buys_product-2:
     label_dx: 0
     label_dy: 0
-  customer-sale-3:
+  dim_country-fact_customer_buys_product-3:
     label_dx: 0
     label_dy: 0
-  product-inventory-4:
+  dim_store-fact_customer_buys_product-4:
     label_dx: 0
     label_dy: 0
-  department-employee-5:
+  dim_marketing_campaign-fact_customer_buys_product-5:
     label_dx: 0
     label_dy: 0
-  employee-employee-6:
-    label_dx: 0
-    label_dy: 0
-  lead-customer-7:
+  dim_promo_code-fact_customer_buys_product-6:
     label_dx: 0
     label_dy: 0
 source_colors: {}
