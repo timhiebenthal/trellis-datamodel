@@ -268,7 +268,7 @@
                 const updates: Partial<BusinessEvent> = {
                     text: eventText.trim(),
                     type: eventType,
-                    domain: eventDomain
+                    domain: eventDomain ?? undefined
                 };
 
                 // Include annotations in request if annotations are shown and have data
@@ -282,7 +282,7 @@
                 await createBusinessEvent(
                     eventText.trim(),
                     eventType,
-                    eventDomain
+                    eventDomain ?? undefined
                 );
                 // Note: Annotations can be added in a separate edit flow after creation
                 // This allows users to create basic events first, then add annotations later
