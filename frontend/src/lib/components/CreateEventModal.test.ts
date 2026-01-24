@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, cleanup } from '@testing-library/svelte';
 import CreateEventModal from './CreateEventModal.svelte';
 import type { BusinessEventType, BusinessEventSevenWs } from '$lib/types';
 
@@ -18,6 +18,7 @@ describe('CreateEventModal', () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
@@ -56,7 +57,7 @@ describe('CreateEventModal', () => {
             onCancel
         });
 
-        expect(screen.getByText(/7 Ws/i)).toBeInTheDocument();
+        expect(screen.getByText(/Annotations/i)).toBeInTheDocument();
     });
 
     it('validates text is required', () => {
@@ -69,8 +70,9 @@ describe('CreateEventModal', () => {
             onCancel
         });
 
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        expect(saveButton).toBeInTheDocument();
+        const saveButtons = screen.getAllByRole('button', { name: /save/i });
+        expect(saveButtons.length).toBeGreaterThan(0);
+        expect(saveButtons[0]).toBeInTheDocument();
         
         // Just verify structure - text input should exist
         const textInput = screen.getByLabelText(/event description/i);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, cleanup } from '@testing-library/svelte';
 import DimensionAutocomplete from './DimensionAutocomplete.svelte';
 import type { Dimension, SevenWType } from '$lib/types';
 
@@ -18,6 +18,7 @@ describe('DimensionAutocomplete', () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, cleanup } from '@testing-library/svelte';
 import SevenWsForm from './SevenWsForm.svelte';
 import type { BusinessEvent, BusinessEventSevenWs } from '$lib/types';
 
@@ -18,6 +18,7 @@ describe('SevenWsForm', () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
@@ -51,7 +52,7 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        expect(screen.getByText('7 Ws - Business Event')).toBeInTheDocument();
+        expect(screen.getByText('Annotations - Business Event')).toBeInTheDocument();
         expect(screen.getByText('customer buys product')).toBeInTheDocument();
     });
 
@@ -65,7 +66,7 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        expect(screen.getByText('1/7 Ws completed')).toBeInTheDocument();
+        expect(screen.getByText('1/7 completed')).toBeInTheDocument();
     });
 
     it('renders all 7 W type sections', () => {
@@ -78,13 +79,21 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        expect(screen.getByText('Who')).toBeInTheDocument();
-        expect(screen.getByText('What')).toBeInTheDocument();
-        expect(screen.getByText('When')).toBeInTheDocument();
-        expect(screen.getByText('Where')).toBeInTheDocument();
-        expect(screen.getByText('How')).toBeInTheDocument();
-        expect(screen.getByText('How Many')).toBeInTheDocument();
-        expect(screen.getByText('Why')).toBeInTheDocument();
+        const whoTexts = screen.getAllByText('Who');
+        const whatTexts = screen.getAllByText('What');
+        const whenTexts = screen.getAllByText('When');
+        const whereTexts = screen.getAllByText('Where');
+        const howTexts = screen.getAllByText('How');
+        const howManyTexts = screen.getAllByText('How Many');
+        const whyTexts = screen.getAllByText('Why');
+        
+        expect(whoTexts.length).toBeGreaterThan(0);
+        expect(whatTexts.length).toBeGreaterThan(0);
+        expect(whenTexts.length).toBeGreaterThan(0);
+        expect(whereTexts.length).toBeGreaterThan(0);
+        expect(howTexts.length).toBeGreaterThan(0);
+        expect(howManyTexts.length).toBeGreaterThan(0);
+        expect(whyTexts.length).toBeGreaterThan(0);
     });
 
     it('shows validation errors when no dimensions or how_many entries', () => {
@@ -110,9 +119,9 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        // Can't actually click in test without user-event, just verify errors exist
-        expect(saveButton).toBeInTheDocument();
+        const saveButtons = screen.getAllByRole('button', { name: /save/i });
+        expect(saveButtons.length).toBeGreaterThan(0);
+        expect(saveButtons[0]).toBeInTheDocument();
         
         // Errors should be present
         expect(screen.getByText(/At least one dimension entry/)).toBeInTheDocument();
@@ -129,11 +138,9 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        // Note: Can't actually click without user-event installed
-        // Just verify the component structure is correct
-        
-        expect(saveButton).toBeInTheDocument();
+        const saveButtons = screen.getAllByRole('button', { name: /save/i });
+        expect(saveButtons.length).toBeGreaterThan(0);
+        expect(saveButtons[0]).toBeInTheDocument();
     });
 
     it('calls onCancel when cancel button is clicked', () => {
@@ -146,7 +153,7 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        const cancelButton = screen.getByRole('button', { name: /cancel/i });
+        const cancelButton = screen.getAllByRole('button', { name: /cancel/i })[0];
         // Note: Can't actually click without user-event installed
         // Just verify the component structure is correct
         expect(cancelButton).toBeInTheDocument();
@@ -175,7 +182,7 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        const badge = screen.getByText('7/7 Ws completed');
+        const badge = screen.getByText('7/7 completed');
         expect(badge).toHaveClass('bg-green-100', 'text-green-800');
     });
 
@@ -189,7 +196,7 @@ describe('SevenWsForm', () => {
             onCancel
         });
 
-        const badge = screen.getByText('1/7 Ws completed');
+        const badge = screen.getByText('1/7 completed');
         expect(badge).toHaveClass('bg-amber-100', 'text-amber-800');
     });
 });

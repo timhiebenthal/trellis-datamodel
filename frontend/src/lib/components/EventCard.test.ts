@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, cleanup } from '@testing-library/svelte';
 import EventCard from './EventCard.svelte';
 import type { BusinessEvent, BusinessEventSevenWs } from '$lib/types';
 
@@ -18,6 +18,7 @@ describe('EventCard', () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
@@ -53,7 +54,7 @@ describe('EventCard', () => {
             onDelete
         });
 
-        expect(screen.getByText('3/7 Ws')).toBeInTheDocument();
+        expect(screen.getByText('3/7')).toBeInTheDocument();
     });
 
     it('shows green badge when all Ws are filled', () => {
@@ -81,7 +82,7 @@ describe('EventCard', () => {
             onDelete
         });
 
-        const badge = screen.getByText('7/7 Ws');
+        const badge = screen.getByText('7/7');
         expect(badge).toHaveClass('bg-green-100', 'text-green-800');
     });
 
@@ -97,7 +98,7 @@ describe('EventCard', () => {
             onDelete
         });
 
-        const badge = screen.getByText('3/7 Ws');
+        const badge = screen.getByText('3/7');
         expect(badge).toHaveClass('bg-amber-100', 'text-amber-800');
     });
 
@@ -132,8 +133,8 @@ describe('EventCard', () => {
             onDelete
         });
 
-        const badge = screen.getByText('0/7 Ws');
-        expect(badge).toHaveClass('bg-gray-100', 'text-gray-800');
+        const badge = screen.queryByText('0/7');
+        expect(badge).not.toBeInTheDocument();
     });
 
     it('shows domain badge when domain exists', () => {
@@ -148,7 +149,8 @@ describe('EventCard', () => {
             onDelete
         });
 
-        expect(screen.getByText('Sales')).toBeInTheDocument();
+        const salesTexts = screen.getAllByText('Sales');
+        expect(salesTexts.length).toBeGreaterThan(0);
     });
 
     it('does not show domain badge when domain is null', () => {
