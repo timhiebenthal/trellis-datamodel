@@ -45,13 +45,12 @@ export class AutoSaveService {
             nodes: currentNodes,
             edges: currentEdges,
         });
+        const matchLast = state === this.lastSavedState;
+        const matchQueued = state === this.queuedState;
+        const matchInFlight = state === this.inFlightState;
 
         // Skip if state hasn't changed or is already queued/in-flight
-        if (
-            state === this.lastSavedState ||
-            state === this.queuedState ||
-            state === this.inFlightState
-        ) {
+        if (matchLast || matchQueued || matchInFlight) {
             return;
         }
 
@@ -62,8 +61,17 @@ export class AutoSaveService {
         }
 
         // Set up new debounced save
-        const nodesSnapshot = structuredClone(currentNodes);
-        const edgesSnapshot = structuredClone(currentEdges);
+        let nodesSnapshot: Node[];
+        let edgesSnapshot: Edge[];
+        try {
+            // structuredClone can fail on non-serializable values in nodes/edges.
+            // JSON clone drops functions and complex types but is safe for payloads.
+            nodesSnapshot = JSON.parse(JSON.stringify(currentNodes)) as Node[];
+            edgesSnapshot = JSON.parse(JSON.stringify(currentEdges)) as Edge[];
+        } catch (e) {
+            console.error('Save snapshot failed', e);
+            return;
+        }
         this.queuedState = state;
         this.setSaving(true);
         this.pendingSaveTimeout = setTimeout(() => {
@@ -336,6 +344,8 @@ export class AutoSaveService {
     ): Promise<void> {
         try {
             const dataModel = this.buildDataModelFromState(nodesSnapshot, edgesSnapshot);
+            const draftedCounts = (dataModel.entities ?? [])
+                .map((e) => (Array.isArray((e as any).drafted_fields) ? (e as any).drafted_fields.length : 0));
             await apiSaveDataModel(dataModel);
             this.lastSavedState = stateString;
             this.inFlightState = null;

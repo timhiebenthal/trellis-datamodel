@@ -59,7 +59,7 @@
     // Cast data to EntityData for proper typing - use $derived to maintain reactivity
     let data = $derived(rawData as unknown as EntityData);
 
-    const { updateNodeData, getNodes } = useSvelteFlow();
+    const { updateNodeData } = useSvelteFlow();
     let showEntityTypeMenu = $state(false);
     let showUndescribedAttributesWarning = $state(false);
     let undescribedAttributeNames = $state<string[]>([]);

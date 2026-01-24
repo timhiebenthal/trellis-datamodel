@@ -473,6 +473,7 @@ import {
         }
     });
 
+
     // Watch for nodes changes and apply persisted state once when nodes are first loaded
     $effect(() => {
         const currentNodes = $nodes;
@@ -755,7 +756,6 @@ import {
         
         const currentNodes = $nodes;
         const currentEdges = $edges;
-        
         autoSaveService.save(currentNodes, currentEdges);
         
         pushHistory();

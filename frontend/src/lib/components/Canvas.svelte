@@ -119,6 +119,10 @@
                     missingCount += 1;
                 }
             });
+            if (updatedCount > 0) {
+                // Force store update so autosave reacts in filtered mode.
+                $nodes = [...$nodes];
+            }
         }
     });
 
