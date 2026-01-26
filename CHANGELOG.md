@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0b1] - 2026-01-26
+
+### Added
+- Added Business Events modeling based on the **7 Ws methodology** (Who, What, When, Where, How, How Many, Why) using the BEAM* approach.
+- Added a new **Business Events view** (`/business-events`) for managing and visualizing business processes.
+- Added a structured **7 Ws Form** for capturing event details, replacing the legacy text-selection annotation system.
+- Added **Automated Entity Generation**: automatically derive star schemas (fact and dimension tables) from defined business events.
+- Added **Dimension Autocomplete** component to link events to existing dimensions or propose new ones.
+- Added **Event Card** and **Event Filter Banner** components for improved organization and discovery of business events.
+- Added `business_events.yml` support for persisting event definitions alongside the data model.
+- Added backend service layer (`BusinessEventsService`, `EntityGenerator`) to handle event logic and dbt artifact generation.
+- Added comprehensive test suites for business events logic, including Vitest for frontend components and pytest for backend services.
+
+### Changed
+- Refactored the annotation system to transition from unstructured text highlights to structured event-based modeling.
+- Updated the main navigation and layout to include the Business Events view.
+- Enhanced `trellis.yml` configuration to support business event metadata and storage paths.
+- Updated the ERD Canvas to visualize relationships derived from business events.
+
+### Fixed
+- Fixed various edge cases in relationship inference when dealing with multi-model entities.
+- Improved frontend state management for auto-saving complex form data in the 7 Ws wizard.
+
 ## [0.7.0]
 
 ### Added
