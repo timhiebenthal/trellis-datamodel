@@ -218,16 +218,6 @@
                 </a>
             {/if}
 
-            {#if process && onResolveProcess}
-                <button
-                    onclick={() => onResolveProcess(process.id)}
-                    class="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
-                    title="Resolve process grouping (ungroup events)"
-                >
-                    <Icon icon="lucide:layers-off" class="w-4 h-4" />
-                </button>
-            {/if}
-
             <button
                 onclick={handleDelete}
                 class="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"

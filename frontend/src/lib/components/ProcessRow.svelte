@@ -6,11 +6,12 @@
         process: BusinessEventProcess;
         eventCount: number;
         onAnnotate?: () => void;
+        onEdit?: () => void;
         onOpenCanvas?: () => void;
         onResolve?: (processId: string) => Promise<void> | void;
     };
 
-    let { process, eventCount, onAnnotate, onOpenCanvas, onResolve }: Props = $props();
+    let { process, eventCount, onAnnotate, onEdit, onOpenCanvas, onResolve }: Props = $props();
 
     let resolving = $state(false);
 
@@ -35,7 +36,7 @@
                 {process.name}
             </span>
             <span class="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                {eventCount} grouped event{eventCount === 1 ? "" : "s"}
+                Process of {eventCount} event{eventCount === 1 ? "" : "s"}
             </span>
             <div class="flex items-center gap-2 text-[11px] text-slate-500">
                 <span>{process.type}</span>
@@ -43,6 +44,15 @@
         </div>
     </div>
     <div class="flex items-center gap-1">
+        <button
+            type="button"
+            class="p-1.5 rounded text-gray-600 hover:text-green-600 hover:bg-green-50 transition-colors disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            on:click={() => onEdit?.()}
+            disabled={!onEdit}
+            title="Edit process details"
+        >
+            <Icon icon="lucide:edit" class="w-4 h-4" />
+        </button>
         <button
             type="button"
             class="p-1.5 rounded text-gray-600 hover:text-green-600 hover:bg-green-50 transition-colors disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
@@ -63,12 +73,12 @@
         </button>
         <button
             type="button"
-            class="p-1.5 rounded text-gray-600 hover:text-orange-600 hover:bg-orange-50 transition-colors disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            class="p-1.5 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             on:click={handleResolve}
             disabled={!onResolve || resolving}
             title="Resolve process"
         >
-            <Icon icon="lucide:layers-off" class="w-4 h-4" />
+            <Icon icon="lucide:x" class="w-4 h-4" />
         </button>
     </div>
 </div>

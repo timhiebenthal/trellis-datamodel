@@ -504,6 +504,32 @@ class TestAnnotationUnionLogic:
         assert len(union.who) == 1
         assert union.who[0].dimension_id == "dim_customer"
 
+    def test_deduplicates_when_dimension_id_missing_in_one_entry(self, temp_dir, monkeypatch):
+        """Test that text matches dedupe when only one entry has dimension_id."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Employee")]
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry2", text="Employee", dimension_id="dim_employee")]
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        events = business_events_service.load_business_events()
+        process_events = [e for e in events if e.id in [event1.id, event2.id]]
+        union = business_events_service._compute_annotation_union(process_events)
+
+        assert len(union.who) == 1
+        assert union.who[0].dimension_id == "dim_employee"
+
     def test_deduplicates_by_normalized_text(self, temp_dir, monkeypatch):
         """Test that entries with same normalized text are deduplicated."""
         events_path = os.path.join(temp_dir, "business_events.yml")

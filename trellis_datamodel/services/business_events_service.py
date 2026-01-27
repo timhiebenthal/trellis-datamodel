@@ -730,84 +730,6 @@ def save_processes(
         raise FileOperationError(f"Failed to write processes file: {e}")
 
 
-def create_process(
-    name: str,
-    type: BusinessEventType,
-    domain: str,
-    event_ids: Optional[List[str]] = None,
-) -> BusinessEventProcess:
-    """
-    Create a new business event process with auto-generated ID.
-
-    Args:
-        name: Process name
-        type: Process type (discrete, evolving, recurring)
-        domain: Business domain for the process
-        event_ids: Optional list of event IDs to attach initially
-
-    Returns:
-        New BusinessEventProcess object
-
-    Raises:
-        ValidationError: If name or domain is invalid, or event_ids contain invalid IDs
-        FileOperationError: If file operations fail
-    """
-    if not name or not name.strip():
-        raise ValidationError("Process name is required")
-
-    if not domain or not domain.strip():
-        raise ValidationError("Process domain is required")
-
-    normalized_domain = domain.strip()
-
-    # Validate event IDs exist
-    if event_ids:
-        events = load_business_events()
-        existing_event_ids = {e.id for e in events}
-        for event_id in event_ids:
-            if event_id not in existing_event_ids:
-                raise ValidationError(f"Event '{event_id}' not found")
-
-    # Generate ID: proc_YYYYMMDD_NNN
-    today = datetime.now().strftime("%Y%m%d")
-    processes = load_processes()
-    # Find highest number for today
-    max_num = 0
-    for process in processes:
-        if process.id.startswith(f"proc_{today}_"):
-            try:
-                num = int(process.id.split("_")[-1])
-                max_num = max(max_num, num)
-            except ValueError:
-                pass
-    new_id = f"proc_{today}_{max_num + 1:03d}"
-
-    now = datetime.now()
-    new_process = BusinessEventProcess(
-        id=new_id,
-        name=name.strip(),
-        type=type,
-        domain=normalized_domain,
-        event_ids=event_ids or [],
-        created_at=now,
-        updated_at=now,
-        resolved_at=None,
-        annotations_superset=None,
-    )
-
-    processes.append(new_process)
-    save_processes(processes)
-
-    # Attach events to process if provided
-    if event_ids:
-        attach_events_to_process(new_id, event_ids)
-
-    logger.info(
-        f"Created process: {new_id} (name: {name}, type: {type.value}, domain: {normalized_domain})"
-    )
-    return new_process
-
-
 def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
     """
     Update an existing business event process.
@@ -1154,43 +1076,54 @@ def _compute_annotation_union(
     Returns:
         BusinessEventAnnotations with unioned entries
     """
-    # Track seen entries by unique key
-    seen_keys: Dict[str, AnnotationEntry] = {}
     annotation_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+    annotations_by_type: Dict[str, List[AnnotationEntry]] = {t: [] for t in annotation_types}
 
-    for event in events:
-        if not event.annotations:
-            continue
+    def _normalize_key(entry: AnnotationEntry) -> tuple[str, str]:
+        normalized_text = entry.text.lower().strip() if entry.text else ""
+        normalized_desc = entry.description.lower().strip() if entry.description else ""
+        return normalized_text, normalized_desc
 
-        for annotation_type in annotation_types:
+    for annotation_type in annotation_types:
+        seen_by_dimension: Dict[str, int] = {}
+        seen_by_text_no_dim: Dict[tuple[str, str], int] = {}
+        seen_text_with_dim: set[tuple[str, str]] = set()
+
+        for event in events:
+            if not event.annotations:
+                continue
+
             category_list = getattr(event.annotations, annotation_type, [])
             for entry in category_list:
-                # Create unique key
+                text_key = _normalize_key(entry)
+
                 if entry.dimension_id:
-                    unique_key = f"{annotation_type}:{entry.dimension_id}"
+                    if entry.dimension_id in seen_by_dimension:
+                        continue
+
+                    if text_key in seen_by_text_no_dim:
+                        index = seen_by_text_no_dim.pop(text_key)
+                        annotations_by_type[annotation_type][index] = entry
+                        seen_by_dimension[entry.dimension_id] = index
+                    else:
+                        index = len(annotations_by_type[annotation_type])
+                        annotations_by_type[annotation_type].append(entry)
+                        seen_by_dimension[entry.dimension_id] = index
+
+                    seen_text_with_dim.add(text_key)
                 else:
-                    # Normalize text for comparison (lowercase, strip)
-                    normalized_text = entry.text.lower().strip() if entry.text else ""
-                    normalized_desc = (
-                        entry.description.lower().strip()
-                        if entry.description
-                        else ""
-                    )
-                    unique_key = f"{annotation_type}:{normalized_text}:{normalized_desc}"
+                    if text_key in seen_by_text_no_dim:
+                        continue
+                    if text_key in seen_text_with_dim:
+                        continue
 
-                # Only add if we haven't seen this key before
-                if unique_key not in seen_keys:
-                    seen_keys[unique_key] = entry
+                    index = len(annotations_by_type[annotation_type])
+                    annotations_by_type[annotation_type].append(entry)
+                    seen_by_text_no_dim[text_key] = index
 
-    # Build result annotations
     result = BusinessEventAnnotations()
     for annotation_type in annotation_types:
-        category_entries = [
-            entry
-            for key, entry in seen_keys.items()
-            if key.startswith(f"{annotation_type}:")
-        ]
-        setattr(result, annotation_type, category_entries)
+        setattr(result, annotation_type, annotations_by_type[annotation_type])
 
     return result
 
@@ -1207,8 +1140,8 @@ def _require_process_domain(domain: Optional[str]) -> str:
 def create_process(
     name: str,
     type: BusinessEventType,
-    event_ids: List[str],
     domain: str,
+    event_ids: List[str],
 ) -> BusinessEventProcess:
     """
     Create a new business event process with auto-generated ID.
@@ -1216,6 +1149,7 @@ def create_process(
     Args:
         name: Process name
         type: Process type (discrete, evolving, recurring)
+        domain: Business domain for the process
         event_ids: List of event IDs to include in this process
 
     Returns:

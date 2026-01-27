@@ -19,6 +19,7 @@ import type {
     import CollapseChevron from './CollapseChevron.svelte';
     import EventCard from './EventCard.svelte';
     import ProcessRow from './ProcessRow.svelte';
+    import ProcessEditModal from './ProcessEditModal.svelte';
     import SevenWsForm from './SevenWsForm.svelte';
     import GenerateEntitiesDialog from './GenerateEntitiesDialog.svelte';
     import ProcessGroupModal from './ProcessGroupModal.svelte';
@@ -57,6 +58,8 @@ let processActionError = $state<string | null>(null);
 let showProcessSevenWsForm = $state(false);
 let processUnderAnnotation = $state<BusinessEventProcess | null>(null);
 let processAnnotationEvent = $state<BusinessEvent | null>(null);
+let showProcessEditModal = $state(false);
+let processUnderEdit = $state<BusinessEventProcess | null>(null);
 
     // Helper function to convert domain to title case
     function toTitleCase(str: string): string {
@@ -251,6 +254,22 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
         showProcessSevenWsForm = false;
         processUnderAnnotation = null;
         processAnnotationEvent = null;
+    }
+
+    function handleProcessEdit(process: BusinessEventProcess) {
+        processUnderEdit = process;
+        showProcessEditModal = true;
+    }
+
+    function handleProcessEditCancel() {
+        showProcessEditModal = false;
+        processUnderEdit = null;
+    }
+
+    function handleProcessEditSave() {
+        showProcessEditModal = false;
+        processUnderEdit = null;
+        reloadEvents();
     }
 
     function handleProcessCanvasLink(process: BusinessEventProcess, derivedIds?: string[]) {
@@ -732,6 +751,7 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                                 <ProcessRow
                                                     process={processGroup.process}
                                                     eventCount={processGroup.events.length}
+                                                    onEdit={() => handleProcessEdit(processGroup.process)}
                                                     onAnnotate={() => handleProcessAnnotate(processGroup.process)}
                                                     onOpenCanvas={
                                                         derivedIds.length > 0
@@ -765,38 +785,19 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                         </div>
                                     {/each}
                                     {#if domainGroup.ungroupedEvents.length > 0}
-                                        {#if domainGroup.processes.length > 0}
-                                            <div class="space-y-2 pt-2">
-                                                <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                                    Ungrouped events
-                                                </p>
-                                                {#each domainGroup.ungroupedEvents as event (event.id)}
-                                                    <EventCard
-                                                        {event}
-                                                        selected={selectedEventIds.has(event.id)}
-                                                        onSelect={(selected) => handleEventSelect(event.id, selected)}
-                                                        onEditEvent={handleEditEvent}
-                                                        onEditSevenWs={handleEditSevenWs}
-                                                        onGenerateEntities={handleGenerateEntities}
-                                                        onDelete={reloadEvents}
-                                                    />
-                                                {/each}
-                                            </div>
-                                        {:else}
-                                            <div class="space-y-2 pt-2">
-                                                {#each domainGroup.ungroupedEvents as event (event.id)}
-                                                    <EventCard
-                                                        {event}
-                                                        selected={selectedEventIds.has(event.id)}
-                                                        onSelect={(selected) => handleEventSelect(event.id, selected)}
-                                                        onEditEvent={handleEditEvent}
-                                                        onEditSevenWs={handleEditSevenWs}
-                                                        onGenerateEntities={handleGenerateEntities}
-                                                        onDelete={reloadEvents}
-                                                    />
-                                                {/each}
-                                            </div>
-                                        {/if}
+                                        <div class="space-y-2 pt-2">
+                                            {#each domainGroup.ungroupedEvents as event (event.id)}
+                                                <EventCard
+                                                    {event}
+                                                    selected={selectedEventIds.has(event.id)}
+                                                    onSelect={(selected) => handleEventSelect(event.id, selected)}
+                                                    onEditEvent={handleEditEvent}
+                                                    onEditSevenWs={handleEditSevenWs}
+                                                    onGenerateEntities={handleGenerateEntities}
+                                                    onDelete={reloadEvents}
+                                                />
+                                            {/each}
+                                        </div>
                                     {/if}
                                 </div>
                             {/if}
@@ -839,6 +840,14 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
             onCancel={handleProcessSevenWsCancel}
         />
     {/if}
+
+    <ProcessEditModal
+        open={showProcessEditModal}
+        process={processUnderEdit ?? undefined}
+        onSave={handleProcessEditSave}
+        onCancel={handleProcessEditCancel}
+        domains={domains}
+    />
 
     <!-- Generate Entities Dialog -->
     <GenerateEntitiesDialog
