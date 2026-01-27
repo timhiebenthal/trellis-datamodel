@@ -702,7 +702,7 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                         aria-expanded={isDomainExpanded(domainGroup.domainKey)}
                                         aria-controls={`domain-${domainGroup.domainKey}`}
                                     >
-                                        <span class="w-4 h-4 transition-transform" class:rotate-90={isDomainExpanded(domainGroup.domainKey)}>
+                                        <span class="w-4 h-4 transition-transform" class:-rotate-90={!isDomainExpanded(domainGroup.domainKey)}>
                                             <Icon
                                                 icon="lucide:chevron-down"
                                                 class="w-4 h-4"
@@ -727,7 +727,7 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                                     aria-expanded={isProcessExpanded(processGroup.process.id)}
                                                     aria-controls={`process-${processGroup.process.id}`}
                                                 >
-                                                    <span class="w-4 h-4 transition-transform" class:rotate-90={isProcessExpanded(processGroup.process.id)}>
+                                                    <span class="w-4 h-4 transition-transform" class:-rotate-90={!isProcessExpanded(processGroup.process.id)}>
                                                         <Icon
                                                             icon="lucide:chevron-down"
                                                             class="w-4 h-4"
