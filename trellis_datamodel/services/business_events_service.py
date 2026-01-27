@@ -16,7 +16,7 @@ This service:
 import logging
 import os
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -31,6 +31,8 @@ from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
     BusinessEventsFile,
+    BusinessEventProcess,
+    BusinessEventProcessFile,
     AnnotationEntry,
     BusinessEventAnnotations,
 )
@@ -107,6 +109,8 @@ def save_business_events(
     """
     Save business events to YAML file.
 
+    This function preserves existing processes when saving events.
+
     Args:
         events: List of BusinessEvent objects to save.
         path: Optional path to business_events.yml. If not provided, uses
@@ -121,8 +125,17 @@ def save_business_events(
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    # Create file structure
-    events_file = BusinessEventsFile(events=events)
+    # Load existing processes to preserve them
+    existing_processes = []
+    if os.path.exists(path):
+        try:
+            existing_processes = load_processes(path)
+        except Exception:
+            # If we can't load processes, continue without them
+            pass
+
+    # Create file structure with events and processes
+    events_file = BusinessEventsFile(events=events, processes=existing_processes)
 
     try:
         # Convert to dict for YAML serialization
@@ -266,6 +279,11 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
     if "annotations" in updates:
         event.annotations = BusinessEventAnnotations(**updates["annotations"])
 
+    # Track if we need to recompute process superset
+    old_process_id = event.process_id
+    annotations_changed = "annotations" in updates
+    process_id_changed = "process_id" in updates
+
     event.updated_at = datetime.now()
 
     # Validate updated event
@@ -277,12 +295,38 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
     events[event_index] = updated_event
     save_business_events(events)
     logger.info(f"Updated business event: {event_id}")
+
+    # Recompute process supersets if needed
+    if annotations_changed or process_id_changed:
+        # Recompute for old process if event was moved or annotations changed
+        if old_process_id:
+            try:
+                recompute_process_superset(old_process_id)
+            except NotFoundError:
+                # Process might have been deleted, ignore
+                pass
+            except Exception as e:
+                logger.warning(f"Failed to recompute superset for old process {old_process_id}: {e}")
+
+        # Recompute for new process if event was moved
+        new_process_id = updated_event.process_id
+        if process_id_changed and new_process_id and new_process_id != old_process_id:
+            try:
+                recompute_process_superset(new_process_id)
+            except NotFoundError:
+                # Process might not exist yet, ignore
+                pass
+            except Exception as e:
+                logger.warning(f"Failed to recompute superset for new process {new_process_id}: {e}")
+
     return updated_event
 
 
 def delete_event(event_id: str) -> None:
     """
     Delete a business event.
+
+    If the event was part of a process, the process superset will be recomputed.
 
     Args:
         event_id: ID of event to delete
@@ -292,14 +336,50 @@ def delete_event(event_id: str) -> None:
         FileOperationError: If file operations fail
     """
     events = load_business_events()
-    original_count = len(events)
-    events = [e for e in events if e.id != event_id]
+    event_to_delete = None
+    for event in events:
+        if event.id == event_id:
+            event_to_delete = event
+            break
 
-    if len(events) == original_count:
+    if event_to_delete is None:
         raise NotFoundError(f"Business event '{event_id}' not found")
 
+    # Track process_id before deletion
+    process_id = event_to_delete.process_id
+
+    events = [e for e in events if e.id != event_id]
     save_business_events(events)
     logger.info(f"Deleted business event: {event_id}")
+
+    # Recompute process superset if event was part of a process
+    if process_id:
+        try:
+            # Remove event from process's event_ids list
+            processes = load_processes()
+            process_index = None
+            for i, proc in enumerate(processes):
+                if proc.id == process_id:
+                    process_index = i
+                    break
+
+            if process_index is not None:
+                process = processes[process_index]
+                if event_id in process.event_ids:
+                    process.event_ids = [eid for eid in process.event_ids if eid != event_id]
+                    # Only recompute if process still has events
+                    if process.event_ids:
+                        process.annotations_superset = _compute_annotation_union(
+                            [e for e in load_business_events() if e.id in process.event_ids]
+                        )
+                        process.updated_at = datetime.now()
+                    else:
+                        # Process has no events left, resolve it
+                        process.resolved_at = datetime.now()
+                        process.updated_at = datetime.now()
+                    save_processes(processes)
+        except Exception as e:
+            logger.warning(f"Failed to update process after event deletion: {e}")
 
 
 def update_event_annotations(event_id: str, annotations_data: dict) -> BusinessEvent:
@@ -542,3 +622,829 @@ def _collect_all_entry_ids(annotations: BusinessEventAnnotations) -> set:
             if hasattr(entry, "id"):
                 entry_ids.add(entry.id)
     return entry_ids
+
+
+def _get_processes_path() -> str:
+    """
+    Get the path to processes YAML file (same as business_events.yml).
+
+    Returns BUSINESS_EVENTS_PATH if set, otherwise defaults to same directory
+    as DATA_MODEL_PATH with filename 'business_events.yml'.
+    """
+    return _get_business_events_path()
+
+
+def load_processes(path: Optional[str] = None) -> List[BusinessEventProcess]:
+    """
+    Load business event processes from YAML file.
+
+    Args:
+        path: Optional path to business_events.yml. If not provided, uses
+              configured BUSINESS_EVENTS_PATH or default location.
+
+    Returns:
+        List of BusinessEventProcess objects.
+
+    Raises:
+        FileOperationError: If file exists but cannot be read or parsed.
+    """
+    if path is None:
+        path = _get_processes_path()
+
+    # If file doesn't exist, return empty list
+    if not os.path.exists(path):
+        logger.info(f"Business events file not found at {path}, returning empty processes list")
+        return []
+
+    try:
+        with open(path, "r") as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as e:
+        logger.error(f"YAML parse error in business events file {path}: {e}")
+        raise FileOperationError("Invalid business events file format")
+    except Exception as e:
+        logger.error(f"Error reading business events file {path}: {e}")
+        raise FileOperationError(f"Failed to read business events file: {e}")
+
+    # Parse processes section
+    try:
+        if "processes" not in data:
+            return []
+        processes_file = BusinessEventProcessFile(**{"processes": data["processes"]})
+        return processes_file.processes
+    except Exception as e:
+        logger.error(f"Invalid processes structure in {path}: {e}")
+        raise FileOperationError("Invalid business events file format")
+
+
+def save_processes(
+    processes: List[BusinessEventProcess], path: Optional[str] = None
+) -> None:
+    """
+    Save business event processes to YAML file.
+
+    Args:
+        processes: List of BusinessEventProcess objects to save.
+        path: Optional path to business_events.yml. If not provided, uses
+              configured BUSINESS_EVENTS_PATH or default location.
+
+    Raises:
+        FileOperationError: If file cannot be written.
+    """
+    if path is None:
+        path = _get_processes_path()
+
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # Load existing file data to preserve events section
+    existing_data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                existing_data = yaml.safe_load(f) or {}
+        except Exception:
+            pass  # If we can't read, we'll create new file
+
+    # Create processes file structure
+    processes_file = BusinessEventProcessFile(processes=processes)
+
+    try:
+        # Merge with existing data (preserve events)
+        data = existing_data.copy()
+        data["processes"] = processes_file.model_dump(mode="json")["processes"]
+
+        with open(path, "w") as f:
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"Saved {len(processes)} processes to {path}")
+    except Exception as e:
+        raise FileOperationError(f"Failed to write processes file: {e}")
+
+
+def create_process(
+    name: str, type: BusinessEventType, event_ids: Optional[List[str]] = None
+) -> BusinessEventProcess:
+    """
+    Create a new business event process with auto-generated ID.
+
+    Args:
+        name: Process name
+        type: Process type (discrete, evolving, recurring)
+        event_ids: Optional list of event IDs to attach initially
+
+    Returns:
+        New BusinessEventProcess object
+
+    Raises:
+        ValidationError: If name is invalid or event_ids contain invalid IDs
+        FileOperationError: If file operations fail
+    """
+    if not name or not name.strip():
+        raise ValidationError("Process name is required")
+
+    # Validate event IDs exist
+    if event_ids:
+        events = load_business_events()
+        existing_event_ids = {e.id for e in events}
+        for event_id in event_ids:
+            if event_id not in existing_event_ids:
+                raise ValidationError(f"Event '{event_id}' not found")
+
+    # Generate ID: proc_YYYYMMDD_NNN
+    today = datetime.now().strftime("%Y%m%d")
+    processes = load_processes()
+    # Find highest number for today
+    max_num = 0
+    for process in processes:
+        if process.id.startswith(f"proc_{today}_"):
+            try:
+                num = int(process.id.split("_")[-1])
+                max_num = max(max_num, num)
+            except ValueError:
+                pass
+    new_id = f"proc_{today}_{max_num + 1:03d}"
+
+    now = datetime.now()
+    new_process = BusinessEventProcess(
+        id=new_id,
+        name=name.strip(),
+        type=type,
+        event_ids=event_ids or [],
+        created_at=now,
+        updated_at=now,
+        resolved_at=None,
+        annotations_superset=None,
+    )
+
+    processes.append(new_process)
+    save_processes(processes)
+
+    # Attach events to process if provided
+    if event_ids:
+        attach_events_to_process(new_id, event_ids)
+
+    logger.info(f"Created process: {new_id} (name: {name}, type: {type.value})")
+    return new_process
+
+
+def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
+    """
+    Update an existing business event process.
+
+    Args:
+        process_id: ID of process to update
+        updates: Dictionary with fields to update (name, type)
+
+    Returns:
+        Updated BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process not found
+        ValidationError: If updates are invalid
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, process in enumerate(processes):
+        if process.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    # Don't allow updating resolved processes
+    if process.resolved_at is not None:
+        raise ValidationError(f"Cannot update resolved process '{process_id}'")
+
+    # Update fields
+    if "name" in updates:
+        name = updates["name"]
+        if not name or not name.strip():
+            raise ValidationError("Process name cannot be empty")
+        process.name = name.strip()
+
+    if "type" in updates:
+        try:
+            process.type = BusinessEventType(updates["type"])
+        except ValueError:
+            raise ValidationError(f"Invalid process type: {updates['type']}")
+
+    process.updated_at = datetime.now()
+
+    # Validate updated process
+    try:
+        updated_process = BusinessEventProcess(**process.model_dump())
+    except Exception as e:
+        raise ValidationError(f"Invalid process data: {str(e)}") from e
+
+    processes[process_index] = updated_process
+    save_processes(processes)
+    logger.info(f"Updated process: {process_id}")
+    return updated_process
+
+
+def resolve_process(process_id: str) -> BusinessEventProcess:
+    """
+    Resolve (ungroup) a process by detaching all events and marking as resolved.
+
+    Args:
+        process_id: ID of process to resolve
+
+    Returns:
+        Resolved BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process not found
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, process in enumerate(processes):
+        if process.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    # Don't allow resolving already resolved processes
+    if process.resolved_at is not None:
+        raise ValidationError(f"Process '{process_id}' is already resolved")
+
+    # Detach all events
+    if process.event_ids:
+        detach_events_from_process(process_id, process.event_ids)
+
+    # Mark as resolved
+    process.resolved_at = datetime.now()
+    process.updated_at = datetime.now()
+    process.event_ids = []
+    process.annotations_superset = None
+
+    processes[process_index] = process
+    save_processes(processes)
+    logger.info(f"Resolved process: {process_id}")
+    return process
+
+
+def attach_events_to_process(process_id: str, event_ids: List[str]) -> BusinessEventProcess:
+    """
+    Attach events to a process.
+
+    Args:
+        process_id: ID of process
+        event_ids: List of event IDs to attach
+
+    Returns:
+        Updated BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process or any event not found
+        ValidationError: If events are already in another process or process is resolved
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, process in enumerate(processes):
+        if process.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    # Don't allow attaching to resolved processes
+    if process.resolved_at is not None:
+        raise ValidationError(f"Cannot attach events to resolved process '{process_id}'")
+
+    # Validate events exist and aren't already in another process
+    events = load_business_events()
+    existing_event_ids = {e.id for e in events}
+    for event_id in event_ids:
+        if event_id not in existing_event_ids:
+            raise NotFoundError(f"Event '{event_id}' not found")
+
+        # Check if event is already in another process
+        for e in events:
+            if e.id == event_id and e.process_id is not None and e.process_id != process_id:
+                raise ValidationError(
+                    f"Event '{event_id}' is already attached to process '{e.process_id}'"
+                )
+
+    # Attach events
+    for event_id in event_ids:
+        if event_id not in process.event_ids:
+            process.event_ids.append(event_id)
+
+        # Update event's process_id
+        events = load_business_events()
+        for i, event in enumerate(events):
+            if event.id == event_id:
+                events[i].process_id = process_id
+                events[i].updated_at = datetime.now()
+                break
+        save_business_events(events)
+
+    process.updated_at = datetime.now()
+    processes[process_index] = process
+    save_processes(processes)
+    logger.info(f"Attached {len(event_ids)} events to process: {process_id}")
+    return process
+
+
+def detach_events_from_process(process_id: str, event_ids: List[str]) -> BusinessEventProcess:
+    """
+    Detach events from a process.
+
+    Args:
+        process_id: ID of process
+        event_ids: List of event IDs to detach
+
+    Returns:
+        Updated BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process not found
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, process in enumerate(processes):
+        if process.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    # Detach events
+    original_count = len(process.event_ids)
+    process.event_ids = [eid for eid in process.event_ids if eid not in event_ids]
+
+    # Update events' process_id
+    events = load_business_events()
+    for i, event in enumerate(events):
+        if event.id in event_ids and event.process_id == process_id:
+            events[i].process_id = None
+            events[i].updated_at = datetime.now()
+    save_business_events(events)
+
+    process.updated_at = datetime.now()
+    processes[process_index] = process
+    save_processes(processes)
+    logger.info(f"Detached {original_count - len(process.event_ids)} events from process: {process_id}")
+    return process
+
+
+# ============================================================================
+# Process Management Functions
+# ============================================================================
+
+
+def load_processes(path: Optional[str] = None) -> List[BusinessEventProcess]:
+    """
+    Load business event processes from YAML file.
+
+    Processes are stored in the same file as events, under a 'processes' key.
+
+    Args:
+        path: Optional path to business_events.yml. If not provided, uses
+              configured BUSINESS_EVENTS_PATH or default location.
+
+    Returns:
+        List of BusinessEventProcess objects.
+
+    Raises:
+        FileOperationError: If file exists but cannot be read or parsed.
+    """
+    if path is None:
+        path = _get_business_events_path()
+
+    # If file doesn't exist, return empty list
+    if not os.path.exists(path):
+        logger.info(f"Business events file not found at {path}, returning empty processes list")
+        return []
+
+    try:
+        with open(path, "r") as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as e:
+        logger.error(f"YAML parse error in business events file {path}: {e}")
+        raise FileOperationError("Invalid business events file format")
+    except Exception as e:
+        logger.error(f"Error reading business events file {path}: {e}")
+        raise FileOperationError(f"Failed to read business events file: {e}")
+
+    # Parse file structure
+    try:
+        processes_data = data.get("processes", [])
+        if not processes_data:
+            return []
+        
+        processes = []
+        for proc_data in processes_data:
+            # Handle resolved_at being None
+            if "resolved_at" in proc_data and proc_data["resolved_at"] is None:
+                proc_data = {k: v for k, v in proc_data.items() if k != "resolved_at"}
+            processes.append(BusinessEventProcess(**proc_data))
+        return processes
+    except Exception as e:
+        logger.error(f"Invalid processes structure in {path}: {e}")
+        raise FileOperationError("Invalid business events file format")
+
+
+def save_processes(
+    processes: List[BusinessEventProcess], path: Optional[str] = None
+) -> None:
+    """
+    Save business event processes to YAML file.
+
+    Processes are saved alongside events in the same file, under a 'processes' key.
+    This function preserves existing events and only updates the processes section.
+
+    Args:
+        processes: List of BusinessEventProcess objects to save.
+        path: Optional path to business_events.yml. If not provided, uses
+              configured BUSINESS_EVENTS_PATH or default location.
+
+    Raises:
+        FileOperationError: If file cannot be written.
+    """
+    if path is None:
+        path = _get_business_events_path()
+
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # Load existing events to preserve them
+    existing_events = []
+    if os.path.exists(path):
+        try:
+            existing_events = load_business_events(path)
+        except Exception:
+            # If we can't load events, continue without them
+            pass
+
+    # Create file structure with events and processes
+    events_file = BusinessEventsFile(events=existing_events, processes=processes)
+
+    try:
+        # Convert to dict for YAML serialization
+        data = events_file.model_dump(mode="json")
+
+        with open(path, "w") as f:
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"Saved {len(processes)} business event processes to {path}")
+    except Exception as e:
+        raise FileOperationError(f"Failed to write business events file: {e}")
+
+
+def _compute_annotation_union(
+    events: List[BusinessEvent],
+) -> BusinessEventAnnotations:
+    """
+    Compute the union of annotations from multiple events.
+
+    Union rules:
+    - Unique key: `annotation_type + dimension_id` when `dimension_id` exists
+    - Fallback unique key: `annotation_type + normalized text + description`
+    - Preserve original entries even if duplicates collapse at the process level
+
+    Args:
+        events: List of BusinessEvent objects to union
+
+    Returns:
+        BusinessEventAnnotations with unioned entries
+    """
+    # Track seen entries by unique key
+    seen_keys: Dict[str, AnnotationEntry] = {}
+    annotation_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+
+    for event in events:
+        if not event.annotations:
+            continue
+
+        for annotation_type in annotation_types:
+            category_list = getattr(event.annotations, annotation_type, [])
+            for entry in category_list:
+                # Create unique key
+                if entry.dimension_id:
+                    unique_key = f"{annotation_type}:{entry.dimension_id}"
+                else:
+                    # Normalize text for comparison (lowercase, strip)
+                    normalized_text = entry.text.lower().strip() if entry.text else ""
+                    normalized_desc = (
+                        entry.description.lower().strip()
+                        if entry.description
+                        else ""
+                    )
+                    unique_key = f"{annotation_type}:{normalized_text}:{normalized_desc}"
+
+                # Only add if we haven't seen this key before
+                if unique_key not in seen_keys:
+                    seen_keys[unique_key] = entry
+
+    # Build result annotations
+    result = BusinessEventAnnotations()
+    for annotation_type in annotation_types:
+        category_entries = [
+            entry
+            for key, entry in seen_keys.items()
+            if key.startswith(f"{annotation_type}:")
+        ]
+        setattr(result, annotation_type, category_entries)
+
+    return result
+
+
+def create_process(
+    name: str,
+    type: BusinessEventType,
+    event_ids: List[str],
+) -> BusinessEventProcess:
+    """
+    Create a new business event process with auto-generated ID.
+
+    Args:
+        name: Process name
+        type: Process type (discrete, evolving, recurring)
+        event_ids: List of event IDs to include in this process
+
+    Returns:
+        New BusinessEventProcess object with computed annotations superset
+
+    Raises:
+        ValidationError: If name is invalid or event_ids is empty
+        NotFoundError: If any event_id doesn't exist
+        FileOperationError: If file operations fail
+    """
+    if not name or not name.strip():
+        raise ValidationError("Process name is required")
+
+    if not event_ids:
+        raise ValidationError("At least one event ID is required")
+
+    # Validate all events exist
+    events = load_business_events()
+    existing_event_ids = {event.id for event in events}
+    for event_id in event_ids:
+        if event_id not in existing_event_ids:
+            raise NotFoundError(f"Business event '{event_id}' not found")
+
+    # Generate ID: proc_YYYYMMDD_NNN
+    today = datetime.now().strftime("%Y%m%d")
+    processes = load_processes()
+    # Find highest number for today
+    max_num = 0
+    for proc in processes:
+        if proc.id.startswith(f"proc_{today}_"):
+            try:
+                num = int(proc.id.split("_")[-1])
+                max_num = max(max_num, num)
+            except ValueError:
+                pass
+    new_id = f"proc_{today}_{max_num + 1:03d}"
+
+    # Get events for this process
+    process_events = [e for e in events if e.id in event_ids]
+
+    # Compute annotations superset
+    annotations_superset = _compute_annotation_union(process_events)
+
+    now = datetime.now()
+    new_process = BusinessEventProcess(
+        id=new_id,
+        name=name.strip(),
+        type=type,
+        event_ids=event_ids,
+        created_at=now,
+        updated_at=now,
+        resolved_at=None,
+        annotations_superset=annotations_superset,
+    )
+
+    # Update events to link them to this process
+    for event_id in event_ids:
+        update_event(event_id, {"process_id": new_id})
+
+    # Save process
+    processes.append(new_process)
+    save_processes(processes)
+    logger.info(f"Created business event process: {new_id} (type: {type.value})")
+    return new_process
+
+
+def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
+    """
+    Update an existing business event process.
+
+    Args:
+        process_id: ID of process to update
+        updates: Dictionary with fields to update (name, type, event_ids)
+
+    Returns:
+        Updated BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process not found
+        ValidationError: If updates are invalid
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, proc in enumerate(processes):
+        if proc.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Business event process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    # Check if process is resolved
+    if process.resolved_at is not None:
+        raise ValidationError("Cannot update a resolved process")
+
+    # Update fields
+    if "name" in updates:
+        name = updates["name"]
+        if not name or not name.strip():
+            raise ValidationError("Process name cannot be empty")
+        process.name = name.strip()
+
+    if "type" in updates:
+        try:
+            process.type = BusinessEventType(updates["type"])
+        except ValueError:
+            raise ValidationError(f"Invalid process type: {updates['type']}")
+
+    old_event_ids = set(process.event_ids)
+    if "event_ids" in updates:
+        new_event_ids = updates["event_ids"]
+        if not new_event_ids:
+            raise ValidationError("Process must have at least one event")
+        
+        # Validate all events exist
+        events = load_business_events()
+        existing_event_ids = {event.id for event in events}
+        for event_id in new_event_ids:
+            if event_id not in existing_event_ids:
+                raise NotFoundError(f"Business event '{event_id}' not found")
+        
+        process.event_ids = new_event_ids
+        new_event_ids_set = set(new_event_ids)
+
+        # Update event links: remove process_id from events no longer in process
+        for event_id in old_event_ids - new_event_ids_set:
+            event = next((e for e in events if e.id == event_id), None)
+            if event and event.process_id == process_id:
+                update_event(event_id, {"process_id": None})
+
+        # Add process_id to newly added events
+        for event_id in new_event_ids_set - old_event_ids:
+            update_event(event_id, {"process_id": process_id})
+
+    # Recompute annotations superset if event_ids changed
+    if "event_ids" in updates:
+        events = load_business_events()
+        process_events = [e for e in events if e.id in process.event_ids]
+        process.annotations_superset = _compute_annotation_union(process_events)
+
+    process.updated_at = datetime.now()
+
+    # Validate updated process
+    try:
+        updated_process = BusinessEventProcess(**process.model_dump())
+    except Exception as e:
+        raise ValidationError(f"Invalid process data: {str(e)}") from e
+
+    processes[process_index] = updated_process
+    save_processes(processes)
+    logger.info(f"Updated business event process: {process_id}")
+    return updated_process
+
+
+def resolve_process(process_id: str) -> BusinessEventProcess:
+    """
+    Resolve (ungroup) a business event process.
+
+    This removes the grouping by:
+    - Setting resolved_at timestamp
+    - Removing process_id from all member events
+    - Preserving the process record for history
+
+    Args:
+        process_id: ID of process to resolve
+
+    Returns:
+        Resolved BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process not found
+        ValidationError: If process is already resolved
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, proc in enumerate(processes):
+        if proc.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Business event process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    if process.resolved_at is not None:
+        raise ValidationError("Process is already resolved")
+
+    # Remove process_id from all member events
+    events = load_business_events()
+    for event_id in process.event_ids:
+        event = next((e for e in events if e.id == event_id), None)
+        if event and event.process_id == process_id:
+            update_event(event_id, {"process_id": None})
+
+    # Mark process as resolved
+    process.resolved_at = datetime.now()
+    process.updated_at = datetime.now()
+
+    processes[process_index] = process
+    save_processes(processes)
+    logger.info(f"Resolved business event process: {process_id}")
+    return process
+
+
+def recompute_process_superset(process_id: str) -> BusinessEventProcess:
+    """
+    Recompute the annotations superset for a process.
+
+    This should be called when:
+    - An event's annotations are updated
+    - Events are added/removed from a process
+
+    Args:
+        process_id: ID of process to recompute
+
+    Returns:
+        Updated BusinessEventProcess object
+
+    Raises:
+        NotFoundError: If process not found
+        FileOperationError: If file operations fail
+    """
+    processes = load_processes()
+    process_index = None
+    for i, proc in enumerate(processes):
+        if proc.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Business event process '{process_id}' not found")
+
+    process = processes[process_index]
+
+    # Skip if resolved
+    if process.resolved_at is not None:
+        return process
+
+    # Get current events for this process
+    events = load_business_events()
+    process_events = [e for e in events if e.id in process.event_ids]
+
+    # Recompute superset
+    process.annotations_superset = _compute_annotation_union(process_events)
+    process.updated_at = datetime.now()
+
+    processes[process_index] = process
+    save_processes(processes)
+    logger.info(f"Recomputed annotations superset for process: {process_id}")
+    return process
+
+
+def recompute_all_process_supersets() -> None:
+    """
+    Recompute annotations supersets for all active (non-resolved) processes.
+
+    Useful after bulk event updates or migrations.
+    """
+    processes = load_processes()
+    active_processes = [p for p in processes if p.resolved_at is None]
+
+    for process in active_processes:
+        try:
+            recompute_process_superset(process.id)
+        except Exception as e:
+            logger.warning(f"Failed to recompute superset for process {process.id}: {e}")
