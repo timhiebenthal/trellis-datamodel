@@ -731,7 +731,10 @@ def save_processes(
 
 
 def create_process(
-    name: str, type: BusinessEventType, event_ids: Optional[List[str]] = None
+    name: str,
+    type: BusinessEventType,
+    domain: str,
+    event_ids: Optional[List[str]] = None,
 ) -> BusinessEventProcess:
     """
     Create a new business event process with auto-generated ID.
@@ -739,17 +742,23 @@ def create_process(
     Args:
         name: Process name
         type: Process type (discrete, evolving, recurring)
+        domain: Business domain for the process
         event_ids: Optional list of event IDs to attach initially
 
     Returns:
         New BusinessEventProcess object
 
     Raises:
-        ValidationError: If name is invalid or event_ids contain invalid IDs
+        ValidationError: If name or domain is invalid, or event_ids contain invalid IDs
         FileOperationError: If file operations fail
     """
     if not name or not name.strip():
         raise ValidationError("Process name is required")
+
+    if not domain or not domain.strip():
+        raise ValidationError("Process domain is required")
+
+    normalized_domain = domain.strip()
 
     # Validate event IDs exist
     if event_ids:
@@ -778,6 +787,7 @@ def create_process(
         id=new_id,
         name=name.strip(),
         type=type,
+        domain=normalized_domain,
         event_ids=event_ids or [],
         created_at=now,
         updated_at=now,
@@ -792,7 +802,9 @@ def create_process(
     if event_ids:
         attach_events_to_process(new_id, event_ids)
 
-    logger.info(f"Created process: {new_id} (name: {name}, type: {type.value})")
+    logger.info(
+        f"Created process: {new_id} (name: {name}, type: {type.value}, domain: {normalized_domain})"
+    )
     return new_process
 
 
@@ -802,7 +814,7 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
 
     Args:
         process_id: ID of process to update
-        updates: Dictionary with fields to update (name, type)
+        updates: Dictionary with fields to update (name, type, domain)
 
     Returns:
         Updated BusinessEventProcess object
@@ -840,6 +852,14 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
             process.type = BusinessEventType(updates["type"])
         except ValueError:
             raise ValidationError(f"Invalid process type: {updates['type']}")
+
+    if "domain" in updates:
+        domain_value = updates["domain"]
+        if domain_value is None or (
+            isinstance(domain_value, str) and not domain_value.strip()
+        ):
+            raise ValidationError("Process domain cannot be empty")
+        process.domain = domain_value.strip()
 
     process.updated_at = datetime.now()
 
@@ -1175,10 +1195,20 @@ def _compute_annotation_union(
     return result
 
 
+def _require_process_domain(domain: Optional[str]) -> str:
+    """
+    Validate that a process domain is provided and return the normalized value.
+    """
+    if not isinstance(domain, str) or not domain.strip():
+        raise ValidationError("Process domain is required")
+    return domain.strip()
+
+
 def create_process(
     name: str,
     type: BusinessEventType,
     event_ids: List[str],
+    domain: str,
 ) -> BusinessEventProcess:
     """
     Create a new business event process with auto-generated ID.
@@ -1192,7 +1222,7 @@ def create_process(
         New BusinessEventProcess object with computed annotations superset
 
     Raises:
-        ValidationError: If name is invalid or event_ids is empty
+        ValidationError: If name is invalid, domain is missing, or event_ids is empty
         NotFoundError: If any event_id doesn't exist
         FileOperationError: If file operations fail
     """
@@ -1201,6 +1231,8 @@ def create_process(
 
     if not event_ids:
         raise ValidationError("At least one event ID is required")
+
+    domain_value = _require_process_domain(domain)
 
     # Validate all events exist
     events = load_business_events()
@@ -1234,6 +1266,7 @@ def create_process(
         id=new_id,
         name=name.strip(),
         type=type,
+        domain=domain_value,
         event_ids=event_ids,
         created_at=now,
         updated_at=now,
@@ -1248,7 +1281,9 @@ def create_process(
     # Save process
     processes.append(new_process)
     save_processes(processes)
-    logger.info(f"Created business event process: {new_id} (type: {type.value})")
+    logger.info(
+        f"Created business event process: {new_id} (type: {type.value}, domain: {domain_value})"
+    )
     return new_process
 
 
@@ -1258,7 +1293,7 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
 
     Args:
         process_id: ID of process to update
-        updates: Dictionary with fields to update (name, type, event_ids)
+        updates: Dictionary with fields to update (name, type, domain, event_ids)
 
     Returns:
         Updated BusinessEventProcess object
@@ -1296,6 +1331,18 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
             process.type = BusinessEventType(updates["type"])
         except ValueError:
             raise ValidationError(f"Invalid process type: {updates['type']}")
+
+    if "domain" in updates:
+        process.domain = _require_process_domain(updates["domain"])
+
+    if "annotations_superset" in updates:
+        annotations_value = updates["annotations_superset"]
+        if annotations_value is None:
+            process.annotations_superset = None
+        elif isinstance(annotations_value, BusinessEventAnnotations):
+            process.annotations_superset = annotations_value
+        else:
+            process.annotations_superset = BusinessEventAnnotations(**annotations_value)
 
     old_event_ids = set(process.event_ids)
     if "event_ids" in updates:
@@ -1450,6 +1497,24 @@ def recompute_all_process_supersets() -> None:
     Useful after bulk event updates or migrations.
     """
     processes = load_processes()
+    active_processes = [p for p in processes if p.resolved_at is None]
+
+    for process in active_processes:
+        try:
+            recompute_process_superset(process.id)
+        except Exception as e:
+            logger.warning(f"Failed to recompute superset for process {process.id}: {e}")
+  Useful after bulk event updates or migrations.
+    """
+    processes = load_processes()
+    active_processes = [p for p in processes if p.resolved_at is None]
+
+    for process in active_processes:
+        try:
+            recompute_process_superset(process.id)
+        except Exception as e:
+            logger.warning(f"Failed to recompute superset for process {process.id}: {e}")
+cesses()
     active_processes = [p for p in processes if p.resolved_at is None]
 
     for process in active_processes:

@@ -494,7 +494,8 @@ describe('Business Event Process API Functions', () => {
             const request: CreateProcessRequest = {
                 name: 'Order Fulfillment',
                 type: 'discrete',
-                event_ids: ['evt_001', 'evt_002']
+                event_ids: ['evt_001', 'evt_002'],
+                domain: 'sales'
             };
 
             const mockResponse = {
@@ -502,6 +503,7 @@ describe('Business Event Process API Functions', () => {
                 name: 'Order Fulfillment',
                 type: 'discrete',
                 event_ids: ['evt_001', 'evt_002'],
+                domain: 'sales',
                 created_at: '2026-01-27T10:00:00Z',
                 updated_at: '2026-01-27T10:00:00Z'
             };
@@ -530,7 +532,7 @@ describe('Business Event Process API Functions', () => {
         it('creates process without event_ids', async () => {
             const request: CreateProcessRequest = {
                 name: 'New Process',
-                type: 'evolving'
+                type: 'evolving',
             };
 
             const mockResponse = {
@@ -579,7 +581,8 @@ describe('Business Event Process API Functions', () => {
     describe('updateBusinessEventProcess', () => {
         it('updates process name', async () => {
             const request: UpdateProcessRequest = {
-                name: 'Updated Process Name'
+                name: 'Updated Process Name',
+                domain: 'marketing'
             };
 
             const mockResponse = {
@@ -587,6 +590,7 @@ describe('Business Event Process API Functions', () => {
                 name: 'Updated Process Name',
                 type: 'discrete',
                 event_ids: ['evt_001'],
+                domain: 'marketing',
                 created_at: '2026-01-27T10:00:00Z',
                 updated_at: '2026-01-27T11:00:00Z'
             };

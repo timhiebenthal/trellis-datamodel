@@ -91,6 +91,7 @@ class CreateProcessRequest(BaseModel):
 
     name: str
     type: str
+    domain: str
     event_ids: list[str] | None = None
 
 
@@ -99,6 +100,8 @@ class UpdateProcessRequest(BaseModel):
 
     name: str | None = None
     type: str | None = None
+    domain: str | None = None
+    annotations_superset: BusinessEventAnnotations | None = None
 
 
 class AttachEventsRequest(BaseModel):
@@ -204,7 +207,9 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
 
         # If annotations provided, update the event with it
         if request.annotations is not None:
-            event = update_event(event.id, {"annotations": request.annotations.model_dump()})
+            event = update_event(
+                event.id, {"annotations": request.annotations.model_dump()}
+            )
 
         return event
     except ValidationError as e:
@@ -541,7 +546,9 @@ async def create_business_event_process(request: CreateProcessRequest = Body(...
         if request.event_ids:
             events = load_business_events()
             existing_event_ids = {e.id for e in events}
-            invalid_ids = [eid for eid in request.event_ids if eid not in existing_event_ids]
+            invalid_ids = [
+                eid for eid in request.event_ids if eid not in existing_event_ids
+            ]
             if invalid_ids:
                 raise HTTPException(
                     status_code=404,
@@ -556,7 +563,15 @@ async def create_business_event_process(request: CreateProcessRequest = Body(...
                         detail=f"Event '{event.id}' is already attached to process '{event.process_id}'",
                     )
 
-        process = create_process(request.name, process_type, event_ids=request.event_ids)
+        if not request.domain or not request.domain.strip():
+            raise HTTPException(status_code=400, detail="Process domain is required")
+
+        process = create_process(
+            request.name,
+            process_type,
+            request.domain.strip(),
+            event_ids=request.event_ids,
+        )
         return process
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -565,9 +580,7 @@ async def create_business_event_process(request: CreateProcessRequest = Body(...
     except FileOperationError:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error creating process: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error creating process: {str(e)}")
 
 
 @router.put("/processes/{process_id}", response_model=BusinessEventProcess)
@@ -607,10 +620,18 @@ async def update_business_event_process(
                 )
             updates["type"] = request.type
 
+        if request.domain is not None:
+            if not request.domain.strip():
+                raise HTTPException(
+                    status_code=400, detail="Process domain cannot be empty"
+                )
+            updates["domain"] = request.domain.strip()
+
+        if request.annotations_superset is not None:
+            updates["annotations_superset"] = request.annotations_superset.model_dump()
+
         if not updates:
-            raise HTTPException(
-                status_code=400, detail="No fields provided to update"
-            )
+            raise HTTPException(status_code=400, detail="No fields provided to update")
 
         process = update_process(process_id, updates)
         return process
@@ -621,9 +642,7 @@ async def update_business_event_process(
     except FileOperationError:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error updating process: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error updating process: {str(e)}")
 
 
 @router.post("/processes/{process_id}/resolve", response_model=BusinessEventProcess)
@@ -660,9 +679,7 @@ async def resolve_business_event_process(process_id: str):
         )
 
 
-@router.post(
-    "/processes/{process_id}/attach", response_model=BusinessEventProcess
-)
+@router.post("/processes/{process_id}/attach", response_model=BusinessEventProcess)
 async def attach_events_to_business_event_process(
     process_id: str, request: AttachEventsRequest = Body(...)
 ):
@@ -693,7 +710,9 @@ async def attach_events_to_business_event_process(
         # Validate event_ids exist
         events = load_business_events()
         existing_event_ids = {e.id for e in events}
-        invalid_ids = [eid for eid in request.event_ids if eid not in existing_event_ids]
+        invalid_ids = [
+            eid for eid in request.event_ids if eid not in existing_event_ids
+        ]
         if invalid_ids:
             raise HTTPException(
                 status_code=404,
@@ -714,9 +733,7 @@ async def attach_events_to_business_event_process(
         )
 
 
-@router.post(
-    "/processes/{process_id}/detach", response_model=BusinessEventProcess
-)
+@router.post("/processes/{process_id}/detach", response_model=BusinessEventProcess)
 async def detach_events_from_business_event_process(
     process_id: str, request: DetachEventsRequest = Body(...)
 ):
@@ -793,7 +810,8 @@ async def generate_entities_from_business_event_process(process_id: str):
 
         if process is None:
             raise HTTPException(
-                status_code=404, detail=f"Business event process '{process_id}' not found"
+                status_code=404,
+                detail=f"Business event process '{process_id}' not found",
             )
 
         result = generate_entities_from_process(process)

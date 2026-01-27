@@ -217,6 +217,10 @@ class BusinessEventProcess(BaseModel):
     type: BusinessEventType = Field(
         ..., description="Process type classification (discrete, evolving, or recurring)"
     )
+    domain: Optional[str] = Field(
+        None,
+        description="Business domain (e.g., 'Sales', 'Marketing') associated with the process",
+    )
     event_ids: List[str] = Field(
         default_factory=list, description="List of event IDs belonging to this process"
     )
@@ -236,6 +240,17 @@ class BusinessEventProcess(BaseModel):
         if self.resolved_at is None and len(self.event_ids) == 0:
             raise ValueError("Process must have at least one event when not resolved")
         return self
+
+    @field_validator("domain", mode="before")
+    @classmethod
+    def _normalize_domain(cls, value: Optional[str]) -> Optional[str]:
+        """Trim domain text and reject empty strings."""
+        if value is None:
+            return value
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Process domain cannot be empty")
+        return stripped
 
 
 class BusinessEventProcessFile(BaseModel):

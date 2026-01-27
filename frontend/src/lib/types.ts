@@ -358,6 +358,7 @@ export interface BusinessEventProcess {
     id: string; // e.g., "proc_YYYYMMDD_NNN"
     name: string;
     type: BusinessEventType;
+    domain?: string;
     event_ids: string[];
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
@@ -369,12 +370,15 @@ export interface BusinessEventProcess {
 export interface CreateProcessRequest {
     name: string;
     type: BusinessEventType;
+    domain: string;
     event_ids?: string[];
 }
 
 export interface UpdateProcessRequest {
     name?: string;
     type?: BusinessEventType;
+    domain?: string | null;
+    annotations_superset?: BusinessEventAnnotations | null;
 }
 
 export interface AttachEventsRequest {

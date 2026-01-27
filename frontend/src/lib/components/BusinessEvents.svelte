@@ -1,10 +1,23 @@
 <script lang="ts">
-    import { getBusinessEvents, getBusinessEventDomains, updateBusinessEvent, getBusinessEventProcesses, resolveBusinessEventProcess } from '$lib/api';
-    import type { BusinessEvent, BusinessEventType, BusinessEventProcess } from '$lib/types';
+import {
+    getBusinessEvents,
+    getBusinessEventDomains,
+    updateBusinessEvent,
+    getBusinessEventProcesses,
+    resolveBusinessEventProcess,
+    updateBusinessEventProcess,
+} from '$lib/api';
+import type {
+    BusinessEvent,
+    BusinessEventType,
+    BusinessEventProcess,
+    BusinessEventAnnotations,
+} from '$lib/types';
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
     import EventCard from './EventCard.svelte';
+    import ProcessRow from './ProcessRow.svelte';
     import SevenWsForm from './SevenWsForm.svelte';
     import GenerateEntitiesDialog from './GenerateEntitiesDialog.svelte';
     import ProcessGroupModal from './ProcessGroupModal.svelte';
@@ -21,6 +34,28 @@
     // Multi-select state
     let selectedEventIds = $state<Set<string>>(new Set());
     let showProcessGroupModal = $state(false);
+
+const UNASSIGNED_DOMAIN_KEY = 'unassigned';
+
+type ProcessGroup = {
+    process: BusinessEventProcess;
+    events: BusinessEvent[];
+};
+
+type DomainGroup = {
+    domainKey: string;
+    domainLabel: string;
+    processes: ProcessGroup[];
+    ungroupedEvents: BusinessEvent[];
+    totalEvents: number;
+};
+
+let domainCollapseState = $state<Record<string, boolean>>({});
+let processCollapseState = $state<Record<string, boolean>>({});
+let processActionError = $state<string | null>(null);
+let showProcessSevenWsForm = $state(false);
+let processUnderAnnotation = $state<BusinessEventProcess | null>(null);
+let processAnnotationEvent = $state<BusinessEvent | null>(null);
 
     // Helper function to convert domain to title case
     function toTitleCase(str: string): string {
@@ -70,6 +105,175 @@
 
         return result;
     });
+
+    function getDomainLabel(domainKey: string) {
+        return domainKey === UNASSIGNED_DOMAIN_KEY ? 'Unassigned' : toTitleCase(domainKey);
+    }
+
+    const domainGroups = $derived.by(() => {
+        const activeProcesses = processes.filter((process) => !process.resolved_at);
+        const processLookup = new Map(activeProcesses.map((proc) => [proc.id, proc]));
+        const eventsByProcess = new Map<string, BusinessEvent[]>();
+
+        filteredEvents.forEach((event) => {
+            const processId = event.process_id;
+            if (processId && processLookup.has(processId)) {
+                const list = eventsByProcess.get(processId) ?? [];
+                list.push(event);
+                eventsByProcess.set(processId, list);
+            }
+        });
+
+        const groupsMap = new Map<string, DomainGroup>();
+
+        function ensureGroup(key: string): DomainGroup {
+            const existing = groupsMap.get(key);
+            if (existing) return existing;
+            const group: DomainGroup = {
+                domainKey: key,
+                domainLabel: getDomainLabel(key),
+                processes: [],
+                ungroupedEvents: [],
+                totalEvents: 0,
+            };
+            groupsMap.set(key, group);
+            return group;
+        }
+
+        activeProcesses.forEach((process) => {
+            const domainKey = process.domain ?? UNASSIGNED_DOMAIN_KEY;
+            const eventsForProcess = eventsByProcess.get(process.id) ?? [];
+            if (eventsForProcess.length === 0) {
+                return;
+            }
+            const group = ensureGroup(domainKey);
+            group.processes.push({ process, events: eventsForProcess });
+        });
+
+        filteredEvents.forEach((event) => {
+            const domainKey = event.domain ?? UNASSIGNED_DOMAIN_KEY;
+            if (event.process_id && processLookup.has(event.process_id)) {
+                return;
+            }
+            const group = ensureGroup(domainKey);
+            group.ungroupedEvents.push(event);
+        });
+
+        const groups = Array.from(groupsMap.values())
+            .map((group) => ({
+                ...group,
+                totalEvents:
+                    group.ungroupedEvents.length +
+                    group.processes.reduce((sum, procGroup) => sum + procGroup.events.length, 0),
+            }))
+            .filter((group) => group.totalEvents > 0)
+            .sort((a, b) => a.domainLabel.localeCompare(b.domainLabel));
+
+        return groups;
+    });
+
+    function toggleDomainCollapse(domainKey: string) {
+        domainCollapseState = {
+            ...domainCollapseState,
+            [domainKey]: !isDomainExpanded(domainKey),
+        };
+    }
+
+    function isDomainExpanded(domainKey: string) {
+        return domainCollapseState[domainKey] !== false;
+    }
+
+    function toggleProcessCollapse(processId: string) {
+        processCollapseState = {
+            ...processCollapseState,
+            [processId]: !isProcessExpanded(processId),
+        };
+    }
+
+    function isProcessExpanded(processId: string) {
+        return processCollapseState[processId] !== false;
+    }
+
+    function createEmptyAnnotations(): BusinessEventAnnotations {
+        return {
+            who: [],
+            what: [],
+            when: [],
+            where: [],
+            how: [],
+            how_many: [],
+            why: [],
+        };
+    }
+
+    function mapProcessToEvent(process: BusinessEventProcess): BusinessEvent {
+        return {
+            id: process.id,
+            text: process.name,
+            type: process.type,
+            domain: process.domain ?? undefined,
+            created_at: process.created_at,
+            updated_at: process.updated_at,
+            annotations: process.annotations_superset ?? createEmptyAnnotations(),
+            derived_entities: [],
+        };
+    }
+
+    function handleProcessAnnotate(process: BusinessEventProcess) {
+        processUnderAnnotation = process;
+        processAnnotationEvent = mapProcessToEvent(process);
+        showProcessSevenWsForm = true;
+    }
+
+    async function handleProcessSevenWsSave(updatedEvent: BusinessEvent) {
+        if (!processUnderAnnotation) return;
+        try {
+            processActionError = null;
+            await updateBusinessEventProcess(processUnderAnnotation.id, {
+                annotations_superset: updatedEvent.annotations,
+            });
+            showProcessSevenWsForm = false;
+            processUnderAnnotation = null;
+            processAnnotationEvent = null;
+            await reloadEvents();
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : 'Failed to save process annotations';
+            processActionError = errorMessage;
+        }
+    }
+
+    function handleProcessSevenWsCancel() {
+        showProcessSevenWsForm = false;
+        processUnderAnnotation = null;
+        processAnnotationEvent = null;
+    }
+
+    function handleProcessCanvasLink(process: BusinessEventProcess, derivedIds?: string[]) {
+        const params: string[] = [];
+        if (derivedIds && derivedIds.length > 0) {
+            const entityParam = derivedIds.map(encodeURIComponent).join(',');
+            params.push(`entities=${entityParam}`);
+        }
+        params.push(`processId=${encodeURIComponent(process.id)}`);
+        params.push(`processName=${encodeURIComponent(process.name)}`);
+
+        const canvasUrl = `/canvas?${params.join('&')}`;
+
+        if (typeof window !== 'undefined') {
+            window.open(canvasUrl, '_blank');
+        }
+    }
+
+    async function handleProcessResolve(processId: string) {
+        try {
+            processActionError = null;
+            await resolveBusinessEventProcess(processId);
+            await reloadEvents();
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : 'Failed to resolve process';
+            processActionError = errorMessage;
+        }
+    }
 
     onMount(async () => {
         try {
@@ -131,6 +335,7 @@
     async function reloadEvents() {
         try {
             error = null;
+            processActionError = null;
             // Load events and domains separately to handle partial failures
             try {
                 events = await getBusinessEvents();
@@ -290,6 +495,14 @@
         showProcessGroupModal = false;
     }
 
+    function getDerivedEntityIds(events: BusinessEvent[]): string[] {
+        const ids = events
+            .flatMap((event) => event.derived_entities ?? [])
+            .map((entry) => (typeof entry === "string" ? entry : entry.entity_id))
+            .filter((id): id is string => Boolean(id));
+        return Array.from(new Set(ids));
+    }
+
 </script>
 
 <div class="h-full w-full overflow-auto bg-gray-50">
@@ -421,7 +634,7 @@
             </div>
 
             <!-- Event List -->
-            {#if filteredEvents.length === 0}
+            {#if domainGroups.length === 0}
                 <div class="flex items-center justify-center min-h-[400px]">
                     <div class="bg-white/90 backdrop-blur-sm p-8 rounded-xl border border-amber-200 shadow-xl text-center max-w-md mx-4">
                         <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -448,29 +661,110 @@
                     </div>
                 </div>
             {:else}
-                <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                    {#each filteredEvents as event (event.id)}
-                        {@const process = processes.find(p => p.id === event.process_id && !p.resolved_at)}
-                        <EventCard
-                            {event}
-                            {process}
-                            selected={selectedEventIds.has(event.id)}
-                            onSelect={(selected) => handleEventSelect(event.id, selected)}
-                            onEditEvent={handleEditEvent}
-                            onEditSevenWs={handleEditSevenWs}
-                            onGenerateEntities={handleGenerateEntities}
-                            onDelete={reloadEvents}
-                            onResolveProcess={async (processId) => {
-                                try {
-                                    await resolveBusinessEventProcess(processId);
-                                    await reloadEvents();
-                                } catch (e) {
-                                    const errorMessage = e instanceof Error ? e.message : 'Failed to resolve process';
-                                    error = errorMessage;
-                                    console.error('Error resolving process:', e);
-                                }
-                            }}
-                        />
+                {#if processActionError}
+                    <div class="mb-3 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                        {processActionError}
+                    </div>
+                {/if}
+                <div class="space-y-4">
+                    {#each domainGroups as domainGroup (domainGroup.domainKey)}
+                        <div class="rounded-lg border border-gray-200 shadow-sm bg-white overflow-hidden">
+                            <div
+                                class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        class="flex items-center gap-2 text-sm font-semibold text-gray-700 focus:outline-none"
+                                        onclick={() => toggleDomainCollapse(domainGroup.domainKey)}
+                                        aria-expanded={isDomainExpanded(domainGroup.domainKey)}
+                                        aria-controls={`domain-${domainGroup.domainKey}`}
+                                    >
+                                        <Icon
+                                            icon="lucide:chevron-down"
+                                            class="w-4 h-4 transition-transform"
+                                            class:rotate-90={isDomainExpanded(domainGroup.domainKey)}
+                                        />
+                                        <span>{domainGroup.domainLabel}</span>
+                                    </button>
+                                </div>
+                                <span class="text-xs text-gray-500">
+                                    {domainGroup.totalEvents} event{domainGroup.totalEvents !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            {#if isDomainExpanded(domainGroup.domainKey)}
+                                <div class="space-y-3 px-4 py-3" id={`domain-${domainGroup.domainKey}`}>
+                                    {#each domainGroup.processes as processGroup (processGroup.process.id)}
+                                        <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 shadow-sm">
+                                            <div class="flex items-center gap-3 px-3 py-2">
+                                                <button
+                                                    class="p-1 text-gray-500 hover:text-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    onclick={() => toggleProcessCollapse(processGroup.process.id)}
+                                                    aria-expanded={isProcessExpanded(processGroup.process.id)}
+                                                    aria-controls={`process-${processGroup.process.id}`}
+                                                >
+                                                    <Icon
+                                                        icon="lucide:chevron-down"
+                                                        class="w-4 h-4 transition-transform"
+                                                        class:rotate-90={isProcessExpanded(processGroup.process.id)}
+                                                    />
+                                                </button>
+                                                {@const derivedIds = getDerivedEntityIds(processGroup.events)}
+                                                <ProcessRow
+                                                    process={processGroup.process}
+                                                    eventCount={processGroup.events.length}
+                                                    onAnnotate={() => handleProcessAnnotate(processGroup.process)}
+                                                    onOpenCanvas={
+                                                        derivedIds.length > 0
+                                                            ? () =>
+                                                                  handleProcessCanvasLink(processGroup.process, derivedIds)
+                                                            : undefined
+                                                    }
+                                                    onResolve={handleProcessResolve}
+                                                />
+                                            </div>
+                                            {#if isProcessExpanded(processGroup.process.id)}
+                                                <div
+                                                    class="space-y-2 px-5 py-3"
+                                                    id={`process-${processGroup.process.id}`}
+                                                >
+                                                    {#each processGroup.events as event (event.id)}
+                                                        <EventCard
+                                                            {event}
+                                                            process={processGroup.process}
+                                                            selected={selectedEventIds.has(event.id)}
+                                                            onSelect={(selected) => handleEventSelect(event.id, selected)}
+                                                            onEditEvent={handleEditEvent}
+                                                            onEditSevenWs={handleEditSevenWs}
+                                                            onGenerateEntities={handleGenerateEntities}
+                                                            onDelete={reloadEvents}
+                                                            onResolveProcess={handleProcessResolve}
+                                                        />
+                                                    {/each}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                    {#if domainGroup.ungroupedEvents.length > 0}
+                                        <div class="space-y-2 pt-2">
+                                            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                                Ungrouped events
+                                            </p>
+                                            {#each domainGroup.ungroupedEvents as event (event.id)}
+                                                <EventCard
+                                                    {event}
+                                                    selected={selectedEventIds.has(event.id)}
+                                                    onSelect={(selected) => handleEventSelect(event.id, selected)}
+                                                    onEditEvent={handleEditEvent}
+                                                    onEditSevenWs={handleEditSevenWs}
+                                                    onGenerateEntities={handleGenerateEntities}
+                                                    onDelete={reloadEvents}
+                                                />
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/if}
+                        </div>
                     {/each}
                 </div>
             {/if}
@@ -502,6 +796,14 @@
         />
     {/if}
 
+    {#if showProcessSevenWsForm && processAnnotationEvent}
+        <SevenWsForm
+            event={processAnnotationEvent}
+            onSave={handleProcessSevenWsSave}
+            onCancel={handleProcessSevenWsCancel}
+        />
+    {/if}
+
     <!-- Generate Entities Dialog -->
     <GenerateEntitiesDialog
         open={showGenerateEntitiesDialog}
@@ -516,5 +818,6 @@
         eventIds={Array.from(selectedEventIds)}
         onSave={handleProcessGroupSave}
         onCancel={handleProcessGroupCancel}
+        domains={domains}
     />
 </div>

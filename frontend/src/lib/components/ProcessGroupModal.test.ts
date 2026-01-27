@@ -2,6 +2,8 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
 import ProcessGroupModal from './ProcessGroupModal.svelte';
 
+const DOMAIN_SUGGESTIONS = ['Sales'];
+
 describe('ProcessGroupModal', () => {
     beforeEach(() => {
         vi.stubGlobal(
@@ -33,6 +35,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -49,6 +52,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: false,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -63,6 +67,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002', 'evt_003'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -77,6 +82,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -91,6 +97,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -106,6 +113,30 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
+            onSave,
+            onCancel
+        });
+
+        const nameInput = screen.getByLabelText(/process name/i);
+        await fireEvent.input(nameInput, { target: { value: 'Test Process' } });
+        const domainInput = screen.getByLabelText(/process domain/i);
+        await fireEvent.input(domainInput, { target: { value: 'Sales' } });
+
+        const createButton = screen.getByRole('button', { name: /create process/i });
+        await waitFor(() => {
+            expect(createButton).not.toBeDisabled();
+        });
+    });
+
+    it('requires a domain before enabling the create button', async () => {
+        const onSave = vi.fn();
+        const onCancel = vi.fn();
+
+        render(ProcessGroupModal, {
+            open: true,
+            eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -114,6 +145,11 @@ describe('ProcessGroupModal', () => {
         await fireEvent.input(nameInput, { target: { value: 'Test Process' } });
 
         const createButton = screen.getByRole('button', { name: /create process/i });
+        expect(createButton).toBeDisabled();
+
+        const domainInput = screen.getByLabelText(/process domain/i);
+        await fireEvent.input(domainInput, { target: { value: 'Sales' } });
+
         await waitFor(() => {
             expect(createButton).not.toBeDisabled();
         });
@@ -126,12 +162,15 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
 
         const nameInput = screen.getByLabelText(/process name/i);
         fireEvent.input(nameInput, { target: { value: 'Test Process' } });
+        const domainInput = screen.getByLabelText(/process domain/i);
+        fireEvent.input(domainInput, { target: { value: 'Sales' } });
 
         const createButton = screen.getByRole('button', { name: /create process/i });
         expect(createButton).toBeDisabled();
@@ -144,6 +183,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -158,6 +198,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -175,6 +216,7 @@ describe('ProcessGroupModal', () => {
         const { container } = render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
@@ -193,12 +235,15 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
 
         const nameInput = screen.getByLabelText(/process name/i);
         await fireEvent.input(nameInput, { target: { value: 'Test Process' } });
+        const domainInput = screen.getByLabelText(/process domain/i);
+        await fireEvent.input(domainInput, { target: { value: 'Sales' } });
 
         const createButton = screen.getByRole('button', { name: /create process/i });
         await waitFor(() => {
@@ -216,6 +261,7 @@ describe('ProcessGroupModal', () => {
                     body: JSON.stringify({
                         name: 'Test Process',
                         type: 'discrete',
+                        domain: 'Sales',
                         event_ids: ['evt_001', 'evt_002']
                     })
                 })
@@ -242,12 +288,15 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });
 
         const nameInput = screen.getByLabelText(/process name/i);
         await fireEvent.input(nameInput, { target: { value: 'Test Process' } });
+        const domainInput = screen.getByLabelText(/process domain/i);
+        await fireEvent.input(domainInput, { target: { value: 'Sales' } });
 
         const createButton = screen.getByRole('button', { name: /create process/i });
         await waitFor(() => {
@@ -268,6 +317,7 @@ describe('ProcessGroupModal', () => {
         render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
+            domains: DOMAIN_SUGGESTIONS,
             onSave,
             onCancel
         });

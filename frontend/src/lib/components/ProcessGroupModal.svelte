@@ -8,13 +8,15 @@
         eventIds: string[];
         onSave: () => void;
         onCancel: () => void;
+        domains?: string[];
     };
 
-    let { open, eventIds, onSave, onCancel }: Props = $props();
+    let { open, eventIds, onSave, onCancel, domains = [] }: Props = $props();
 
     // Form state
     let processName = $state("");
     let processType = $state<BusinessEventType>("discrete");
+    let domain = $state("");
     let loading = $state(false);
     let error = $state<string | null>(null);
 
@@ -27,6 +29,7 @@
         if (processName.trim().length === 0) return false;
         if (processName.length > MAX_NAME_LENGTH) return false;
         if (!processType) return false;
+        if (domain.trim().length === 0) return false;
         if (loading) return false;
         if (eventIds.length < 2) return false;
         return true;
@@ -37,6 +40,7 @@
         if (open) {
             processName = "";
             processType = "discrete";
+            domain = "";
             error = null;
             loading = false;
         }
@@ -72,6 +76,7 @@
             const request: CreateProcessRequest = {
                 name: processName.trim(),
                 type: processType,
+                domain: domain.trim(),
                 event_ids: eventIds,
             };
 
@@ -219,6 +224,30 @@
                         <option value="evolving">Evolving</option>
                         <option value="recurring">Recurring</option>
                     </select>
+                </div>
+
+                <!-- Process Domain -->
+                <div>
+                    <label for="process-domain" class="block text-sm font-medium text-gray-700 mb-2">
+                        Process Domain
+                    </label>
+                    <input
+                        id="process-domain"
+                        type="text"
+                        list="domain-suggestions"
+                        bind:value={domain}
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="e.g., Sales"
+                        disabled={loading}
+                    />
+                    <datalist id="domain-suggestions">
+                        {#each domains as domainOption}
+                            <option value={domainOption} />
+                        {/each}
+                    </datalist>
+                    {#if domain.trim().length === 0}
+                        <span class="text-xs text-red-600 mt-1 block">Process domain is required</span>
+                    {/if}
                 </div>
 
                 <!-- Error Message -->

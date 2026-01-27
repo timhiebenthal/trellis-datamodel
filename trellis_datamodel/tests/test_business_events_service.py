@@ -15,6 +15,8 @@ from trellis_datamodel.models.business_event import (
 )
 from trellis_datamodel.exceptions import ValidationError, NotFoundError, FileOperationError
 
+TEST_PROCESS_DOMAIN = "Sales"
+
 
 class TestCreateEvent:
     """Test create_event() function."""
@@ -232,7 +234,10 @@ class TestCreateProcess:
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id],
         )
 
         assert process.id.startswith("proc_")
@@ -251,10 +256,16 @@ class TestCreateProcess:
         event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
 
         process1 = business_events_service.create_process(
-            "Process 1", BusinessEventType.DISCRETE, [event1.id]
+            "Process 1",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id],
         )
         process2 = business_events_service.create_process(
-            "Process 2", BusinessEventType.EVOLVING, [event2.id, event3.id]
+            "Process 2",
+            BusinessEventType.EVOLVING,
+            TEST_PROCESS_DOMAIN,
+            [event2.id, event3.id],
         )
 
         assert process1.id.endswith("001")
@@ -270,7 +281,10 @@ class TestCreateProcess:
 
         before = datetime.now()
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event.id],
         )
         after = datetime.now()
 
@@ -288,7 +302,10 @@ class TestCreateProcess:
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id],
         )
 
         # Reload events to check process_id
@@ -323,12 +340,33 @@ class TestCreateProcess:
         business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id],
         )
 
         assert process.annotations_superset is not None
         assert len(process.annotations_superset.who) == 2  # Both customers
         assert len(process.annotations_superset.what) == 1  # Duplicate Product X deduplicated
+
+    def test_process_domain_persisted(self, temp_dir, monkeypatch):
+        """Test that the selected domain is saved in the process record."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        process = business_events_service.create_process(
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event.id],
+        )
+
+        processes = business_events_service.load_processes()
+        loaded_process = next(p for p in processes if p.id == process.id)
+        assert loaded_process.domain == TEST_PROCESS_DOMAIN
 
     def test_raises_validation_error_for_empty_name(self, temp_dir, monkeypatch):
         """Test that empty name raises ValidationError."""
@@ -339,10 +377,20 @@ class TestCreateProcess:
         event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
 
         with pytest.raises(ValidationError, match="Process name is required"):
-            business_events_service.create_process("", BusinessEventType.DISCRETE, [event.id])
+            business_events_service.create_process(
+                "",
+                BusinessEventType.DISCRETE,
+                TEST_PROCESS_DOMAIN,
+                [event.id],
+            )
 
         with pytest.raises(ValidationError, match="Process name is required"):
-            business_events_service.create_process("   ", BusinessEventType.DISCRETE, [event.id])
+            business_events_service.create_process(
+                "   ",
+                BusinessEventType.DISCRETE,
+                TEST_PROCESS_DOMAIN,
+                [event.id],
+            )
 
     def test_raises_validation_error_for_empty_event_ids(self, temp_dir, monkeypatch):
         """Test that empty event_ids raises ValidationError."""
@@ -351,7 +399,12 @@ class TestCreateProcess:
         monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
 
         with pytest.raises(ValidationError, match="At least one event ID is required"):
-            business_events_service.create_process("Test Process", BusinessEventType.DISCRETE, [])
+            business_events_service.create_process(
+                "Test Process",
+                BusinessEventType.DISCRETE,
+                TEST_PROCESS_DOMAIN,
+                [],
+            )
 
     def test_raises_not_found_error_for_invalid_event_id(self, temp_dir, monkeypatch):
         """Test that invalid event_id raises NotFoundError."""
@@ -361,7 +414,34 @@ class TestCreateProcess:
 
         with pytest.raises(NotFoundError, match="not found"):
             business_events_service.create_process(
-                "Test Process", BusinessEventType.DISCRETE, ["evt_20260101_999"]
+                "Test Process",
+                BusinessEventType.DISCRETE,
+                TEST_PROCESS_DOMAIN,
+                ["evt_20260101_999"],
+            )
+
+    def test_raises_validation_error_for_missing_domain(self, temp_dir, monkeypatch):
+        """Test that missing or blank domain raises ValidationError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
+
+        with pytest.raises(ValidationError, match="Process domain is required"):
+            business_events_service.create_process(
+                "Test Process",
+                BusinessEventType.DISCRETE,
+                domain=None,
+                event_ids=[event.id],
+            )
+
+        with pytest.raises(ValidationError, match="Process domain is required"):
+            business_events_service.create_process(
+                "Test Process",
+                BusinessEventType.DISCRETE,
+                domain="   ",
+                event_ids=[event.id],
             )
 
 
@@ -492,7 +572,10 @@ class TestResolveProcess:
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id],
         )
 
         resolved = business_events_service.resolve_process(process.id)
@@ -508,6 +591,33 @@ class TestResolveProcess:
 
         assert event1_reloaded.process_id is None
         assert event2_reloaded.process_id is None
+
+    def test_resolve_restores_events_to_domain_listing(self, temp_dir, monkeypatch):
+        """Regression: resolved events should remain associated with their domain."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event(
+            "event 3", BusinessEventType.DISCRETE, domain=TEST_PROCESS_DOMAIN
+        )
+        process = business_events_service.create_process(
+            "Domain Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event.id],
+        )
+
+        business_events_service.resolve_process(process.id)
+
+        reloaded = next(
+            e for e in business_events_service.load_business_events() if e.id == event.id
+        )
+        domains = business_events_service.get_unique_domains()
+
+        assert reloaded.process_id is None
+        assert reloaded.domain == TEST_PROCESS_DOMAIN
+        assert TEST_PROCESS_DOMAIN in domains
 
     def test_raises_not_found_error_for_missing_process(self, temp_dir, monkeypatch):
         """Test that resolving non-existent process raises NotFoundError."""
@@ -526,7 +636,10 @@ class TestResolveProcess:
 
         event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event.id],
         )
 
         business_events_service.resolve_process(process.id)
@@ -549,7 +662,10 @@ class TestEventRelink:
         event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id],
         )
 
         updated = business_events_service.attach_events_to_process(process.id, [event2.id, event3.id])
@@ -577,7 +693,10 @@ class TestEventRelink:
         event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id, event3.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id, event3.id],
         )
 
         updated = business_events_service.detach_events_from_process(process.id, [event2.id])
@@ -601,10 +720,16 @@ class TestEventRelink:
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
 
         process1 = business_events_service.create_process(
-            "Process 1", BusinessEventType.DISCRETE, [event1.id]
+            "Process 1",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id],
         )
         process2 = business_events_service.create_process(
-            "Process 2", BusinessEventType.DISCRETE, [event2.id]
+            "Process 2",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event2.id],
         )
 
         with pytest.raises(ValidationError, match="already attached"):
@@ -622,7 +747,10 @@ class TestSupersetRecompute:
 
         event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event.id],
         )
 
         # Initial superset should be empty
@@ -663,7 +791,10 @@ class TestSupersetRecompute:
         business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id],
         )
 
         # Initial superset has only Customer A
@@ -697,7 +828,10 @@ class TestSupersetRecompute:
         business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
 
         process = business_events_service.create_process(
-            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id],
         )
 
         # Initial superset has both customers
