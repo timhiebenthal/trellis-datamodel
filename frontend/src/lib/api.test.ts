@@ -533,6 +533,7 @@ describe('Business Event Process API Functions', () => {
             const request: CreateProcessRequest = {
                 name: 'New Process',
                 type: 'evolving',
+                domain: 'Test Domain',
             };
 
             const mockResponse = {
@@ -560,6 +561,7 @@ describe('Business Event Process API Functions', () => {
             const request: CreateProcessRequest = {
                 name: 'Test Process',
                 type: 'discrete',
+                domain: 'Test Domain',
                 event_ids: ['evt_invalid']
             };
 

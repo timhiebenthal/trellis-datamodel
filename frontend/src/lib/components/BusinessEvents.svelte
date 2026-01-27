@@ -998,21 +998,21 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                                 onGenerateEntities={handleGenerateEntities}
                                                                 onDelete={reloadEvents}
                                                                 onResolveProcess={handleProcessResolve}
-                                                                onDragStart={(dragEvent) =>
+                                                                onDragStart={(evt, dragEvent) =>
                                                                     handleEventDragStart(
-                                                                        event,
+                                                                        evt,
                                                                         processGroup.process.id,
                                                                         dragEvent
                                                                     )}
-                                                                onDragOver={(_, dragEvent) =>
+                                                                onDragOver={(evt, dragEvent) =>
                                                                     handleEventDragOver(
-                                                                        event,
+                                                                        evt,
                                                                         processGroup.process.id,
                                                                         dragEvent,
                                                                         processGroup
                                                                     )}
-                                                                onDrop={(_, dragEvent) =>
-                                                                    handleEventDrop(event, processGroup, dragEvent)}
+                                                                onDrop={(evt, dragEvent) =>
+                                                                    handleEventDrop(evt, processGroup, dragEvent)}
                                                                 onDragEnd={handleEventDragEnd}
                                                             />
                                                             {#if dragOverEventId === event.id && dropIndicatorPosition === 'after'}
@@ -1047,8 +1047,8 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                     onEditSevenWs={handleEditSevenWs}
                                                     onGenerateEntities={handleGenerateEntities}
                                                     onDelete={reloadEvents}
-                                                    onDragStart={(dragEvent) =>
-                                                        handleEventDragStart(event, null, dragEvent)}
+                                                    onDragStart={(evt, dragEvent) =>
+                                                        handleEventDragStart(evt, null, dragEvent)}
                                                     onDragEnd={handleEventDragEnd}
                                                 />
                                             {/each}

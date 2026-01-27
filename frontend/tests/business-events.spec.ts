@@ -739,7 +739,7 @@ test.describe('Business Events - E2E', () => {
         await expect(modal).toBeVisible({ timeout: 5000 });
 
         // Fill in process name
-        const nameInput = page.getByLabelText(/process name/i);
+        const nameInput = page.getByLabel(/process name/i);
         await nameInput.fill('Test Process');
 
         // Verify Create Process button is disabled (domain not selected)
@@ -751,7 +751,7 @@ test.describe('Business Events - E2E', () => {
         await expect(domainRequired).toBeVisible();
 
         // Fill in domain
-        const domainInput = page.getByLabelText(/process domain/i);
+        const domainInput = page.getByLabel(/process domain/i);
         await domainInput.fill('Sales');
 
         // Verify Create Process button is now enabled
