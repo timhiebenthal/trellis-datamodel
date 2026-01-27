@@ -110,13 +110,14 @@ describe('BusinessEvents - Grouping Logic', () => {
 
         // Verify domain groups are rendered
         // The component should show domains with processes and ungrouped events
-        const salesDomain = screen.queryByText(/sales/i);
-        const marketingDomain = screen.queryByText(/marketing/i);
+        // Use getAllByText to handle multiple matches (dropdown options + rendered content)
+        const salesDomains = screen.queryAllByText(/sales/i);
+        const marketingDomains = screen.queryAllByText(/marketing/i);
 
         // Since the component renders domains, processes, and events in a hierarchy,
         // we verify the structure exists. The exact rendering depends on collapse state,
-        // but we can verify that domain labels appear
-        expect(salesDomain || marketingDomain).toBeTruthy();
+        // but we can verify that domain labels appear (should have at least 2 matches: dropdown + label)
+        expect(salesDomains.length > 0 || marketingDomains.length > 0).toBeTruthy();
     });
 
     it('places ungrouped events directly under their domain', async () => {
@@ -164,9 +165,11 @@ describe('BusinessEvents - Grouping Logic', () => {
 
         // Verify ungrouped events section exists
         // The component should show "Ungrouped events" label for events without process_id
-        const ungroupedLabel = screen.queryByText(/ungrouped events/i);
+        const ungroupedLabels = screen.queryAllByText(/ungrouped events/i);
+        const ungroupedEvents = screen.queryAllByText(/ungrouped event/i);
         // The label may or may not be visible depending on collapse state, but structure should exist
-        expect(ungroupedLabel !== null || screen.queryByText(/ungrouped event/i) !== null).toBeTruthy();
+        // Check if we have either the label or the event names (multiple events can match)
+        expect(ungroupedLabels.length > 0 || ungroupedEvents.length > 0).toBeTruthy();
     });
 
     it('handles events without domain by placing them in "Unassigned" group', async () => {
@@ -208,9 +211,11 @@ describe('BusinessEvents - Grouping Logic', () => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Verify "Unassigned" domain appears for events without domain
-        const unassignedLabel = screen.queryByText(/unassigned/i);
+        const unassignedLabels = screen.queryAllByText(/unassigned/i);
+        const eventWithoutDomain = screen.queryByText(/event without domain/i);
         // Component should show "Unassigned" for events without domain
-        expect(unassignedLabel !== null || screen.queryByText(/event without domain/i) !== null).toBeTruthy();
+        // Multiple matches expected: dropdown option + domain label
+        expect(unassignedLabels.length > 0 || eventWithoutDomain !== null).toBeTruthy();
     });
 
     it('excludes resolved processes from grouping', async () => {
@@ -264,10 +269,12 @@ describe('BusinessEvents - Grouping Logic', () => {
 
         // Verify only active process appears (resolved process should be excluded)
         // Events from resolved processes should appear as ungrouped under their domain
-        const activeProcessName = screen.queryByText(/active process/i);
-        const resolvedProcessName = screen.queryByText(/resolved process/i);
+        const activeProcessNames = screen.queryAllByText(/active process/i);
+        const resolvedProcessNames = screen.queryAllByText(/resolved process/i);
 
-        // Active process should be visible, resolved process should not
-        expect(activeProcessName !== null || resolvedProcessName === null).toBeTruthy();
+        // Active process should be visible (multiple matches: dropdown + process name)
+        // Resolved process should not appear anywhere (dropdown only shows activeProcesses)
+        expect(activeProcessNames.length > 0).toBeTruthy();
+        expect(resolvedProcessNames.length).toBe(0);
     });
 });
