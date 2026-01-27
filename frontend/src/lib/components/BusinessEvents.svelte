@@ -324,7 +324,12 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
     }
 
     function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent) {
-        if (!dragState || dragState.processId !== processId || dragState.eventId === event.id) {
+        // Allow reordering within the same process - only reject if dragging onto itself or no drag state
+        if (!dragState || dragState.eventId === event.id) {
+            return;
+        }
+        // Only allow drag-over if both events are in the same process
+        if (dragState.processId !== processId) {
             return;
         }
         dragEvent.preventDefault();
@@ -742,7 +747,10 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
                         <h2 class="text-xl font-bold text-gray-800">Business Events</h2>
                         <p class="text-sm text-gray-600 mt-1">
                             Document business events during the conception phase of dimensional data modeling.
-                            Capture events like "Customer buys Product" and annotate them with analytical relevant information answering "Who, What, When, Where, How, Why and How Many".
+                            <br />
+                            Identify granular events by asking "What happens?" (e.g. "Customer buys Product") and annotate them with analytical context answering "Who, What, When, Where, How, Why, and How Many".
+                            <br />
+                            Optionally group related events into a holistic process to consolidate multiple events into the same fact table.
                         </p>
                     </div>
                     <button
@@ -983,13 +991,13 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
                                                                     processGroup.process.id,
                                                                     dragEvent
                                                                 )}
-                                                            onDragOver={(dragEvent) =>
+                                                            onDragOver={(_, dragEvent) =>
                                                                 handleEventDragOver(
                                                                     event,
                                                                     processGroup.process.id,
                                                                     dragEvent
                                                                 )}
-                                                            onDrop={(dragEvent) =>
+                                                            onDrop={(_, dragEvent) =>
                                                                 handleEventDrop(event, processGroup, dragEvent)}
                                                             onDragEnd={handleEventDragEnd}
                                                         />
