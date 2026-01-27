@@ -27,6 +27,8 @@
         return str.trim().charAt(0).toUpperCase() + str.trim().slice(1).toLowerCase();
     }
     let showCreateModal = $state(false);
+    let showEditModal = $state(false);
+    let editEvent = $state<BusinessEvent | null>(null);
     let showSevenWsForm = $state(false);
     let showGenerateEntitiesDialog = $state(false);
     let sevenWsEvent = $state<BusinessEvent | null>(null);
@@ -185,6 +187,22 @@
     function handleModalClose() {
         showCreateModal = false;
         reloadEvents();
+    }
+
+    function handleEditEvent(event: BusinessEvent) {
+        editEvent = event;
+        showEditModal = true;
+    }
+
+    function handleEditModalClose() {
+        showEditModal = false;
+        editEvent = null;
+        reloadEvents();
+    }
+
+    function handleEditModalCancel() {
+        showEditModal = false;
+        editEvent = null;
     }
 
     function handleEditSevenWs(event: BusinessEvent) {
@@ -438,6 +456,7 @@
                             {process}
                             selected={selectedEventIds.has(event.id)}
                             onSelect={(selected) => handleEventSelect(event.id, selected)}
+                            onEditEvent={handleEditEvent}
                             onEditSevenWs={handleEditSevenWs}
                             onGenerateEntities={handleGenerateEntities}
                             onDelete={reloadEvents}
@@ -463,6 +482,14 @@
         open={showCreateModal}
         onSave={handleModalClose}
         onCancel={() => { showCreateModal = false; }}
+    />
+
+    <!-- Edit Event Modal -->
+    <CreateEventModal
+        open={showEditModal}
+        event={editEvent ?? undefined}
+        onSave={handleEditModalClose}
+        onCancel={handleEditModalCancel}
     />
 
 

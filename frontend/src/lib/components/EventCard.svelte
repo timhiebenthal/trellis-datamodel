@@ -10,13 +10,14 @@
         process?: BusinessEventProcess;
         selected?: boolean;
         onSelect?: (selected: boolean) => void;
+        onEditEvent?: (event: BusinessEvent) => void;
         onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
         onDelete: () => void;
         onResolveProcess?: (processId: string) => void;
     };
 
-    let { event, process, selected = false, onSelect, onEditSevenWs, onGenerateEntities, onDelete, onResolveProcess }: Props = $props();
+    let { event, process, selected = false, onSelect, onEditEvent, onEditSevenWs, onGenerateEntities, onDelete, onResolveProcess }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -180,6 +181,15 @@
 
         <!-- Action buttons -->
         <div class="flex items-center gap-1 flex-shrink-0">
+            {#if onEditEvent}
+                <button
+                    onclick={() => onEditEvent(event)}
+                    class="p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                    title="Edit event properties (text, type, domain)"
+                >
+                    <Icon icon="lucide:edit" class="w-4 h-4" />
+                </button>
+            {/if}
             <button
                 onclick={() => onEditSevenWs(event)}
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
