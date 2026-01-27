@@ -16,6 +16,7 @@ import type {
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
+    import CollapseChevron from './CollapseChevron.svelte';
     import EventCard from './EventCard.svelte';
     import ProcessRow from './ProcessRow.svelte';
     import SevenWsForm from './SevenWsForm.svelte';
@@ -702,12 +703,9 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                         aria-expanded={isDomainExpanded(domainGroup.domainKey)}
                                         aria-controls={`domain-${domainGroup.domainKey}`}
                                     >
-                                        <span class="w-4 h-4 transition-transform" class:-rotate-90={!isDomainExpanded(domainGroup.domainKey)}>
-                                            <Icon
-                                                icon="lucide:chevron-down"
-                                                class="w-4 h-4"
-                                            />
-                                        </span>
+                                        <CollapseChevron
+                                            expanded={isDomainExpanded(domainGroup.domainKey)}
+                                        />
                                         <span>{domainGroup.domainLabel}</span>
                                     </button>
                                 </div>
@@ -727,12 +725,9 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                                     aria-expanded={isProcessExpanded(processGroup.process.id)}
                                                     aria-controls={`process-${processGroup.process.id}`}
                                                 >
-                                                    <span class="w-4 h-4 transition-transform" class:-rotate-90={!isProcessExpanded(processGroup.process.id)}>
-                                                        <Icon
-                                                            icon="lucide:chevron-down"
-                                                            class="w-4 h-4"
-                                                        />
-                                                    </span>
+                                                    <CollapseChevron
+                                                        expanded={isProcessExpanded(processGroup.process.id)}
+                                                    />
                                                 </button>
                                                 <ProcessRow
                                                     process={processGroup.process}
@@ -770,22 +765,38 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                         </div>
                                     {/each}
                                     {#if domainGroup.ungroupedEvents.length > 0}
-                                        <div class="space-y-2 pt-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                                Ungrouped events
-                                            </p>
-                                            {#each domainGroup.ungroupedEvents as event (event.id)}
-                                                <EventCard
-                                                    {event}
-                                                    selected={selectedEventIds.has(event.id)}
-                                                    onSelect={(selected) => handleEventSelect(event.id, selected)}
-                                                    onEditEvent={handleEditEvent}
-                                                    onEditSevenWs={handleEditSevenWs}
-                                                    onGenerateEntities={handleGenerateEntities}
-                                                    onDelete={reloadEvents}
-                                                />
-                                            {/each}
-                                        </div>
+                                        {#if domainGroup.processes.length > 0}
+                                            <div class="space-y-2 pt-2">
+                                                <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                                    Ungrouped events
+                                                </p>
+                                                {#each domainGroup.ungroupedEvents as event (event.id)}
+                                                    <EventCard
+                                                        {event}
+                                                        selected={selectedEventIds.has(event.id)}
+                                                        onSelect={(selected) => handleEventSelect(event.id, selected)}
+                                                        onEditEvent={handleEditEvent}
+                                                        onEditSevenWs={handleEditSevenWs}
+                                                        onGenerateEntities={handleGenerateEntities}
+                                                        onDelete={reloadEvents}
+                                                    />
+                                                {/each}
+                                            </div>
+                                        {:else}
+                                            <div class="space-y-2 pt-2">
+                                                {#each domainGroup.ungroupedEvents as event (event.id)}
+                                                    <EventCard
+                                                        {event}
+                                                        selected={selectedEventIds.has(event.id)}
+                                                        onSelect={(selected) => handleEventSelect(event.id, selected)}
+                                                        onEditEvent={handleEditEvent}
+                                                        onEditSevenWs={handleEditSevenWs}
+                                                        onGenerateEntities={handleGenerateEntities}
+                                                        onDelete={reloadEvents}
+                                                    />
+                                                {/each}
+                                            </div>
+                                        {/if}
                                     {/if}
                                 </div>
                             {/if}

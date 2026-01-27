@@ -1,7 +1,5 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import DomainBadge from "./DomainBadge.svelte";
-    import ProcessBadge from "./ProcessBadge.svelte";
     import type { BusinessEventProcess } from "$lib/types";
 
     type Props = {
@@ -30,18 +28,17 @@
     }
 </script>
 
-<div class="bg-indigo-50 border-b border-indigo-200 px-4 py-3 flex items-center justify-between gap-4" role="group">
+<div class="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-4" role="group">
     <div class="flex-1 flex items-center gap-3 min-w-0">
-        <ProcessBadge processName={process.name} processId={process.id} size="small" />
         <div class="flex flex-col min-w-0">
+            <span class="text-sm font-semibold text-slate-800 truncate">
+                {process.name}
+            </span>
             <span class="text-xs font-medium text-slate-600 uppercase tracking-wide">
                 {eventCount} grouped event{eventCount === 1 ? "" : "s"}
             </span>
             <div class="flex items-center gap-2 text-[11px] text-slate-500">
                 <span>{process.type}</span>
-                {#if process.domain}
-                    <DomainBadge domain={process.domain} size="small" />
-                {/if}
             </div>
         </div>
     </div>
