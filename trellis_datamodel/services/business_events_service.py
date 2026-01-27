@@ -1504,21 +1504,3 @@ def recompute_all_process_supersets() -> None:
             recompute_process_superset(process.id)
         except Exception as e:
             logger.warning(f"Failed to recompute superset for process {process.id}: {e}")
-  Useful after bulk event updates or migrations.
-    """
-    processes = load_processes()
-    active_processes = [p for p in processes if p.resolved_at is None]
-
-    for process in active_processes:
-        try:
-            recompute_process_superset(process.id)
-        except Exception as e:
-            logger.warning(f"Failed to recompute superset for process {process.id}: {e}")
-cesses()
-    active_processes = [p for p in processes if p.resolved_at is None]
-
-    for process in active_processes:
-        try:
-            recompute_process_superset(process.id)
-        except Exception as e:
-            logger.warning(f"Failed to recompute superset for process {process.id}: {e}")

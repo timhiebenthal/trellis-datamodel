@@ -2,9 +2,6 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventProcess } from "$lib/types";
     import { deleteBusinessEvent } from "$lib/api";
-    import DomainBadge from "./DomainBadge.svelte";
-    import ProcessBadge from "./ProcessBadge.svelte";
-
     type Props = {
         event: BusinessEvent;
         process?: BusinessEventProcess;
@@ -164,17 +161,9 @@
             {/if}
         </div>
 
-        <!-- Domain, Process, and Type badges -->
+        <!-- Type badge -->
         <div class="flex items-center gap-2 flex-shrink-0">
-            {#if event.domain}
-                <DomainBadge domain={event.domain} size="small" />
-            {/if}
-            {#if process}
-                <ProcessBadge processName={process.name} processId={process.id} size="small" />
-            {/if}
-            <span
-                class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}"
-            >
+            <span class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}">
                 {event.type}
             </span>
         </div>

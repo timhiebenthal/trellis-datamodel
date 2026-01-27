@@ -110,8 +110,12 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
         return domainKey === UNASSIGNED_DOMAIN_KEY ? 'Unassigned' : toTitleCase(domainKey);
     }
 
+    const activeProcesses = $derived.by(() =>
+        processes.filter((process) => !process.resolved_at)
+    );
+    const hasActiveProcesses = $derived(() => activeProcesses.length > 0);
+
     const domainGroups = $derived.by(() => {
-        const activeProcesses = processes.filter((process) => !process.resolved_at);
         const processLookup = new Map(activeProcesses.map((proc) => [proc.id, proc]));
         const eventsByProcess = new Map<string, BusinessEvent[]>();
 
@@ -585,7 +589,7 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                             class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                             <option value={null}>All Processes</option>
-                            {#each processes.filter(p => !p.resolved_at) as process}
+                            {#each activeProcesses as process}
                                 <option value={process.id}>{process.name}</option>
                             {/each}
                             <option value="ungrouped">Ungrouped</option>
@@ -633,6 +637,25 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                 </div>
             </div>
 
+            {#if events.length > 0}
+                {#if !hasActiveProcesses}
+                    <div class="mb-4 rounded-lg border border-dashed border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+                        <p class="font-semibold text-primary-800">No processes yet</p>
+                        <p class="text-xs text-primary-700">
+                            Select multiple events and click "Group into Process" to create the first process.
+                        </p>
+                    </div>
+                {/if}
+                {#if domains.length === 0}
+                    <div class="mb-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                        <p class="font-semibold text-gray-800">No domains assigned</p>
+                        <p class="text-xs text-gray-600">
+                            Edit an event and add a business domain so events appear under meaningful headings.
+                        </p>
+                    </div>
+                {/if}
+            {/if}
+
             <!-- Event List -->
             {#if domainGroups.length === 0}
                 <div class="flex items-center justify-center min-h-[400px]">
@@ -679,11 +702,12 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                         aria-expanded={isDomainExpanded(domainGroup.domainKey)}
                                         aria-controls={`domain-${domainGroup.domainKey}`}
                                     >
-                                        <Icon
-                                            icon="lucide:chevron-down"
-                                            class="w-4 h-4 transition-transform"
-                                            class:rotate-90={isDomainExpanded(domainGroup.domainKey)}
-                                        />
+                                        <span class="w-4 h-4 transition-transform" class:rotate-90={isDomainExpanded(domainGroup.domainKey)}>
+                                            <Icon
+                                                icon="lucide:chevron-down"
+                                                class="w-4 h-4"
+                                            />
+                                        </span>
                                         <span>{domainGroup.domainLabel}</span>
                                     </button>
                                 </div>
@@ -694,6 +718,7 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                             {#if isDomainExpanded(domainGroup.domainKey)}
                                 <div class="space-y-3 px-4 py-3" id={`domain-${domainGroup.domainKey}`}>
                                     {#each domainGroup.processes as processGroup (processGroup.process.id)}
+                                        {@const derivedIds = getDerivedEntityIds(processGroup.events)}
                                         <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 shadow-sm">
                                             <div class="flex items-center gap-3 px-3 py-2">
                                                 <button
@@ -702,13 +727,13 @@ let processAnnotationEvent = $state<BusinessEvent | null>(null);
                                                     aria-expanded={isProcessExpanded(processGroup.process.id)}
                                                     aria-controls={`process-${processGroup.process.id}`}
                                                 >
-                                                    <Icon
-                                                        icon="lucide:chevron-down"
-                                                        class="w-4 h-4 transition-transform"
-                                                        class:rotate-90={isProcessExpanded(processGroup.process.id)}
-                                                    />
+                                                    <span class="w-4 h-4 transition-transform" class:rotate-90={isProcessExpanded(processGroup.process.id)}>
+                                                        <Icon
+                                                            icon="lucide:chevron-down"
+                                                            class="w-4 h-4"
+                                                        />
+                                                    </span>
                                                 </button>
-                                                {@const derivedIds = getDerivedEntityIds(processGroup.events)}
                                                 <ProcessRow
                                                     process={processGroup.process}
                                                     eventCount={processGroup.events.length}

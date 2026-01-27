@@ -668,4 +668,104 @@ test.describe('Business Events - E2E', () => {
         }
     });
 
+    test('should require domain selection before creating process', async ({ page }) => {
+        // Mock processes API
+        await page.route('**/api/processes', async (route) => {
+            if (route.request().method() === 'POST') {
+                const body = await route.request().postDataJSON();
+                await route.fulfill({
+                    status: 201,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'proc_20260127_001',
+                        name: body.name,
+                        type: body.type,
+                        domain: body.domain,
+                        event_ids: body.event_ids,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                });
+            } else {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify([])
+                });
+            }
+        });
+
+        // Mock domains API
+        await page.route('**/api/business-events/domains', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(['Sales', 'Marketing', 'Finance'])
+            });
+        });
+
+        // Navigate to business events
+        await page.goto('/business-events').catch(() => {
+            test.skip();
+        });
+        await page.waitForLoadState('networkidle');
+
+        // Select multiple events (checkboxes)
+        const checkboxes = page.locator('input[type="checkbox"]').filter({ hasNotText: /select all/i });
+        const checkboxCount = await checkboxes.count();
+
+        if (checkboxCount < 2) {
+            test.skip();
+            return;
+        }
+
+        // Select at least 2 events
+        await checkboxes.nth(0).check();
+        await checkboxes.nth(1).check();
+
+        // Click "Group into Process" button
+        const groupButton = page.getByRole('button', { name: /group into process/i });
+        const groupButtonExists = await groupButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (!groupButtonExists) {
+            test.skip();
+            return;
+        }
+
+        await groupButton.click();
+
+        // Wait for ProcessGroupModal to appear
+        const modal = page.getByRole('dialog').filter({ hasText: /group into process/i });
+        await expect(modal).toBeVisible({ timeout: 5000 });
+
+        // Fill in process name
+        const nameInput = page.getByLabelText(/process name/i);
+        await nameInput.fill('Test Process');
+
+        // Verify Create Process button is disabled (domain not selected)
+        const createButton = page.getByRole('button', { name: /create process/i });
+        await expect(createButton).toBeDisabled();
+
+        // Verify domain required message is shown
+        const domainRequired = page.getByText(/process domain is required/i);
+        await expect(domainRequired).toBeVisible();
+
+        // Fill in domain
+        const domainInput = page.getByLabelText(/process domain/i);
+        await domainInput.fill('Sales');
+
+        // Verify Create Process button is now enabled
+        await expect(createButton).not.toBeDisabled({ timeout: 2000 });
+
+        // Clear domain
+        await domainInput.clear();
+
+        // Verify Create Process button is disabled again
+        await expect(createButton).toBeDisabled({ timeout: 2000 });
+
+        // Fill domain again and verify button enables
+        await domainInput.fill('Marketing');
+        await expect(createButton).not.toBeDisabled({ timeout: 2000 });
+    });
+
 });
