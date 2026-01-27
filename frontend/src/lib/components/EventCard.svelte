@@ -139,9 +139,6 @@
     class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
     class:bg-primary-50={selected}
     class:border-primary-200={selected}
-    class:border-primary-300={dragOver}
-    class:ring-2={dragOver}
-    class:ring-primary-200={dragOver}
     ondragover={(e) => {
         if (!onDragOver) return;
         e.preventDefault();

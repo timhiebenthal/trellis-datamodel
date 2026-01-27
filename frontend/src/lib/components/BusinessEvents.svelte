@@ -64,6 +64,7 @@ let dragState = $state<{ eventId: string; processId: string | null } | null>(nul
 let dragOverEventId = $state<string | null>(null);
 let dragOverProcessId = $state<string | null>(null);
 let dragOverUngroupedDomainKey = $state<string | null>(null);
+let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
     // Helper function to convert domain to title case
     function toTitleCase(str: string): string {
@@ -317,13 +318,14 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
         dragOverEventId = null;
         dragOverProcessId = null;
         dragOverUngroupedDomainKey = null;
+        dropIndicatorPosition = null;
         if (dragEvent.dataTransfer) {
             dragEvent.dataTransfer.effectAllowed = 'move';
             dragEvent.dataTransfer.setData('text/plain', event.id);
         }
     }
 
-    function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent) {
+    function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent, processGroup: ProcessGroup) {
         // Allow reordering within the same process - only reject if dragging onto itself or no drag state
         if (!dragState || dragState.eventId === event.id) {
             return;
@@ -336,6 +338,12 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
         dragOverEventId = event.id;
         dragOverProcessId = processId;
         dragOverUngroupedDomainKey = null;
+        
+        // Determine if we should show indicator before or after this event
+        const draggedIndex = processGroup.process.event_ids.indexOf(dragState.eventId);
+        const targetIndex = processGroup.process.event_ids.indexOf(event.id);
+        dropIndicatorPosition = draggedIndex < targetIndex ? 'after' : 'before';
+        
         if (dragEvent.dataTransfer) {
             dragEvent.dataTransfer.dropEffect = 'move';
         }
@@ -356,6 +364,7 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
         dragOverEventId = null;
         dragOverProcessId = null;
         dragOverUngroupedDomainKey = null;
+        dropIndicatorPosition = null;
 
         if (fromId === toId) {
             return;
@@ -383,6 +392,7 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
         dragOverEventId = null;
         dragOverProcessId = null;
         dragOverUngroupedDomainKey = null;
+        dropIndicatorPosition = null;
     }
 
     function handleProcessDragOver(processId: string, dragEvent: DragEvent) {
@@ -970,37 +980,48 @@ let dragOverUngroupedDomainKey = $state<string | null>(null);
                                                     id={`process-${processGroup.process.id}`}
                                                 >
                                                     {#each processGroup.events as event (event.id)}
-                                                        <EventCard
-                                                            {event}
-                                                            process={processGroup.process}
-                                                            selected={selectedEventIds.has(event.id)}
-                                                            draggable={true}
-                                                            dragOver={
-                                                                dragOverEventId === event.id &&
-                                                                dragState?.processId === processGroup.process.id
-                                                            }
-                                                            onSelect={(selected) => handleEventSelect(event.id, selected)}
-                                                            onEditEvent={handleEditEvent}
-                                                            onEditSevenWs={handleEditSevenWs}
-                                                            onGenerateEntities={handleGenerateEntities}
-                                                            onDelete={reloadEvents}
-                                                            onResolveProcess={handleProcessResolve}
-                                                            onDragStart={(dragEvent) =>
-                                                                handleEventDragStart(
-                                                                    event,
-                                                                    processGroup.process.id,
-                                                                    dragEvent
-                                                                )}
-                                                            onDragOver={(_, dragEvent) =>
-                                                                handleEventDragOver(
-                                                                    event,
-                                                                    processGroup.process.id,
-                                                                    dragEvent
-                                                                )}
-                                                            onDrop={(_, dragEvent) =>
-                                                                handleEventDrop(event, processGroup, dragEvent)}
-                                                            onDragEnd={handleEventDragEnd}
-                                                        />
+                                                        <div class="relative">
+                                                            {#if dragOverEventId === event.id && dropIndicatorPosition === 'before'}
+                                                                <div class="absolute -top-1 left-0 right-0 h-0.5 bg-primary-500 z-10">
+                                                                    <div class="absolute -left-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
+                                                                    <div class="absolute -right-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
+                                                                </div>
+                                                            {/if}
+                                                            <EventCard
+                                                                {event}
+                                                                process={processGroup.process}
+                                                                selected={selectedEventIds.has(event.id)}
+                                                                draggable={true}
+                                                                onSelect={(selected) => handleEventSelect(event.id, selected)}
+                                                                onEditEvent={handleEditEvent}
+                                                                onEditSevenWs={handleEditSevenWs}
+                                                                onGenerateEntities={handleGenerateEntities}
+                                                                onDelete={reloadEvents}
+                                                                onResolveProcess={handleProcessResolve}
+                                                                onDragStart={(dragEvent) =>
+                                                                    handleEventDragStart(
+                                                                        event,
+                                                                        processGroup.process.id,
+                                                                        dragEvent
+                                                                    )}
+                                                                onDragOver={(_, dragEvent) =>
+                                                                    handleEventDragOver(
+                                                                        event,
+                                                                        processGroup.process.id,
+                                                                        dragEvent,
+                                                                        processGroup
+                                                                    )}
+                                                                onDrop={(_, dragEvent) =>
+                                                                    handleEventDrop(event, processGroup, dragEvent)}
+                                                                onDragEnd={handleEventDragEnd}
+                                                            />
+                                                            {#if dragOverEventId === event.id && dropIndicatorPosition === 'after'}
+                                                                <div class="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary-500 z-10">
+                                                                    <div class="absolute -left-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
+                                                                    <div class="absolute -right-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
+                                                                </div>
+                                                            {/if}
+                                                        </div>
                                                     {/each}
                                                 </div>
                                             {/if}
