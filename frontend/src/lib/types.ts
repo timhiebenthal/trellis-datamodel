@@ -328,6 +328,7 @@ export interface BusinessEvent {
     text: string;
     type: BusinessEventType;
     domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
+    process_id?: string; // Optional ID of the process this event belongs to
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
     annotations?: BusinessEventAnnotations; // Event annotations (Who, What, When, Where, How, How Many, Why)
@@ -350,4 +351,36 @@ export interface GeneratedEntitiesResult {
         label?: string;
     }>;
     errors: string[];
+}
+
+// Business Event Process types
+export interface BusinessEventProcess {
+    id: string; // e.g., "proc_YYYYMMDD_NNN"
+    name: string;
+    type: BusinessEventType;
+    event_ids: string[];
+    created_at: string; // ISO timestamp
+    updated_at: string; // ISO timestamp
+    resolved_at?: string; // ISO timestamp, when the process was resolved (ungrouped)
+    annotations_superset?: BusinessEventAnnotations; // Union of all member event annotations
+}
+
+// Process API request types
+export interface CreateProcessRequest {
+    name: string;
+    type: BusinessEventType;
+    event_ids?: string[];
+}
+
+export interface UpdateProcessRequest {
+    name?: string;
+    type?: BusinessEventType;
+}
+
+export interface AttachEventsRequest {
+    event_ids: string[];
+}
+
+export interface DetachEventsRequest {
+    event_ids: string[];
 }

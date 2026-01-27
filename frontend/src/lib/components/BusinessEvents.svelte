@@ -1,19 +1,26 @@
 <script lang="ts">
-    import { getBusinessEvents, getBusinessEventDomains, updateBusinessEvent } from '$lib/api';
-    import type { BusinessEvent, BusinessEventType } from '$lib/types';
+    import { getBusinessEvents, getBusinessEventDomains, updateBusinessEvent, getBusinessEventProcesses, resolveBusinessEventProcess } from '$lib/api';
+    import type { BusinessEvent, BusinessEventType, BusinessEventProcess } from '$lib/types';
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
     import EventCard from './EventCard.svelte';
     import SevenWsForm from './SevenWsForm.svelte';
     import GenerateEntitiesDialog from './GenerateEntitiesDialog.svelte';
+    import ProcessGroupModal from './ProcessGroupModal.svelte';
 
     let events = $state<BusinessEvent[]>([]);
+    let processes = $state<BusinessEventProcess[]>([]);
     let domains = $state<string[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
     let selectedFilter = $state<BusinessEventType | 'all'>('all');
     let selectedDomain = $state<string | null>(null);
+    let selectedProcess = $state<string | null>(null);
+    
+    // Multi-select state
+    let selectedEventIds = $state<Set<string>>(new Set());
+    let showProcessGroupModal = $state(false);
 
     // Helper function to convert domain to title case
     function toTitleCase(str: string): string {
@@ -41,6 +48,22 @@
             } else {
                 result = result.filter((event) => event.domain === selectedDomain);
             }
+        }
+
+        // Apply process filter
+        if (selectedProcess !== null) {
+            if (selectedProcess === 'ungrouped') {
+                result = result.filter((event) => !event.process_id);
+            } else {
+                result = result.filter((event) => event.process_id === selectedProcess);
+            }
+        }
+
+        // Clear selection if filtered events don't include selected items
+        const filteredIds = new Set(result.map(e => e.id));
+        const stillSelected = Array.from(selectedEventIds).filter(id => filteredIds.has(id));
+        if (stillSelected.length !== selectedEventIds.size) {
+            selectedEventIds = new Set(stillSelected);
         }
 
         return result;
@@ -80,6 +103,14 @@
             } catch (e) {
                 console.warn('Failed to load domain suggestions:', e);
                 domains = []; // Continue without domain suggestions
+            }
+
+            // Load processes separately
+            try {
+                processes = await getBusinessEventProcesses();
+            } catch (e) {
+                console.warn('Failed to load processes:', e);
+                processes = []; // Continue without processes
             }
         } catch (e) {
             // Fallback error handling
@@ -127,6 +158,14 @@
             } catch (e) {
                 console.warn('Failed to reload domain suggestions:', e);
                 domains = [];
+            }
+
+            // Load processes separately
+            try {
+                processes = await getBusinessEventProcesses();
+            } catch (e) {
+                console.warn('Failed to reload processes:', e);
+                processes = [];
             }
         } catch (e) {
             console.error('Error reloading events:', e);
@@ -195,6 +234,44 @@
         reloadEvents();
     }
 
+    // Multi-select handlers
+    function handleEventSelect(eventId: string, selected: boolean) {
+        if (selected) {
+            selectedEventIds = new Set([...selectedEventIds, eventId]);
+        } else {
+            const newSet = new Set(selectedEventIds);
+            newSet.delete(eventId);
+            selectedEventIds = newSet;
+        }
+    }
+
+    function handleSelectAll() {
+        if (selectedEventIds.size === filteredEvents.length) {
+            selectedEventIds = new Set();
+        } else {
+            selectedEventIds = new Set(filteredEvents.map(e => e.id));
+        }
+    }
+
+    const selectedCount = $derived(selectedEventIds.size);
+    const canGroup = $derived(selectedEventIds.size >= 2);
+
+    function handleGroupIntoProcess() {
+        if (canGroup) {
+            showProcessGroupModal = true;
+        }
+    }
+
+    function handleProcessGroupSave() {
+        showProcessGroupModal = false;
+        selectedEventIds = new Set();
+        reloadEvents();
+    }
+
+    function handleProcessGroupCancel() {
+        showProcessGroupModal = false;
+    }
+
 </script>
 
 <div class="h-full w-full overflow-auto bg-gray-50">
@@ -239,34 +316,89 @@
 
             <!-- Filter Controls -->
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
-                <div class="flex items-center gap-4 flex-wrap">
-                    <div class="flex items-center gap-2">
-                        <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
-                        <span class="text-sm font-medium text-gray-700">Filter by type:</span>
-                    </div>
-                    <select
-                        bind:value={selectedFilter}
-                        class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    >
-                        <option value="all">All</option>
-                        <option value="discrete">Discrete</option>
-                        <option value="evolving">Evolving</option>
-                        <option value="recurring">Recurring</option>
-                    </select>
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
+                            <span class="text-sm font-medium text-gray-700">Filter by type:</span>
+                        </div>
+                        <select
+                            bind:value={selectedFilter}
+                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                            <option value="all">All</option>
+                            <option value="discrete">Discrete</option>
+                            <option value="evolving">Evolving</option>
+                            <option value="recurring">Recurring</option>
+                        </select>
 
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-700">Filter by domain:</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-gray-700">Filter by domain:</span>
+                        </div>
+                        <select
+                            bind:value={selectedDomain}
+                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                            <option value={null}>All Domains</option>
+                            {#each domains as domain}
+                                <option value={domain}>{toTitleCase(domain)}</option>
+                            {/each}
+                            <option value="unassigned">Unassigned</option>
+                        </select>
+
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-gray-700">Filter by process:</span>
+                        </div>
+                        <select
+                            bind:value={selectedProcess}
+                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                            <option value={null}>All Processes</option>
+                            {#each processes.filter(p => !p.resolved_at) as process}
+                                <option value={process.id}>{process.name}</option>
+                            {/each}
+                            <option value="ungrouped">Ungrouped</option>
+                        </select>
                     </div>
-                    <select
-                        bind:value={selectedDomain}
-                        class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    >
-                        <option value={null}>All Domains</option>
-                        {#each domains as domain}
-                            <option value={domain}>{toTitleCase(domain)}</option>
-                        {/each}
-                        <option value="unassigned">Unassigned</option>
-                    </select>
+
+                    <!-- Multi-select controls -->
+                    {#if filteredEvents.length > 0}
+                        <div class="flex items-center gap-3">
+                            {#if selectedCount > 0}
+                                <span class="text-sm text-gray-600">
+                                    {selectedCount} selected
+                                </span>
+                                <button
+                                    onclick={handleSelectAll}
+                                    class="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                                >
+                                    {selectedCount === filteredEvents.length ? 'Deselect All' : 'Select All'}
+                                </button>
+                                <button
+                                    onclick={() => selectedEventIds = new Set()}
+                                    class="text-sm text-gray-600 hover:text-gray-700"
+                                >
+                                    Clear
+                                </button>
+                            {:else}
+                                <button
+                                    onclick={handleSelectAll}
+                                    class="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                                >
+                                    Select All
+                                </button>
+                            {/if}
+                            {#if canGroup}
+                                <button
+                                    onclick={handleGroupIntoProcess}
+                                    class="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm"
+                                >
+                                    <Icon icon="lucide:layers" class="w-4 h-4" />
+                                    Group into Process
+                                </button>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             </div>
 
@@ -300,11 +432,25 @@
             {:else}
                 <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                     {#each filteredEvents as event (event.id)}
+                        {@const process = processes.find(p => p.id === event.process_id && !p.resolved_at)}
                         <EventCard
                             {event}
+                            {process}
+                            selected={selectedEventIds.has(event.id)}
+                            onSelect={(selected) => handleEventSelect(event.id, selected)}
                             onEditSevenWs={handleEditSevenWs}
                             onGenerateEntities={handleGenerateEntities}
                             onDelete={reloadEvents}
+                            onResolveProcess={async (processId) => {
+                                try {
+                                    await resolveBusinessEventProcess(processId);
+                                    await reloadEvents();
+                                } catch (e) {
+                                    const errorMessage = e instanceof Error ? e.message : 'Failed to resolve process';
+                                    error = errorMessage;
+                                    console.error('Error resolving process:', e);
+                                }
+                            }}
                         />
                     {/each}
                 </div>
@@ -335,5 +481,13 @@
         event={generateEntitiesEvent}
         onConfirm={handleGenerateEntitiesClose}
         onCancel={handleGenerateEntitiesClose}
+    />
+
+    <!-- Process Group Modal -->
+    <ProcessGroupModal
+        open={showProcessGroupModal}
+        eventIds={Array.from(selectedEventIds)}
+        onSave={handleProcessGroupSave}
+        onCancel={handleProcessGroupCancel}
     />
 </div>

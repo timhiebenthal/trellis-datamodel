@@ -1,17 +1,22 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { BusinessEvent } from "$lib/types";
+    import type { BusinessEvent, BusinessEventProcess } from "$lib/types";
     import { deleteBusinessEvent } from "$lib/api";
     import DomainBadge from "./DomainBadge.svelte";
+    import ProcessBadge from "./ProcessBadge.svelte";
 
     type Props = {
         event: BusinessEvent;
+        process?: BusinessEventProcess;
+        selected?: boolean;
+        onSelect?: (selected: boolean) => void;
         onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
         onDelete: () => void;
+        onResolveProcess?: (processId: string) => void;
     };
 
-    let { event, onEditSevenWs, onGenerateEntities, onDelete }: Props = $props();
+    let { event, process, selected = false, onSelect, onEditSevenWs, onGenerateEntities, onDelete, onResolveProcess }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -112,9 +117,22 @@
 
 <div
     class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
+    class:bg-primary-50={selected}
+    class:border-primary-200={selected}
 >
     <!-- List-like row layout -->
     <div class="flex items-center gap-4">
+        <!-- Selection checkbox -->
+        {#if onSelect}
+            <input
+                type="checkbox"
+                checked={selected}
+                onchange={(e) => onSelect?.(e.currentTarget.checked)}
+                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                aria-label={`Select ${event.text}`}
+            />
+        {/if}
+        
         <!-- Event text (flex-1 to take available space) -->
         <div class="flex-1 min-w-0 text-sm text-gray-700 leading-relaxed">
             {event.text}
@@ -145,10 +163,13 @@
             {/if}
         </div>
 
-        <!-- Domain and Type badges -->
+        <!-- Domain, Process, and Type badges -->
         <div class="flex items-center gap-2 flex-shrink-0">
             {#if event.domain}
                 <DomainBadge domain={event.domain} size="small" />
+            {/if}
+            {#if process}
+                <ProcessBadge processName={process.name} processId={process.id} size="small" />
             {/if}
             <span
                 class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}"
@@ -196,6 +217,16 @@
                 >
                     <Icon icon="lucide:layout-dashboard" class="w-4 h-4" />
                 </a>
+            {/if}
+
+            {#if process && onResolveProcess}
+                <button
+                    onclick={() => onResolveProcess(process.id)}
+                    class="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                    title="Resolve process grouping (ungroup events)"
+                >
+                    <Icon icon="lucide:layers-off" class="w-4 h-4" />
+                </button>
             {/if}
 
             <button
