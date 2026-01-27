@@ -222,7 +222,7 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
 
     Args:
         event_id: ID of event to update
-        updates: Dictionary with fields to update (text, type, domain, annotations, derived_entities)
+        updates: Dictionary with fields to update (text, type, domain, annotations, derived_entities, process_id)
 
     Returns:
         Updated BusinessEvent object
@@ -283,6 +283,15 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
     old_process_id = event.process_id
     annotations_changed = "annotations" in updates
     process_id_changed = "process_id" in updates
+
+    if process_id_changed:
+        process_value = updates["process_id"]
+        if process_value is None or (
+            isinstance(process_value, str) and not process_value.strip()
+        ):
+            event.process_id = None
+        else:
+            event.process_id = process_value
 
     event.updated_at = datetime.now()
 
