@@ -48,6 +48,24 @@ entities:
     tags:
       - sales
     entity_type: fact
+  - id: dim_employee
+    label: Employee
+    description: 'Dimension: Employee'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: dim_lead
+    label: Lead
+    description: 'Dimension: Lead'
+    tags:
+      - sales
+    entity_type: dimension
+  - id: fact_sales_agent_calls_leads
+    label: Sales Agent Calls Leads
+    description: 'Fact: Sales Agent Calls Leads'
+    tags:
+      - sales
+    entity_type: fact
 relationships:
   - source: dim_customer
     target: fact_customer_buys_product
@@ -75,5 +93,17 @@ relationships:
     type: one_to_many
   - source: dim_promo_code
     target: fact_customer_buys_product
+    label: ''
+    type: one_to_many
+  - source: dim_employee
+    target: fact_sales_agent_calls_leads
+    label: ''
+    type: one_to_many
+  - source: dim_lead
+    target: fact_sales_agent_calls_leads
+    label: ''
+    type: one_to_many
+  - source: dim_order_date
+    target: fact_sales_agent_calls_leads
     label: ''
     type: one_to_many
