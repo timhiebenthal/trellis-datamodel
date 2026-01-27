@@ -797,52 +797,6 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
     return updated_process
 
 
-def resolve_process(process_id: str) -> BusinessEventProcess:
-    """
-    Resolve (ungroup) a process by detaching all events and marking as resolved.
-
-    Args:
-        process_id: ID of process to resolve
-
-    Returns:
-        Resolved BusinessEventProcess object
-
-    Raises:
-        NotFoundError: If process not found
-        FileOperationError: If file operations fail
-    """
-    processes = load_processes()
-    process_index = None
-    for i, process in enumerate(processes):
-        if process.id == process_id:
-            process_index = i
-            break
-
-    if process_index is None:
-        raise NotFoundError(f"Process '{process_id}' not found")
-
-    process = processes[process_index]
-
-    # Don't allow resolving already resolved processes
-    if process.resolved_at is not None:
-        raise ValidationError(f"Process '{process_id}' is already resolved")
-
-    # Detach all events
-    if process.event_ids:
-        detach_events_from_process(process_id, process.event_ids)
-
-    # Mark as resolved
-    process.resolved_at = datetime.now()
-    process.updated_at = datetime.now()
-    process.event_ids = []
-    process.annotations_superset = None
-
-    processes[process_index] = process
-    save_processes(processes)
-    logger.info(f"Resolved process: {process_id}")
-    return process
-
-
 def attach_events_to_process(process_id: str, event_ids: List[str]) -> BusinessEventProcess:
     """
     Attach events to a process.
@@ -1359,18 +1313,33 @@ def resolve_process(process_id: str) -> BusinessEventProcess:
     if process.resolved_at is not None:
         raise ValidationError("Process is already resolved")
 
-    # Remove process_id from all member events
-    events = load_business_events()
-    for event_id in process.event_ids:
-        event = next((e for e in events if e.id == event_id), None)
-        if event and event.process_id == process_id:
-            update_event(event_id, {"process_id": None})
-
-    # Mark process as resolved
+    # Mark process as resolved FIRST (before detaching events)
+    # This allows the process to have empty event_ids without validation error
     process.resolved_at = datetime.now()
     process.updated_at = datetime.now()
-
+    process.annotations_superset = None
     processes[process_index] = process
+    save_processes(processes)
+
+    # Now detach all events so process_id is cleared from events
+    # Note: detach_events_from_process will reload and save processes again,
+    # but since resolved_at is set, empty event_ids is valid
+    if process.event_ids:
+        event_ids_to_detach = list(process.event_ids)
+        detach_events_from_process(process_id, event_ids_to_detach)
+
+    # Reload to get final state
+    processes = load_processes()
+    process_index = None
+    for i, proc in enumerate(processes):
+        if proc.id == process_id:
+            process_index = i
+            break
+
+    if process_index is None:
+        raise NotFoundError(f"Business event process '{process_id}' not found")
+
+    process = processes[process_index]
     save_processes(processes)
     logger.info(f"Resolved business event process: {process_id}")
     return process
