@@ -6,15 +6,37 @@
         event: BusinessEvent;
         process?: BusinessEventProcess;
         selected?: boolean;
+        draggable?: boolean;
+        dragOver?: boolean;
         onSelect?: (selected: boolean) => void;
         onEditEvent?: (event: BusinessEvent) => void;
         onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
         onDelete: () => void;
         onResolveProcess?: (processId: string) => void;
+        onDragStart?: (event: BusinessEvent, dragEvent: DragEvent) => void;
+        onDragOver?: (event: BusinessEvent, dragEvent: DragEvent) => void;
+        onDrop?: (event: BusinessEvent, dragEvent: DragEvent) => void;
+        onDragEnd?: () => void;
     };
 
-    let { event, process, selected = false, onSelect, onEditEvent, onEditSevenWs, onGenerateEntities, onDelete, onResolveProcess }: Props = $props();
+    let {
+        event,
+        process,
+        selected = false,
+        draggable = false,
+        dragOver = false,
+        onSelect,
+        onEditEvent,
+        onEditSevenWs,
+        onGenerateEntities,
+        onDelete,
+        onResolveProcess,
+        onDragStart,
+        onDragOver,
+        onDrop,
+        onDragEnd,
+    }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -117,9 +139,36 @@
     class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
     class:bg-primary-50={selected}
     class:border-primary-200={selected}
+    class:border-primary-300={dragOver}
+    class:ring-2={dragOver}
+    class:ring-primary-200={dragOver}
+    ondragover={(e) => {
+        if (!onDragOver) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDragOver(event, e);
+    }}
+    ondrop={(e) => {
+        if (!onDrop) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDrop(event, e);
+    }}
 >
     <!-- List-like row layout -->
     <div class="flex items-center gap-4">
+        {#if draggable}
+            <button
+                class="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                draggable="true"
+                ondragstart={(e) => onDragStart?.(event, e)}
+                ondragend={() => onDragEnd?.()}
+                aria-label={`Reorder ${event.text}`}
+                title="Drag to reorder"
+            >
+                <Icon icon="lucide:grip-vertical" class="w-4 h-4" />
+            </button>
+        {/if}
         <!-- Selection checkbox -->
         {#if onSelect}
             <input

@@ -102,6 +102,7 @@ class UpdateProcessRequest(BaseModel):
     type: str | None = None
     domain: str | None = None
     annotations_superset: BusinessEventAnnotations | None = None
+    event_ids: list[str] | None = None
 
 
 class AttachEventsRequest(BaseModel):
@@ -629,6 +630,13 @@ async def update_business_event_process(
 
         if request.annotations_superset is not None:
             updates["annotations_superset"] = request.annotations_superset.model_dump()
+
+        if request.event_ids is not None:
+            if len(request.event_ids) == 0:
+                raise HTTPException(
+                    status_code=400, detail="event_ids list cannot be empty"
+                )
+            updates["event_ids"] = request.event_ids
 
         if not updates:
             raise HTTPException(status_code=400, detail="No fields provided to update")

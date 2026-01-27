@@ -379,6 +379,7 @@ export interface UpdateProcessRequest {
     type?: BusinessEventType;
     domain?: string | null;
     annotations_superset?: BusinessEventAnnotations | null;
+    event_ids?: string[];
 }
 
 export interface AttachEventsRequest {

@@ -761,6 +761,35 @@ class TestEventRelink:
         with pytest.raises(ValidationError, match="already attached"):
             business_events_service.attach_events_to_process(process2.id, [event1.id])
 
+    def test_update_process_reorders_event_ids(self, temp_dir, monkeypatch):
+        """Test that updating event_ids preserves order and links."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+        event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
+
+        process = business_events_service.create_process(
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id, event2.id, event3.id],
+        )
+
+        updated = business_events_service.update_process(
+            process.id,
+            {"event_ids": [event3.id, event1.id, event2.id]},
+        )
+
+        assert updated.event_ids == [event3.id, event1.id, event2.id]
+
+        events = business_events_service.load_business_events()
+        for event_id in updated.event_ids:
+            reloaded = next(e for e in events if e.id == event_id)
+            assert reloaded.process_id == process.id
+
 
 class TestSupersetRecompute:
     """Test superset recomputation when events change."""

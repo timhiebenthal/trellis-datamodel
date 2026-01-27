@@ -60,6 +60,10 @@ let processUnderAnnotation = $state<BusinessEventProcess | null>(null);
 let processAnnotationEvent = $state<BusinessEvent | null>(null);
 let showProcessEditModal = $state(false);
 let processUnderEdit = $state<BusinessEventProcess | null>(null);
+let dragState = $state<{ eventId: string; processId: string | null } | null>(null);
+let dragOverEventId = $state<string | null>(null);
+let dragOverProcessId = $state<string | null>(null);
+let dragOverUngroupedDomainKey = $state<string | null>(null);
 
     // Helper function to convert domain to title case
     function toTitleCase(str: string): string {
@@ -121,16 +125,7 @@ let processUnderEdit = $state<BusinessEventProcess | null>(null);
 
     const domainGroups = $derived.by(() => {
         const processLookup = new Map(activeProcesses.map((proc) => [proc.id, proc]));
-        const eventsByProcess = new Map<string, BusinessEvent[]>();
-
-        filteredEvents.forEach((event) => {
-            const processId = event.process_id;
-            if (processId && processLookup.has(processId)) {
-                const list = eventsByProcess.get(processId) ?? [];
-                list.push(event);
-                eventsByProcess.set(processId, list);
-            }
-        });
+        const eventsById = new Map(filteredEvents.map((event) => [event.id, event]));
 
         const groupsMap = new Map<string, DomainGroup>();
 
@@ -150,7 +145,9 @@ let processUnderEdit = $state<BusinessEventProcess | null>(null);
 
         activeProcesses.forEach((process) => {
             const domainKey = process.domain ?? UNASSIGNED_DOMAIN_KEY;
-            const eventsForProcess = eventsByProcess.get(process.id) ?? [];
+            const eventsForProcess = process.event_ids
+                .map((eventId) => eventsById.get(eventId))
+                .filter((event): event is BusinessEvent => Boolean(event));
             if (eventsForProcess.length === 0) {
                 return;
             }
@@ -295,6 +292,195 @@ let processUnderEdit = $state<BusinessEventProcess | null>(null);
             await reloadEvents();
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'Failed to resolve process';
+            processActionError = errorMessage;
+        }
+    }
+
+    function reorderIds(ids: string[], fromId: string, toId: string): string[] {
+        const fromIndex = ids.indexOf(fromId);
+        const toIndex = ids.indexOf(toId);
+        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+            return ids;
+        }
+        const next = [...ids];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        return next;
+    }
+
+    function handleEventDragStart(
+        event: BusinessEvent,
+        processId: string | null,
+        dragEvent: DragEvent
+    ) {
+        dragState = { eventId: event.id, processId };
+        dragOverEventId = null;
+        dragOverProcessId = null;
+        dragOverUngroupedDomainKey = null;
+        if (dragEvent.dataTransfer) {
+            dragEvent.dataTransfer.effectAllowed = 'move';
+            dragEvent.dataTransfer.setData('text/plain', event.id);
+        }
+    }
+
+    function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent) {
+        if (!dragState || dragState.processId !== processId || dragState.eventId === event.id) {
+            return;
+        }
+        dragEvent.preventDefault();
+        dragOverEventId = event.id;
+        dragOverProcessId = processId;
+        dragOverUngroupedDomainKey = null;
+        if (dragEvent.dataTransfer) {
+            dragEvent.dataTransfer.dropEffect = 'move';
+        }
+    }
+
+    async function handleEventDrop(
+        event: BusinessEvent,
+        processGroup: ProcessGroup,
+        dragEvent: DragEvent
+    ) {
+        if (!dragState || dragState.processId !== processGroup.process.id) {
+            return;
+        }
+        dragEvent.preventDefault();
+        const fromId = dragState.eventId;
+        const toId = event.id;
+        dragState = null;
+        dragOverEventId = null;
+        dragOverProcessId = null;
+        dragOverUngroupedDomainKey = null;
+
+        if (fromId === toId) {
+            return;
+        }
+
+        const currentOrder = processGroup.process.event_ids;
+        const nextOrder = reorderIds(currentOrder, fromId, toId);
+        if (nextOrder.join('|') === currentOrder.join('|')) {
+            return;
+        }
+
+        try {
+            processActionError = null;
+            await updateBusinessEventProcess(processGroup.process.id, { event_ids: nextOrder });
+            await reloadEvents();
+        } catch (e) {
+            const errorMessage =
+                e instanceof Error ? e.message : 'Failed to reorder process events';
+            processActionError = errorMessage;
+        }
+    }
+
+    function handleEventDragEnd() {
+        dragState = null;
+        dragOverEventId = null;
+        dragOverProcessId = null;
+        dragOverUngroupedDomainKey = null;
+    }
+
+    function handleProcessDragOver(processId: string, dragEvent: DragEvent) {
+        if (!dragState) {
+            return;
+        }
+        if (dragState.processId === processId) {
+            return;
+        }
+        dragEvent.preventDefault();
+        dragOverProcessId = processId;
+        dragOverUngroupedDomainKey = null;
+        if (dragEvent.dataTransfer) {
+            dragEvent.dataTransfer.dropEffect = 'move';
+        }
+    }
+
+    async function handleProcessDrop(processGroup: ProcessGroup, dragEvent: DragEvent) {
+        if (!dragState) {
+            return;
+        }
+        dragEvent.preventDefault();
+        const { eventId, processId: sourceProcessId } = dragState;
+        const targetProcessId = processGroup.process.id;
+        dragState = null;
+        dragOverEventId = null;
+        dragOverProcessId = null;
+        dragOverUngroupedDomainKey = null;
+
+        if (sourceProcessId === targetProcessId) {
+            return;
+        }
+
+        try {
+            processActionError = null;
+            if (sourceProcessId) {
+                const sourceProcess = processes.find((proc) => proc.id === sourceProcessId);
+                if (sourceProcess) {
+                    const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
+                    if (nextSourceIds.length > 0) {
+                        await updateBusinessEventProcess(sourceProcessId, { event_ids: nextSourceIds });
+                    } else {
+                        await resolveBusinessEventProcess(sourceProcessId);
+                    }
+                }
+            }
+
+            const targetProcess = processes.find((proc) => proc.id === targetProcessId);
+            const targetIds = targetProcess?.event_ids ?? [];
+            if (!targetIds.includes(eventId)) {
+                await updateBusinessEventProcess(targetProcessId, {
+                    event_ids: [...targetIds, eventId],
+                });
+            }
+            await reloadEvents();
+        } catch (e) {
+            const errorMessage =
+                e instanceof Error ? e.message : 'Failed to move event into process';
+            processActionError = errorMessage;
+        }
+    }
+
+    function handleUngroupedDragOver(domainKey: string, dragEvent: DragEvent) {
+        if (!dragState) {
+            return;
+        }
+        if (!dragState.processId) {
+            return;
+        }
+        dragEvent.preventDefault();
+        dragOverUngroupedDomainKey = domainKey;
+        dragOverProcessId = null;
+        if (dragEvent.dataTransfer) {
+            dragEvent.dataTransfer.dropEffect = 'move';
+        }
+    }
+
+    async function handleUngroupedDrop(domainKey: string, dragEvent: DragEvent) {
+        if (!dragState || !dragState.processId) {
+            return;
+        }
+        dragEvent.preventDefault();
+        const { eventId, processId: sourceProcessId } = dragState;
+        dragState = null;
+        dragOverEventId = null;
+        dragOverProcessId = null;
+        dragOverUngroupedDomainKey = null;
+
+        try {
+            processActionError = null;
+            const sourceProcess = processes.find((proc) => proc.id === sourceProcessId);
+            if (sourceProcess) {
+                const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
+                if (nextSourceIds.length > 0) {
+                    await updateBusinessEventProcess(sourceProcessId, { event_ids: nextSourceIds });
+                } else {
+                    await resolveBusinessEventProcess(sourceProcessId);
+                }
+            }
+            await reloadEvents();
+        } catch (e) {
+            const errorMessage =
+                e instanceof Error ? e.message : 'Failed to move event out of process';
             processActionError = errorMessage;
         }
     }
@@ -736,7 +922,15 @@ let processUnderEdit = $state<BusinessEventProcess | null>(null);
                                 <div class="space-y-3 px-4 py-3" id={`domain-${domainGroup.domainKey}`}>
                                     {#each domainGroup.processes as processGroup (processGroup.process.id)}
                                         {@const derivedIds = getDerivedEntityIds(processGroup.events)}
-                                        <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 shadow-sm">
+                                        <div
+                                            class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 shadow-sm"
+                                            class:border-primary-300={dragOverProcessId === processGroup.process.id}
+                                            class:ring-2={dragOverProcessId === processGroup.process.id}
+                                            class:ring-primary-200={dragOverProcessId === processGroup.process.id}
+                                            ondragover={(event) =>
+                                                handleProcessDragOver(processGroup.process.id, event)}
+                                            ondrop={(event) => handleProcessDrop(processGroup, event)}
+                                        >
                                             <div class="flex items-center gap-3 px-3 py-2">
                                                 <button
                                                     class="p-1 text-gray-500 hover:text-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -772,12 +966,32 @@ let processUnderEdit = $state<BusinessEventProcess | null>(null);
                                                             {event}
                                                             process={processGroup.process}
                                                             selected={selectedEventIds.has(event.id)}
+                                                            draggable={true}
+                                                            dragOver={
+                                                                dragOverEventId === event.id &&
+                                                                dragState?.processId === processGroup.process.id
+                                                            }
                                                             onSelect={(selected) => handleEventSelect(event.id, selected)}
                                                             onEditEvent={handleEditEvent}
                                                             onEditSevenWs={handleEditSevenWs}
                                                             onGenerateEntities={handleGenerateEntities}
                                                             onDelete={reloadEvents}
                                                             onResolveProcess={handleProcessResolve}
+                                                            onDragStart={(dragEvent) =>
+                                                                handleEventDragStart(
+                                                                    event,
+                                                                    processGroup.process.id,
+                                                                    dragEvent
+                                                                )}
+                                                            onDragOver={(dragEvent) =>
+                                                                handleEventDragOver(
+                                                                    event,
+                                                                    processGroup.process.id,
+                                                                    dragEvent
+                                                                )}
+                                                            onDrop={(dragEvent) =>
+                                                                handleEventDrop(event, processGroup, dragEvent)}
+                                                            onDragEnd={handleEventDragEnd}
                                                         />
                                                     {/each}
                                                 </div>
@@ -785,16 +999,28 @@ let processUnderEdit = $state<BusinessEventProcess | null>(null);
                                         </div>
                                     {/each}
                                     {#if domainGroup.ungroupedEvents.length > 0}
-                                        <div class="space-y-2 pt-2">
+                                        <div
+                                            class="space-y-2 pt-2"
+                                            class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            ondragover={(event) =>
+                                                handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                            ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                        >
                                             {#each domainGroup.ungroupedEvents as event (event.id)}
                                                 <EventCard
                                                     {event}
                                                     selected={selectedEventIds.has(event.id)}
+                                                    draggable={true}
                                                     onSelect={(selected) => handleEventSelect(event.id, selected)}
                                                     onEditEvent={handleEditEvent}
                                                     onEditSevenWs={handleEditSevenWs}
                                                     onGenerateEntities={handleGenerateEntities}
                                                     onDelete={reloadEvents}
+                                                    onDragStart={(dragEvent) =>
+                                                        handleEventDragStart(event, null, dragEvent)}
+                                                    onDragEnd={handleEventDragEnd}
                                                 />
                                             {/each}
                                         </div>
