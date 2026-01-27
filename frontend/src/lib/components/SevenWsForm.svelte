@@ -498,10 +498,10 @@
             <div class="p-6 space-y-4">
                 <!-- Annotation Sections -->
                 {#each ANNOTATION_TYPES as annotationType}
-                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="border border-gray-200 rounded-lg overflow-visible">
                         <!-- Section Header -->
                         <button
-                            class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                            class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
                             onclick={() => toggleCollapse(annotationType.type)}
                             aria-expanded={!collapsedState[annotationType.type]}
                             aria-controls={`section-${annotationType.type}`}
@@ -531,7 +531,7 @@
                                         icon="lucide:info"
                                         class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
                                     />
-                                    <div class="absolute right-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
+                                    <div class="absolute right-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50">
                                         {annotationType.tooltip}
                                         <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                                     </div>
@@ -545,7 +545,7 @@
 
                                  <!-- Section Content -->
                         {#if !collapsedState[annotationType.type]}
-                            <div id={`section-${annotationType.type}`} class="p-4 space-y-3">
+                            <div id={`section-${annotationType.type}`} class="p-4 space-y-3 rounded-b-lg">
                                 <!-- Entries List -->
                                 {#if dimensionsLoading && annotations[annotationType.type].length === 0}
                                     <!-- Skeleton Loader -->
