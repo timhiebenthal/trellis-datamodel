@@ -3,6 +3,7 @@ name: commit-message-creator
 description: This skill ensures all git commit messages follow the Conventional Commits specification."
 ---
 
+
 # Commit Message Creator
 
 ## Instructions
@@ -26,3 +27,4 @@ When I ask you to commit changes or write a commit message, you must analyze the
 - `feat: add password strength meter`
 - `fix(ui): resolve alignment issue on mobile`
 - `chore: update dependencies`
+

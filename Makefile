@@ -29,7 +29,7 @@ setup: install-uv setup-cursor-symlink
 	cd frontend && npm install
 
 setup-cursor-symlink:
-	@echo "Setting up .cursor directory with symlinks to .ai_agent..."
+	@echo "Setting up .cursor directory with symlinks to .ai_agent commands..."
 	@if [ -L .cursor ]; then \
 		echo "Warning: .cursor is a symlink, converting to directory..."; \
 		rm .cursor; \
@@ -37,9 +37,6 @@ setup-cursor-symlink:
 	@mkdir -p .cursor
 	@if [ ! -L .cursor/commands ]; then \
 		ln -sf ../.ai_agent/commands .cursor/commands && echo "Created .cursor/commands symlink"; \
-	fi
-	@if [ ! -L .cursor/skills ]; then \
-		ln -sf ../.ai_agent/skills .cursor/skills && echo "Created .cursor/skills symlink"; \
 	fi
 	@echo ".cursor directory setup complete (mcp.json can be created here)"
 
