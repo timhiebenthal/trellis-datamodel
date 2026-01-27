@@ -34,7 +34,10 @@ from trellis_datamodel.services.business_events_service import (
     attach_events_to_process,
     detach_events_from_process,
 )
-from trellis_datamodel.services.entity_generator import generate_entities_from_event
+from trellis_datamodel.services.entity_generator import (
+    generate_entities_from_event,
+    generate_entities_from_process,
+)
 
 router = APIRouter(prefix="/api", tags=["business-events"])
 
@@ -749,4 +752,59 @@ async def detach_events_from_business_event_process(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error detaching events from process: {str(e)}"
+        )
+
+
+@router.post(
+    "/processes/{process_id}/generate-entities",
+    response_model=GeneratedEntitiesResult,
+)
+async def generate_entities_from_business_event_process(process_id: str):
+    """
+    Generate dimensional entities from a business event process.
+
+    Uses the process's annotations_superset (union of all member event annotations).
+    Behavior differs by process type:
+    - discrete: one fact table with per-event records (includes event_id/process_id)
+    - evolving: accumulating snapshot with status/time columns
+    - recurring: same as discrete
+
+    Args:
+        process_id: ID of process to generate entities from
+
+    Returns:
+        GeneratedEntitiesResult with entities, relationships, and any errors
+
+    Raises:
+        FeatureDisabledError: If business events feature is disabled
+        NotFoundError: If process not found
+        ValidationError: If process doesn't have required annotations or is resolved
+        FileOperationError: If file operations fail
+    """
+    _check_feature_enabled()
+
+    try:
+        processes = load_processes()
+        process = None
+        for p in processes:
+            if p.id == process_id:
+                process = p
+                break
+
+        if process is None:
+            raise HTTPException(
+                status_code=404, detail=f"Business event process '{process_id}' not found"
+            )
+
+        result = generate_entities_from_process(process)
+        return result
+    except NotFoundError:
+        raise
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileOperationError:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error generating entities from process: {str(e)}"
         )

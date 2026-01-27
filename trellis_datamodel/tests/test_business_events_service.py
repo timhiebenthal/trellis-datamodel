@@ -6,7 +6,13 @@ import pytest
 from datetime import datetime
 
 from trellis_datamodel.services import business_events_service
-from trellis_datamodel.models.business_event import BusinessEvent, BusinessEventType
+from trellis_datamodel.models.business_event import (
+    BusinessEvent,
+    BusinessEventType,
+    BusinessEventProcess,
+    BusinessEventAnnotations,
+    AnnotationEntry,
+)
 from trellis_datamodel.exceptions import ValidationError, NotFoundError, FileOperationError
 
 
@@ -210,3 +216,498 @@ class TestDeleteEvent:
 
         with pytest.raises(NotFoundError, match="not found"):
             business_events_service.delete_event("evt_20260101_999")
+
+
+class TestCreateProcess:
+    """Test create_process() function."""
+
+    def test_creates_process_with_auto_generated_id(self, temp_dir, monkeypatch):
+        """Test that create_process generates ID in format proc_YYYYMMDD_NNN."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        # Create events first
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+        )
+
+        assert process.id.startswith("proc_")
+        assert len(process.id.split("_")) == 3  # proc_YYYYMMDD_NNN
+        assert process.id.endswith("001")  # First process of the day
+
+    def test_increments_id_for_multiple_processes_same_day(self, temp_dir, monkeypatch):
+        """Test that ID increments for multiple processes created on same day."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        # Create events
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+        event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
+
+        process1 = business_events_service.create_process(
+            "Process 1", BusinessEventType.DISCRETE, [event1.id]
+        )
+        process2 = business_events_service.create_process(
+            "Process 2", BusinessEventType.EVOLVING, [event2.id, event3.id]
+        )
+
+        assert process1.id.endswith("001")
+        assert process2.id.endswith("002")
+
+    def test_sets_timestamps(self, temp_dir, monkeypatch):
+        """Test that created_at and updated_at are set."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
+
+        before = datetime.now()
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event.id]
+        )
+        after = datetime.now()
+
+        assert before <= process.created_at <= after
+        assert before <= process.updated_at <= after
+        assert process.created_at == process.updated_at
+
+    def test_links_events_to_process(self, temp_dir, monkeypatch):
+        """Test that events are linked to the process via process_id."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+        )
+
+        # Reload events to check process_id
+        events = business_events_service.load_business_events()
+        event1_reloaded = next(e for e in events if e.id == event1.id)
+        event2_reloaded = next(e for e in events if e.id == event2.id)
+
+        assert event1_reloaded.process_id == process.id
+        assert event2_reloaded.process_id == process.id
+
+    def test_computes_annotations_superset(self, temp_dir, monkeypatch):
+        """Test that annotations superset is computed from member events."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        # Create events with annotations
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        # Add annotations to events
+        annotations1 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Customer A")],
+            what=[AnnotationEntry(id="entry2", text="Product X")],
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry3", text="Customer B")],
+            what=[AnnotationEntry(id="entry2", text="Product X")],  # Duplicate
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+        )
+
+        assert process.annotations_superset is not None
+        assert len(process.annotations_superset.who) == 2  # Both customers
+        assert len(process.annotations_superset.what) == 1  # Duplicate Product X deduplicated
+
+    def test_raises_validation_error_for_empty_name(self, temp_dir, monkeypatch):
+        """Test that empty name raises ValidationError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
+
+        with pytest.raises(ValidationError, match="Process name is required"):
+            business_events_service.create_process("", BusinessEventType.DISCRETE, [event.id])
+
+        with pytest.raises(ValidationError, match="Process name is required"):
+            business_events_service.create_process("   ", BusinessEventType.DISCRETE, [event.id])
+
+    def test_raises_validation_error_for_empty_event_ids(self, temp_dir, monkeypatch):
+        """Test that empty event_ids raises ValidationError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        with pytest.raises(ValidationError, match="At least one event ID is required"):
+            business_events_service.create_process("Test Process", BusinessEventType.DISCRETE, [])
+
+    def test_raises_not_found_error_for_invalid_event_id(self, temp_dir, monkeypatch):
+        """Test that invalid event_id raises NotFoundError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        with pytest.raises(NotFoundError, match="not found"):
+            business_events_service.create_process(
+                "Test Process", BusinessEventType.DISCRETE, ["evt_20260101_999"]
+            )
+
+
+class TestAnnotationUnionLogic:
+    """Test _compute_annotation_union() function."""
+
+    def test_unions_annotations_from_multiple_events(self, temp_dir, monkeypatch):
+        """Test that union combines annotations from multiple events."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Customer A")],
+            what=[AnnotationEntry(id="entry2", text="Product X")],
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry3", text="Customer B")],
+            when=[AnnotationEntry(id="entry4", text="2024-01-01")],
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        events = business_events_service.load_business_events()
+        process_events = [e for e in events if e.id in [event1.id, event2.id]]
+        union = business_events_service._compute_annotation_union(process_events)
+
+        assert len(union.who) == 2
+        assert len(union.what) == 1
+        assert len(union.when) == 1
+
+    def test_deduplicates_by_dimension_id(self, temp_dir, monkeypatch):
+        """Test that entries with same dimension_id are deduplicated."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Customer A", dimension_id="dim_customer")]
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry2", text="Customer B", dimension_id="dim_customer")]
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        events = business_events_service.load_business_events()
+        process_events = [e for e in events if e.id in [event1.id, event2.id]]
+        union = business_events_service._compute_annotation_union(process_events)
+
+        # Should deduplicate by dimension_id, keeping first occurrence
+        assert len(union.who) == 1
+        assert union.who[0].dimension_id == "dim_customer"
+
+    def test_deduplicates_by_normalized_text(self, temp_dir, monkeypatch):
+        """Test that entries with same normalized text are deduplicated."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            what=[AnnotationEntry(id="entry1", text="Product X", description="A product")]
+        )
+        annotations2 = BusinessEventAnnotations(
+            what=[AnnotationEntry(id="entry2", text="product x", description="a product")]
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        events = business_events_service.load_business_events()
+        process_events = [e for e in events if e.id in [event1.id, event2.id]]
+        union = business_events_service._compute_annotation_union(process_events)
+
+        # Should deduplicate by normalized text+description
+        assert len(union.what) == 1
+
+    def test_preserves_distinct_entries(self, temp_dir, monkeypatch):
+        """Test that distinct entries are preserved."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            who=[
+                AnnotationEntry(id="entry1", text="Customer A"),
+                AnnotationEntry(id="entry2", text="Customer B"),
+            ]
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry3", text="Customer C")]
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        events = business_events_service.load_business_events()
+        process_events = [e for e in events if e.id in [event1.id, event2.id]]
+        union = business_events_service._compute_annotation_union(process_events)
+
+        assert len(union.who) == 3
+
+
+class TestResolveProcess:
+    """Test resolve_process() function."""
+
+    def test_resolves_process_and_unlinks_events(self, temp_dir, monkeypatch):
+        """Test that resolving a process unlinks events."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+        )
+
+        resolved = business_events_service.resolve_process(process.id)
+
+        assert resolved.resolved_at is not None
+        assert len(resolved.event_ids) == 0
+        assert resolved.annotations_superset is None
+
+        # Check events are unlinked
+        events = business_events_service.load_business_events()
+        event1_reloaded = next(e for e in events if e.id == event1.id)
+        event2_reloaded = next(e for e in events if e.id == event2.id)
+
+        assert event1_reloaded.process_id is None
+        assert event2_reloaded.process_id is None
+
+    def test_raises_not_found_error_for_missing_process(self, temp_dir, monkeypatch):
+        """Test that resolving non-existent process raises NotFoundError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        with pytest.raises(NotFoundError, match="not found"):
+            business_events_service.resolve_process("proc_20260101_999")
+
+    def test_raises_validation_error_for_already_resolved_process(self, temp_dir, monkeypatch):
+        """Test that resolving already resolved process raises ValidationError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event.id]
+        )
+
+        business_events_service.resolve_process(process.id)
+
+        with pytest.raises(ValidationError, match="already resolved"):
+            business_events_service.resolve_process(process.id)
+
+
+class TestEventRelink:
+    """Test attach_events_to_process() and detach_events_from_process() functions."""
+
+    def test_attach_events_updates_process_and_links_events(self, temp_dir, monkeypatch):
+        """Test that attaching events updates process and links events."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+        event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id]
+        )
+
+        updated = business_events_service.attach_events_to_process(process.id, [event2.id, event3.id])
+
+        assert len(updated.event_ids) == 3
+        assert event2.id in updated.event_ids
+        assert event3.id in updated.event_ids
+
+        # Check events are linked
+        events = business_events_service.load_business_events()
+        event2_reloaded = next(e for e in events if e.id == event2.id)
+        event3_reloaded = next(e for e in events if e.id == event3.id)
+
+        assert event2_reloaded.process_id == process.id
+        assert event3_reloaded.process_id == process.id
+
+    def test_detach_events_updates_process_and_unlinks_events(self, temp_dir, monkeypatch):
+        """Test that detaching events updates process and unlinks events."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+        event3 = business_events_service.create_event("event 3", BusinessEventType.DISCRETE)
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id, event3.id]
+        )
+
+        updated = business_events_service.detach_events_from_process(process.id, [event2.id])
+
+        assert len(updated.event_ids) == 2
+        assert event2.id not in updated.event_ids
+
+        # Check event is unlinked
+        events = business_events_service.load_business_events()
+        event2_reloaded = next(e for e in events if e.id == event2.id)
+
+        assert event2_reloaded.process_id is None
+
+    def test_attach_raises_error_for_event_in_another_process(self, temp_dir, monkeypatch):
+        """Test that attaching event already in another process raises ValidationError."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        process1 = business_events_service.create_process(
+            "Process 1", BusinessEventType.DISCRETE, [event1.id]
+        )
+        process2 = business_events_service.create_process(
+            "Process 2", BusinessEventType.DISCRETE, [event2.id]
+        )
+
+        with pytest.raises(ValidationError, match="already attached"):
+            business_events_service.attach_events_to_process(process2.id, [event1.id])
+
+
+class TestSupersetRecompute:
+    """Test superset recomputation when events change."""
+
+    def test_recomputes_superset_when_event_annotations_change(self, temp_dir, monkeypatch):
+        """Test that process superset is recomputed when event annotations change."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event.id]
+        )
+
+        # Initial superset should be empty
+        assert process.annotations_superset is not None
+        assert len(process.annotations_superset.who) == 0
+
+        # Update event annotations
+        new_annotations = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Customer A")]
+        )
+        business_events_service.update_event(event.id, {"annotations": new_annotations.model_dump()})
+
+        # Reload process and check superset was recomputed
+        processes = business_events_service.load_processes()
+        updated_process = next(p for p in processes if p.id == process.id)
+
+        assert updated_process.annotations_superset is not None
+        assert len(updated_process.annotations_superset.who) == 1
+        assert updated_process.annotations_superset.who[0].text == "Customer A"
+
+    def test_recomputes_superset_when_event_added_to_process(self, temp_dir, monkeypatch):
+        """Test that process superset is recomputed when event is added."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Customer A")]
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry2", text="Customer B")]
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id]
+        )
+
+        # Initial superset has only Customer A
+        assert len(process.annotations_superset.who) == 1
+
+        # Attach event2
+        business_events_service.attach_events_to_process(process.id, [event2.id])
+
+        # Manually recompute superset (attach doesn't auto-recompute, so we need to call it)
+        updated_process = business_events_service.recompute_process_superset(process.id)
+
+        assert len(updated_process.annotations_superset.who) == 2
+
+    def test_recomputes_superset_when_event_removed_from_process(self, temp_dir, monkeypatch):
+        """Test that process superset is recomputed when event is removed."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
+
+        annotations1 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry1", text="Customer A")]
+        )
+        annotations2 = BusinessEventAnnotations(
+            who=[AnnotationEntry(id="entry2", text="Customer B")]
+        )
+
+        business_events_service.update_event(event1.id, {"annotations": annotations1.model_dump()})
+        business_events_service.update_event(event2.id, {"annotations": annotations2.model_dump()})
+
+        process = business_events_service.create_process(
+            "Test Process", BusinessEventType.DISCRETE, [event1.id, event2.id]
+        )
+
+        # Initial superset has both customers
+        assert len(process.annotations_superset.who) == 2
+
+        # Detach event2
+        business_events_service.detach_events_from_process(process.id, [event2.id])
+
+        # Manually recompute superset
+        updated_process = business_events_service.recompute_process_superset(process.id)
+
+        assert len(updated_process.annotations_superset.who) == 1
+        assert updated_process.annotations_superset.who[0].text == "Customer A"

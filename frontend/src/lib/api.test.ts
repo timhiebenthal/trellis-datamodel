@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent } from './api';
-import type { BusinessEventType, BusinessEventSevenWs } from '$lib/types';
+import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess } from './api';
+import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
 
 describe('API Functions - 7 Ws', () => {
     afterEach(() => {
@@ -387,5 +387,437 @@ describe('inferRelationships error handling', () => {
         );
 
         await expect(inferRelationships()).resolves.toEqual([]);
+    });
+});
+
+describe('Business Event Process API Functions', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    describe('getBusinessEventProcesses', () => {
+        it('fetches all processes', async () => {
+            const mockProcesses = [
+                {
+                    id: 'proc_001',
+                    name: 'Order Fulfillment',
+                    type: 'discrete',
+                    event_ids: ['evt_001', 'evt_002'],
+                    created_at: '2026-01-27T10:00:00Z',
+                    updated_at: '2026-01-27T10:00:00Z'
+                }
+            ];
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockProcesses)
+                })
+            );
+
+            const result = await getBusinessEventProcesses();
+
+            expect(result).toEqual(mockProcesses);
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes'
+            );
+        });
+
+        it('handles array response format', async () => {
+            const mockProcesses = [
+                {
+                    id: 'proc_001',
+                    name: 'Test Process',
+                    type: 'discrete',
+                    event_ids: [],
+                    created_at: '2026-01-27T10:00:00Z',
+                    updated_at: '2026-01-27T10:00:00Z'
+                }
+            ];
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockProcesses)
+                })
+            );
+
+            const result = await getBusinessEventProcesses();
+            expect(result).toEqual(mockProcesses);
+        });
+
+        it('handles wrapped response format', async () => {
+            const mockProcesses = [
+                {
+                    id: 'proc_001',
+                    name: 'Test Process',
+                    type: 'discrete',
+                    event_ids: [],
+                    created_at: '2026-01-27T10:00:00Z',
+                    updated_at: '2026-01-27T10:00:00Z'
+                }
+            ];
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue({ processes: mockProcesses })
+                })
+            );
+
+            const result = await getBusinessEventProcesses();
+            expect(result).toEqual(mockProcesses);
+        });
+
+        it('handles errors when fetching processes', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 500,
+                    statusText: 'Internal Server Error',
+                    json: vi.fn().mockResolvedValue({ detail: 'Server error' })
+                })
+            );
+
+            await expect(getBusinessEventProcesses())
+                .rejects.toThrow('Failed to fetch business event processes');
+        });
+    });
+
+    describe('createBusinessEventProcess', () => {
+        it('creates a new process', async () => {
+            const request: CreateProcessRequest = {
+                name: 'Order Fulfillment',
+                type: 'discrete',
+                event_ids: ['evt_001', 'evt_002']
+            };
+
+            const mockResponse = {
+                id: 'proc_001',
+                name: 'Order Fulfillment',
+                type: 'discrete',
+                event_ids: ['evt_001', 'evt_002'],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T10:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await createBusinessEventProcess(request);
+
+            expect(result).toEqual(mockResponse);
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes',
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request)
+                })
+            );
+        });
+
+        it('creates process without event_ids', async () => {
+            const request: CreateProcessRequest = {
+                name: 'New Process',
+                type: 'evolving'
+            };
+
+            const mockResponse = {
+                id: 'proc_002',
+                name: 'New Process',
+                type: 'evolving',
+                event_ids: [],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T10:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await createBusinessEventProcess(request);
+            expect(result).toEqual(mockResponse);
+        });
+
+        it('handles errors when creating process', async () => {
+            const request: CreateProcessRequest = {
+                name: 'Test Process',
+                type: 'discrete',
+                event_ids: ['evt_invalid']
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                    json: vi.fn().mockResolvedValue({ detail: 'Events not found' })
+                })
+            );
+
+            await expect(createBusinessEventProcess(request))
+                .rejects.toThrow('Events not found');
+        });
+    });
+
+    describe('updateBusinessEventProcess', () => {
+        it('updates process name', async () => {
+            const request: UpdateProcessRequest = {
+                name: 'Updated Process Name'
+            };
+
+            const mockResponse = {
+                id: 'proc_001',
+                name: 'Updated Process Name',
+                type: 'discrete',
+                event_ids: ['evt_001'],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T11:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await updateBusinessEventProcess('proc_001', request);
+
+            expect(result).toEqual(mockResponse);
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes/proc_001',
+                expect.objectContaining({
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request)
+                })
+            );
+        });
+
+        it('updates process type', async () => {
+            const request: UpdateProcessRequest = {
+                type: 'evolving'
+            };
+
+            const mockResponse = {
+                id: 'proc_001',
+                name: 'Test Process',
+                type: 'evolving',
+                event_ids: ['evt_001'],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T11:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await updateBusinessEventProcess('proc_001', request);
+            expect(result.type).toBe('evolving');
+        });
+
+        it('handles errors when updating process', async () => {
+            const request: UpdateProcessRequest = {
+                name: 'Updated Name'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                    json: vi.fn().mockResolvedValue({ detail: 'Process not found' })
+                })
+            );
+
+            await expect(updateBusinessEventProcess('proc_invalid', request))
+                .rejects.toThrow('Process not found');
+        });
+    });
+
+    describe('resolveBusinessEventProcess', () => {
+        it('resolves a process', async () => {
+            const mockResponse = {
+                id: 'proc_001',
+                name: 'Test Process',
+                type: 'discrete',
+                event_ids: [],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T11:00:00Z',
+                resolved_at: '2026-01-27T11:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await resolveBusinessEventProcess('proc_001');
+
+            expect(result).toEqual(mockResponse);
+            expect(result.resolved_at).toBeDefined();
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes/proc_001/resolve',
+                expect.objectContaining({
+                    method: 'POST'
+                })
+            );
+        });
+
+        it('handles errors when resolving process', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                    json: vi.fn().mockResolvedValue({ detail: 'Process not found' })
+                })
+            );
+
+            await expect(resolveBusinessEventProcess('proc_invalid'))
+                .rejects.toThrow('Process not found');
+        });
+    });
+
+    describe('attachEventsToProcess', () => {
+        it('attaches events to a process', async () => {
+            const request: AttachEventsRequest = {
+                event_ids: ['evt_003', 'evt_004']
+            };
+
+            const mockResponse = {
+                id: 'proc_001',
+                name: 'Test Process',
+                type: 'discrete',
+                event_ids: ['evt_001', 'evt_002', 'evt_003', 'evt_004'],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T11:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await attachEventsToProcess('proc_001', request);
+
+            expect(result).toEqual(mockResponse);
+            expect(result.event_ids).toContain('evt_003');
+            expect(result.event_ids).toContain('evt_004');
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes/proc_001/attach',
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request)
+                })
+            );
+        });
+
+        it('handles errors when attaching events', async () => {
+            const request: AttachEventsRequest = {
+                event_ids: ['evt_invalid']
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                    json: vi.fn().mockResolvedValue({ detail: 'Events not found' })
+                })
+            );
+
+            await expect(attachEventsToProcess('proc_001', request))
+                .rejects.toThrow('Events not found');
+        });
+    });
+
+    describe('detachEventsFromProcess', () => {
+        it('detaches events from a process', async () => {
+            const request: DetachEventsRequest = {
+                event_ids: ['evt_002']
+            };
+
+            const mockResponse = {
+                id: 'proc_001',
+                name: 'Test Process',
+                type: 'discrete',
+                event_ids: ['evt_001'],
+                created_at: '2026-01-27T10:00:00Z',
+                updated_at: '2026-01-27T11:00:00Z'
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await detachEventsFromProcess('proc_001', request);
+
+            expect(result).toEqual(mockResponse);
+            expect(result.event_ids).not.toContain('evt_002');
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes/proc_001/detach',
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request)
+                })
+            );
+        });
+
+        it('handles errors when detaching events', async () => {
+            const request: DetachEventsRequest = {
+                event_ids: ['evt_002']
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                    json: vi.fn().mockResolvedValue({ detail: 'Process not found' })
+                })
+            );
+
+            await expect(detachEventsFromProcess('proc_invalid', request))
+                .rejects.toThrow('Process not found');
+        });
     });
 });
