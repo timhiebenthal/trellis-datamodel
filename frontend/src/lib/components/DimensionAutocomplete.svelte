@@ -178,6 +178,7 @@
             searchInput = textValue || "";
         }
     });
+
 </script>
 
 <div class="relative" bind:this={containerRef}>
