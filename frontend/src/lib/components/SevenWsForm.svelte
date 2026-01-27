@@ -20,7 +20,7 @@
         { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', tooltip: 'When did the event occur?' },
         { type: 'where', label: 'Where', icon: 'lucide:map-pin', placeholder: 'e.g., store location, region', tooltip: 'Where did the event happen?' },
         { type: 'how', label: 'How', icon: 'lucide:settings', placeholder: 'e.g., online, in-store, phone', tooltip: 'How was the event performed?' },
-        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', tooltip: 'What are the quantitative measures (becomes fact table)?' },
+        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', tooltip: 'What are the quantitative measures? (becoming the fact table)' },
         { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', tooltip: 'Why did the event occur?' }
     ];
 
