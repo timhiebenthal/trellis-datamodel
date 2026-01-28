@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/svelte';
 import EventCard from './EventCard.svelte';
-import type { BusinessEvent, BusinessEventSevenWs } from '$lib/types';
+import type { BusinessEvent, BusinessEventProcess } from '$lib/types';
 
 describe('EventCard', () => {
     beforeEach(() => {
@@ -137,39 +137,32 @@ describe('EventCard', () => {
         expect(badge).not.toBeInTheDocument();
     });
 
-    it('shows domain badge when domain exists', () => {
+    it('does not render domain or process badges', () => {
         const onEditSevenWs = vi.fn();
         const onGenerateEntities = vi.fn();
         const onDelete = vi.fn();
+        const onResolveProcess = vi.fn();
 
-        render(EventCard, {
-            event: mockEventWith7Ws,
-            onEditSevenWs,
-            onGenerateEntities,
-            onDelete
-        });
-
-        const salesTexts = screen.getAllByText('Sales');
-        expect(salesTexts.length).toBeGreaterThan(0);
-    });
-
-    it('does not show domain badge when domain is null', () => {
-        const onEditSevenWs = vi.fn();
-        const onGenerateEntities = vi.fn();
-        const onDelete = vi.fn();
-
-        const mockEventNoDomain: BusinessEvent = {
-            ...mockEventWith7Ws,
-            domain: undefined
+        const process: BusinessEventProcess = {
+            id: 'proc_20250122_001',
+            name: 'Customer Journey',
+            type: 'discrete',
+            domain: 'Sales',
+            event_ids: [mockEventWith7Ws.id],
+            created_at: '2025-01-22T10:00:00Z',
+            updated_at: '2025-01-22T10:00:00Z'
         };
 
         render(EventCard, {
-            event: mockEventNoDomain,
+            event: mockEventWith7Ws,
+            process,
             onEditSevenWs,
             onGenerateEntities,
-            onDelete
+            onDelete,
+            onResolveProcess
         });
 
-        expect(screen.queryByText(/domain/i)).not.toBeInTheDocument();
+        expect(screen.queryByText('Sales')).not.toBeInTheDocument();
+        expect(screen.queryByText(process.name)).not.toBeInTheDocument();
     });
 });

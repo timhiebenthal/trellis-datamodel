@@ -18,6 +18,11 @@ import type {
     Dimension,
     Annotation,
     GeneratedEntitiesResult,
+    BusinessEventProcess,
+    CreateProcessRequest,
+    UpdateProcessRequest,
+    AttachEventsRequest,
+    DetachEventsRequest,
 } from './types';
 
 /**
@@ -873,3 +878,238 @@ export async function generateEntitiesFromEvent(
         throw new Error(`Error generating entities: ${message}`);
     }
 }
+
+/**
+ * Generate entities from a business event process.
+ * Uses the process's annotations_superset (union of all member event annotations).
+ * @param processId - Process ID to generate entities from
+ * @returns Promise containing GeneratedEntitiesResult
+ */
+export async function generateEntitiesFromProcess(
+    processId: string
+): Promise<GeneratedEntitiesResult> {
+    try {
+        const res = await fetch(`${API_BASE}/processes/${processId}/generate-entities`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
+        }
+        const data = await res.json();
+        // Handle both direct response and wrapped response formats
+        return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error generating entities from process: ${message}`);
+    }
+}
+
+/**
+ * Business Event Process API functions
+ */
+
+/**
+ * Fetch all business event processes.
+ * @returns Promise containing array of BusinessEventProcess objects
+ */
+export async function getBusinessEventProcesses(): Promise<BusinessEventProcess[]> {
+    try {
+        const res = await fetch(`${API_BASE}/processes`);
+        if (!res.ok) {
+            // Try to get error detail from response
+            let errorDetail = res.statusText;
+            try {
+                const errorData = await res.json();
+                errorDetail = errorData.detail || errorData.message || errorDetail;
+            } catch {
+                // If JSON parsing fails, use statusText
+            }
+            const error = new Error(`Failed to fetch business event processes: ${errorDetail}`);
+            (error as any).status = res.status;
+            (error as any).statusText = res.statusText;
+            throw error;
+        }
+        const data = await res.json();
+        // Handle both { processes: [...] } and direct array response
+        return Array.isArray(data) ? data : (data.processes || []);
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error fetching business event processes: ${message}`);
+    }
+}
+
+/**
+ * Create a new business event process.
+ * @param request - CreateProcessRequest with name, type, and optional event_ids
+ * @returns Promise containing the created BusinessEventProcess
+ */
+export async function createBusinessEventProcess(
+    request: CreateProcessRequest
+): Promise<BusinessEventProcess> {
+    try {
+        const res = await fetch(`${API_BASE}/processes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            const errorMessage = error.detail || `Failed to create business event process: ${res.statusText}`;
+            const apiError = new Error(errorMessage);
+            (apiError as any).status = res.status;
+            (apiError as any).statusText = res.statusText;
+            throw apiError;
+        }
+        return await res.json();
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error creating business event process: ${message}`);
+    }
+}
+
+/**
+ * Update an existing business event process.
+ * @param processId - Process ID to update
+ * @param request - UpdateProcessRequest with fields to update (name, type)
+ * @returns Promise containing the updated BusinessEventProcess
+ */
+export async function updateBusinessEventProcess(
+    processId: string,
+    request: UpdateProcessRequest
+): Promise<BusinessEventProcess> {
+    try {
+        const res = await fetch(`${API_BASE}/processes/${processId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            const errorMessage = error.detail || `Failed to update business event process: ${res.statusText}`;
+            const apiError = new Error(errorMessage);
+            (apiError as any).status = res.status;
+            (apiError as any).statusText = res.statusText;
+            throw apiError;
+        }
+        return await res.json();
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error updating business event process: ${message}`);
+    }
+}
+
+/**
+ * Resolve (ungroup) a business event process.
+ * This removes the grouping by setting resolved_at and removing process_id from member events.
+ * @param processId - Process ID to resolve
+ * @returns Promise containing the resolved BusinessEventProcess
+ */
+export async function resolveBusinessEventProcess(
+    processId: string
+): Promise<BusinessEventProcess> {
+    try {
+        const res = await fetch(`${API_BASE}/processes/${processId}/resolve`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            const errorMessage = error.detail || `Failed to resolve business event process: ${res.statusText}`;
+            const apiError = new Error(errorMessage);
+            (apiError as any).status = res.status;
+            (apiError as any).statusText = res.statusText;
+            throw apiError;
+        }
+        return await res.json();
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error resolving business event process: ${message}`);
+    }
+}
+
+/**
+ * Attach events to a business event process.
+ * @param processId - Process ID
+ * @param request - AttachEventsRequest with event_ids list
+ * @returns Promise containing the updated BusinessEventProcess
+ */
+export async function attachEventsToProcess(
+    processId: string,
+    request: AttachEventsRequest
+): Promise<BusinessEventProcess> {
+    try {
+        const res = await fetch(`${API_BASE}/processes/${processId}/attach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            const errorMessage = error.detail || `Failed to attach events to process: ${res.statusText}`;
+            const apiError = new Error(errorMessage);
+            (apiError as any).status = res.status;
+            (apiError as any).statusText = res.statusText;
+            throw apiError;
+        }
+        return await res.json();
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error attaching events to process: ${message}`);
+    }
+}
+
+/**
+ * Detach events from a business event process.
+ * @param processId - Process ID
+ * @param request - DetachEventsRequest with event_ids list
+ * @returns Promise containing the updated BusinessEventProcess
+ */
+export async function detachEventsFromProcess(
+    processId: string,
+    request: DetachEventsRequest
+): Promise<BusinessEventProcess> {
+    try {
+        const res = await fetch(`${API_BASE}/processes/${processId}/detach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            const errorMessage = error.detail || `Failed to detach events from process: ${res.statusText}`;
+            const apiError = new Error(errorMessage);
+            (apiError as any).status = res.status;
+            (apiError as any).statusText = res.statusText;
+            throw apiError;
+        }
+        return await res.json();
+    } catch (e) {
+        // Re-throw with status code preserved
+        if (e instanceof Error && (e as any).status) {
+            throw e;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error detaching events from process: ${message}`);
+    }
+}
+
