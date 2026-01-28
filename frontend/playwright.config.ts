@@ -27,10 +27,10 @@ lineage:
   enabled: false
 bus_matrix:
   enabled: true
-business_events:
-  enabled: true
 
 # Optional: enable other features if needed
+# business_events:
+#   enabled: true
 # exposures:
 #   enabled: true
 `;
