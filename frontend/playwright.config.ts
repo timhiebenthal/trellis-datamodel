@@ -27,6 +27,8 @@ lineage:
   enabled: false
 bus_matrix:
   enabled: true
+business_events:
+  enabled: true
 
 # Optional: enable other features if needed
 # exposures:

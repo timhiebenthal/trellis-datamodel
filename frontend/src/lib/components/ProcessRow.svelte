@@ -9,9 +9,10 @@
         onEdit?: () => void;
         onOpenCanvas?: () => void;
         onResolve?: (processId: string) => Promise<void> | void;
+        onGenerateEntities?: () => void;
     };
 
-    let { process, eventCount, onAnnotate, onEdit, onOpenCanvas, onResolve }: Props = $props();
+    let { process, eventCount, onAnnotate, onEdit, onOpenCanvas, onResolve, onGenerateEntities }: Props = $props();
 
     let resolving = $state(false);
 
@@ -61,6 +62,15 @@
             title="Annotate process"
         >
             <Icon icon="lucide:highlighter" class="w-4 h-4" />
+        </button>
+        <button
+            type="button"
+            class="p-1.5 rounded text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            on:click={() => onGenerateEntities?.()}
+            disabled={!onGenerateEntities}
+            title="Generate dimensional entities from process"
+        >
+            <Icon icon="lucide:sparkles" class="w-4 h-4" />
         </button>
         <button
             type="button"

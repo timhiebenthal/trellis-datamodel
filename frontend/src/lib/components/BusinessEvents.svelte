@@ -77,6 +77,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     let showGenerateEntitiesDialog = $state(false);
     let sevenWsEvent = $state<BusinessEvent | null>(null);
     let generateEntitiesEvent = $state<BusinessEvent | null>(null);
+    let generateEntitiesProcess = $state<BusinessEventProcess | null>(null);
 
     // Filter events based on selected type and domain (combined filters)
     let filteredEvents = $derived.by(() => {
@@ -673,12 +674,20 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
     function handleGenerateEntities(event: BusinessEvent) {
         generateEntitiesEvent = event;
+        generateEntitiesProcess = null;
+        showGenerateEntitiesDialog = true;
+    }
+
+    function handleGenerateEntitiesFromProcess(process: BusinessEventProcess) {
+        generateEntitiesProcess = process;
+        generateEntitiesEvent = null;
         showGenerateEntitiesDialog = true;
     }
 
     function handleGenerateEntitiesClose() {
         showGenerateEntitiesDialog = false;
         generateEntitiesEvent = null;
+        generateEntitiesProcess = null;
         reloadEvents();
     }
 
@@ -972,6 +981,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                             : undefined
                                                     }
                                                     onResolve={handleProcessResolve}
+                                                    onGenerateEntities={() => handleGenerateEntitiesFromProcess(processGroup.process)}
                                                 />
                                             </div>
                                             {#if isProcessExpanded(processGroup.process.id)}
@@ -1108,6 +1118,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     <GenerateEntitiesDialog
         open={showGenerateEntitiesDialog}
         event={generateEntitiesEvent}
+        process={generateEntitiesProcess}
         onConfirm={handleGenerateEntitiesClose}
         onCancel={handleGenerateEntitiesClose}
     />

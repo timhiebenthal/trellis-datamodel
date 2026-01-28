@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess } from './api';
+import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess } from './api';
 import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
 
 describe('API Functions - 7 Ws', () => {
@@ -824,6 +824,96 @@ describe('Business Event Process API Functions', () => {
 
             await expect(detachEventsFromProcess('proc_invalid', request))
                 .rejects.toThrow('Process not found');
+        });
+    });
+
+    describe('generateEntitiesFromProcess', () => {
+        it('generates entities from a process', async () => {
+            const mockResponse = {
+                entities: [
+                    {
+                        id: 'order_fact',
+                        label: 'Order',
+                        entity_type: 'fact',
+                        tags: ['sales']
+                    },
+                    {
+                        id: 'customer_dim',
+                        label: 'Customer',
+                        entity_type: 'dimension',
+                        tags: ['sales']
+                    }
+                ],
+                relationships: [
+                    {
+                        source: 'order_fact',
+                        target: 'customer_dim',
+                        label: 'has',
+                        type: 'many_to_one'
+                    }
+                ],
+                errors: []
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue(mockResponse)
+                })
+            );
+
+            const result = await generateEntitiesFromProcess('proc_001');
+
+            expect(result).toEqual(mockResponse);
+            expect(result.entities).toHaveLength(2);
+            expect(result.relationships).toHaveLength(1);
+            expect(global.fetch).toHaveBeenCalledWith(
+                'http://localhost:8089/api/processes/proc_001/generate-entities',
+                expect.objectContaining({
+                    method: 'POST'
+                })
+            );
+        });
+
+        it('handles empty response', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: true,
+                    json: vi.fn().mockResolvedValue({ entities: [], relationships: [] })
+                })
+            );
+
+            const result = await generateEntitiesFromProcess('proc_002');
+
+            expect(result.entities).toEqual([]);
+            expect(result.relationships).toEqual([]);
+        });
+
+        it('handles errors when generating from process', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found',
+                    json: vi.fn().mockResolvedValue({ detail: 'Process not found' })
+                })
+            );
+
+            await expect(generateEntitiesFromProcess('proc_invalid'))
+                .rejects.toThrow('Process not found');
+        });
+
+        it('handles network errors', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockRejectedValue(new Error('Network error'))
+            );
+
+            await expect(generateEntitiesFromProcess('proc_001'))
+                .rejects.toThrow('Error generating entities from process: Network error');
         });
     });
 });

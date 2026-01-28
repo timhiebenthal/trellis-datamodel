@@ -880,6 +880,32 @@ export async function generateEntitiesFromEvent(
 }
 
 /**
+ * Generate entities from a business event process.
+ * Uses the process's annotations_superset (union of all member event annotations).
+ * @param processId - Process ID to generate entities from
+ * @returns Promise containing GeneratedEntitiesResult
+ */
+export async function generateEntitiesFromProcess(
+    processId: string
+): Promise<GeneratedEntitiesResult> {
+    try {
+        const res = await fetch(`${API_BASE}/processes/${processId}/generate-entities`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
+        }
+        const data = await res.json();
+        // Handle both direct response and wrapped response formats
+        return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`Error generating entities from process: ${message}`);
+    }
+}
+
+/**
  * Business Event Process API functions
  */
 

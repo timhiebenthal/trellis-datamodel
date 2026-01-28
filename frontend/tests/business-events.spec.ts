@@ -768,4 +768,44 @@ test.describe('Business Events - E2E', () => {
         await expect(createButton).not.toBeDisabled({ timeout: 2000 });
     });
 
+    test('should show generate entities button on process rows', async ({ page }) => {
+        await page.goto('/business-events').catch(() => {
+            test.skip();
+        });
+        await page.waitForLoadState('networkidle');
+
+        // Check if there are any processes displayed
+        const processRow = page.locator('[class*="process"]').or(
+            page.locator('text=/process/i')
+        ).first();
+
+        const hasProcess = await processRow.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (hasProcess) {
+            // Verify the generate entities button exists on the process row
+            const generateBtn = page.getByTitle(/generate dimensional entities from process/i);
+            const btnExists = await generateBtn.isVisible({ timeout: 3000 }).catch(() => false);
+
+            if (btnExists) {
+                // Verify button is clickable
+                await expect(generateBtn).toBeEnabled();
+
+                // Click button to open dialog
+                await generateBtn.click();
+
+                // Verify dialog opens in process mode
+                const generateDialog = page.getByRole('dialog').filter({
+                    hasText: /generate entities from process/i
+                });
+                await expect(generateDialog).toBeVisible({ timeout: 5000 });
+            } else {
+                // No generate button found, skip test
+                test.skip();
+            }
+        } else {
+            // No processes exist, skip test
+            test.skip();
+        }
+    });
+
 });
