@@ -1,2 +1,3 @@
-// Temporarily commented out - jest-dom not installed in current node_modules
-// import '@testing-library/jest-dom/vitest';
+// Import jest-dom matchers for enhanced assertions (toBeInTheDocument, toHaveClass, etc.)
+// Note: Requires @testing-library/jest-dom to be installed (run `npm install` if missing)
+import '@testing-library/jest-dom/vitest';
