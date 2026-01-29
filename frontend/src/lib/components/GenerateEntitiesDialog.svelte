@@ -182,6 +182,21 @@
                 const trimmedId = edited.id.trim();
 
                 if (existingEntityIds.has(trimmedId)) {
+                    // Entity already exists - update its drafted_fields if this is a fact
+                    if (edited.entity_type === 'fact' && (original as any).drafted_fields) {
+                        nodesToUse = nodesToUse.map((n) => {
+                            if (n.id === trimmedId) {
+                                return {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        drafted_fields: (original as any).drafted_fields,
+                                    },
+                                };
+                            }
+                            return n;
+                        });
+                    }
                     entityIdByIndex.push(trimmedId);
                     continue;
                 }
@@ -206,7 +221,7 @@
                     };
                 }
 
-                // Create node (include tags and annotation_type from preview data)
+                // Create node (include tags, annotation_type, and drafted_fields from preview data)
                 const newNode: Node = {
                     id,
                     type: 'entity',
@@ -217,6 +232,7 @@
                         entity_type: edited.entity_type,
                         annotation_type: (original as any).annotation_type || undefined,
                         tags: original.tags || [],
+                        drafted_fields: (original as any).drafted_fields || undefined,
                         width: 280,
                         panelHeight: 200,
                         collapsed: false,
@@ -297,6 +313,12 @@
 
             // Save the data model to persist entities to data_model.yml
             const dataModel = buildDataModelFromState($nodes, $edges);
+
+            // Debug: Log what we're saving
+            const factEntity = dataModel.entities.find((e: any) => e.entity_type === 'fact');
+            console.log('Saving data model - fact entity:', factEntity);
+            console.log('Fact has drafted_fields:', factEntity?.drafted_fields);
+
             await saveDataModel(dataModel);
 
             success = true;

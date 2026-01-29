@@ -32,7 +32,7 @@ export interface ColumnLink {
 
 export interface DraftedField {
     name: string;
-    datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp';
+    datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp' | 'unknown';
     description?: string;
 }
 
@@ -343,6 +343,7 @@ export interface GeneratedEntitiesResult {
         description?: string;
         metadata?: Record<string, any>;
         tags?: string[]; // Tags including inherited domain tags
+        drafted_fields?: DraftedField[]; // Fields for fact tables from how_many annotations
     }>;
     relationships: Array<{
         source: string;

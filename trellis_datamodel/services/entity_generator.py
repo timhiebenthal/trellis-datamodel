@@ -161,7 +161,7 @@ def _create_dimension_from_annotation_entry(
         and entry.dimension_id in existing_entities
     ):
         existing_entity = existing_entities[entry.dimension_id]
-        return {
+        entity = {
             "id": existing_entity["id"],
             "label": existing_entity.get("label", entry.text),
             "entity_type": "dimension",
@@ -169,6 +169,10 @@ def _create_dimension_from_annotation_entry(
                 "description", entry.description or f"Dimension: {entry.text}"
             ),
         }
+        # Add domain tag if provided
+        if domain_tag:
+            entity["tags"] = [domain_tag]
+        return entity
 
     # Otherwise, create a new dimension
     base_name = _text_to_snake_case(entry.text)
@@ -430,7 +434,7 @@ def generate_entities_from_process(
     Uses the process's annotations_superset (union of all member event annotations).
     Behavior differs by process type:
     - discrete: one fact table with per-event records (includes event_id/process_id)
-    - evolving: accumulating snapshot with status/time columns
+    - evolving: one fact table with process-level records (includes process_id)
     - recurring: same as discrete
 
     Args:
@@ -504,9 +508,11 @@ def generate_entities_from_process(
     # Load existing entities for dimension_id references
     existing_entities = _load_existing_entities()
 
-    # Get domain tag from first event (or process name if no domain)
+    # Get domain tag from process domain (preferred) or first event's domain (fallback)
     domain_tag = None
-    if process_events[0].domain:
+    if process.domain:
+        domain_tag = slugify_domain(process.domain)
+    elif process_events[0].domain:
         domain_tag = slugify_domain(process_events[0].domain)
 
     # Generate dimension entities from all dimension entries
@@ -671,8 +677,8 @@ def _create_fact_from_process_evolving(
     """
     Create a fact entity dictionary for an evolving process.
 
-    Evolving processes create an accumulating snapshot fact table with status/time columns.
-    Includes process_id and status tracking fields.
+    Evolving processes create a fact table from the how_many entries.
+    Includes process_id for traceability.
 
     Args:
         entries: List of AnnotationEntry objects (how_many category)
@@ -700,7 +706,7 @@ def _create_fact_from_process_evolving(
         "id": entity_id,
         "label": label,
         "entity_type": "fact",
-        "description": f"Fact: {label} (evolving process - accumulating snapshot)",
+        "description": f"Fact: {label} (evolving process)",
     }
 
     # Add process and event metadata
@@ -724,40 +730,12 @@ def _create_fact_from_process_evolving(
             field["description"] = entry.description
         drafted_fields.append(field)
 
-    # Add accumulating snapshot fields for evolving process
+    # Add process_id for traceability
     drafted_fields.append(
         {
             "name": "process_id",
             "datatype": "text",
             "description": "ID of the process this record belongs to",
-        }
-    )
-    drafted_fields.append(
-        {
-            "name": "status",
-            "datatype": "text",
-            "description": "Current status of the process instance",
-        }
-    )
-    drafted_fields.append(
-        {
-            "name": "status_updated_at",
-            "datatype": "timestamp",
-            "description": "Timestamp when status was last updated",
-        }
-    )
-    drafted_fields.append(
-        {
-            "name": "process_started_at",
-            "datatype": "timestamp",
-            "description": "Timestamp when the process instance started",
-        }
-    )
-    drafted_fields.append(
-        {
-            "name": "process_completed_at",
-            "datatype": "timestamp",
-            "description": "Timestamp when the process instance completed (nullable)",
         }
     )
 

@@ -791,7 +791,7 @@ async def generate_entities_from_business_event_process(process_id: str):
     Uses the process's annotations_superset (union of all member event annotations).
     Behavior differs by process type:
     - discrete: one fact table with per-event records (includes event_id/process_id)
-    - evolving: accumulating snapshot with status/time columns
+    - evolving: one fact table with process-level records (includes process_id)
     - recurring: same as discrete
 
     Args:
