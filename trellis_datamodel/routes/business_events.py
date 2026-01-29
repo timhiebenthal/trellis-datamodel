@@ -328,7 +328,7 @@ async def add_event_annotation_entry(
     _check_feature_enabled()
 
     # Validate annotation_type
-    valid_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+    valid_types = ["who", "what", "when", "where", "how", "why", "how_many"]
     if request.annotation_type not in valid_types:
         raise HTTPException(
             status_code=400,

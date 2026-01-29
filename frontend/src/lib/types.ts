@@ -282,7 +282,7 @@ export interface ConfigUpdateResponse {
 // Business Events types
 export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
 
-export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'how_many' | 'why';
+export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'why' | 'how_many';
 
 export type SevenWType = AnnotationType;
 
@@ -306,8 +306,8 @@ export interface BusinessEventAnnotations {
     when: AnnotationEntry[];
     where: AnnotationEntry[];
     how: AnnotationEntry[];
-    how_many: AnnotationEntry[];
     why: AnnotationEntry[];
+    how_many: AnnotationEntry[];
 }
 
 export interface Dimension {

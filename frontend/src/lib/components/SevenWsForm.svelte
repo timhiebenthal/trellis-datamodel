@@ -20,8 +20,8 @@
         { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', description: 'Defining points in time or timestamps', tooltip: '1. Order Date\n2. Delivery Due Date\n3. Treatment Time (Clock Dimension)' },
         { type: 'where', label: 'Where', icon: 'lucide:map-pin', placeholder: 'e.g., store location, region', description: 'Specific locations or virtual addresses', tooltip: '1. Retail Store\n2. Website URL\n3. Delivery Address' },
         { type: 'how', label: 'How', icon: 'lucide:settings', placeholder: 'e.g., online, in-store, phone', description: 'The method, manner, or status', tooltip: '1. Order Channel (Online, In-store, Phone)\n2. Payment Method (Credit card, PO)\n3. Call Status (Connected, Busy)' },
-        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' },
-        { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' }
+        { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
+        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
     ];
 
     // Form state

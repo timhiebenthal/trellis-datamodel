@@ -39,10 +39,10 @@ class BusinessEventAnnotations(BaseModel):
     when: List[AnnotationEntry] = Field(default_factory=list, description="When entries")
     where: List[AnnotationEntry] = Field(default_factory=list, description="Where entries")
     how: List[AnnotationEntry] = Field(default_factory=list, description="How entries")
+    why: List[AnnotationEntry] = Field(default_factory=list, description="Why entries")
     how_many: List[AnnotationEntry] = Field(
         default_factory=list, description="How Many entries (becomes fact table)"
     )
-    why: List[AnnotationEntry] = Field(default_factory=list, description="Why entries")
 
     @model_validator(mode="after")
     def validate_unique_entry_ids(self) -> "BusinessEventAnnotations":
@@ -54,8 +54,8 @@ class BusinessEventAnnotations(BaseModel):
             self.when,
             self.where,
             self.how,
-            self.how_many,
             self.why,
+            self.how_many,
         ]:
             all_entries.extend(w_list)
 
@@ -120,8 +120,8 @@ class BusinessEventAnnotations(BaseModel):
             "when": self.when,
             "where": self.where,
             "how": self.how,
-            "how_many": self.how_many,
             "why": self.why,
+            "how_many": self.how_many,
         }
 
         seen_keys: Dict[tuple, AnnotationEntry] = {}
