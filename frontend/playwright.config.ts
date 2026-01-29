@@ -29,6 +29,8 @@ bus_matrix:
   enabled: true
 
 # Optional: enable other features if needed
+# business_events:
+#   enabled: true
 # exposures:
 #   enabled: true
 `;

@@ -58,6 +58,13 @@ Task types:
 
 ## Step 3: Organize into SPRINTS and STREAMS
 
+### Dependency Awareness
+
+- Before finalizing any stream, inventory the upstream work it relies on (other streams, services, data models, etc.).
+- Document hard dependencies with `⚠️ Depends on:` so implementers know they cannot progress until those streams are complete.
+- Do not plan a stream whose tasks require functionality that still needs to be built elsewhere unless that dependency is explicitly tracked and slated to finish first.
+- When executing filtered tasks, double-check the dependency notes in `tasks.md`—if a dependency is incomplete, pause and request the requisite work instead of proceeding.
+
 ### SPRINTS (sequential phases)
 - SPRINT 1: Foundation/infrastructure
 - SPRINT 2: Core features

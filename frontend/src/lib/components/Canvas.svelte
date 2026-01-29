@@ -123,6 +123,10 @@
                 // Force store update so autosave reacts in filtered mode.
                 $nodes = [...$nodes];
             }
+        } else {
+            // In non-filtered mode, sync displayNodes directly to $nodes store
+            // This ensures edges update during drag operations
+            $nodes = displayNodes;
         }
     });
 
@@ -448,13 +452,13 @@
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function onNodeDragStart(params: any) {
-        console.log("Drag start:", params.node?.id);
+        console.log("Drag start:", params.targetNode?.id);
         isDragging = true;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function onNodeDragStop(params: any) {
-        console.log("Drag stop:", params.node?.id);
+        console.log("Drag stop:", params.targetNode?.id);
         isDragging = false;
         // Force update after drag
         updateGroupSizes();

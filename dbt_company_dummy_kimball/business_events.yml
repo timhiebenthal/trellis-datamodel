@@ -2,9 +2,10 @@ events:
 - id: evt_20260121_001
   text: Sales Agent Calls Leads
   type: discrete
-  domain: null
+  domain: Sales
+  process_id: null
   created_at: '2026-01-21T23:14:19.346876'
-  updated_at: '2026-01-23T18:39:49.412817'
+  updated_at: '2026-01-27T13:27:22.649861'
   annotations:
     who:
     - id: new_1769189669903_3z67uy2lh
@@ -35,17 +36,18 @@ events:
     why: []
   derived_entities:
   - entity_id: dim_employee
-    created_at: '2026-01-23T17:39:49.297000Z'
+    created_at: '2026-01-27T12:23:54.752000Z'
   - entity_id: dim_lead
-    created_at: '2026-01-23T17:39:49.298000Z'
+    created_at: '2026-01-27T12:23:54.753000Z'
   - entity_id: dim_order_date
-    created_at: '2026-01-23T17:39:49.298000Z'
+    created_at: '2026-01-27T12:23:54.753000Z'
   - entity_id: fact_sales_agent_calls_leads
-    created_at: '2026-01-23T17:39:49.298000Z'
+    created_at: '2026-01-27T12:23:54.753000Z'
 - id: evt_20260122_001
   text: customer buys product
   type: discrete
   domain: Sales
+  process_id: null
   created_at: '2026-01-22T00:07:15.211092'
   updated_at: '2026-01-23T18:33:08.068250'
   annotations:
@@ -132,6 +134,7 @@ events:
   text: order gets invoiced
   type: discrete
   domain: finance
+  process_id: null
   created_at: '2026-01-22T08:40:04.196757'
   updated_at: '2026-01-22T08:50:16.177326'
   annotations:
@@ -147,6 +150,7 @@ events:
   text: marketing runs campaign
   type: discrete
   domain: marketing
+  process_id: null
   created_at: '2026-01-22T08:49:28.698219'
   updated_at: '2026-01-22T08:49:28.698219'
   annotations:
@@ -156,5 +160,41 @@ events:
     where: []
     how: []
     how_many: []
+    why: []
+  derived_entities: []
+- id: evt_20260127_001
+  text: Sales Agent qualified Leads
+  type: discrete
+  domain: Sales
+  process_id: null
+  created_at: '2026-01-27T13:10:49.097536'
+  updated_at: '2026-01-27T13:27:22.691337'
+  annotations:
+    who:
+    - id: new_1769516780314_wzo5hd69g
+      dimension_id: dim_employee
+      text: Employee
+      description: ''
+      attributes: {}
+    what:
+    - id: new_1769516784815_33ocjrrhv
+      dimension_id: dim_lead
+      text: Lead
+      description: ''
+      attributes: {}
+    when:
+    - id: new_1769516783974_gtxknjt3u
+      dimension_id: dim_order_date
+      text: Order Date
+      description: ''
+      attributes: {}
+    where: []
+    how: []
+    how_many:
+    - id: new_1769516798134_lx1kyosa9
+      dimension_id: null
+      text: Amount
+      description: ''
+      attributes: {}
     why: []
   derived_entities: []

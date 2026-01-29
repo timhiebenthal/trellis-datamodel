@@ -2,6 +2,19 @@ import { writable, get } from 'svelte/store';
 import type { Node, Edge } from '@xyflow/svelte';
 import type { DbtModel, FieldDragState } from './types';
 
+/**
+ * Deep clone that handles Svelte 5 Proxy objects (which structuredClone cannot clone).
+ * Falls back to JSON serialization which unwraps Proxy objects.
+ */
+function deepClone<T>(obj: T): T {
+    try {
+        return structuredClone(obj);
+    } catch {
+        // structuredClone fails on Proxy objects, use JSON serialization as fallback
+        return JSON.parse(JSON.stringify(obj));
+    }
+}
+
 export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
 export const dbtModels = writable<DbtModel[]>([]);
@@ -107,8 +120,8 @@ export function pushHistory() {
     if (pushDebounceTimeout) clearTimeout(pushDebounceTimeout);
     pushDebounceTimeout = setTimeout(() => {
         const state: HistoryState = {
-            nodes: structuredClone(get(nodes)),
-            edges: structuredClone(get(edges)),
+            nodes: deepClone(get(nodes)),
+            edges: deepClone(get(edges)),
         };
 
         // Remove any redo states if we're not at the end
@@ -128,8 +141,8 @@ export function pushHistory() {
 
 export function initHistory() {
     history = [{
-        nodes: structuredClone(get(nodes)),
-        edges: structuredClone(get(edges)),
+        nodes: deepClone(get(nodes)),
+        edges: deepClone(get(edges)),
     }];
     historyIndex = 0;
     updateCanUndoRedo();
@@ -141,8 +154,8 @@ export function undo() {
     isUndoRedoAction = true;
     historyIndex--;
     const state = history[historyIndex];
-    nodes.set(structuredClone(state.nodes));
-    edges.set(structuredClone(state.edges));
+    nodes.set(deepClone(state.nodes));
+    edges.set(deepClone(state.edges));
     updateCanUndoRedo();
     isUndoRedoAction = false;
 }
@@ -153,8 +166,8 @@ export function redo() {
     isUndoRedoAction = true;
     historyIndex++;
     const state = history[historyIndex];
-    nodes.set(structuredClone(state.nodes));
-    edges.set(structuredClone(state.edges));
+    nodes.set(deepClone(state.nodes));
+    edges.set(deepClone(state.edges));
     updateCanUndoRedo();
     isUndoRedoAction = false;
 }

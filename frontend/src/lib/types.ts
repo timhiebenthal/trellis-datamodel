@@ -32,7 +32,7 @@ export interface ColumnLink {
 
 export interface DraftedField {
     name: string;
-    datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp';
+    datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp' | 'unknown';
     description?: string;
 }
 
@@ -282,7 +282,7 @@ export interface ConfigUpdateResponse {
 // Business Events types
 export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
 
-export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'how_many' | 'why';
+export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'why' | 'how_many';
 
 export type SevenWType = AnnotationType;
 
@@ -306,8 +306,8 @@ export interface BusinessEventAnnotations {
     when: AnnotationEntry[];
     where: AnnotationEntry[];
     how: AnnotationEntry[];
-    how_many: AnnotationEntry[];
     why: AnnotationEntry[];
+    how_many: AnnotationEntry[];
 }
 
 export interface Dimension {
@@ -328,6 +328,7 @@ export interface BusinessEvent {
     text: string;
     type: BusinessEventType;
     domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
+    process_id?: string; // Optional ID of the process this event belongs to
     created_at: string; // ISO timestamp
     updated_at: string; // ISO timestamp
     annotations?: BusinessEventAnnotations; // Event annotations (Who, What, When, Where, How, How Many, Why)
@@ -342,6 +343,7 @@ export interface GeneratedEntitiesResult {
         description?: string;
         metadata?: Record<string, any>;
         tags?: string[]; // Tags including inherited domain tags
+        drafted_fields?: DraftedField[]; // Fields for fact tables from how_many annotations
     }>;
     relationships: Array<{
         source: string;
@@ -350,4 +352,41 @@ export interface GeneratedEntitiesResult {
         label?: string;
     }>;
     errors: string[];
+}
+
+// Business Event Process types
+export interface BusinessEventProcess {
+    id: string; // e.g., "proc_YYYYMMDD_NNN"
+    name: string;
+    type: BusinessEventType;
+    domain?: string;
+    event_ids: string[];
+    created_at: string; // ISO timestamp
+    updated_at: string; // ISO timestamp
+    resolved_at?: string; // ISO timestamp, when the process was resolved (ungrouped)
+    annotations_superset?: BusinessEventAnnotations; // Union of all member event annotations
+}
+
+// Process API request types
+export interface CreateProcessRequest {
+    name: string;
+    type: BusinessEventType;
+    domain: string;
+    event_ids?: string[];
+}
+
+export interface UpdateProcessRequest {
+    name?: string;
+    type?: BusinessEventType;
+    domain?: string | null;
+    annotations_superset?: BusinessEventAnnotations | null;
+    event_ids?: string[];
+}
+
+export interface AttachEventsRequest {
+    event_ids: string[];
+}
+
+export interface DetachEventsRequest {
+    event_ids: string[];
 }

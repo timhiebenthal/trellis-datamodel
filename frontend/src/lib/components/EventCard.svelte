@@ -1,17 +1,42 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { BusinessEvent } from "$lib/types";
+    import type { BusinessEvent, BusinessEventProcess } from "$lib/types";
     import { deleteBusinessEvent } from "$lib/api";
-    import DomainBadge from "./DomainBadge.svelte";
-
     type Props = {
         event: BusinessEvent;
+        process?: BusinessEventProcess;
+        selected?: boolean;
+        draggable?: boolean;
+        dragOver?: boolean;
+        onSelect?: (selected: boolean) => void;
+        onEditEvent?: (event: BusinessEvent) => void;
         onEditSevenWs: (event: BusinessEvent) => void;
         onGenerateEntities: (event: BusinessEvent) => void;
         onDelete: () => void;
+        onResolveProcess?: (processId: string) => void;
+        onDragStart?: (event: BusinessEvent, dragEvent: DragEvent) => void;
+        onDragOver?: (event: BusinessEvent, dragEvent: DragEvent) => void;
+        onDrop?: (event: BusinessEvent, dragEvent: DragEvent) => void;
+        onDragEnd?: () => void;
     };
 
-    let { event, onEditSevenWs, onGenerateEntities, onDelete }: Props = $props();
+    let {
+        event,
+        process,
+        selected = false,
+        draggable = false,
+        dragOver = false,
+        onSelect,
+        onEditEvent,
+        onEditSevenWs,
+        onGenerateEntities,
+        onDelete,
+        onResolveProcess,
+        onDragStart,
+        onDragOver,
+        onDrop,
+        onDragEnd,
+    }: Props = $props();
 
     let showDeleteConfirm = $state(false);
 
@@ -112,9 +137,46 @@
 
 <div
     class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
+    class:bg-primary-50={selected}
+    class:border-primary-200={selected}
+    ondragover={(e) => {
+        if (!onDragOver) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDragOver(event, e);
+    }}
+    ondrop={(e) => {
+        if (!onDrop) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDrop(event, e);
+    }}
 >
     <!-- List-like row layout -->
     <div class="flex items-center gap-4">
+        {#if draggable}
+            <button
+                class="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                draggable="true"
+                ondragstart={(e) => onDragStart?.(event, e)}
+                ondragend={() => onDragEnd?.()}
+                aria-label={`Reorder ${event.text}`}
+                title="Drag to reorder"
+            >
+                <Icon icon="lucide:grip-vertical" class="w-4 h-4" />
+            </button>
+        {/if}
+        <!-- Selection checkbox -->
+        {#if onSelect}
+            <input
+                type="checkbox"
+                checked={selected}
+                onchange={(e) => onSelect?.(e.currentTarget.checked)}
+                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                aria-label={`Select ${event.text}`}
+            />
+        {/if}
+        
         <!-- Event text (flex-1 to take available space) -->
         <div class="flex-1 min-w-0 text-sm text-gray-700 leading-relaxed">
             {event.text}
@@ -145,20 +207,24 @@
             {/if}
         </div>
 
-        <!-- Domain and Type badges -->
+        <!-- Type badge -->
         <div class="flex items-center gap-2 flex-shrink-0">
-            {#if event.domain}
-                <DomainBadge domain={event.domain} size="small" />
-            {/if}
-            <span
-                class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}"
-            >
+            <span class="px-2 py-1 rounded text-xs font-medium border {typeBadgeClass}">
                 {event.type}
             </span>
         </div>
 
         <!-- Action buttons -->
         <div class="flex items-center gap-1 flex-shrink-0">
+            {#if onEditEvent}
+                <button
+                    onclick={() => onEditEvent(event)}
+                    class="p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                    title="Edit event properties (text, type, domain)"
+                >
+                    <Icon icon="lucide:edit" class="w-4 h-4" />
+                </button>
+            {/if}
             <button
                 onclick={() => onEditSevenWs(event)}
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"

@@ -29,6 +29,59 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 
 Trellis includes native support for Kimball dimensional modeling, making it easier to design, visualize, and document star and snowflake schemas.
 
+## Business Events and Processes
+
+Trellis supports capturing granular business events with 7W annotations and grouping related events into named processes. Processes let you consolidate multiple events into a single fact table (discrete records) or model an accumulating snapshot for evolving workflows.
+
+### Business Events File Structure
+
+Business events are stored in `business_events.yml`. Processes group events without deleting the originals and maintain a superset of annotations across member events.
+
+```yaml
+events:
+  - id: evt_20260127_001
+    text: customer places order
+    type: discrete
+    domain: sales
+    process_id: proc_20260127_001
+    created_at: "2026-01-27T09:15:00Z"
+    updated_at: "2026-01-27T09:15:00Z"
+    annotations:
+      who:
+        - id: entry_01
+          text: customer
+      what:
+        - id: entry_02
+          text: order
+      how_many:
+        - id: entry_03
+          text: order_amount
+    derived_entities: []
+
+processes:
+  - id: proc_20260127_001
+    name: order to cash
+    type: evolving
+    event_ids: [evt_20260127_001, evt_20260127_002]
+    created_at: "2026-01-27T09:20:00Z"
+    updated_at: "2026-01-27T09:25:00Z"
+    annotations_superset:
+      who:
+        - id: entry_01
+          text: customer
+      what:
+        - id: entry_02
+          text: order
+      how_many:
+        - id: entry_03
+          text: order_amount
+```
+
+Notes:
+- `process_id` links events to a process but does not remove the event.
+- `annotations_superset` is the union of member event 7Ws.
+- Resolving a process detaches events while keeping them intact.
+
 ### Features
 
 **Entity Classification**

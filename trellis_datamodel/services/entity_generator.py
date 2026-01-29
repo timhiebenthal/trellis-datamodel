@@ -17,9 +17,11 @@ from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
+    BusinessEventProcess,
     AnnotationEntry,
     GeneratedEntitiesResult,
 )
+from trellis_datamodel.services.business_events_service import load_business_events
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +161,7 @@ def _create_dimension_from_annotation_entry(
         and entry.dimension_id in existing_entities
     ):
         existing_entity = existing_entities[entry.dimension_id]
-        return {
+        entity = {
             "id": existing_entity["id"],
             "label": existing_entity.get("label", entry.text),
             "entity_type": "dimension",
@@ -167,6 +169,10 @@ def _create_dimension_from_annotation_entry(
                 "description", entry.description or f"Dimension: {entry.text}"
             ),
         }
+        # Add domain tag if provided
+        if domain_tag:
+            entity["tags"] = [domain_tag]
+        return entity
 
     # Otherwise, create a new dimension
     base_name = _text_to_snake_case(entry.text)
@@ -417,3 +423,327 @@ def _generate_from_annotations(
     )
 
     return result
+
+
+def generate_entities_from_process(
+    process: BusinessEventProcess, config=None
+) -> GeneratedEntitiesResult:
+    """
+    Generate dimensional entities from a business event process.
+
+    Uses the process's annotations_superset (union of all member event annotations).
+    Behavior differs by process type:
+    - discrete: one fact table with per-event records (includes event_id/process_id)
+    - evolving: one fact table with process-level records (includes process_id)
+    - recurring: same as discrete
+
+    Args:
+        process: BusinessEventProcess with annotations_superset
+        config: Optional config object (uses global config if not provided)
+
+    Returns:
+        GeneratedEntitiesResult with entities, relationships, and any errors
+
+    Raises:
+        ValidationError: If process doesn't have required data
+    """
+    errors = []
+
+    # Check if process is resolved
+    if process.resolved_at is not None:
+        errors.append("Cannot generate entities from a resolved process")
+        return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
+
+    # Check if process has annotations_superset
+    if not process.annotations_superset:
+        errors.append("Process must have annotations_superset computed")
+        return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
+
+    # Load member events for metadata
+    events = load_business_events()
+    process_events = [e for e in events if e.id in process.event_ids]
+
+    if not process_events:
+        errors.append("Process must have at least one member event")
+        return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
+
+    # Use annotations_superset for generation
+    annotations = process.annotations_superset
+
+    # Collect dimension entries from all annotation categories except how_many
+    dimension_entries = []
+    for annotation_type, entries in [
+        ("who", annotations.who),
+        ("what", annotations.what),
+        ("when", annotations.when),
+        ("where", annotations.where),
+        ("how", annotations.how),
+        ("why", annotations.why),
+    ]:
+        for entry in entries:
+            dimension_entries.append((annotation_type, entry))
+
+    # Validate: require at least 1 dimension entry
+    if not dimension_entries:
+        errors.append(
+            "At least one dimension entry (Who, What, When, Where, How, or Why) is required"
+        )
+
+    # Validate: require at least 1 how_many entry (fact)
+    how_many_entries = annotations.how_many
+    if not how_many_entries:
+        errors.append("At least one 'How Many' entry is required for fact table")
+
+    if errors:
+        return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
+
+    # Get prefixes from config
+    if config is None:
+        dim_prefixes = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix or []
+        fact_prefixes = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix or []
+    else:
+        dim_prefixes = getattr(config, "dimension_prefix", []) or []
+        fact_prefixes = getattr(config, "fact_prefix", []) or []
+
+    # Load existing entities for dimension_id references
+    existing_entities = _load_existing_entities()
+
+    # Get domain tag from process domain (preferred) or first event's domain (fallback)
+    domain_tag = None
+    if process.domain:
+        domain_tag = slugify_domain(process.domain)
+    elif process_events[0].domain:
+        domain_tag = slugify_domain(process_events[0].domain)
+
+    # Generate dimension entities from all dimension entries
+    dimension_entities = []
+    dimension_ids = []
+    for annotation_type, entry in dimension_entries:
+        entity = _create_dimension_from_annotation_entry(
+            entry,
+            annotation_type=annotation_type,
+            prefixes=dim_prefixes,
+            domain_tag=domain_tag,
+            existing_entities=existing_entities,
+        )
+        # Avoid duplicates (same dimension_id referenced multiple times)
+        if entity["id"] not in dimension_ids:
+            dimension_entities.append(entity)
+            dimension_ids.append(entity["id"])
+
+    # Generate fact entity based on process type
+    if process.type.value == "discrete" or process.type.value == "recurring":
+        fact_entity = _create_fact_from_process_discrete(
+            entries=how_many_entries,
+            prefixes=fact_prefixes,
+            process=process,
+            process_events=process_events,
+            domain_tag=domain_tag,
+        )
+    elif process.type.value == "evolving":
+        fact_entity = _create_fact_from_process_evolving(
+            entries=how_many_entries,
+            prefixes=fact_prefixes,
+            process=process,
+            process_events=process_events,
+            domain_tag=domain_tag,
+        )
+    else:
+        errors.append(f"Unknown process type: {process.type.value}")
+        return GeneratedEntitiesResult(entities=[], relationships=[], errors=errors)
+
+    fact_id = fact_entity["id"]
+
+    # Check for duplicate entity names
+    all_entity_ids = [e["id"] for e in dimension_entities + [fact_entity]]
+    duplicates = [eid for eid in all_entity_ids if all_entity_ids.count(eid) > 1]
+    if duplicates:
+        errors.append(f"Duplicate entity names detected: {', '.join(set(duplicates))}")
+
+    # Create relationships: all dimensions connect to fact
+    relationships = _create_relationships(fact_id, dimension_ids)
+
+    result = GeneratedEntitiesResult(
+        entities=dimension_entities + [fact_entity],
+        relationships=relationships,
+        errors=errors,
+    )
+
+    logger.info(
+        f"Generated entities from process {process.id} (type: {process.type.value}): "
+        f"{len(dimension_entities)} dimensions, 1 fact, "
+        f"{len(relationships)} relationships"
+    )
+
+    return result
+
+
+def _create_fact_from_process_discrete(
+    entries: List[AnnotationEntry],
+    prefixes: List[str],
+    process: BusinessEventProcess,
+    process_events: List[BusinessEvent],
+    domain_tag: Optional[str] = None,
+) -> dict:
+    """
+    Create a fact entity dictionary for a discrete process.
+
+    Discrete processes create one fact table with per-event records.
+    Includes event_id and process_id columns for traceability.
+
+    Args:
+        entries: List of AnnotationEntry objects (how_many category)
+        prefixes: List of fact prefixes to apply (e.g., ['fct_'])
+        process: BusinessEventProcess object
+        process_events: List of BusinessEvent objects in the process
+        domain_tag: Optional domain tag to add to entity
+
+    Returns:
+        Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
+    """
+    # Generate fact name from process name
+    base_name = _text_to_snake_case(process.name)
+    label = _text_to_title_case(process.name)
+
+    # Apply prefix if configured and not already present
+    entity_id = base_name
+    if prefixes:
+        prefix = prefixes[0]  # Use first prefix
+        has_prefix = any(base_name.lower().startswith(p.lower()) for p in prefixes)
+        if not has_prefix:
+            entity_id = f"{prefix}{base_name}"
+
+    entity = {
+        "id": entity_id,
+        "label": label,
+        "entity_type": "fact",
+        "description": f"Fact: {label} (discrete process)",
+    }
+
+    # Add process and event metadata
+    entity["metadata"] = {
+        "process_id": process.id,
+        "process_name": process.name,
+        "process_type": process.type.value,
+        "event_ids": process.event_ids,
+        "event_count": len(process_events),
+    }
+
+    # Create drafted_fields from how_many entries
+    drafted_fields = []
+    for entry in entries:
+        field_name = _text_to_snake_case(entry.text)
+        field = {
+            "name": field_name,
+            "datatype": "unknown",
+        }
+        if entry.description:
+            field["description"] = entry.description
+        drafted_fields.append(field)
+
+    # Add process/event traceability fields
+    drafted_fields.append(
+        {
+            "name": "event_id",
+            "datatype": "text",
+            "description": "ID of the business event this record represents",
+        }
+    )
+    drafted_fields.append(
+        {
+            "name": "process_id",
+            "datatype": "text",
+            "description": "ID of the process this record belongs to",
+        }
+    )
+
+    if drafted_fields:
+        entity["drafted_fields"] = drafted_fields
+
+    # Add domain tag if provided
+    if domain_tag:
+        entity["tags"] = [domain_tag]
+
+    return entity
+
+
+def _create_fact_from_process_evolving(
+    entries: List[AnnotationEntry],
+    prefixes: List[str],
+    process: BusinessEventProcess,
+    process_events: List[BusinessEvent],
+    domain_tag: Optional[str] = None,
+) -> dict:
+    """
+    Create a fact entity dictionary for an evolving process.
+
+    Evolving processes create a fact table from the how_many entries.
+    Includes process_id for traceability.
+
+    Args:
+        entries: List of AnnotationEntry objects (how_many category)
+        prefixes: List of fact prefixes to apply (e.g., ['fct_'])
+        process: BusinessEventProcess object
+        process_events: List of BusinessEvent objects in the process
+        domain_tag: Optional domain tag to add to entity
+
+    Returns:
+        Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
+    """
+    # Generate fact name from process name
+    base_name = _text_to_snake_case(process.name)
+    label = _text_to_title_case(process.name)
+
+    # Apply prefix if configured and not already present
+    entity_id = base_name
+    if prefixes:
+        prefix = prefixes[0]  # Use first prefix
+        has_prefix = any(base_name.lower().startswith(p.lower()) for p in prefixes)
+        if not has_prefix:
+            entity_id = f"{prefix}{base_name}"
+
+    entity = {
+        "id": entity_id,
+        "label": label,
+        "entity_type": "fact",
+        "description": f"Fact: {label} (evolving process)",
+    }
+
+    # Add process and event metadata
+    entity["metadata"] = {
+        "process_id": process.id,
+        "process_name": process.name,
+        "process_type": process.type.value,
+        "event_ids": process.event_ids,
+        "event_count": len(process_events),
+    }
+
+    # Create drafted_fields from how_many entries
+    drafted_fields = []
+    for entry in entries:
+        field_name = _text_to_snake_case(entry.text)
+        field = {
+            "name": field_name,
+            "datatype": "unknown",
+        }
+        if entry.description:
+            field["description"] = entry.description
+        drafted_fields.append(field)
+
+    # Add process_id for traceability
+    drafted_fields.append(
+        {
+            "name": "process_id",
+            "datatype": "text",
+            "description": "ID of the process this record belongs to",
+        }
+    )
+
+    if drafted_fields:
+        entity["drafted_fields"] = drafted_fields
+
+    # Add domain tag if provided
+    if domain_tag:
+        entity["tags"] = [domain_tag]
+
+    return entity

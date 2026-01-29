@@ -103,7 +103,12 @@ export class AutoSaveService {
         this.queuedState = null;
         this.inFlightState = state;
         this.setSaving(true);
-        void this.persistDataModel(structuredClone(currentNodes), structuredClone(currentEdges), state);
+        // Use JSON clone to handle Svelte 5 Proxy objects that structuredClone can't handle
+        void this.persistDataModel(
+            JSON.parse(JSON.stringify(currentNodes)) as Node[],
+            JSON.parse(JSON.stringify(currentEdges)) as Edge[],
+            state
+        );
     }
 
     /**

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { generateEntitiesFromEvent, updateBusinessEvent, saveDataModel } from '$lib/api';
-    import type { BusinessEvent, GeneratedEntitiesResult } from '$lib/types';
+    import { generateEntitiesFromEvent, generateEntitiesFromProcess, updateBusinessEvent, saveDataModel, getBusinessEvents } from '$lib/api';
+    import type { BusinessEvent, BusinessEventProcess, GeneratedEntitiesResult } from '$lib/types';
     import { nodes, edges, modelingStyle, sourceColors } from '$lib/stores';
     import { generateSlug, mergeRelationshipIntoEdges, normalizeTags } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
@@ -12,11 +12,14 @@
     type Props = {
         open: boolean;
         event: BusinessEvent | null;
+        process: BusinessEventProcess | null;
         onConfirm: () => void;
         onCancel: () => void;
     };
 
-    let { open, event, onConfirm, onCancel }: Props = $props();
+    let { open, event, process, onConfirm, onCancel }: Props = $props();
+
+    const mode = $derived(event ? 'event' : (process ? 'process' : null));
 
     let loading = $state(false);
     let error = $state<string | null>(null);
@@ -30,7 +33,7 @@
 
     // Load preview data when dialog opens
     $effect(() => {
-        if (open && event) {
+        if (open && mode) {
             loadPreview();
         } else if (!open) {
             // Reset state when dialog closes - use untrack to avoid triggering validation effect
@@ -45,12 +48,18 @@
     });
 
     async function loadPreview() {
-        if (!event) return;
+        if (!mode) return;
 
         try {
             loading = true;
             error = null;
-            previewData = await generateEntitiesFromEvent(event.id);
+            if (mode === 'event' && event) {
+                previewData = await generateEntitiesFromEvent(event.id);
+            } else if (mode === 'process' && process) {
+                previewData = await generateEntitiesFromProcess(process.id);
+            } else {
+                return;
+            }
             // Initialize edited entities with preview data (including tags)
             editedEntities = previewData.entities.map((e) => ({
                 id: e.id,
@@ -115,7 +124,7 @@
     }
 
     async function handleCreateAll() {
-        if (!previewData || !event) return;
+        if (!previewData || !mode) return;
 
         validateEntities();
         if (validationErrors.length > 0) {
@@ -126,14 +135,44 @@
             creating = true;
             error = null;
 
+            // For process mode: collect event-level entity IDs to skip
+            const eventLevelEntityIds = new Set<string>();
+            if (mode === 'process' && process) {
+                const allEvents = await getBusinessEvents();
+                const processEvents = allEvents.filter(e => e.process_id === process.id);
+                for (const evt of processEvents) {
+                    if (evt.derived_entities) {
+                        for (const derived of evt.derived_entities) {
+                            const entityId = typeof derived === 'string' ? derived : derived.entity_id;
+                            if (entityId) {
+                                eventLevelEntityIds.add(entityId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Remove event-level entities from nodes/edges before creating new ones
+            let nodesToUse = $nodes;
+            let edgesToUse = $edges;
+            if (mode === 'process' && eventLevelEntityIds.size > 0) {
+                nodesToUse = $nodes.filter(n => {
+                    if (n.type !== 'entity') return true;
+                    return !eventLevelEntityIds.has(n.id);
+                });
+                edgesToUse = $edges.filter(e => {
+                    return !eventLevelEntityIds.has(e.source) && !eventLevelEntityIds.has(e.target);
+                });
+            }
+
             // Create entities on canvas (skip ones that already exist)
             const createdEntityIds: string[] = [];
             const entityIdByIndex: string[] = [];
             const existingEntityIds = new Set(
-                $nodes.filter((n) => n.type === 'entity').map((n) => n.id)
+                nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
             );
             const maxZIndex = Math.max(
-                ...$nodes.map((n) => n.zIndex || (n.type === 'group' ? 1 : 10)),
+                ...nodesToUse.map((n) => n.zIndex || (n.type === 'group' ? 1 : 10)),
                 10
             );
 
@@ -143,13 +182,28 @@
                 const trimmedId = edited.id.trim();
 
                 if (existingEntityIds.has(trimmedId)) {
+                    // Entity already exists - update its drafted_fields if this is a fact
+                    if (edited.entity_type === 'fact' && (original as any).drafted_fields) {
+                        nodesToUse = nodesToUse.map((n) => {
+                            if (n.id === trimmedId) {
+                                return {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        drafted_fields: (original as any).drafted_fields,
+                                    },
+                                };
+                            }
+                            return n;
+                        });
+                    }
                     entityIdByIndex.push(trimmedId);
                     continue;
                 }
 
                 // Generate unique ID
                 const id = generateSlug(trimmedId, [
-                    ...$nodes.map((n) => n.id),
+                    ...nodesToUse.map((n) => n.id),
                     ...createdEntityIds,
                 ]);
 
@@ -158,7 +212,7 @@
                 if ($modelingStyle === 'dimensional_model' && edited.entity_type) {
                     position = positioner.calculateSmartPosition(
                         edited.entity_type as 'fact' | 'dimension' | 'unclassified',
-                        $nodes
+                        nodesToUse
                     );
                 } else {
                     position = {
@@ -167,7 +221,7 @@
                     };
                 }
 
-                // Create node (include tags and annotation_type from preview data)
+                // Create node (include tags, annotation_type, and drafted_fields from preview data)
                 const newNode: Node = {
                     id,
                     type: 'entity',
@@ -178,6 +232,7 @@
                         entity_type: edited.entity_type,
                         annotation_type: (original as any).annotation_type || undefined,
                         tags: original.tags || [],
+                        drafted_fields: (original as any).drafted_fields || undefined,
                         width: 280,
                         panelHeight: 200,
                         collapsed: false,
@@ -185,10 +240,14 @@
                     zIndex: maxZIndex + i + 1,
                 };
 
-                $nodes = [...$nodes, newNode];
+                // Add new node to the filtered nodes list
+                nodesToUse = [...nodesToUse, newNode];
                 createdEntityIds.push(id);
                 entityIdByIndex.push(id);
             }
+
+            // Update nodes store with filtered + new nodes
+            $nodes = nodesToUse;
 
             // Create relationships
             if (previewData.relationships && previewData.relationships.length > 0) {
@@ -204,6 +263,7 @@
                 const allEntityIds = new Set([...existingEntityIds, ...createdEntityIds]);
 
                 // Create edges for relationships
+                let updatedEdges = edgesToUse;
                 for (const rel of previewData.relationships) {
                     const sourceId = idMapping.get(rel.source) || rel.source;
                     const targetId = idMapping.get(rel.target) || rel.target;
@@ -219,26 +279,46 @@
                             label: rel.label || '',
                             type: rel.type || 'one_to_many',
                         };
-                        $edges = mergeRelationshipIntoEdges($edges, relationship);
+                        updatedEdges = mergeRelationshipIntoEdges(updatedEdges, relationship);
                     }
+                }
+                $edges = updatedEdges;
+            } else {
+                $edges = edgesToUse;
+            }
+
+            // Update event's or process's derived_entities list
+            if (mode === 'event' && event) {
+                const uniqueDerivedIds = Array.from(
+                    new Set([...entityIdByIndex, ...createdEntityIds].filter(Boolean))
+                );
+                const derivedEntities = uniqueDerivedIds.map((id) => ({
+                    entity_id: id,
+                    created_at: new Date().toISOString(),
+                }));
+
+                await updateBusinessEvent(event.id, {
+                    derived_entities: derivedEntities,
+                });
+            } else if (mode === 'process' && process) {
+                // Clear derived_entities for all events in the process
+                const allEvents = await getBusinessEvents();
+                const processEvents = allEvents.filter(e => e.process_id === process.id);
+                for (const evt of processEvents) {
+                    await updateBusinessEvent(evt.id, {
+                        derived_entities: [],
+                    });
                 }
             }
 
-            // Update event's derived_entities list
-            const uniqueDerivedIds = Array.from(
-                new Set([...entityIdByIndex, ...createdEntityIds].filter(Boolean))
-            );
-            const derivedEntities = uniqueDerivedIds.map((id) => ({
-                entity_id: id,
-                created_at: new Date().toISOString(),
-            }));
-
-            await updateBusinessEvent(event.id, {
-                derived_entities: derivedEntities,
-            });
-
             // Save the data model to persist entities to data_model.yml
             const dataModel = buildDataModelFromState($nodes, $edges);
+
+            // Debug: Log what we're saving
+            const factEntity = dataModel.entities.find((e: any) => e.entity_type === 'fact');
+            console.log('Saving data model - fact entity:', factEntity);
+            console.log('Fact has drafted_fields:', factEntity?.drafted_fields);
+
             await saveDataModel(dataModel);
 
             success = true;
@@ -406,7 +486,7 @@
                     id="generate-entities-dialog-title"
                     class="text-xl font-semibold text-gray-900"
                 >
-                    Generate Entities from Event
+                    {mode === 'process' ? 'Generate Entities from Process' : 'Generate Entities from Event'}
                 </h2>
                 <button
                     onclick={onCancel}
@@ -466,12 +546,12 @@
                     {/if}
 
                     <!-- Domain Tag Note -->
-                    {#if event?.domain}
+                    {#if (mode === 'event' && event?.domain) || (mode === 'process' && process?.domain)}
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                             <div class="flex items-start gap-2">
                                 <Icon icon="lucide:info" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                                 <p class="text-sm text-blue-800">
-                                    <strong>Domain Tag:</strong> All entities will inherit the "<span class="font-mono font-semibold">{event.domain}</span>" tag from this event.
+                                    <strong>Domain Tag:</strong> All entities will inherit the "<span class="font-mono font-semibold">{mode === 'event' ? event?.domain : process?.domain}</span>" tag from this {mode === 'event' ? 'event' : 'process'}.
                                 </p>
                             </div>
                         </div>

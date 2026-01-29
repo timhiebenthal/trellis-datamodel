@@ -39,10 +39,10 @@ class BusinessEventAnnotations(BaseModel):
     when: List[AnnotationEntry] = Field(default_factory=list, description="When entries")
     where: List[AnnotationEntry] = Field(default_factory=list, description="Where entries")
     how: List[AnnotationEntry] = Field(default_factory=list, description="How entries")
+    why: List[AnnotationEntry] = Field(default_factory=list, description="Why entries")
     how_many: List[AnnotationEntry] = Field(
         default_factory=list, description="How Many entries (becomes fact table)"
     )
-    why: List[AnnotationEntry] = Field(default_factory=list, description="Why entries")
 
     @model_validator(mode="after")
     def validate_unique_entry_ids(self) -> "BusinessEventAnnotations":
@@ -54,8 +54,8 @@ class BusinessEventAnnotations(BaseModel):
             self.when,
             self.where,
             self.how,
-            self.how_many,
             self.why,
+            self.how_many,
         ]:
             all_entries.extend(w_list)
 
@@ -66,6 +66,83 @@ class BusinessEventAnnotations(BaseModel):
             duplicates = [eid for eid in unique_ids if entry_ids.count(eid) > 1]
             raise ValueError(
                 f"Duplicate entry IDs found in annotations structure: {', '.join(duplicates)}"
+            )
+
+        return self
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for comparison (lowercase, strip whitespace)."""
+        return text.lower().strip()
+
+    def _get_entry_unique_key(
+        self, entry: AnnotationEntry, annotation_type: str
+    ) -> tuple:
+        """
+        Get unique key for an annotation entry based on union rules.
+
+        Union rules:
+        - Primary key: (annotation_type, dimension_id) when dimension_id exists
+        - Fallback key: (annotation_type, normalized_text, description)
+
+        Args:
+            entry: The annotation entry
+            annotation_type: The annotation category ('who', 'what', etc.)
+
+        Returns:
+            Tuple representing the unique key for this entry
+        """
+        if entry.dimension_id:
+            return (annotation_type, entry.dimension_id)
+        else:
+            normalized_text = self._normalize_text(entry.text)
+            return (annotation_type, normalized_text, entry.description or "")
+
+    def validate_superset_uniqueness(self) -> "BusinessEventAnnotations":
+        """
+        Validate that superset annotations follow union uniqueness rules.
+
+        For process-level superset annotations, entries should be unique based on:
+        - Primary key: annotation_type + dimension_id (when dimension_id exists)
+        - Fallback key: annotation_type + normalized_text + description
+
+        This ensures that when multiple events are grouped, duplicate annotations
+        are properly unioned at the process level.
+
+        Returns:
+            Self (for chaining)
+
+        Raises:
+            ValueError: If duplicate entries violate union uniqueness rules
+        """
+        annotation_categories = {
+            "who": self.who,
+            "what": self.what,
+            "when": self.when,
+            "where": self.where,
+            "how": self.how,
+            "why": self.why,
+            "how_many": self.how_many,
+        }
+
+        seen_keys: Dict[tuple, AnnotationEntry] = {}
+        duplicates: List[str] = []
+
+        for annotation_type, entries in annotation_categories.items():
+            for entry in entries:
+                key = self._get_entry_unique_key(entry, annotation_type)
+                if key in seen_keys:
+                    existing = seen_keys[key]
+                    duplicates.append(
+                        f"{annotation_type}: '{entry.text}' (id: {entry.id}) "
+                        f"conflicts with '{existing.text}' (id: {existing.id})"
+                    )
+                else:
+                    seen_keys[key] = entry
+
+        if duplicates:
+            raise ValueError(
+                f"Duplicate entries in superset annotations violate union uniqueness rules:\n"
+                + "\n".join(f"  - {dup}" for dup in duplicates)
             )
 
         return self
@@ -118,6 +195,9 @@ class BusinessEvent(BaseModel):
     domain: Optional[str] = Field(
         None, description="Optional business domain (e.g., 'Sales', 'Marketing')"
     )
+    process_id: Optional[str] = Field(
+        None, description="Optional ID of the process this event belongs to"
+    )
     created_at: datetime = Field(..., description="When the event was created")
     updated_at: datetime = Field(..., description="When the event was last updated")
     annotations: BusinessEventAnnotations = Field(
@@ -129,11 +209,66 @@ class BusinessEvent(BaseModel):
     )
 
 
+class BusinessEventProcess(BaseModel):
+    """A process that groups related business events."""
+
+    id: str = Field(..., description="Unique process ID (e.g., proc_YYYYMMDD_NNN)")
+    name: str = Field(..., description="Process name")
+    type: BusinessEventType = Field(
+        ..., description="Process type classification (discrete, evolving, or recurring)"
+    )
+    domain: Optional[str] = Field(
+        None,
+        description="Business domain (e.g., 'Sales', 'Marketing') associated with the process",
+    )
+    event_ids: List[str] = Field(
+        default_factory=list, description="List of event IDs belonging to this process"
+    )
+    created_at: datetime = Field(..., description="When the process was created")
+    updated_at: datetime = Field(..., description="When the process was last updated")
+    resolved_at: Optional[datetime] = Field(
+        None, description="When the process was resolved (ungrouped), if applicable"
+    )
+    annotations_superset: Optional[BusinessEventAnnotations] = Field(
+        None,
+        description="Union of all member event annotations (computed or persisted)",
+    )
+
+    @model_validator(mode="after")
+    def validate_event_ids_not_empty(self) -> "BusinessEventProcess":
+        """Validate that a process has at least one event when not resolved."""
+        if self.resolved_at is None and len(self.event_ids) == 0:
+            raise ValueError("Process must have at least one event when not resolved")
+        return self
+
+    @field_validator("domain", mode="before")
+    @classmethod
+    def _normalize_domain(cls, value: Optional[str]) -> Optional[str]:
+        """Trim domain text and reject empty strings."""
+        if value is None:
+            return value
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Process domain cannot be empty")
+        return stripped
+
+
+class BusinessEventProcessFile(BaseModel):
+    """YAML file structure for business event processes."""
+
+    processes: List[BusinessEventProcess] = Field(
+        default_factory=list, description="List of business event processes"
+    )
+
+
 class BusinessEventsFile(BaseModel):
     """YAML file structure for business events."""
 
     events: List[BusinessEvent] = Field(
         default_factory=list, description="List of business events"
+    )
+    processes: Optional[List[BusinessEventProcess]] = Field(
+        default_factory=list, description="List of business event processes"
     )
 
 

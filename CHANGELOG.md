@@ -5,28 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0b1] - 2026-01-26
+## [0.8.0] - 2026-01-29
 
 ### Added
 - Added Business Events modeling based on the **7 Ws methodology** (Who, What, When, Where, How, How Many, Why) using the BEAM* approach.
 - Added a new **Business Events view** (`/business-events`) for managing and visualizing business processes.
-- Added a structured **7 Ws Form** for capturing event details, replacing the legacy text-selection annotation system.
-- Added **Automated Entity Generation**: automatically derive star schemas (fact and dimension tables) from defined business events.
+- Added a structured **7 Ws Form** for capturing event details with enhanced annotations, descriptions, and examples.
+- Added **Automated Entity Generation**: automatically derive star schemas (fact and dimension tables) from defined business events and processes.
 - Added **Dimension Autocomplete** component to link events to existing dimensions or propose new ones.
 - Added **Event Card** and **Event Filter Banner** components for improved organization and discovery of business events.
 - Added `business_events.yml` support for persisting event definitions alongside the data model.
-- Added backend service layer (`BusinessEventsService`, `EntityGenerator`) to handle event logic and dbt artifact generation.
+- Added backend service layer (`BusinessEventsService`, `EntityGenerator`, `BusinessEventProcessService`) to handle event logic and dbt artifact generation.
 - Added comprehensive test suites for business events logic, including Vitest for frontend components and pytest for backend services.
+- Added **Business Event Grouping**: users can now multi-select business events and group them into named processes for consolidated modeling.
+- Added process creation modal with name, type, and domain selection (discrete/evolving/recurring) for organizing related events.
+- Added process-level 7W annotation union logic that automatically combines annotations from all member events using unique key deduplication.
+- Added process badges in the business events list to visually indicate grouped events.
+- Added process detail panel showing member events and the unified 7W superset annotations.
+- Added process resolution functionality to ungroup events while preserving all original event data and maintaining history fields.
+- Added `processes` section to `business_events.yml` for storing process definitions with metadata (`id`, `name`, `type`, `domain`, `event_ids`, timestamps).
+- Added optional `process_id` field on business events to link events to their parent process.
+- Added API endpoints for creating, updating, resolving, and listing processes.
+- Added service methods for recomputing process-level annotation supersets when events are edited or re-linked.
+- Extended entity generation to support process-level inputs:
+  - `discrete` process type generates a single fact table with per-event records (`event_id`/`process_id` columns).
+  - `evolving` process type generates accumulating snapshot modeling with status and time columns.
+- Added **Drag-and-Drop Event Reordering**: users can now reorder events within processes using intuitive drag-and-drop interactions with visual feedback indicators.
+- Added **Process Editing Modal**: edit process details (name, type, domain) directly from the business events view.
+- Added **CollapseChevron** component for consistent expansion/collapse UI patterns across the application.
+- Added enhanced annotation type descriptions and examples in the 7 Ws Form for improved user guidance.
+- Added **Deep Clone Support** for Svelte 5 Proxy objects to ensure proper state management in history functions and auto-save operations.
+- Added domain-based filtering for organizing events and processes by business domain.
+- Added support for generating dimensional entities directly from business event processes with process-aware entity tagging.
 
 ### Changed
 - Refactored the annotation system to transition from unstructured text highlights to structured event-based modeling.
 - Updated the main navigation and layout to include the Business Events view.
 - Enhanced `trellis.yml` configuration to support business event metadata and storage paths.
 - Updated the ERD Canvas to visualize relationships derived from business events.
+- Updated business events list UI to support multi-select functionality, domain filtering, and process-based organization.
+- Enhanced entity generation service to accept process-level inputs in addition to individual events.
+- Improved 7 Ws Form with clearer annotations, better descriptions, and consistent ordering across components.
+- Refactored BusinessEvents component to support domain grouping, drag-and-drop reordering, and process management.
+- Enhanced drag event handling in Canvas component for more accurate node positioning during interactions.
 
 ### Fixed
 - Fixed various edge cases in relationship inference when dealing with multi-model entities.
 - Improved frontend state management for auto-saving complex form data in the 7 Ws wizard.
+- Fixed process annotation superset recomputation when events are edited after grouping to maintain data integrity.
+- Fixed node drag event handling to use accurate target tracking and synchronize edges correctly during drag operations.
+- Fixed annotation type ordering for consistency across all form components.
+- Fixed tooltip visibility in SevenWsForm by adjusting z-index layering.
 
 ## [0.7.0]
 

@@ -14,14 +14,14 @@
     let { event, onSave, onCancel }: Props = $props();
 
     // Annotation type configuration
-    const ANNOTATION_TYPES: Array<{ type: AnnotationType; label: string; icon: string; placeholder: string; tooltip: string }> = [
-        { type: 'who', label: 'Who', icon: 'lucide:user', placeholder: 'e.g., customer, employee, supplier', tooltip: 'Who performed or participated in the event?' },
-        { type: 'what', label: 'What', icon: 'lucide:box', placeholder: 'e.g., product, service, order', tooltip: 'What was involved in the event?' },
-        { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', tooltip: 'When did the event occur?' },
-        { type: 'where', label: 'Where', icon: 'lucide:map-pin', placeholder: 'e.g., store location, region', tooltip: 'Where did the event happen?' },
-        { type: 'how', label: 'How', icon: 'lucide:settings', placeholder: 'e.g., online, in-store, phone', tooltip: 'How was the event performed?' },
-        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', tooltip: 'What are the quantitative measures (becomes fact table)?' },
-        { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', tooltip: 'Why did the event occur?' }
+    const ANNOTATION_TYPES: Array<{ type: AnnotationType; label: string; icon: string; placeholder: string; description: string; tooltip: string }> = [
+        { type: 'who', label: 'Who', icon: 'lucide:user', placeholder: 'e.g., customer, employee, supplier', description: 'People and organizations involved', tooltip: '1. Customer\n2. Employee (Salesperson, Technician)\n3. Supplier' },
+        { type: 'what', label: 'What', icon: 'lucide:box', placeholder: 'e.g., product, service, order', description: 'The things or objects being acted upon', tooltip: '1. Product (SKU)\n2. Service (Consulting, Warranty)\n3. Digital Asset (Web page, App feature)' },
+        { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', description: 'Defining points in time or timestamps', tooltip: '1. Order Date\n2. Delivery Due Date\n3. Treatment Time (Clock Dimension)' },
+        { type: 'where', label: 'Where', icon: 'lucide:map-pin', placeholder: 'e.g., store location, region', description: 'Specific locations or virtual addresses', tooltip: '1. Retail Store\n2. Website URL\n3. Delivery Address' },
+        { type: 'how', label: 'How', icon: 'lucide:settings', placeholder: 'e.g., online, in-store, phone', description: 'The method, manner, or status', tooltip: '1. Order Channel (Online, In-store, Phone)\n2. Payment Method (Credit card, PO)\n3. Call Status (Connected, Busy)' },
+        { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
+        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
     ];
 
     // Form state
@@ -498,10 +498,10 @@
             <div class="p-6 space-y-4">
                 <!-- Annotation Sections -->
                 {#each ANNOTATION_TYPES as annotationType}
-                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="border border-gray-200 rounded-lg overflow-visible">
                         <!-- Section Header -->
                         <button
-                            class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                            class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
                             onclick={() => toggleCollapse(annotationType.type)}
                             aria-expanded={!collapsedState[annotationType.type]}
                             aria-controls={`section-${annotationType.type}`}
@@ -521,7 +521,7 @@
                                             </span>
                                         {/if}
                                     </div>
-                                    <p class="text-xs text-gray-500">{annotationType.tooltip}</p>
+                                    <p class="text-xs text-gray-500">{annotationType.description}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -531,7 +531,8 @@
                                         icon="lucide:info"
                                         class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
                                     />
-                                    <div class="absolute right-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
+                                    <div class="absolute right-0 bottom-full mb-2 w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
+                                        <div class="font-semibold mb-1">Common Examples:</div>
                                         {annotationType.tooltip}
                                         <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                                     </div>
@@ -545,7 +546,7 @@
 
                                  <!-- Section Content -->
                         {#if !collapsedState[annotationType.type]}
-                            <div id={`section-${annotationType.type}`} class="p-4 space-y-3">
+                            <div id={`section-${annotationType.type}`} class="p-4 space-y-3 rounded-b-lg">
                                 <!-- Entries List -->
                                 {#if dimensionsLoading && annotations[annotationType.type].length === 0}
                                     <!-- Skeleton Loader -->
