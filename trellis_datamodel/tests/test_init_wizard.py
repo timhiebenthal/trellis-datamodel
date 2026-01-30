@@ -14,7 +14,7 @@ from trellis_datamodel.init_wizard import (
     prompt_entity_creation_guidance,
     prompt_dbt_model_paths,
     detect_dbt_project_path,
-    validate_dbt_project_path,
+    validate_dbt_project_path_with_config,
     resolve_relative_path,
     prompt_dbt_project_path,
     generate_config_from_answers,
@@ -350,18 +350,18 @@ class TestDetectDbtProjectPath:
 
 
 class TestValidateDbtProjectPath:
-    """Test validate_dbt_project_path function."""
+    """Test validate_dbt_project_path_with_config function."""
 
     def test_validates_existing_directory(self):
         """Test that an existing directory passes validation."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            is_valid, error = validate_dbt_project_path(tmpdir, Path(tmpdir) / "trellis.yml")
+            is_valid, error = validate_dbt_project_path_with_config(tmpdir, Path(tmpdir) / "trellis.yml")
             assert is_valid is True
             assert error == ""
 
     def test_fails_nonexistent_path(self):
         """Test that a nonexistent path fails validation."""
-        is_valid, error = validate_dbt_project_path("/nonexistent/path", Path.cwd() / "trellis.yml")
+        is_valid, error = validate_dbt_project_path_with_config("/nonexistent/path", Path.cwd() / "trellis.yml")
         assert is_valid is False
         assert "does not exist" in error
 
@@ -372,7 +372,7 @@ class TestValidateDbtProjectPath:
             file_path = Path(tmpdir) / "file.txt"
             file_path.write_text("content")
 
-            is_valid, error = validate_dbt_project_path(
+            is_valid, error = validate_dbt_project_path_with_config(
                 str(file_path), Path(tmpdir) / "trellis.yml"
             )
             assert is_valid is False
@@ -388,7 +388,7 @@ class TestValidateDbtProjectPath:
             subdir.mkdir()
 
             # Validate relative path from config location
-            is_valid, error = validate_dbt_project_path(
+            is_valid, error = validate_dbt_project_path_with_config(
                 "dbt_project", tmpdir_path / "trellis.yml"
             )
             assert is_valid is True
@@ -557,7 +557,7 @@ class TestRunInitWizard:
 
         # Mock path validation to always succeed
         monkeypatch.setattr(
-            "trellis_datamodel.init_wizard.validate_dbt_project_path",
+            "trellis_datamodel.init_wizard.validate_dbt_project_path_with_config",
             lambda x, y: (True, ""),
         )
 

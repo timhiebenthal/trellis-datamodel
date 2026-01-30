@@ -338,7 +338,7 @@ def detect_dbt_project_path(current_dir: Optional[Path] = None) -> Optional[str]
     return str(dbt_project_dir).replace("\\", "/")
 
 
-def validate_dbt_project_path(
+def validate_dbt_project_path_with_config(
     path: str, config_file_location: Path
 ) -> tuple[bool, str]:
     """
@@ -455,7 +455,7 @@ def prompt_dbt_project_path(config_file_location: Path) -> str:
         )
 
         # Validate the path
-        is_valid, error_msg = validate_dbt_project_path(
+        is_valid, error_msg = validate_dbt_project_path_with_config(
             path_input, config_file_location
         )
 

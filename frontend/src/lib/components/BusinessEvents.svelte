@@ -13,6 +13,7 @@ import type {
     BusinessEventProcess,
     BusinessEventAnnotations,
 } from '$lib/types';
+import { toTitleCase } from '$lib/utils';
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
@@ -66,10 +67,6 @@ let dragOverProcessId = $state<string | null>(null);
 let dragOverUngroupedDomainKey = $state<string | null>(null);
 let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
-    // Helper function to convert domain to title case
-    function toTitleCase(str: string): string {
-        return str.trim().charAt(0).toUpperCase() + str.trim().slice(1).toLowerCase();
-    }
     let showCreateModal = $state(false);
     let showEditModal = $state(false);
     let editEvent = $state<BusinessEvent | null>(null);

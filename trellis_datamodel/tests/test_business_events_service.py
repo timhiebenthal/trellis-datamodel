@@ -227,7 +227,7 @@ class TestCreateProcess:
         """Test that create_process generates ID in format proc_YYYYMMDD_NNN."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         # Create events first
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
@@ -248,7 +248,7 @@ class TestCreateProcess:
         """Test that ID increments for multiple processes created on same day."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         # Create events
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
@@ -275,7 +275,7 @@ class TestCreateProcess:
         """Test that created_at and updated_at are set."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
 
@@ -296,7 +296,7 @@ class TestCreateProcess:
         """Test that events are linked to the process via process_id."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -320,7 +320,7 @@ class TestCreateProcess:
         """Test that annotations superset is computed from member events."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         # Create events with annotations
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
@@ -354,7 +354,7 @@ class TestCreateProcess:
         """Test that the selected domain is saved in the process record."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         process = business_events_service.create_process(
@@ -372,7 +372,7 @@ class TestCreateProcess:
         """Test that empty name raises ValidationError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
 
@@ -396,7 +396,7 @@ class TestCreateProcess:
         """Test that empty event_ids raises ValidationError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         with pytest.raises(ValidationError, match="At least one event ID is required"):
             business_events_service.create_process(
@@ -410,7 +410,7 @@ class TestCreateProcess:
         """Test that invalid event_id raises NotFoundError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         with pytest.raises(NotFoundError, match="not found"):
             business_events_service.create_process(
@@ -424,7 +424,7 @@ class TestCreateProcess:
         """Test that missing or blank domain raises ValidationError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("test event", BusinessEventType.DISCRETE)
 
@@ -452,7 +452,7 @@ class TestAnnotationUnionLogic:
         """Test that union combines annotations from multiple events."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -481,7 +481,7 @@ class TestAnnotationUnionLogic:
         """Test that entries with same dimension_id are deduplicated."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -508,7 +508,7 @@ class TestAnnotationUnionLogic:
         """Test that text matches dedupe when only one entry has dimension_id."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -534,7 +534,7 @@ class TestAnnotationUnionLogic:
         """Test that entries with same normalized text are deduplicated."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -560,7 +560,7 @@ class TestAnnotationUnionLogic:
         """Test that distinct entries are preserved."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -592,7 +592,7 @@ class TestResolveProcess:
         """Test that resolving a process unlinks events."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -622,7 +622,7 @@ class TestResolveProcess:
         """Regression: resolved events should remain associated with their domain."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event(
             "event 3", BusinessEventType.DISCRETE, domain=TEST_PROCESS_DOMAIN
@@ -649,7 +649,7 @@ class TestResolveProcess:
         """Test that resolving non-existent process raises NotFoundError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         with pytest.raises(NotFoundError, match="not found"):
             business_events_service.resolve_process("proc_20260101_999")
@@ -658,7 +658,7 @@ class TestResolveProcess:
         """Test that resolving already resolved process raises ValidationError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         process = business_events_service.create_process(
@@ -681,7 +681,7 @@ class TestEventRelink:
         """Test that attaching events updates process and links events."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -712,7 +712,7 @@ class TestEventRelink:
         """Test that detaching events updates process and unlinks events."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -740,7 +740,7 @@ class TestEventRelink:
         """Test that attaching event already in another process raises ValidationError."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -765,7 +765,7 @@ class TestEventRelink:
         """Test that updating event_ids preserves order and links."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -798,7 +798,7 @@ class TestSupersetRecompute:
         """Test that process superset is recomputed when event annotations change."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         process = business_events_service.create_process(
@@ -830,7 +830,7 @@ class TestSupersetRecompute:
         """Test that process superset is recomputed when event is added."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
@@ -867,7 +867,7 @@ class TestSupersetRecompute:
         """Test that process superset is recomputed when event is removed."""
         events_path = os.path.join(temp_dir, "business_events.yml")
         monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
-        monkeypatch.setattr(business_events_service, "_get_processes_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
 
         event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
         event2 = business_events_service.create_event("event 2", BusinessEventType.DISCRETE)
