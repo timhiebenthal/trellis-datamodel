@@ -67,4 +67,53 @@ test.describe('Lineage button behavior', () => {
             await restoreConfig(request, originalConfig);
         }
     });
+
+    test('renders lineage edges for a model', async ({ page, request }) => {
+        const originalConfig = await applyConfigOverrides(request, {
+            ...getCompanyDummyConfigOverrides(),
+            lineage: { enabled: true },
+        });
+
+        try {
+            const SEEDED_MODEL: DataModelPayload = {
+                version: 0.1,
+                entities: [
+                    {
+                        id: 'dim_customer',
+                        label: 'Dim Customer',
+                        dbt_model: 'model.company_dummy.dim_customer',
+                    },
+                ],
+                relationships: [],
+            };
+
+            await resetDataModel(request, SEEDED_MODEL);
+            await page.addInitScript(() => {
+                localStorage.clear();
+                sessionStorage.clear();
+            });
+            await page.goto('/');
+            await page.waitForLoadState('networkidle');
+
+            const entityInput = page.locator('input[value="Dim Customer"]');
+            await expect(entityInput).toBeVisible({ timeout: 15000 });
+
+            const lineageButton = page.locator(
+                'button[aria-label="Show lineage for model.company_dummy.dim_customer"]',
+            );
+            await expect(lineageButton).toBeVisible({ timeout: 10000 });
+            await lineageButton.click();
+
+            await expect(page.getByRole('heading', { name: 'Upstream Lineage' })).toBeVisible({
+                timeout: 10000,
+            });
+
+            const edgeLocator = page.locator('.svelte-flow__edge');
+            await expect
+                .poll(async () => edgeLocator.count(), { timeout: 15000 })
+                .toBeGreaterThan(0);
+        } finally {
+            await restoreConfig(request, originalConfig);
+        }
+    });
 });
