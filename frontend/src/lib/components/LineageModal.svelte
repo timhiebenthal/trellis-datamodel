@@ -847,9 +847,9 @@
                         bind:nodes={lineageNodes}
                         edges={$lineageEdgesStore}
                         nodeTypes={nodeTypes}
-                        defaultEdgeOptions={{ 
+                        defaultEdgeOptions={{
                             type: LINEAGE_EDGE_TYPE,
-                            style: { ...DEFAULT_EDGE_STYLE }
+                            style: DEFAULT_EDGE_STYLE
                         }}
                         fitView
                         fitViewOptions={{
