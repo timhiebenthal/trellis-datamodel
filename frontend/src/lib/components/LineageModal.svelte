@@ -8,7 +8,7 @@
         type Node,
         type Edge,
     } from "@xyflow/svelte";
-    import { writable } from "svelte/store";
+    import { writable, get } from "svelte/store";
     import { getLineage } from "$lib/api";
     import type { LineageResponse, LineageNode, LineageEdge } from "$lib/types";
     import Icon from "@iconify/svelte";
@@ -45,10 +45,15 @@
     // Edge type constant - bezier for curved edges
     // The {#key flowKey} wrapper ensures proper re-rendering on graph changes
     const LINEAGE_EDGE_TYPE = "bezier";
+    const DEFAULT_EDGE_STYLE = "stroke: #94a3b8; stroke-width: 2;";
+    const HIGHLIGHT_EDGE_STYLE = "stroke: #0d9488; stroke-width: 3;";
+    const DIM_EDGE_STYLE = DEFAULT_EDGE_STYLE;
+    const CONNECTED_NODE_CLASS = "ring-2 ring-primary-400";
 
     // Progressive display state (per-node expansion)
     // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
     let expandedNodeIds = $state<Set<string>>(new Set());
+    let selectedNodeId = $state<string | null>(null);
 
     // Fetch lineage when modal opens
     $effect(() => {
@@ -61,6 +66,7 @@
             lineageEdgesStore.set([]);
             error = null;
             expandedNodeIds = new Set();
+            selectedNodeId = null;
         }
     });
 
@@ -360,7 +366,7 @@
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
                         zIndex: 5, // Ensure edges render above layer bands (zIndex: -1)
-                        style: { stroke: '#94a3b8', strokeWidth: 2 }, // Ensure edges are visible
+                        style: DEFAULT_EDGE_STYLE, // Ensure edges are visible
                     });
                     continue;
                 }
@@ -378,7 +384,7 @@
                     target: placeholderId,
                     type: LINEAGE_EDGE_TYPE,
                     zIndex: 5,
-                    style: { stroke: '#94a3b8', strokeWidth: 2 }, // Ensure edges are visible
+                    style: DEFAULT_EDGE_STYLE, // Ensure edges are visible
                 });
 
                 const key = `${placeholderId}=>${targetId}`;
@@ -390,7 +396,7 @@
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
                         zIndex: 5,
-                        style: { stroke: '#94a3b8', strokeWidth: 2 }, // Ensure edges are visible
+                    style: DEFAULT_EDGE_STYLE, // Ensure edges are visible
                     });
                 }
             }
@@ -494,6 +500,7 @@
         lineageEdgesStore.set([...visibleEdges]);
         // Increment key to force SvelteFlow to re-render with new graph structure
         flowKey++;
+        applyConnectionHighlight(selectedNodeId);
     }
 
     function createFlowNode(
@@ -638,6 +645,107 @@
         await updateGraphDisplay();
     }
 
+    function applyConnectionHighlight(selectedId: string | null) {
+        const edges = get(lineageEdgesStore);
+        if (edges.length === 0 || lineageNodes.length === 0) return;
+        if (!selectedId) {
+            lineageEdgesStore.set(
+                edges.map((edge) => ({
+                    ...edge,
+                    style: DEFAULT_EDGE_STYLE,
+                })),
+            );
+            lineageNodes = lineageNodes.map((node) => {
+                if (typeof node.id === "string" && node.id.startsWith("layer-band-")) return node;
+                return {
+                    ...node,
+                    class: undefined,
+                    style: "opacity: 1;",
+                };
+            });
+            return;
+        }
+
+        const connectedEdgeIds = new Set<string>();
+        const connectedNodeIds = new Set<string>();
+
+        // Build full upstream closure from raw lineage (not just visible edges).
+        const upstreamOf = new Map<string, string[]>();
+        for (const e of lineageData?.edges ?? []) {
+            const list = upstreamOf.get(e.target) ?? [];
+            list.push(e.source);
+            upstreamOf.set(e.target, list);
+        }
+
+        const queue: string[] = [selectedId];
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (!current || connectedNodeIds.has(current)) continue;
+            connectedNodeIds.add(current);
+            for (const up of upstreamOf.get(current) ?? []) {
+                if (!connectedNodeIds.has(up)) queue.push(up);
+            }
+        }
+
+        for (const edge of edges) {
+            const sourceId = edge.source.toString();
+            const targetId = edge.target.toString();
+            const sourceInSet = connectedNodeIds.has(sourceId);
+            const targetInSet = connectedNodeIds.has(targetId);
+
+            if (sourceInSet && targetInSet) {
+                connectedEdgeIds.add(edge.id);
+                continue;
+            }
+
+            const isPlaceholderSource = sourceId.startsWith("placeholder-");
+            const isPlaceholderTarget = targetId.startsWith("placeholder-");
+            if ((sourceInSet && isPlaceholderTarget) || (targetInSet && isPlaceholderSource)) {
+                connectedEdgeIds.add(edge.id);
+                connectedNodeIds.add(isPlaceholderSource ? sourceId : targetId);
+            }
+        }
+
+        lineageEdgesStore.set(
+            edges.map((edge) => {
+                if (connectedEdgeIds.has(edge.id)) {
+                    return {
+                        ...edge,
+                        style: HIGHLIGHT_EDGE_STYLE,
+                    };
+                }
+                return {
+                    ...edge,
+                    style: DIM_EDGE_STYLE,
+                };
+            }),
+        );
+
+        lineageNodes = lineageNodes.map((node) => {
+            if (typeof node.id === "string" && node.id.startsWith("layer-band-")) return node;
+            const id = node.id.toString();
+            const isConnected = connectedNodeIds.has(id);
+            return {
+                ...node,
+                class: isConnected ? CONNECTED_NODE_CLASS : undefined,
+                style: "opacity: 1;",
+            };
+        });
+    }
+
+    function handleNodeClick(event: { node: Node }) {
+        const nextSelected = event.node?.id?.toString() ?? null;
+        if (nextSelected === selectedNodeId) return;
+        selectedNodeId = nextSelected;
+        applyConnectionHighlight(selectedNodeId);
+    }
+
+    function handlePaneClick() {
+        if (!selectedNodeId) return;
+        selectedNodeId = null;
+        applyConnectionHighlight(selectedNodeId);
+    }
+
     function handleBackdropClick(event: MouseEvent) {
         if (event.target === event.currentTarget) {
             onClose();
@@ -740,7 +848,7 @@
                         nodeTypes={nodeTypes}
                         defaultEdgeOptions={{ 
                             type: LINEAGE_EDGE_TYPE,
-                            style: { stroke: '#94a3b8', strokeWidth: 2 }
+                            style: { ...DEFAULT_EDGE_STYLE }
                         }}
                         fitView
                         fitViewOptions={{
@@ -755,6 +863,8 @@
                         onlyRenderVisibleElements={false}
                         elevateEdgesOnSelect={true}
                         onnodedragstop={handleNodeDragStop}
+                        onnodeclick={handleNodeClick}
+                        onpaneclick={handlePaneClick}
                         class="w-full h-full"
                     >
                         <Controls />
