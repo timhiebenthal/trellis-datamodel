@@ -38,8 +38,9 @@
         layerBand: LineageLayerBandNode,
     };
 
-    // Edge type constant - use bezier curves (default) for all lineage edges
-    const LINEAGE_EDGE_TYPE = "default";
+    // Edge type constant - use smoothstep for reliable rendering in complex graphs
+    // (bezier edges can disappear due to viewport culling issues with control points)
+    const LINEAGE_EDGE_TYPE = "smoothstep";
 
     // Progressive display state (per-node expansion)
     // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
@@ -352,6 +353,7 @@
                         source: upstreamId,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
+                        zIndex: 5, // Ensure edges render above layer bands (zIndex: -1)
                     });
                     continue;
                 }
@@ -368,6 +370,7 @@
                     source: upstreamId,
                     target: placeholderId,
                     type: LINEAGE_EDGE_TYPE,
+                    zIndex: 5,
                 });
 
                 const key = `${placeholderId}=>${targetId}`;
@@ -378,6 +381,7 @@
                         source: placeholderId,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
+                        zIndex: 5,
                     });
                 }
             }
@@ -438,13 +442,16 @@
 
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
         if (layersConfigured && layerOrder.length > 0) {
-            // Create an "infinite" horizontal strip that spans the entire canvas
+            // Create a wide horizontal strip that spans the canvas
             const xs = visibleNodes.map((n) => n.position.x);
             const minX = Math.min(...xs, 0);
-            
-            // Use massive width to create seamless infinite bands
-            const BAND_WIDTH = 100000;
-            const bandX = minX - 50000;
+            const maxX = Math.max(...xs, 0);
+
+            // Use reasonable width based on actual node spread (with generous padding)
+            // Avoids massive DOM elements that can interfere with edge visibility calculations
+            const BAND_PADDING = 2000;
+            const BAND_WIDTH = Math.max(5000, (maxX - minX) + BAND_PADDING * 2);
+            const bandX = minX - BAND_PADDING;
 
             const bandNodes: Node[] = layerOrder.map((layer) => {
                 const bounds = layerBounds.get(layer);
@@ -723,6 +730,7 @@
                         selectionOnDrag={false}
                         nodesDraggable={true}
                         nodesConnectable={false}
+                        onlyRenderVisibleElements={false}
                         onnodedragstop={handleNodeDragStop}
                         class="w-full h-full"
                     >
