@@ -46,7 +46,8 @@
     // The {#key flowKey} wrapper ensures proper re-rendering on graph changes
     const LINEAGE_EDGE_TYPE = "bezier";
     const DEFAULT_EDGE_STYLE = "stroke: #94a3b8; stroke-width: 2;";
-    const HIGHLIGHT_EDGE_STYLE = "stroke: #0d9488; stroke-width: 3;";
+    const HIGHLIGHT_EDGE_STYLE =
+        "stroke: #2dd4bf; stroke-width: 3.25; filter: drop-shadow(0 0 4px rgba(13, 148, 136, 0.3));";
     const DIM_EDGE_STYLE = DEFAULT_EDGE_STYLE;
     const CONNECTED_NODE_CLASS = "ring-2 ring-primary-400";
 
