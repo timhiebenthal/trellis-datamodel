@@ -8,6 +8,7 @@
         type Node,
         type Edge,
     } from "@xyflow/svelte";
+    import { writable } from "svelte/store";
     import { getLineage } from "$lib/api";
     import type { LineageResponse, LineageNode, LineageEdge } from "$lib/types";
     import Icon from "@iconify/svelte";
@@ -27,9 +28,12 @@
     let error = $state<string | null>(null);
     let lineageData = $state<LineageResponse | null>(null);
     let lineageNodes = $state<Node[]>([]);
-    let lineageEdges = $state<Edge[]>([]);
+    // Use writable store for edges - SvelteFlow's internal reactivity works better with stores
+    const lineageEdgesStore = writable<Edge[]>([]);
     let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
     let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
+    // Key to force SvelteFlow re-render when graph structure changes significantly
+    let flowKey = $state(0);
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -38,9 +42,9 @@
         layerBand: LineageLayerBandNode,
     };
 
-    // Edge type constant - use smoothstep for reliable rendering in complex graphs
-    // (bezier edges can disappear due to viewport culling issues with control points)
-    const LINEAGE_EDGE_TYPE = "smoothstep";
+    // Edge type constant - bezier for curved edges
+    // The {#key flowKey} wrapper ensures proper re-rendering on graph changes
+    const LINEAGE_EDGE_TYPE = "bezier";
 
     // Progressive display state (per-node expansion)
     // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
@@ -54,7 +58,7 @@
             // Reset state when modal closes
             lineageData = null;
             lineageNodes = [];
-            lineageEdges = [];
+            lineageEdgesStore.set([]);
             error = null;
             expandedNodeIds = new Set();
         }
@@ -74,7 +78,7 @@
             }
 
             lineageData = data;
-            updateGraphDisplay();
+            await updateGraphDisplay();
         } catch (e) {
             console.error("Error loading lineage:", e);
             error = e instanceof Error ? e.message : "Failed to load lineage";
@@ -83,7 +87,7 @@
         }
     }
 
-    function updateGraphDisplay() {
+    async function updateGraphDisplay() {
         if (!lineageData) return;
 
         const rootId = lineageData.metadata?.root_model_id ?? modelId ?? "";
@@ -292,6 +296,8 @@
                     // Temporary; we'll reposition "centrically" once we know upstream connections.
                     y: targetFlowNode.position.y,
                 },
+                width: 120,
+                height: 32,
                 data: {
                     label: "...",
                     onClick: () => expandNode(targetId),
@@ -354,6 +360,7 @@
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
                         zIndex: 5, // Ensure edges render above layer bands (zIndex: -1)
+                        style: { stroke: '#94a3b8', strokeWidth: 2 }, // Ensure edges are visible
                     });
                     continue;
                 }
@@ -371,6 +378,7 @@
                     target: placeholderId,
                     type: LINEAGE_EDGE_TYPE,
                     zIndex: 5,
+                    style: { stroke: '#94a3b8', strokeWidth: 2 }, // Ensure edges are visible
                 });
 
                 const key = `${placeholderId}=>${targetId}`;
@@ -382,6 +390,7 @@
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
                         zIndex: 5,
+                        style: { stroke: '#94a3b8', strokeWidth: 2 }, // Ensure edges are visible
                     });
                 }
             }
@@ -437,10 +446,8 @@
             }
         }
 
-        lineageNodes = visibleNodes;
-        lineageEdges = visibleEdges;
-
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
+        let finalNodes: Node[];
         if (layersConfigured && layerOrder.length > 0) {
             // Create a wide horizontal strip that spans the canvas
             const xs = visibleNodes.map((n) => n.position.x);
@@ -474,12 +481,19 @@
 
             // Ensure layer bands are behind edges and nodes
             // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
-            lineageNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
+            finalNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
             layerBandMeta = bandNodes.map((b) => ({ id: b.id as string, bandX }));
         } else {
-            lineageNodes = visibleNodes;
+            finalNodes = visibleNodes;
             layerBandMeta = [];
         }
+
+        // Set nodes and edges SIMULTANEOUSLY - SvelteFlow needs both at once
+        // Use store.set() for edges to ensure proper reactivity with SvelteFlow
+        lineageNodes = finalNodes;
+        lineageEdgesStore.set([...visibleEdges]);
+        // Increment key to force SvelteFlow to re-render with new graph structure
+        flowKey++;
     }
 
     function createFlowNode(
@@ -497,6 +511,8 @@
                 id: node.id,
                 type: node.isSource ? "source" : "default",
                 position: { x: 0, y: 0 },
+                width: node.isSource ? 160 : 150,
+                height: node.isSource ? 60 : 36,
                 data: {
                     label: node.label,
                     level: node.level,
@@ -574,6 +590,8 @@
             id: node.id,
             type: node.isSource ? "source" : "default",
             position: { x: xPosition, y: yPosition },
+            width: node.isSource ? 160 : 150,
+            height: node.isSource ? 60 : 36,
             data: {
                 label: node.label,
                 level: node.level,
@@ -615,9 +633,9 @@
         });
     }
 
-    function expandNode(nodeId: string) {
+    async function expandNode(nodeId: string) {
         expandedNodeIds = new Set([...expandedNodeIds, nodeId]);
-        updateGraphDisplay();
+        await updateGraphDisplay();
     }
 
     function handleBackdropClick(event: MouseEvent) {
@@ -715,11 +733,15 @@
                         </button>
                     </div>
                 {:else if lineageData && lineageNodes.length > 0}
+                    {#key flowKey}
                     <SvelteFlow
                         bind:nodes={lineageNodes}
-                        edges={lineageEdges}
+                        edges={$lineageEdgesStore}
                         nodeTypes={nodeTypes}
-                        defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
+                        defaultEdgeOptions={{ 
+                            type: LINEAGE_EDGE_TYPE,
+                            style: { stroke: '#94a3b8', strokeWidth: 2 }
+                        }}
                         fitView
                         fitViewOptions={{
                             // Only fit the nodes that are NOT background bands
@@ -731,6 +753,7 @@
                         nodesDraggable={true}
                         nodesConnectable={false}
                         onlyRenderVisibleElements={false}
+                        elevateEdgesOnSelect={true}
                         onnodedragstop={handleNodeDragStop}
                         class="w-full h-full"
                     >
@@ -741,6 +764,7 @@
                         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                         <MiniMap />
                     </SvelteFlow>
+                    {/key}
                 {:else if lineageData}
                     <div class="p-5 text-center text-gray-500 text-sm">
                         No upstream dependencies found for this model.
