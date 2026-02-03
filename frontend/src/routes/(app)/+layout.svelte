@@ -515,7 +515,6 @@ import {
     onMount(() => {
         (async () => {
             try {
-                console.log(`[${Date.now()}] Page onMount starting...`);
                 // Check Config Status
                 const status = await getConfigStatus();
                 $configStatus = status;
@@ -716,7 +715,7 @@ import {
                 lastSyncedState = autoSaveService.getLastSavedState();
                 initHistory();
             } catch (e) {
-                console.error("Initialization error:", e);
+                console.error(e);
                 alert("Failed to initialize. Check backend connection.");
             } finally {
                 loading = false;

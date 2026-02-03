@@ -123,10 +123,6 @@
                 // Force store update so autosave reacts in filtered mode.
                 $nodes = [...$nodes];
             }
-        } else {
-            // In non-filtered mode, sync displayNodes directly to $nodes store
-            // This ensures edges update during drag operations
-            $nodes = displayNodes;
         }
     });
 
