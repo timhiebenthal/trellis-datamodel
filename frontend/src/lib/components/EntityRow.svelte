@@ -6,10 +6,9 @@
 
 	type Props = {
 		entity: Entity;
-		selectionMode?: boolean;
 	};
 
-	let { entity, selectionMode = false }: Props = $props();
+	let { entity }: Props = $props();
 
 	// Determine entity type icon
 	const typeIcon = $derived(() => {
@@ -62,11 +61,9 @@
 		entitySelection.set(newSelection);
 	}
 
-	// Handle row click (open detail modal if not in selection mode)
+	// Handle row click (open detail modal)
 	function handleRowClick() {
-		if (!selectionMode) {
-			entityDetailModal.set({ open: true, entityId: entity.id });
-		}
+		entityDetailModal.set({ open: true, entityId: entity.id });
 	}
 
 	// Get visible tags (max 3, +N more if overflow)
@@ -85,16 +82,15 @@
 	on:keydown={(e) => e.key === "Enter" && handleRowClick()}
 	tabindex="0"
 >
-	<!-- Checkbox (visible only in selection mode) -->
-	{#if selectionMode}
-		<input
-			type="checkbox"
-			checked={isSelected}
-			on:change={handleCheckboxToggle}
-			class="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer flex-shrink-0"
-			title="Select entity"
-		/>
-	{/if}
+	<!-- Checkbox (always visible for selection) -->
+	<input
+		type="checkbox"
+		checked={isSelected}
+		on:change={handleCheckboxToggle}
+		on:click={(e) => e.stopPropagation()}
+		class="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer flex-shrink-0"
+		title="Select entity"
+	/>
 
 	<!-- Entity Icon -->
 	<div
@@ -151,10 +147,8 @@
 		{/if}
 	</div>
 
-	<!-- Right side action hint (visible on hover in non-selection mode) -->
-	{#if !selectionMode}
-		<div class="flex-shrink-0 text-gray-400 group-hover:text-gray-600 transition-colors">
-			<Icon icon="lucide:chevron-right" class="w-4 h-4" />
-		</div>
-	{/if}
+	<!-- Right side action hint (visible on hover) -->
+	<div class="flex-shrink-0 text-gray-400 group-hover:text-gray-600 transition-colors">
+		<Icon icon="lucide:chevron-right" class="w-4 h-4" />
+	</div>
 </div>

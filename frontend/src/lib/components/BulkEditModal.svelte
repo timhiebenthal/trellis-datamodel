@@ -204,10 +204,10 @@
 			role="document"
 			tabindex="-1"
 		>
-			<!-- Header with gradient accent -->
+			<!-- Header with primary accent -->
 			<div class="relative overflow-hidden">
-				<!-- Geometric background pattern -->
-				<div class="absolute inset-0 bg-gradient-to-r from-teal-500 to-teal-600 opacity-95"></div>
+				<!-- Solid background -->
+				<div class="absolute inset-0 bg-primary-600"></div>
 				<div
 					class="absolute inset-0 opacity-10"
 					style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);"
@@ -463,7 +463,7 @@
 				</button>
 				<button
 					onclick={handleApplyChanges}
-					class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-teal-700 rounded-lg hover:from-teal-700 hover:to-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
+					class="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
 					disabled={!hasOperations || processing}
 				>
 					{#if processing}

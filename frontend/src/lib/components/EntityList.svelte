@@ -199,7 +199,7 @@
 					<!-- Domain Header -->
 					<button
 						onclick={() => toggleDomainCollapse(domain)}
-						class="w-full bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-300 px-4 py-2 flex items-center gap-2 hover:from-slate-100 hover:to-slate-200 transition-all group"
+						class="w-full bg-gray-100 border-b border-gray-300 px-4 py-2 flex items-center gap-2 hover:bg-gray-200 transition-all group"
 					>
 						<!-- Collapse Chevron -->
 						<CollapseChevron expanded={isDomainExpanded(domain)} sizeClass="w-4 h-4" />
@@ -242,7 +242,7 @@
 					{#if isDomainExpanded(domain)}
 						<div class="bg-white border-b border-gray-200 overflow-hidden">
 							{#each domainEntities as entity (entity.id)}
-								<EntityRow {entity} {selectionMode} />
+								<EntityRow {entity} />
 							{/each}
 						</div>
 					{/if}
@@ -254,19 +254,19 @@
 	<!-- Bulk Action Toolbar (fixed bottom, visible when entities selected) -->
 	{#if selectionMode}
 		<div
-			class="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-blue-700 border-t border-blue-800 shadow-2xl z-50 animate-slide-up"
+			class="fixed bottom-0 left-0 right-0 bg-primary-600 border-t border-primary-700 shadow-2xl z-50 animate-slide-up"
 		>
 			<div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
 				<!-- Selection Count -->
 				<div class="flex items-center gap-3">
-					<div class="bg-blue-500 rounded-full p-2">
+					<div class="bg-primary-700 rounded-full p-2">
 						<Icon icon="lucide:check-square" class="w-5 h-5 text-white" />
 					</div>
 					<div class="text-white">
 						<div class="text-sm font-semibold">
 							{$entitySelection.size} {$entitySelection.size === 1 ? 'entity' : 'entities'} selected
 						</div>
-						<div class="text-xs text-blue-200">Choose an action below</div>
+						<div class="text-xs text-primary-100">Choose an action below</div>
 					</div>
 				</div>
 
@@ -274,7 +274,7 @@
 				<div class="flex items-center gap-2">
 					<button
 						onclick={handleBulkAssignDomain}
-						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-all shadow-md hover:shadow-lg"
+						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg font-medium hover:bg-primary-50 transition-all shadow-md hover:shadow-lg"
 						title="Assign domain to selected entities"
 					>
 						<Icon icon="lucide:tag" class="w-4 h-4" />
@@ -283,7 +283,7 @@
 
 					<button
 						onclick={handleBulkAddTags}
-						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-all shadow-md hover:shadow-lg"
+						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg font-medium hover:bg-primary-50 transition-all shadow-md hover:shadow-lg"
 						title="Add tags to selected entities"
 					>
 						<Icon icon="lucide:tags" class="w-4 h-4" />
@@ -292,7 +292,7 @@
 
 					<button
 						onclick={handleBulkRemoveTags}
-						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-all shadow-md hover:shadow-lg"
+						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg font-medium hover:bg-primary-50 transition-all shadow-md hover:shadow-lg"
 						title="Remove tags from selected entities"
 					>
 						<Icon icon="lucide:tag-x" class="w-4 h-4" />
@@ -301,7 +301,7 @@
 
 					<button
 						onclick={handleBulkDelete}
-						class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all shadow-md hover:shadow-lg"
+						class="inline-flex items-center gap-2 px-4 py-2 bg-danger-600 text-white rounded-lg font-medium hover:bg-danger-700 transition-all shadow-md hover:shadow-lg"
 						title="Delete selected entities"
 					>
 						<Icon icon="lucide:trash-2" class="w-4 h-4" />
@@ -310,7 +310,7 @@
 
 					<button
 						onclick={clearSelection}
-						class="inline-flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+						class="inline-flex items-center gap-2 px-3 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
 						title="Clear selection"
 					>
 						<Icon icon="lucide:x" class="w-4 h-4" />
