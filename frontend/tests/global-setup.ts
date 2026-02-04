@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,33 @@ async function globalSetup() {
 
     if (!fs.existsSync(CONFIG_DIR)) {
         fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+
+    // Compile dbt projects to generate manifests before tests run
+    console.log('Compiling dbt projects for tests...');
+
+    // Compile dbt_concept (used by most tests)
+    const dbtConceptPath = path.resolve(__dirname, '..', '..', 'dbt_concept');
+    try {
+        execSync('uv run dbt compile --profiles-dir .', {
+            cwd: dbtConceptPath,
+            stdio: 'inherit'
+        });
+        console.log('✓ dbt_concept manifest generated');
+    } catch (e) {
+        console.error('Warning: dbt_concept compilation failed:', e);
+    }
+
+    // Compile dbt_company_dummy (used by lineage tests)
+    const dbtCompanyDummyPath = path.resolve(__dirname, '..', '..', 'dbt_company_dummy');
+    try {
+        execSync('uv run dbt compile --profiles-dir .', {
+            cwd: dbtCompanyDummyPath,
+            stdio: 'inherit'
+        });
+        console.log('✓ dbt_company_dummy manifest generated');
+    } catch (e) {
+        console.error('Warning: dbt_company_dummy compilation failed:', e);
     }
 
     const TEST_CONFIG_PATH = path.join(CONFIG_DIR, 'trellis.yml');
