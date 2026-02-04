@@ -40,6 +40,31 @@ export const exposureTypeFilter = writable<string[]>([]);
 export const exposureOwnerFilter = writable<string[]>([]);
 export const exposureEntityFilter = writable<string | null>(null); // Filter by specific entity ID
 
+// Entity list view stores
+// Modal management
+export const entityDetailModal = writable<{
+	open: boolean;
+	entityId: string | null;
+}>({ open: false, entityId: null });
+
+export const bulkEditModal = writable<{
+	open: boolean;
+	selectedEntityIds: string[];
+}>({ open: false, selectedEntityIds: [] });
+
+// Filter state
+export const entityListFilters = writable<{
+	searchTerm: string;
+	selectedDomains: string[];
+	selectedTags: string[];
+}>({ searchTerm: '', selectedDomains: [], selectedTags: [] });
+
+// Bulk selection
+export const entitySelection = writable<Set<string>>(new Set());
+
+// Collapse state for domain groups
+export const entityListCollapseState = writable<Record<string, boolean>>({});
+
 // Drag-and-drop state for field linking
 export const draggingField = writable<FieldDragState | null>(null);
 

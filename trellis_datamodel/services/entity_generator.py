@@ -139,6 +139,7 @@ def _create_dimension_from_annotation_entry(
     annotation_type: str,
     prefixes: List[str],
     domain_tag: Optional[str] = None,
+    domain: Optional[str] = None,
     existing_entities: Optional[Dict[str, dict]] = None,
 ) -> dict:
     """
@@ -149,6 +150,7 @@ def _create_dimension_from_annotation_entry(
         annotation_type: The annotation category (who, what, when, where, how, why)
         prefixes: List of dimension prefixes to apply (e.g., ['dim_'])
         domain_tag: Optional domain tag to add to entity (slugified domain)
+        domain: Optional explicit domain value (not slugified)
         existing_entities: Dictionary of existing entities from data_model.yml
 
     Returns:
@@ -169,7 +171,10 @@ def _create_dimension_from_annotation_entry(
                 "description", entry.description or f"Dimension: {entry.text}"
             ),
         }
-        # Add domain tag if provided
+        # Add explicit domain field if provided
+        if domain:
+            entity["domain"] = domain
+        # Add domain tag if provided (backward compatibility)
         if domain_tag:
             entity["tags"] = [domain_tag]
         return entity
@@ -197,7 +202,11 @@ def _create_dimension_from_annotation_entry(
         },  # Track which annotation category this dimension represents
     }
 
-    # Add domain tag if provided
+    # Add explicit domain field if provided
+    if domain:
+        entity["domain"] = domain
+
+    # Add domain tag if provided (backward compatibility)
     if domain_tag:
         entity["tags"] = [domain_tag]
 
@@ -209,6 +218,7 @@ def _create_fact_from_annotation_entries(
     prefixes: List[str],
     event_type: str,
     domain_tag: Optional[str] = None,
+    domain: Optional[str] = None,
     event_text: Optional[str] = None,
 ) -> dict:
     """
@@ -221,6 +231,7 @@ def _create_fact_from_annotation_entries(
         prefixes: List of fact prefixes to apply (e.g., ['fct_'])
         event_type: Business event type (discrete, evolving, recurring)
         domain_tag: Optional domain tag to add to entity (slugified domain)
+        domain: Optional explicit domain value (not slugified)
         event_text: Optional event text for default fact name
 
     Returns:
@@ -270,7 +281,11 @@ def _create_fact_from_annotation_entries(
     if drafted_fields:
         entity["drafted_fields"] = drafted_fields
 
-    # Add domain tag if provided
+    # Add explicit domain field if provided
+    if domain:
+        entity["domain"] = domain
+
+    # Add domain tag if provided (backward compatibility)
     if domain_tag:
         entity["tags"] = [domain_tag]
 
@@ -372,8 +387,10 @@ def _generate_from_annotations(
 
     # Check if event has domain and slugify it for tag
     domain_tag = None
+    domain = None
     if event.domain:
-        domain_tag = slugify_domain(event.domain)
+        domain = event.domain  # Store original domain value
+        domain_tag = slugify_domain(event.domain)  # Also keep slugified for backward compat
 
     # Generate dimension entities from all dimension entries
     dimension_entities = []
@@ -384,6 +401,7 @@ def _generate_from_annotations(
             annotation_type=annotation_type,
             prefixes=dim_prefixes,
             domain_tag=domain_tag,
+            domain=domain,
             existing_entities=existing_entities,
         )
         # Avoid duplicates (same dimension_id referenced multiple times)
@@ -397,6 +415,7 @@ def _generate_from_annotations(
         prefixes=fact_prefixes,
         event_type=event.type.value,
         domain_tag=domain_tag,
+        domain=domain,
         event_text=event.text,
     )
     fact_id = fact_entity["id"]
@@ -510,9 +529,12 @@ def generate_entities_from_process(
 
     # Get domain tag from process domain (preferred) or first event's domain (fallback)
     domain_tag = None
+    domain = None
     if process.domain:
+        domain = process.domain  # Store original domain value
         domain_tag = slugify_domain(process.domain)
     elif process_events[0].domain:
+        domain = process_events[0].domain  # Store original domain value
         domain_tag = slugify_domain(process_events[0].domain)
 
     # Generate dimension entities from all dimension entries
@@ -524,6 +546,7 @@ def generate_entities_from_process(
             annotation_type=annotation_type,
             prefixes=dim_prefixes,
             domain_tag=domain_tag,
+            domain=domain,
             existing_entities=existing_entities,
         )
         # Avoid duplicates (same dimension_id referenced multiple times)
@@ -539,6 +562,7 @@ def generate_entities_from_process(
             process=process,
             process_events=process_events,
             domain_tag=domain_tag,
+            domain=domain,
         )
     elif process.type.value == "evolving":
         fact_entity = _create_fact_from_process_evolving(
@@ -547,6 +571,7 @@ def generate_entities_from_process(
             process=process,
             process_events=process_events,
             domain_tag=domain_tag,
+            domain=domain,
         )
     else:
         errors.append(f"Unknown process type: {process.type.value}")
@@ -584,6 +609,7 @@ def _create_fact_from_process_discrete(
     process: BusinessEventProcess,
     process_events: List[BusinessEvent],
     domain_tag: Optional[str] = None,
+    domain: Optional[str] = None,
 ) -> dict:
     """
     Create a fact entity dictionary for a discrete process.
@@ -596,7 +622,8 @@ def _create_fact_from_process_discrete(
         prefixes: List of fact prefixes to apply (e.g., ['fct_'])
         process: BusinessEventProcess object
         process_events: List of BusinessEvent objects in the process
-        domain_tag: Optional domain tag to add to entity
+        domain_tag: Optional domain tag to add to entity (slugified domain)
+        domain: Optional explicit domain value (not slugified)
 
     Returns:
         Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
@@ -660,7 +687,11 @@ def _create_fact_from_process_discrete(
     if drafted_fields:
         entity["drafted_fields"] = drafted_fields
 
-    # Add domain tag if provided
+    # Add explicit domain field if provided
+    if domain:
+        entity["domain"] = domain
+
+    # Add domain tag if provided (backward compatibility)
     if domain_tag:
         entity["tags"] = [domain_tag]
 
@@ -673,6 +704,7 @@ def _create_fact_from_process_evolving(
     process: BusinessEventProcess,
     process_events: List[BusinessEvent],
     domain_tag: Optional[str] = None,
+    domain: Optional[str] = None,
 ) -> dict:
     """
     Create a fact entity dictionary for an evolving process.
@@ -685,7 +717,8 @@ def _create_fact_from_process_evolving(
         prefixes: List of fact prefixes to apply (e.g., ['fct_'])
         process: BusinessEventProcess object
         process_events: List of BusinessEvent objects in the process
-        domain_tag: Optional domain tag to add to entity
+        domain_tag: Optional domain tag to add to entity (slugified domain)
+        domain: Optional explicit domain value (not slugified)
 
     Returns:
         Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
@@ -742,7 +775,11 @@ def _create_fact_from_process_evolving(
     if drafted_fields:
         entity["drafted_fields"] = drafted_fields
 
-    # Add domain tag if provided
+    # Add explicit domain field if provided
+    if domain:
+        entity["domain"] = domain
+
+    # Add domain tag if provided (backward compatibility)
     if domain_tag:
         entity["tags"] = [domain_tag]
 

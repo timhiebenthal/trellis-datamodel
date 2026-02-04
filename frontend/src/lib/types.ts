@@ -50,6 +50,7 @@ export interface EntityData {
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
+    domain?: string; // Optional business domain (supports entities created outside business events)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
     _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
@@ -74,6 +75,7 @@ export interface Entity {
     entity_type?: "fact" | "dimension" | "unclassified";
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Only for unbound entities (mock sources)
+    domain?: string; // Optional business domain (supports entities created outside business events)
 }
 
 /**
@@ -389,4 +391,21 @@ export interface AttachEventsRequest {
 
 export interface DetachEventsRequest {
     event_ids: string[];
+}
+
+// Entity List View types
+export interface EntityListFilters {
+    searchTerm: string;
+    selectedDomains: string[];
+    selectedTags: string[];
+}
+
+export interface EntityDetailModalState {
+    open: boolean;
+    entityId: string | null;
+}
+
+export interface BulkEditModalState {
+    open: boolean;
+    selectedEntityIds: string[];
 }

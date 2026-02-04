@@ -1,0 +1,654 @@
+<script lang="ts">
+	import Icon from '@iconify/svelte';
+	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
+	import type { EntityData, AnnotationType, DraftedField } from '$lib/types';
+	import type { Node } from '@xyflow/svelte';
+	import { goto } from '$app/navigation';
+	import { getContext } from 'svelte';
+	import type { AutoSaveService } from '$lib/services/auto-save';
+
+	// Get autoSaveService from parent context (set in +layout.svelte)
+	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
+
+	// Local state for form fields
+	let entityName = $state('');
+	let entityDomain = $state('');
+	let entityTags = $state<string[]>([]);
+	let entitySourceSystems = $state<string[]>([]);
+	let entityType = $state<'dimension' | 'fact' | 'unclassified'>('unclassified');
+	let annotationType = $state<AnnotationType | undefined>(undefined);
+	let tagInput = $state('');
+	let sourceInput = $state('');
+	let showDeleteConfirm = $state(false);
+	let isDirty = $state(false);
+
+	// Get available domains from existing entities
+	let uniqueDomains = $derived.by(() => {
+		const domains = new Set<string>();
+		$nodes.forEach((node) => {
+			const domain = (node.data as unknown as EntityData)?.domain;
+			if (domain && domain.trim()) {
+				domains.add(domain.trim());
+			}
+		});
+		return Array.from(domains).sort();
+	});
+
+	// Get available tags from existing entities
+	let uniqueTags = $derived.by(() => {
+		const tags = new Set<string>();
+		$nodes.forEach((node) => {
+			const nodeTags = (node.data as unknown as EntityData)?.tags || [];
+			nodeTags.forEach((tag) => {
+				if (tag && tag.trim()) {
+					tags.add(tag.trim());
+				}
+			});
+		});
+		return Array.from(tags).sort();
+	});
+
+	// Current entity data
+	let currentEntity = $derived.by(() => {
+		if (!$entityDetailModal.open || !$entityDetailModal.entityId) return null;
+		return $nodes.find((n) => n.id === $entityDetailModal.entityId) || null;
+	});
+
+	// Entity attributes (from dbt model or drafted fields)
+	let entityAttributes = $derived.by(() => {
+		if (!currentEntity) return [];
+
+		const data = currentEntity.data as unknown as EntityData;
+		const dbtModelId = data?.dbt_model;
+		const draftedFields = data?.drafted_fields || [];
+
+		// If bound to dbt model, get columns from dbtModels store
+		if (dbtModelId) {
+			const model = $dbtModels.find((m) => m.unique_id === dbtModelId);
+			if (model && model.columns) {
+				return model.columns.map((col) => ({
+					name: col.name,
+					type: col.type || 'unknown',
+					description: ''
+				}));
+			}
+		}
+
+		// Otherwise, show drafted fields
+		return draftedFields.map((field) => ({
+			name: field.name,
+			type: field.datatype || 'unknown',
+			description: field.description || ''
+		}));
+	});
+
+	// Bound dbt models
+	let boundModels = $derived.by(() => {
+		if (!currentEntity) return [];
+
+		const data = currentEntity.data as unknown as EntityData;
+		const models: string[] = [];
+
+		if (data?.dbt_model) {
+			models.push(data.dbt_model);
+		}
+
+		if (data?.additional_models) {
+			models.push(...data.additional_models);
+		}
+
+		return models;
+	});
+
+	// Initialize form when modal opens
+	$effect(() => {
+		if ($entityDetailModal.open && currentEntity) {
+			const data = currentEntity.data as unknown as EntityData;
+			entityName = data.label || '';
+			entityDomain = data.domain || '';
+			entityTags = [...(data.tags || [])];
+			entitySourceSystems = [...(data.source_system || [])];
+			entityType = data.entity_type || 'unclassified';
+			annotationType = data.annotation_type;
+			tagInput = '';
+			sourceInput = '';
+			showDeleteConfirm = false;
+			isDirty = false;
+		}
+	});
+
+	// Track changes for dirty state
+	$effect(() => {
+		if (!currentEntity) return;
+
+		const data = currentEntity.data as unknown as EntityData;
+		const hasChanges =
+			entityName !== (data.label || '') ||
+			entityDomain !== (data.domain || '') ||
+			JSON.stringify(entityTags.sort()) !== JSON.stringify([...(data.tags || [])].sort()) ||
+			JSON.stringify(entitySourceSystems.sort()) !==
+				JSON.stringify([...(data.source_system || [])].sort()) ||
+			entityType !== (data.entity_type || 'unclassified') ||
+			annotationType !== data.annotation_type;
+
+		isDirty = hasChanges;
+	});
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			if (showDeleteConfirm) {
+				showDeleteConfirm = false;
+			} else {
+				handleCancel();
+			}
+		} else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+			handleSave();
+		}
+	}
+
+	function handleBackdropClick(event: MouseEvent) {
+		if (event.target === event.currentTarget) {
+			handleCancel();
+		}
+	}
+
+	function addTag() {
+		const trimmed = tagInput.trim();
+		if (trimmed && !entityTags.includes(trimmed)) {
+			entityTags = [...entityTags, trimmed];
+			tagInput = '';
+		}
+	}
+
+	function removeTag(tag: string) {
+		entityTags = entityTags.filter((t) => t !== tag);
+	}
+
+	function handleTagInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addTag();
+		}
+	}
+
+	function addSourceSystem() {
+		const trimmed = sourceInput.trim();
+		if (trimmed && !entitySourceSystems.includes(trimmed)) {
+			entitySourceSystems = [...entitySourceSystems, trimmed];
+			sourceInput = '';
+		}
+	}
+
+	function removeSourceSystem(source: string) {
+		entitySourceSystems = entitySourceSystems.filter((s) => s !== source);
+	}
+
+	function handleSourceInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addSourceSystem();
+		}
+	}
+
+	function handleSave() {
+		if (!currentEntity || !entityName.trim()) return;
+
+		// Update the node in the store
+		nodes.update((n) => {
+			return n.map((node) => {
+				if (node.id === currentEntity.id) {
+					return {
+						...node,
+						data: {
+							...node.data,
+							label: entityName.trim(),
+							domain: entityDomain.trim() || undefined,
+							tags: entityTags.length > 0 ? entityTags : undefined,
+							source_system:
+								entitySourceSystems.length > 0 ? entitySourceSystems : undefined,
+							entity_type: entityType,
+							annotation_type: entityType === 'dimension' ? annotationType : undefined
+						}
+					};
+				}
+				return node;
+			});
+		});
+
+		// Push to history for undo/redo
+		pushHistory();
+
+		// Trigger auto-save
+		if (autoSaveServiceContext?.current) {
+			autoSaveServiceContext.current.saveNow($nodes, $edges);
+		}
+
+		// Close modal
+		closeModal();
+	}
+
+	function handleCancel() {
+		if (isDirty) {
+			const confirmed = confirm('You have unsaved changes. Are you sure you want to cancel?');
+			if (!confirmed) return;
+		}
+		closeModal();
+	}
+
+	function handleDelete() {
+		showDeleteConfirm = true;
+	}
+
+	function confirmDelete() {
+		if (!currentEntity) return;
+
+		// Remove node from store
+		nodes.update((n) => n.filter((node) => node.id !== currentEntity.id));
+
+		// Push to history
+		pushHistory();
+
+		// Trigger auto-save
+		if (autoSaveServiceContext?.current) {
+			autoSaveServiceContext.current.saveNow($nodes, $edges);
+		}
+
+		// Close modal
+		closeModal();
+	}
+
+	function cancelDelete() {
+		showDeleteConfirm = false;
+	}
+
+	function handleViewOnCanvas() {
+		if (!currentEntity) return;
+
+		// Navigate to canvas with entity filter
+		goto(`/canvas?entities=${currentEntity.id}`);
+		closeModal();
+	}
+
+	function closeModal() {
+		$entityDetailModal = { open: false, entityId: null };
+	}
+
+	// Annotation type options for dimensions
+	const annotationTypes: { value: AnnotationType; label: string; color: string }[] = [
+		{ value: 'who', label: 'Who', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+		{ value: 'what', label: 'What', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+		{ value: 'when', label: 'When', color: 'bg-green-100 text-green-800 border-green-200' },
+		{ value: 'where', label: 'Where', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+		{ value: 'how', label: 'How', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+		{ value: 'why', label: 'Why', color: 'bg-red-100 text-red-800 border-red-200' },
+		{
+			value: 'how_many',
+			label: 'How Many',
+			color: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+		}
+	];
+</script>
+
+{#if $entityDetailModal.open && currentEntity}
+	<!-- Backdrop with gradient -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+		style="background: linear-gradient(135deg, rgba(17, 24, 39, 0.88) 0%, rgba(55, 65, 81, 0.85) 100%);"
+		onclick={handleBackdropClick}
+		onkeydown={handleKeydown}
+		role="dialog"
+		tabindex="-1"
+		aria-modal="true"
+		aria-labelledby="entity-detail-modal-title"
+	>
+		<!-- Modal Container -->
+		<div
+			class="relative bg-white rounded-xl shadow-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
+			style="max-width: 680px; border: 1px solid rgba(209, 213, 219, 0.3);"
+			role="document"
+			tabindex="-1"
+		>
+			<!-- Header with gradient accent -->
+			<div
+				class="relative px-8 pt-8 pb-6"
+				style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);"
+			>
+				<div
+					class="absolute top-0 left-0 right-0 h-1"
+					style="background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);"
+				></div>
+
+				<div class="flex items-start justify-between">
+					<div class="flex-1">
+						<h2
+							id="entity-detail-modal-title"
+							class="text-2xl font-bold text-gray-900 mb-2"
+							style="letter-spacing: -0.02em;"
+						>
+							Entity Details
+						</h2>
+						<p class="text-sm text-gray-600">
+							{entityType === 'dimension' ? 'Dimension' : entityType === 'fact' ? 'Fact' : 'Unclassified'} entity
+						</p>
+					</div>
+					<button
+						class="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
+						onclick={handleCancel}
+						aria-label="Close"
+					>
+						<Icon icon="lucide:x" class="w-5 h-5" />
+					</button>
+				</div>
+			</div>
+
+			<!-- Scrollable Content -->
+			<div class="px-8 py-6 overflow-y-auto" style="max-height: calc(90vh - 220px);">
+				<div class="space-y-6">
+					<!-- Entity Name -->
+					<div>
+						<label for="entity-name" class="block text-sm font-semibold text-gray-700 mb-2">
+							Entity Name *
+						</label>
+						<input
+							id="entity-name"
+							type="text"
+							bind:value={entityName}
+							class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 font-medium"
+							placeholder="e.g., Customer, Order, Product"
+							required
+						/>
+					</div>
+
+					<!-- Domain -->
+					<div>
+						<label for="entity-domain" class="block text-sm font-semibold text-gray-700 mb-2">
+							Domain
+						</label>
+						<input
+							id="entity-domain"
+							type="text"
+							list="domain-suggestions"
+							bind:value={entityDomain}
+							class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+							placeholder="e.g., Sales, Marketing, Finance (leave blank for Unassigned)"
+						/>
+						<datalist id="domain-suggestions">
+							<option value="Unassigned" />
+							{#each uniqueDomains as domain}
+								<option value={domain} />
+							{/each}
+						</datalist>
+					</div>
+
+					<!-- Entity Type -->
+					<div>
+						<label class="block text-sm font-semibold text-gray-700 mb-3">Entity Type</label>
+						<div class="flex gap-3">
+							<button
+								type="button"
+								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
+								'dimension'
+									? 'bg-blue-50 border-blue-500 text-blue-700'
+									: 'bg-white border-gray-200 text-gray-700 hover:border-blue-300'}"
+								onclick={() => (entityType = 'dimension')}
+							>
+								<Icon icon="lucide:box" class="w-5 h-5 inline-block mr-2" />
+								Dimension
+							</button>
+							<button
+								type="button"
+								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
+								'fact'
+									? 'bg-purple-50 border-purple-500 text-purple-700'
+									: 'bg-white border-gray-200 text-gray-700 hover:border-purple-300'}"
+								onclick={() => (entityType = 'fact')}
+							>
+								<Icon icon="lucide:database" class="w-5 h-5 inline-block mr-2" />
+								Fact
+							</button>
+							<button
+								type="button"
+								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
+								'unclassified'
+									? 'bg-gray-50 border-gray-500 text-gray-700'
+									: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
+								onclick={() => (entityType = 'unclassified')}
+							>
+								<Icon icon="lucide:circle-help" class="w-5 h-5 inline-block mr-2" />
+								Unclassified
+							</button>
+						</div>
+					</div>
+
+					<!-- Annotation Type (for dimensions only) -->
+					{#if entityType === 'dimension'}
+						<div>
+							<label
+								for="annotation-type"
+								class="block text-sm font-semibold text-gray-700 mb-3"
+							>
+								Annotation Type (7Ws)
+							</label>
+							<select
+								id="annotation-type"
+								bind:value={annotationType}
+								class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+							>
+								<option value={undefined}>Select annotation type...</option>
+								{#each annotationTypes as option}
+									<option value={option.value}>{option.label}</option>
+								{/each}
+							</select>
+							{#if annotationType}
+								<div class="mt-2">
+									<span
+										class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border {annotationTypes.find(
+											(a) => a.value === annotationType
+										)?.color || ''}"
+									>
+										{annotationTypes.find((a) => a.value === annotationType)?.label}
+									</span>
+								</div>
+							{/if}
+						</div>
+					{/if}
+
+					<!-- Tags -->
+					<div>
+						<label class="block text-sm font-semibold text-gray-700 mb-2">Tags</label>
+						<div
+							class="flex flex-wrap gap-2 min-h-[56px] p-3 border-2 border-gray-200 rounded-lg bg-gray-50"
+						>
+							{#each entityTags as tag}
+								<span
+									class="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-gray-800 text-sm rounded-full border border-blue-200 font-medium"
+								>
+									{tag}
+									<button
+										type="button"
+										onclick={() => removeTag(tag)}
+										class="ml-1 text-gray-600 hover:text-gray-900 focus:outline-none"
+										aria-label="Remove {tag}"
+									>
+										<Icon icon="lucide:x" class="w-3 h-3" />
+									</button>
+								</span>
+							{/each}
+							<input
+								type="text"
+								list="tag-suggestions"
+								bind:value={tagInput}
+								onkeydown={handleTagInputKeydown}
+								class="flex-1 min-w-[120px] px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-0"
+								placeholder="Type and press Enter to add tags"
+							/>
+						</div>
+						<datalist id="tag-suggestions">
+							{#each uniqueTags as tag}
+								<option value={tag} />
+							{/each}
+						</datalist>
+					</div>
+
+					<!-- Source Systems -->
+					<div>
+						<label class="block text-sm font-semibold text-gray-700 mb-2">
+							Source Systems
+						</label>
+						<div
+							class="flex flex-wrap gap-2 min-h-[56px] p-3 border-2 border-gray-200 rounded-lg bg-gray-50"
+						>
+							{#each entitySourceSystems as source}
+								<span
+									class="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-green-100 to-teal-100 text-gray-800 text-sm rounded-full border border-green-200 font-medium"
+								>
+									{source}
+									<button
+										type="button"
+										onclick={() => removeSourceSystem(source)}
+										class="ml-1 text-gray-600 hover:text-gray-900 focus:outline-none"
+										aria-label="Remove {source}"
+									>
+										<Icon icon="lucide:x" class="w-3 h-3" />
+									</button>
+								</span>
+							{/each}
+							<input
+								type="text"
+								bind:value={sourceInput}
+								onkeydown={handleSourceInputKeydown}
+								class="flex-1 min-w-[120px] px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-0"
+								placeholder="Type and press Enter to add source"
+							/>
+						</div>
+					</div>
+
+					<!-- Attributes (Read-only) -->
+					{#if entityAttributes.length > 0}
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 mb-3">
+								Attributes ({entityAttributes.length})
+							</label>
+							<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+								<table class="w-full text-sm">
+									<thead class="bg-gray-100">
+										<tr>
+											<th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
+											<th class="px-4 py-2 text-left font-semibold text-gray-700">Type</th>
+											<th class="px-4 py-2 text-left font-semibold text-gray-700"
+												>Description</th
+											>
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-gray-200">
+										{#each entityAttributes as attr}
+											<tr class="hover:bg-gray-50">
+												<td class="px-4 py-2 font-medium text-gray-900">{attr.name}</td>
+												<td class="px-4 py-2 text-gray-600 font-mono text-xs"
+													>{attr.type}</td
+												>
+												<td class="px-4 py-2 text-gray-600"
+													>{attr.description || '—'}</td
+												>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Bound dbt Models (Read-only) -->
+					{#if boundModels.length > 0}
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 mb-3">
+								Bound dbt Models ({boundModels.length})
+							</label>
+							<div class="space-y-2">
+								{#each boundModels as model}
+									<div
+										class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg"
+									>
+										<div class="flex items-center gap-2">
+											<Icon icon="lucide:layers" class="w-4 h-4 text-indigo-600" />
+											<span class="font-mono text-sm text-gray-900">{model}</span>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Footer Actions -->
+			<div
+				class="px-8 py-6 border-t-2 border-gray-100"
+				style="background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);"
+			>
+				{#if !showDeleteConfirm}
+					<div class="flex items-center justify-between gap-4">
+						<button
+							onclick={handleDelete}
+							class="px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border-2 border-red-200 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all flex items-center gap-2"
+						>
+							<Icon icon="lucide:trash-2" class="w-4 h-4" />
+							Delete Entity
+						</button>
+
+						<div class="flex gap-3">
+							<button
+								onclick={handleViewOnCanvas}
+								class="px-5 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center gap-2"
+							>
+								<Icon icon="lucide:eye" class="w-4 h-4" />
+								View on Canvas
+							</button>
+							<button
+								onclick={handleCancel}
+								class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
+							>
+								Cancel
+							</button>
+							<button
+								onclick={handleSave}
+								disabled={!isDirty || !entityName.trim()}
+								class="px-5 py-2.5 text-sm font-bold text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+								style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);"
+							>
+								<Icon icon="lucide:save" class="w-4 h-4" />
+								Save Changes
+							</button>
+						</div>
+					</div>
+				{:else}
+					<!-- Delete Confirmation -->
+					<div
+						class="flex items-center justify-between p-4 bg-red-50 border-2 border-red-300 rounded-lg"
+					>
+						<div class="flex items-center gap-3">
+							<Icon icon="lucide:alert-triangle" class="w-5 h-5 text-red-600" />
+							<span class="text-sm font-medium text-red-900"
+								>Are you sure you want to delete this entity? This action cannot be undone.</span
+							>
+						</div>
+						<div class="flex gap-2">
+							<button
+								onclick={cancelDelete}
+								class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								onclick={confirmDelete}
+								class="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+							>
+								Delete
+							</button>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
