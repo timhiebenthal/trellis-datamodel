@@ -19,17 +19,7 @@ async function globalSetup() {
     // Compile dbt projects to generate manifests before tests run
     console.log('Compiling dbt projects for tests...');
 
-    // Compile dbt_concept (used by most tests)
-    const dbtConceptPath = path.resolve(__dirname, '..', '..', 'dbt_concept');
-    try {
-        execSync('uv run dbt compile --profiles-dir .', {
-            cwd: dbtConceptPath,
-            stdio: 'inherit'
-        });
-        console.log('✓ dbt_concept manifest generated');
-    } catch (e) {
-        console.error('Warning: dbt_concept compilation failed:', e);
-    }
+    // Note: dbt_concept is not a dbt project, just a data model directory - skip compilation
 
     // Compile dbt_company_dummy (used by lineage tests)
     const dbtCompanyDummyPath = path.resolve(__dirname, '..', '..', 'dbt_company_dummy');
@@ -46,13 +36,16 @@ async function globalSetup() {
     const TEST_CONFIG_PATH = path.join(CONFIG_DIR, 'trellis.yml');
 
     // Write test config file
+    // Use dbt_company_dummy as the dbt project since dbt_concept is not a real dbt project
     const TEST_CONFIG = `framework: dbt-core
-dbt_project_path: ${path.resolve(__dirname, '..', '..', 'dbt_concept')}
+dbt_project_path: ${dbtCompanyDummyPath}
 data_model_file: ${TEST_DATA_MODEL_PATH}
 modeling_style: dimensional_model
 lineage:
   enabled: false
 bus_matrix:
+  enabled: true
+business_events:
   enabled: true
 
 # Optional: enable other features if needed

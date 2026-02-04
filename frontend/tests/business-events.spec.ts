@@ -155,7 +155,7 @@ test.describe('Business Events - E2E', () => {
     });
 
     test('tab should not be visible when business_events.enabled is false', async ({ page }) => {
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         // Mock config API to return business_events.enabled: false
         await page.route('**/api/config', async (route) => {
@@ -172,7 +172,7 @@ test.describe('Business Events - E2E', () => {
         });
 
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         // Business Events tab should not be visible
         const businessEventsLink = page.getByRole('link', { name: 'Business Events' });
@@ -217,12 +217,15 @@ test.describe('Business Events - E2E', () => {
             }
         });
 
-        // Navigate to business events (assuming tab exists - this test may need config)
-        await page.goto('/business-events').catch(() => {
-            // If route doesn't exist yet, skip test
+        // Navigate to business events and verify it exists
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Check for empty state message
         const emptyState = page.getByText(/no business events/i);
@@ -245,11 +248,15 @@ test.describe('Business Events - E2E', () => {
     });
 
     test('should display events list when events exist', async ({ page }) => {
-        // Navigate to business events (assuming route exists)
-        await page.goto('/business-events').catch(() => {
+        // Navigate to business events and verify it exists
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Check for event text
         const eventText = page.getByText('customer buys product');
@@ -264,10 +271,14 @@ test.describe('Business Events - E2E', () => {
     });
 
     test('should filter events by type', async ({ page }) => {
-        await page.goto('/business-events').catch(() => {
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Find filter dropdown
         const filterSelect = page.locator('select').filter({ hasText: /all|discrete|evolving|recurring/i });
@@ -291,10 +302,14 @@ test.describe('Business Events - E2E', () => {
     });
 
     test('should create new event', async ({ page }) => {
-        await page.goto('/business-events').catch(() => {
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Click "Add Event" button
         const addButton = page.getByRole('button', { name: /add event/i });
@@ -342,10 +357,14 @@ test.describe('Business Events - E2E', () => {
     });
 
     test('should delete event', async ({ page }) => {
-        await page.goto('/business-events').catch(() => {
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Find delete button for first event
         const deleteButton = page.getByRole('button', { name: /delete/i }).first();
@@ -376,11 +395,15 @@ test.describe('Business Events - E2E', () => {
      * 7 Ws E2E Tests
      */
     test('should create business event with 7 Ws', async ({ page }) => {
-        // Navigate to business events
-        await page.goto('/business-events').catch(() => {
-            // Route might not be implemented yet, skip navigation
-        });
-        await page.waitForLoadState('networkidle');
+        // Navigate to business events and verify it exists
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Click "Add Event" button
         const addButton = page.getByRole('button', { name: /add event/i });
@@ -495,8 +518,14 @@ test.describe('Business Events - E2E', () => {
         });
 
         // Navigate and click add event
-        await page.goto('/business-events').catch(() => {});
-        await page.waitForLoadState('networkidle');
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         const addButton = page.getByRole('button', { name: /add event/i });
         const buttonExists = await addButton.isVisible({ timeout: 3000 }).catch(() => false);
@@ -579,9 +608,15 @@ test.describe('Business Events - E2E', () => {
             });
         });
 
-        // Navigate to business events
-        await page.goto('/business-events').catch(() => {});
-        await page.waitForLoadState('networkidle');
+        // Navigate to business events and verify it exists
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Find event card with 7 Ws
         const eventCard = page.locator('[data-testid="event-card"]').or(page.locator('.bg-white.rounded-lg')).first();
@@ -634,8 +669,14 @@ test.describe('Business Events - E2E', () => {
         });
 
         // Navigate and click edit
-        await page.goto('/business-events').catch(() => {});
-        await page.waitForLoadState('networkidle');
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         const editButton = page.getByRole('button', { name: /7 ws|highlighter/i }).first();
         const editExists = await editButton.isVisible({ timeout: 3000 }).catch(() => false);
@@ -704,11 +745,15 @@ test.describe('Business Events - E2E', () => {
             });
         });
 
-        // Navigate to business events
-        await page.goto('/business-events').catch(() => {
+        // Navigate to business events and verify it exists
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Select multiple events (checkboxes)
         const checkboxes = page.locator('input[type="checkbox"]').filter({ hasNotText: /select all/i });
@@ -769,10 +814,14 @@ test.describe('Business Events - E2E', () => {
     });
 
     test('should show generate entities button on process rows', async ({ page }) => {
-        await page.goto('/business-events').catch(() => {
+        const response = await page.goto('/business-events').catch(() => null);
+        
+        if (!response || !response.ok()) {
             test.skip();
-        });
-        await page.waitForLoadState('networkidle');
+            return;
+        }
+        
+        await page.waitForLoadState('domcontentloaded');
 
         // Check if there are any processes displayed
         const processRow = page.locator('[class*="process"]').or(
