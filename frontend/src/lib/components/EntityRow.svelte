@@ -79,7 +79,7 @@
 </script>
 
 <div
-	class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer group"
+	class="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer group"
 	role="row"
 	on:click={handleRowClick}
 	on:keydown={(e) => e.key === "Enter" && handleRowClick()}
@@ -91,7 +91,7 @@
 			type="checkbox"
 			checked={isSelected}
 			on:change={handleCheckboxToggle}
-			class="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+			class="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer flex-shrink-0"
 			title="Select entity"
 		/>
 	{/if}
@@ -106,34 +106,33 @@
 		<Icon icon={typeIcon()} class="w-5 h-5" />
 	</div>
 
-	<!-- Entity Info (name, type, domain, tags) -->
-	<div class="flex-1 min-w-0 flex flex-col gap-1.5">
+	<!-- Entity Info (name, type, domain, tags) - Horizontal Layout -->
+	<div class="flex-1 min-w-0 flex items-center gap-3">
 		<!-- Entity name -->
-		<span class="text-sm font-semibold text-slate-800 truncate">
+		<span class="text-sm font-semibold text-slate-800 truncate min-w-[200px]">
 			{entity.label}
 		</span>
 
-		<!-- Type badge + Domain badge -->
-		<div class="flex items-center gap-2 flex-wrap">
-			<!-- Type badge -->
-			<span
-				class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-xs font-medium {typeBadgeColor()}"
-			>
-				{typeLabel()}
-			</span>
+		<!-- Type badge -->
+		<span
+			class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {typeBadgeColor()}"
+		>
+			{typeLabel()}
+		</span>
 
-			<!-- Domain badge (if present) -->
-			{#if entity.domain}
+		<!-- Domain badge (if present) -->
+		{#if entity.domain}
+			<div class="flex-shrink-0">
 				<DomainBadge domain={entity.domain} size="small" />
-			{/if}
-		</div>
+			</div>
+		{/if}
 
 		<!-- Tags as compact chips -->
 		{#if visibleTags.length > 0 || hiddenCount > 0}
 			<div class="flex items-center gap-1.5 flex-wrap">
 				{#each visibleTags as tag}
 					<span
-						class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[11px] font-medium"
+						class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[11px] font-medium whitespace-nowrap"
 						title={tag}
 					>
 						{tag}
@@ -142,10 +141,10 @@
 
 				{#if hiddenCount > 0}
 					<span
-						class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-300 text-gray-700 text-[11px] font-medium"
+						class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-300 text-gray-700 text-[11px] font-medium whitespace-nowrap"
 						title={`${hiddenCount} more tag${hiddenCount === 1 ? "" : "s"}`}
 					>
-						+{hiddenCount} more
+						+{hiddenCount}
 					</span>
 				{/if}
 			</div>
