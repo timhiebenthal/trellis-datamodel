@@ -332,10 +332,9 @@
 </script>
 
 {#if $entityDetailModal.open && currentEntity}
-	<!-- Backdrop with gradient -->
+	<!-- Backdrop -->
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-		style="background: linear-gradient(135deg, rgba(17, 24, 39, 0.88) 0%, rgba(55, 65, 81, 0.85) 100%);"
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-gray-900/85"
 		onclick={handleBackdropClick}
 		onkeydown={handleKeydown}
 		role="dialog"
