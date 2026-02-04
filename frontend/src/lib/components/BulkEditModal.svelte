@@ -188,9 +188,9 @@
 </script>
 
 {#if open}
-	<!-- Backdrop with dramatic blur -->
+	<!-- Backdrop -->
 	<div
-		class="fixed inset-0 bg-gradient-to-br from-slate-900/90 via-slate-800/85 to-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center"
+		class="fixed inset-0 bg-gray-900/85 backdrop-blur-md z-50 flex items-center justify-center"
 		onclick={handleBackdropClick}
 		onkeydown={handleKeydown}
 		role="dialog"
