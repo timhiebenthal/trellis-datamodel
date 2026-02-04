@@ -4,7 +4,6 @@
 	import type { Entity, EntityData } from '$lib/types';
 	import { filterEntities } from '$lib/utils/entity-filtering';
 	import { groupEntitiesByDomain } from '$lib/utils/entity-grouping';
-	import EntityListFilters from './EntityListFilters.svelte';
 	import EntityRow from './EntityRow.svelte';
 	import CollapseChevron from './CollapseChevron.svelte';
 	import Icon from '@iconify/svelte';
@@ -132,12 +131,9 @@
 	}
 </script>
 
-<div class="flex flex-col h-full bg-gray-50">
-	<!-- Filter Controls -->
-	<EntityListFilters filteredCount={filteredEntities.length} totalCount={entities.length} />
-
+<div class="flex flex-col h-full bg-gray-50 w-full">
 	<!-- Main Content Area -->
-	<div class="flex-1 overflow-y-auto" class:pb-20={selectionMode}>
+	<div class="flex-1 overflow-y-auto w-full" class:pb-20={selectionMode}>
 		<!-- Select All Bar (visible when any entities exist) -->
 		{#if filteredEntities.length > 0}
 			<div class="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10">

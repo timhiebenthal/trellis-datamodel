@@ -36,9 +36,9 @@
 	// Type badge color
 	const typeBadgeColor = $derived(() => {
 		if (entity.entity_type === "dimension") {
-			return "bg-blue-100 text-blue-700 border-blue-300";
+			return "bg-green-100 text-green-700 border-green-300";
 		} else if (entity.entity_type === "fact") {
-			return "bg-amber-100 text-amber-700 border-amber-300";
+			return "bg-blue-100 text-blue-700 border-blue-300";
 		} else {
 			return "bg-gray-100 text-gray-700 border-gray-300";
 		}
@@ -97,7 +97,12 @@
 	{/if}
 
 	<!-- Entity Icon -->
-	<div class="flex-shrink-0 text-gray-600">
+	<div
+		class="flex-shrink-0"
+		class:text-green-600={entity.entity_type === "dimension"}
+		class:text-blue-600={entity.entity_type === "fact"}
+		class:text-gray-600={entity.entity_type !== "dimension" && entity.entity_type !== "fact"}
+	>
 		<Icon icon={typeIcon()} class="w-5 h-5" />
 	</div>
 

@@ -48,28 +48,34 @@
 	<meta name="description" content="Browse and manage entities in list view" />
 </svelte:head>
 
-<div class="flex flex-col h-full bg-gray-50">
+<div class="flex flex-col h-full bg-gray-50 w-full">
 	<!-- Header -->
-	<div class="bg-white border-b border-gray-200 px-6 py-4">
-		<div class="flex items-center gap-3">
-			<Icon icon="lucide:list" class="w-6 h-6 text-gray-700" />
-			<h1 class="text-2xl font-bold text-gray-900">Entity List</h1>
+	<div class="bg-white border-b border-gray-200 px-6 py-4 w-full">
+		<div class="max-w-7xl mx-auto">
+			<div class="flex items-center gap-3">
+				<Icon icon="lucide:list" class="w-6 h-6 text-gray-700" />
+				<h1 class="text-2xl font-bold text-gray-900">Entity List</h1>
+			</div>
+			<p class="text-sm text-gray-600 mt-1">
+				Browse and manage entities organized by domain
+			</p>
 		</div>
-		<p class="text-sm text-gray-600 mt-1">
-			Browse and manage entities organized by domain
-		</p>
 	</div>
 
 	<!-- Content -->
-	<div class="flex-1 overflow-hidden flex flex-col">
+	<div class="flex-1 overflow-hidden flex flex-col w-full">
 		<!-- Filters Section -->
-		<div class="bg-white border-b border-gray-200">
-			<EntityListFilters {filteredCount} {totalCount} />
+		<div class="bg-white border-b border-gray-200 w-full">
+			<div class="max-w-7xl mx-auto">
+				<EntityListFilters {filteredCount} {totalCount} />
+			</div>
 		</div>
 
 		<!-- List Section -->
-		<div class="flex-1 overflow-auto">
-			<EntityList />
+		<div class="flex-1 overflow-auto w-full">
+			<div class="max-w-7xl mx-auto">
+				<EntityList />
+			</div>
 		</div>
 	</div>
 </div>
