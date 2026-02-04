@@ -82,6 +82,41 @@
 		}));
 	});
 
+	// Check if entity is bound to dbt model (attributes are read-only if bound)
+	let isBoundEntity = $derived.by(() => {
+		if (!currentEntity) return false;
+		const data = currentEntity.data as unknown as EntityData;
+		return !!data?.dbt_model;
+	});
+
+	// Editable drafted fields state
+	let editableDraftedFields = $state<DraftedField[]>([]);
+
+	// Initialize editable drafted fields when modal opens
+	$effect(() => {
+		if ($entityDetailModal.open && currentEntity && !isBoundEntity) {
+			const data = currentEntity.data as unknown as EntityData;
+			editableDraftedFields = [...(data?.drafted_fields || [])];
+		}
+	});
+
+	function updateDraftedField(index: number, updates: Partial<DraftedField>) {
+		editableDraftedFields = editableDraftedFields.map((field, i) =>
+			i === index ? { ...field, ...updates } : field
+		);
+	}
+
+	function addDraftedField() {
+		editableDraftedFields = [
+			...editableDraftedFields,
+			{ name: '', datatype: 'text', description: '' }
+		];
+	}
+
+	function deleteDraftedField(index: number) {
+		editableDraftedFields = editableDraftedFields.filter((_, i) => i !== index);
+	}
+
 	// Bound dbt models
 	let boundModels = $derived.by(() => {
 		if (!currentEntity) return [];
@@ -129,7 +164,10 @@
 			JSON.stringify(entitySourceSystems.sort()) !==
 				JSON.stringify([...(data.source_system || [])].sort()) ||
 			entityType !== (data.entity_type || 'unclassified') ||
-			annotationType !== data.annotation_type;
+			annotationType !== data.annotation_type ||
+			(!isBoundEntity &&
+				JSON.stringify(editableDraftedFields) !==
+					JSON.stringify(data?.drafted_fields || []));
 
 		isDirty = hasChanges;
 	});
@@ -207,7 +245,11 @@
 							source_system:
 								entitySourceSystems.length > 0 ? entitySourceSystems : undefined,
 							entity_type: entityType,
-							annotation_type: entityType === 'dimension' ? annotationType : undefined
+							annotation_type: entityType === 'dimension' ? annotationType : undefined,
+							drafted_fields:
+								!isBoundEntity && editableDraftedFields.length > 0
+									? editableDraftedFields
+									: undefined
 						}
 					};
 				}
@@ -304,18 +346,16 @@
 		<!-- Modal Container -->
 		<div
 			class="relative bg-white rounded-xl shadow-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
-			style="max-width: 680px; border: 1px solid rgba(209, 213, 219, 0.3);"
+			style="max-width: 1400px; border: 1px solid rgba(209, 213, 219, 0.3);"
 			role="document"
 			tabindex="-1"
 		>
-			<!-- Header with gradient accent -->
+			<!-- Header with primary accent -->
 			<div
-				class="relative px-8 pt-8 pb-6"
-				style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);"
+				class="relative px-8 pt-8 pb-6 bg-gray-50"
 			>
 				<div
-					class="absolute top-0 left-0 right-0 h-1"
-					style="background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);"
+					class="absolute top-0 left-0 right-0 h-1 bg-primary-600"
 				></div>
 
 				<div class="flex items-start justify-between">
@@ -384,28 +424,28 @@
 					<div>
 						<label class="block text-sm font-semibold text-gray-700 mb-3">Entity Type</label>
 						<div class="flex gap-3">
-							<button
-								type="button"
-								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
-								'dimension'
-									? 'bg-blue-50 border-blue-500 text-blue-700'
-									: 'bg-white border-gray-200 text-gray-700 hover:border-blue-300'}"
-								onclick={() => (entityType = 'dimension')}
-							>
-								<Icon icon="lucide:box" class="w-5 h-5 inline-block mr-2" />
-								Dimension
-							</button>
-							<button
-								type="button"
-								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
-								'fact'
-									? 'bg-purple-50 border-purple-500 text-purple-700'
-									: 'bg-white border-gray-200 text-gray-700 hover:border-purple-300'}"
-								onclick={() => (entityType = 'fact')}
-							>
-								<Icon icon="lucide:database" class="w-5 h-5 inline-block mr-2" />
-								Fact
-							</button>
+						<button
+							type="button"
+							class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
+							'dimension'
+								? 'bg-green-50 border-green-500 text-green-700'
+								: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+							onclick={() => (entityType = 'dimension')}
+						>
+							<Icon icon="lucide:list" class="w-5 h-5 inline-block mr-2" />
+							Dimension
+						</button>
+						<button
+							type="button"
+							class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
+							'fact'
+								? 'bg-blue-50 border-blue-500 text-blue-700'
+								: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+							onclick={() => (entityType = 'fact')}
+						>
+							<Icon icon="lucide:bar-chart-3" class="w-5 h-5 inline-block mr-2" />
+							Fact
+						</button>
 							<button
 								type="button"
 								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
@@ -459,21 +499,21 @@
 						<div
 							class="flex flex-wrap gap-2 min-h-[56px] p-3 border-2 border-gray-200 rounded-lg bg-gray-50"
 						>
-							{#each entityTags as tag}
-								<span
-									class="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-gray-800 text-sm rounded-full border border-blue-200 font-medium"
+						{#each entityTags as tag}
+							<span
+								class="inline-flex items-center gap-1 px-3 py-1 bg-primary-50 text-primary-700 text-sm rounded-full border border-primary-200 font-medium"
+							>
+								{tag}
+								<button
+									type="button"
+									onclick={() => removeTag(tag)}
+									class="ml-1 text-primary-600 hover:text-primary-900 focus:outline-none"
+									aria-label="Remove {tag}"
 								>
-									{tag}
-									<button
-										type="button"
-										onclick={() => removeTag(tag)}
-										class="ml-1 text-gray-600 hover:text-gray-900 focus:outline-none"
-										aria-label="Remove {tag}"
-									>
-										<Icon icon="lucide:x" class="w-3 h-3" />
-									</button>
-								</span>
-							{/each}
+									<Icon icon="lucide:x" class="w-3 h-3" />
+								</button>
+							</span>
+						{/each}
 							<input
 								type="text"
 								list="tag-suggestions"
@@ -498,21 +538,21 @@
 						<div
 							class="flex flex-wrap gap-2 min-h-[56px] p-3 border-2 border-gray-200 rounded-lg bg-gray-50"
 						>
-							{#each entitySourceSystems as source}
-								<span
-									class="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-green-100 to-teal-100 text-gray-800 text-sm rounded-full border border-green-200 font-medium"
+						{#each entitySourceSystems as source}
+							<span
+								class="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full border border-gray-300 font-medium"
+							>
+								{source}
+								<button
+									type="button"
+									onclick={() => removeSourceSystem(source)}
+									class="ml-1 text-gray-600 hover:text-gray-900 focus:outline-none"
+									aria-label="Remove {source}"
 								>
-									{source}
-									<button
-										type="button"
-										onclick={() => removeSourceSystem(source)}
-										class="ml-1 text-gray-600 hover:text-gray-900 focus:outline-none"
-										aria-label="Remove {source}"
-									>
-										<Icon icon="lucide:x" class="w-3 h-3" />
-									</button>
-								</span>
-							{/each}
+									<Icon icon="lucide:x" class="w-3 h-3" />
+								</button>
+							</span>
+						{/each}
 							<input
 								type="text"
 								bind:value={sourceInput}
@@ -523,38 +563,140 @@
 						</div>
 					</div>
 
-					<!-- Attributes (Read-only) -->
-					{#if entityAttributes.length > 0}
-						<div>
-							<label class="block text-sm font-semibold text-gray-700 mb-3">
-								Attributes ({entityAttributes.length})
-							</label>
-							<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
-								<table class="w-full text-sm">
-									<thead class="bg-gray-100">
-										<tr>
-											<th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
-											<th class="px-4 py-2 text-left font-semibold text-gray-700">Type</th>
-											<th class="px-4 py-2 text-left font-semibold text-gray-700"
-												>Description</th
-											>
-										</tr>
-									</thead>
-									<tbody class="divide-y divide-gray-200">
-										{#each entityAttributes as attr}
-											<tr class="hover:bg-gray-50">
-												<td class="px-4 py-2 font-medium text-gray-900">{attr.name}</td>
-												<td class="px-4 py-2 text-gray-600 font-mono text-xs"
-													>{attr.type}</td
-												>
-												<td class="px-4 py-2 text-gray-600"
-													>{attr.description || '—'}</td
+					<!-- Attributes -->
+					{#if isBoundEntity}
+						<!-- Read-only attributes for bound entities -->
+						{#if entityAttributes.length > 0}
+							<div>
+								<label class="block text-sm font-semibold text-gray-700 mb-3">
+									Attributes ({entityAttributes.length}) - Read Only
+								</label>
+								<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+									<table class="w-full text-sm">
+										<thead class="bg-gray-100">
+											<tr>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700">Type</th>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700"
+													>Description</th
 												>
 											</tr>
-										{/each}
-									</tbody>
-								</table>
+										</thead>
+										<tbody class="divide-y divide-gray-200">
+											{#each entityAttributes as attr}
+												<tr class="hover:bg-gray-50">
+													<td class="px-4 py-2 font-medium text-gray-900">{attr.name}</td>
+													<td class="px-4 py-2 text-gray-600 font-mono text-xs"
+														>{attr.type}</td
+													>
+													<td class="px-4 py-2 text-gray-600"
+														>{attr.description || '—'}</td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								<p class="mt-2 text-xs text-gray-500 italic">
+									Attributes are managed in the dbt schema file. Edit them on the canvas in logical
+									view.
+								</p>
 							</div>
+						{/if}
+					{:else}
+						<!-- Editable attributes for unbound entities -->
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 mb-3">
+								Attributes ({editableDraftedFields.length})
+							</label>
+							<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+								{#if editableDraftedFields.length > 0}
+									<!-- Header row -->
+									<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
+										<div class="col-span-3">Name</div>
+										<div class="col-span-2">Type</div>
+										<div class="col-span-6">Description</div>
+										<div class="col-span-1"></div>
+									</div>
+									<!-- Attribute rows -->
+									<div class="divide-y divide-gray-200">
+										{#each editableDraftedFields as field, index}
+											<div class="px-3 py-2 hover:bg-gray-50 group">
+												<div class="grid grid-cols-12 gap-2 items-center">
+													<!-- Name (narrower) -->
+													<div class="col-span-3">
+														<input
+															type="text"
+															value={field.name}
+															oninput={(e) =>
+																updateDraftedField(index, {
+																	name: (e.target as HTMLInputElement).value
+																})}
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+															placeholder="attribute_name"
+														/>
+													</div>
+													<!-- Type -->
+													<div class="col-span-2">
+														<select
+															value={field.datatype}
+															onchange={(e) =>
+																updateDraftedField(index, {
+																	datatype: (e.target as HTMLSelectElement)
+																		.value as any
+																})}
+															class="w-full px-2 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
+														>
+															<option value="text">text</option>
+															<option value="int">int</option>
+															<option value="float">float</option>
+															<option value="bool">bool</option>
+															<option value="date">date</option>
+															<option value="timestamp">timestamp</option>
+														</select>
+													</div>
+													<!-- Description (wider) -->
+													<div class="col-span-6">
+														<input
+															type="text"
+															value={field.description || ''}
+															oninput={(e) =>
+																updateDraftedField(index, {
+																	description: (e.target as HTMLInputElement).value
+																})}
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+															placeholder="Description (optional)"
+														/>
+													</div>
+													<!-- Delete button -->
+													<div class="col-span-1 flex justify-end">
+														<button
+															type="button"
+															onclick={() => deleteDraftedField(index)}
+															class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+															title="Delete attribute"
+														>
+															<Icon icon="lucide:trash-2" class="w-4 h-4" />
+														</button>
+													</div>
+												</div>
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<div class="p-6 text-center text-gray-400 text-sm italic">
+										No attributes defined
+									</div>
+								{/if}
+							</div>
+							<button
+								type="button"
+								onclick={addDraftedField}
+								class="mt-3 w-full px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center justify-center gap-2"
+							>
+								<Icon icon="lucide:plus" class="w-4 h-4" />
+								Add Attribute
+							</button>
 						</div>
 					{/if}
 
@@ -565,16 +707,16 @@
 								Bound dbt Models ({boundModels.length})
 							</label>
 							<div class="space-y-2">
-								{#each boundModels as model}
-									<div
-										class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg"
-									>
-										<div class="flex items-center gap-2">
-											<Icon icon="lucide:layers" class="w-4 h-4 text-indigo-600" />
-											<span class="font-mono text-sm text-gray-900">{model}</span>
-										</div>
+							{#each boundModels as model}
+								<div
+									class="px-4 py-3 bg-primary-50 border border-primary-200 rounded-lg"
+								>
+									<div class="flex items-center gap-2">
+										<Icon icon="lucide:layers" class="w-4 h-4 text-primary-600" />
+										<span class="font-mono text-sm text-gray-900">{model}</span>
 									</div>
-								{/each}
+								</div>
+							{/each}
 							</div>
 						</div>
 					{/if}
@@ -583,8 +725,7 @@
 
 			<!-- Footer Actions -->
 			<div
-				class="px-8 py-6 border-t-2 border-gray-100"
-				style="background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);"
+				class="px-8 py-6 border-t-2 border-gray-100 bg-gray-50"
 			>
 				{#if !showDeleteConfirm}
 					<div class="flex items-center justify-between gap-4">
@@ -599,7 +740,7 @@
 						<div class="flex gap-3">
 							<button
 								onclick={handleViewOnCanvas}
-								class="px-5 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center gap-2"
+								class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2"
 							>
 								<Icon icon="lucide:eye" class="w-4 h-4" />
 								View on Canvas
@@ -613,8 +754,7 @@
 							<button
 								onclick={handleSave}
 								disabled={!isDirty || !entityName.trim()}
-								class="px-5 py-2.5 text-sm font-bold text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-								style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);"
+								class="px-5 py-2.5 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								<Icon icon="lucide:save" class="w-4 h-4" />
 								Save Changes
