@@ -59,12 +59,14 @@
         </div>
     </div>
 {:else}
-    <Canvas
-        guidanceConfig={guidanceConfig}
-        lineageEnabled={lineageEnabled}
-        exposuresEnabled={exposuresEnabled}
-        hasExposuresData={hasExposuresData}
-        filteredEntityIds={filteredEntityIds}
-        filterEventText={filterEventText}
-    />
+    <div data-testid="canvas-ready">
+        <Canvas
+            guidanceConfig={guidanceConfig}
+            lineageEnabled={lineageEnabled}
+            exposuresEnabled={exposuresEnabled}
+            hasExposuresData={hasExposuresData}
+            filteredEntityIds={filteredEntityIds}
+            filterEventText={filterEventText}
+        />
+    </div>
 {/if}

@@ -95,6 +95,9 @@ test.describe('Lineage button behavior', () => {
             await page.goto('/');
             await page.waitForLoadState('networkidle');
 
+            // Wait for canvas to finish loading
+            await page.waitForSelector('[data-testid="canvas-ready"]', { timeout: 15000 });
+
             const entityInput = page.locator('input[value="Dim Customer"]');
             await expect(entityInput).toBeVisible({ timeout: 15000 });
 
