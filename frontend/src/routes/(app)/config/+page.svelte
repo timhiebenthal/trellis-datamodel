@@ -990,7 +990,7 @@
                     {#if fileInfo}
                                 <div class="mt-6 text-xs text-gray-500">
                                     <p>Config file: {fileInfo.path}</p>
-                                    <p>Last modified: {new Date(fileInfo.mtime * 1000).toLocaleString()}</p>
+                                    <p>Last modified: {new Date(fileInfo.mtime * 1000).toISOString()}</p>
                                     <p>trellis version: {trellisVersion ?? 'Unknown'}</p>
                                 </div>
                             {/if}
