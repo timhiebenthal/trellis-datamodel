@@ -54,3 +54,4 @@ dbt_company_dummy_entity/target/run/
 dbt_company_dummy_entity/target/compiled/
 dbt_company_dummy_entity/logs/
 dbt_company_dummy_entity/target/
+.omc/*
