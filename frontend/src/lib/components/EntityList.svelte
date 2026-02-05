@@ -37,6 +37,7 @@
 					annotation_type: data.annotation_type,
 					source_system: data.source_system,
 					domain: data.domain,
+					domains: data.domains,
 				};
 				return entity;
 			});
@@ -288,10 +289,10 @@
 					<button
 						onclick={handleBulkAssignDomain}
 						class="inline-flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg font-medium hover:bg-primary-50 transition-all shadow-md hover:shadow-lg"
-						title="Assign domain to selected entities"
+						title="Add domain to selected entities"
 					>
 						<Icon icon="lucide:tag" class="w-4 h-4" />
-						<span>Assign Domain</span>
+						<span>Add Domain</span>
 					</button>
 
 					<button

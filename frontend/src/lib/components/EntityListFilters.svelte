@@ -19,9 +19,16 @@
 		$nodes.forEach((node) => {
 			if (node.type === 'entity') {
 				const data = node.data as unknown as EntityData;
-				if (data.domain) {
-					domains.add(data.domain);
-				}
+				const domainList = Array.isArray(data.domains) && data.domains.length > 0
+					? data.domains
+					: data.domain
+						? [data.domain]
+						: [];
+				domainList.forEach((domain) => {
+					if (domain && domain.trim()) {
+						domains.add(domain.trim());
+					}
+				});
 			}
 		});
 		return Array.from(domains).sort();

@@ -102,6 +102,20 @@
 		const hidden = Math.max(0, tags.length - 3);
 		return { visibleTags: visible, hiddenCount: hidden };
 	});
+
+	// Get visible domains (max 2, +N more if overflow)
+	const { visibleDomains, hiddenDomainCount } = $derived.by(() => {
+		const rawDomains = Array.isArray(entity.domains) && entity.domains.length > 0
+			? entity.domains
+			: entity.domain
+				? [entity.domain]
+				: [];
+		const cleaned = rawDomains.map((domain) => domain.trim()).filter(Boolean);
+		const unique = Array.from(new Set(cleaned));
+		const visible = unique.slice(0, 2);
+		const hidden = Math.max(0, unique.length - 2);
+		return { visibleDomains: visible, hiddenDomainCount: hidden };
+	});
 </script>
 
 <div
@@ -141,6 +155,7 @@
 		<!-- Type badge -->
 		<span
 			class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {typeBadgeColor()}"
+			title={`Entity Type: ${typeLabel()}`}
 		>
 			{typeLabel()}
 		</span>
@@ -155,10 +170,20 @@
 			</span>
 		{/if}
 
-		<!-- Domain badge (if present) -->
-		{#if entity.domain}
-			<div class="flex-shrink-0">
-				<DomainBadge domain={entity.domain} size="small" />
+		<!-- Domain badges (if present) -->
+		{#if visibleDomains.length > 0}
+			<div class="flex items-center gap-1.5 flex-shrink-0">
+				{#each visibleDomains as domain}
+					<DomainBadge {domain} size="small" />
+				{/each}
+				{#if hiddenDomainCount > 0}
+					<span
+						class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[11px] font-medium whitespace-nowrap"
+						title={`${hiddenDomainCount} more domain${hiddenDomainCount === 1 ? "" : "s"}`}
+					>
+						+{hiddenDomainCount}
+					</span>
+				{/if}
 			</div>
 		{/if}
 
@@ -168,7 +193,7 @@
 				{#each visibleTags as tag}
 					<span
 						class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 text-[11px] font-medium whitespace-nowrap"
-						title={tag}
+						title={`Tag: ${tag}`}
 					>
 						{tag}
 					</span>

@@ -21,7 +21,7 @@
 				return {
 					id: node.id,
 					label: data.label,
-					domain: data.domain,
+					domains: Array.isArray(data.domains) ? data.domains : data.domain ? [data.domain] : [],
 					tags: data.tags || [],
 				};
 			});
@@ -37,10 +37,16 @@
 			.filter((node) => node.type === 'entity')
 			.forEach((node) => {
 				const data = node.data as unknown as EntityData;
-				const domain = data.domain;
-				if (domain) {
-					domains.add(domain);
-				}
+				const domainList = Array.isArray(data.domains) && data.domains.length > 0
+					? data.domains
+					: data.domain
+						? [data.domain]
+						: [];
+				domainList.forEach((domain) => {
+					if (domain && domain.trim()) {
+						domains.add(domain.trim());
+					}
+				});
 			});
 		return Array.from(domains).sort();
 	});
@@ -157,7 +163,7 @@
 		try {
 			const entityIds = selectedEntities.map((e) => e.id);
 
-			// Apply domain assignment
+			// Apply domain addition
 			if (selectedDomain) {
 				bulkAssignDomain(entityIds, selectedDomain);
 			}
@@ -257,9 +263,14 @@
 							>
 								<div class="w-1 h-1 bg-teal-500 rounded-full"></div>
 								{entity.label}
-								{#if entity.domain}
+								{#if entity.domains.length > 0}
 									<span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-										{entity.domain}
+										{entity.domains[0]}
+										{#if entity.domains.length > 1}
+											<span class="ml-1 text-[10px] text-slate-500">
+												+{entity.domains.length - 1}
+											</span>
+										{/if}
 									</span>
 								{/if}
 							</span>
@@ -276,7 +287,7 @@
 				<div>
 					<label for="bulk-domain-select" class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 mb-2 uppercase tracking-wide">
 						<Icon icon="lucide:folder" class="w-4 h-4 text-slate-700" />
-						Domain
+						Add Domain
 					</label>
 					<select
 						id="bulk-domain-select"

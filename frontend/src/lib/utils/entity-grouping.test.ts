@@ -8,11 +8,13 @@ describe('entity-grouping', () => {
 		id: string,
 		label: string,
 		domain?: string,
-		tags?: string[]
+		tags?: string[],
+		domains?: string[]
 	): Entity => ({
 		id,
 		label,
 		domain,
+		domains,
 		tags,
 		description: '',
 		entity_type: 'dimension',
@@ -111,6 +113,19 @@ describe('entity-grouping', () => {
 
 			expect(result.size).toBe(4);
 			expect(Array.from(result.keys())).toEqual(['Sales', 'Inventory', 'Finance', 'Logistics']);
+		});
+
+		it('should allow entities in multiple domains', () => {
+			const entities = [
+				createEntity('1', 'Customer', undefined, undefined, ['Sales', 'Marketing']),
+				createEntity('2', 'Product', 'Inventory'),
+			];
+
+			const result = groupEntitiesByDomain(entities);
+
+			expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Customer']);
+			expect(result.get('Marketing')?.map((e) => e.label)).toEqual(['Customer']);
+			expect(result.get('Inventory')?.map((e) => e.label)).toEqual(['Product']);
 		});
 
 		it('should preserve original order within domain groups (except Unassigned)', () => {

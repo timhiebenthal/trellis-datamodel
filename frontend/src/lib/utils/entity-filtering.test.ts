@@ -8,11 +8,13 @@ describe('entity-filtering', () => {
 		id: string,
 		label: string,
 		domain?: string,
-		tags?: string[]
+		tags?: string[],
+		domains?: string[]
 	): Entity => ({
 		id,
 		label,
 		domain,
+		domains,
 		tags,
 		description: '',
 		entity_type: 'dimension',
@@ -157,6 +159,22 @@ describe('entity-filtering', () => {
 				expect(result).toHaveLength(3);
 				expect(result.map((e) => e.label)).toEqual(['Customer', 'Order', 'Warehouse']);
 			});
+
+		it('should match entities with multiple domains', () => {
+			const entities = [
+				createEntity('1', 'Customer', undefined, undefined, ['Sales', 'Marketing']),
+				createEntity('2', 'Order', 'Sales'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: ['Marketing'],
+				selectedTags: [],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Customer');
+		});
 
 			it('should handle entities without domain field', () => {
 				const entities = [

@@ -1,0 +1,987 @@
+events:
+- id: evt_20260127_001
+  text: Sales Agent creates Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-27T15:12:29.775181'
+  updated_at: '2026-02-05T16:03:31.553334'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260127_002
+  text: Sales Agent qualifies Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-27T15:13:09.493252'
+  updated_at: '2026-02-05T16:03:31.741549'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260127_003
+  text: Sales Agent creates Appointment with Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-27T15:17:20.660735'
+  updated_at: '2026-02-05T16:03:31.931560'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_001
+  text: Sales Agent closes Appointment
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-28T08:59:19.705260'
+  updated_at: '2026-02-05T16:03:32.106587'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_002
+  text: Sales Agent (?) qualifies Lead / Lead becomes Prospect and has an opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-28T09:00:10.897153'
+  updated_at: '2026-02-05T16:03:32.295195'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_003
+  text: System (automatically) creates Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-28T09:02:33.696845'
+  updated_at: '2026-02-05T16:03:32.479802'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_004
+  text: Sales Agent enters specific products and volumes to activate an Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-28T09:04:17.106941'
+  updated_at: '2026-02-05T16:03:32.685963'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_005
+  text: Sales Agent creates Quote
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-28T09:04:45.281418'
+  updated_at: '2026-02-05T16:03:32.878352'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_006
+  text: Sales Agent closes Acquisition (Lost/Won)
+  type: discrete
+  domain: null
+  process_id: proc_20260128_001
+  created_at: '2026-01-28T09:05:34.781400'
+  updated_at: '2026-02-05T16:03:33.049491'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_007
+  text: Sales Agent creates an Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_002
+  created_at: '2026-01-28T09:09:25.276877'
+  updated_at: '2026-02-05T16:04:43.326202'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_008
+  text: Sales Agent creates a Quote
+  type: discrete
+  domain: null
+  process_id: proc_20260128_002
+  created_at: '2026-01-28T09:10:18.531772'
+  updated_at: '2026-02-05T16:04:43.501881'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_010
+  text: Sales Agent enters specific products and volumes to activate an Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_002
+  created_at: '2026-01-28T09:11:56.052333'
+  updated_at: '2026-02-05T16:04:43.699282'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_011
+  text: Sales Agent closes Quote (Lost/Won)
+  type: discrete
+  domain: null
+  process_id: proc_20260128_002
+  created_at: '2026-01-28T09:12:19.425310'
+  updated_at: '2026-02-05T16:04:43.878130'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_012
+  text: Sales Agent creates a task (if there is a a chance to win the prospect a later
+    date)
+  type: discrete
+  domain: null
+  process_id: proc_20260128_002
+  created_at: '2026-01-28T09:13:20.185246'
+  updated_at: '2026-02-05T16:04:44.067258'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_013
+  text: Customer Service/Sales Agent (?) closes the additional Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_002
+  created_at: '2026-01-28T09:17:51.173192'
+  updated_at: '2026-02-05T16:04:44.281986'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_014
+  text: Sales Agent creates Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:19:35.554307'
+  updated_at: '2026-01-28T09:50:28.854586'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_015
+  text: API (Google) creates Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:20:18.255440'
+  updated_at: '2026-01-28T09:50:28.908211'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_016
+  text: Teammanager assigns Lead to an Agent
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:21:07.448227'
+  updated_at: '2026-01-28T09:50:28.960638'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_017
+  text: Sales Agent enters all relevant information about the Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:22:14.359627'
+  updated_at: '2026-01-28T09:50:29.013347'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_018
+  text: Sales Agent (?) qualifies Lead / Lead becomes Prospect
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:47:24.174213'
+  updated_at: '2026-01-28T09:50:29.066195'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_019
+  text: System (automatically) creates Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:47:33.751704'
+  updated_at: '2026-01-28T09:50:29.119061'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_020
+  text: Sales Agent enters specific products and volumes to activate an Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:49:03.700086'
+  updated_at: '2026-01-28T09:50:29.171705'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_021
+  text: Sales Agent creates Quote
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:49:21.961481'
+  updated_at: '2026-01-28T09:50:29.223719'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_022
+  text: Sales Agent closes Acquisition (Lost/Won)
+  type: discrete
+  domain: null
+  process_id: proc_20260128_003
+  created_at: '2026-01-28T09:49:41.185849'
+  updated_at: '2026-01-28T09:50:29.275592'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260128_023
+  text: Sales Agent creates an Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-01-28T09:51:52.206872'
+  updated_at: '2026-02-03T14:20:00.044523'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_001
+  text: '[OPTIONAL] Delta-oppy is created if customer does not make the full potential
+    of the initial opportunity'
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-02-03T13:59:26.016060'
+  updated_at: '2026-02-03T14:20:00.115545'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_002
+  text: '[OPTIONAL] Sales agent creates negative opportunity if business risk is imminent
+    and thus volume in the existing customer business could be partially or completely
+    lost. Reasons 1) decline in business activities or sale of fleet partly 2) dissatisfaction
+    with DKV or a better offer'
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-02-03T14:13:02.937628'
+  updated_at: '2026-02-03T14:20:00.186579'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_003
+  text: Sales agent creates quote
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-02-03T14:13:50.270157'
+  updated_at: '2026-02-03T14:20:00.257520'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_004
+  text: Sales agent documents why offer/quote is not accepted
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-02-03T14:14:22.370236'
+  updated_at: '2026-02-03T14:20:00.328534'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_005
+  text: If won, sales agent enters conditions to inform customer service
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-02-03T14:17:15.121212'
+  updated_at: '2026-02-03T14:20:00.399565'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_006
+  text: Sales agent closes the growth process (=handover to customer service)
+  type: discrete
+  domain: null
+  process_id: proc_20260203_001
+  created_at: '2026-02-03T14:19:35.250064'
+  updated_at: '2026-02-03T14:20:00.470297'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_007
+  text: Pre-Sales Representative creates Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:25:13.124327'
+  updated_at: '2026-02-03T14:33:33.276575'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_008
+  text: API (Google) creates Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:25:33.274645'
+  updated_at: '2026-02-03T14:33:33.371013'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_009
+  text: Teammanager assigns Lead to an Pre-Sales Representative
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:25:51.720620'
+  updated_at: '2026-02-03T14:33:33.464691'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_010
+  text: Pre-Sales Representative enters all relevant information about the Lead
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:26:07.552849'
+  updated_at: '2026-02-03T14:33:33.559800'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_011
+  text: Pre-Sales Representative qualifies Lead / Lead becomes Prospect
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:26:24.155802'
+  updated_at: '2026-02-03T14:33:33.653400'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_012
+  text: System (automatically) creates Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:26:45.172667'
+  updated_at: '2026-02-03T14:33:33.748090'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_013
+  text: Pre-Sales Representative enters specific products and volumes to activate
+    an Opportunity
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:27:08.103806'
+  updated_at: '2026-02-03T14:33:33.843456'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_014
+  text: Pre-Sales Representative creates appointment with propsect/customer
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:28:18.924971'
+  updated_at: '2026-02-03T14:33:33.937546'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_015
+  text: Pre-Sales Representative hands over to Field Sales Agent
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:28:55.981288'
+  updated_at: '2026-02-03T14:33:34.031968'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_016
+  text: Field Sales Agent enters result of appointment
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:31:38.249168'
+  updated_at: '2026-02-03T14:33:34.125807'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_017
+  text: Field Sales Agent enters status after appointment
+  type: discrete
+  domain: null
+  process_id: proc_20260203_002
+  created_at: '2026-02-03T14:32:21.550764'
+  updated_at: '2026-02-03T14:33:34.242439'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_018
+  text: Campaign manager creates rough campaign planning as part of the budget process
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:37:18.033495'
+  updated_at: '2026-02-03T14:46:49.632717'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_019
+  text: Campaign manager creates detailed planning (2 months before campaign start)
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:39:42.137471'
+  updated_at: '2026-02-03T14:46:49.746348'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_020
+  text: Campaign manager defines marketing list ba adding members (accounts or prospects)
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:40:44.663325'
+  updated_at: '2026-02-03T14:46:49.875125'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_021
+  text: Campaign manager creates campaign activitiy (e.g. phone call) per member
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:42:14.546643'
+  updated_at: '2026-02-03T14:46:49.987156'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_022
+  text: Campaign manager distributes campaign activities to team
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:43:32.468926'
+  updated_at: '2026-02-03T14:46:50.097803'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_023
+  text: Campaign team enters if member of the target group (prospect/account) is interested
+    or not interested
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:44:43.234496'
+  updated_at: '2026-02-03T14:46:50.209698'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+- id: evt_20260203_024
+  text: Campaign team analyses the campaign after conclusion
+  type: discrete
+  domain: null
+  process_id: proc_20260203_003
+  created_at: '2026-02-03T14:45:39.688548'
+  updated_at: '2026-02-03T14:46:50.321284'
+  annotations:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+  derived_entities: []
+processes:
+- id: proc_20260128_001
+  name: Field Sales - Acquire (Lead to Quote)
+  type: evolving
+  domain: Sales
+  event_ids:
+  - evt_20260127_001
+  - evt_20260127_002
+  - evt_20260127_003
+  - evt_20260128_001
+  - evt_20260128_002
+  - evt_20260128_003
+  - evt_20260128_004
+  - evt_20260128_005
+  - evt_20260128_006
+  created_at: '2026-01-28T09:07:59.996505'
+  updated_at: '2026-02-05T14:34:56.304849'
+  resolved_at: null
+  annotations_superset:
+    who:
+    - id: new_1770298445304_ntbi0iztj
+      dimension_id: null
+      text: customer
+      description: ''
+      attributes: {}
+    - id: new_1770298450363_hnqqye1xj
+      dimension_id: null
+      text: account
+      description: ''
+      attributes: {}
+    what:
+    - id: new_1770298462000_y12khqsr2
+      dimension_id: null
+      text: product
+      description: ''
+      attributes: {}
+    - id: new_1770298466454_moufcg0cq
+      dimension_id: null
+      text: lead
+      description: ''
+      attributes: {}
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many:
+    - id: new_1770298472642_tty81kwyy
+      dimension_id: null
+      text: lead count
+      description: ''
+      attributes: {}
+    - id: new_1770298488167_7w9ux5zpm
+      dimension_id: null
+      text: days in stage
+      description: ''
+      attributes: {}
+- id: proc_20260128_002
+  name: Field Sales - Growth
+  type: evolving
+  domain: Sales
+  event_ids:
+  - evt_20260128_007
+  - evt_20260128_008
+  - evt_20260128_010
+  - evt_20260128_011
+  - evt_20260128_012
+  - evt_20260128_013
+  created_at: '2026-01-28T09:18:33.409328'
+  updated_at: '2026-02-05T16:04:38.054922'
+  resolved_at: null
+  annotations_superset:
+    who:
+    - id: new_1770303852786_ly8dggku8
+      dimension_id: null
+      text: Customer
+      description: ''
+      attributes: {}
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many:
+    - id: new_1770303871006_v70eg8wwu
+      dimension_id: null
+      text: Amount
+      description: ''
+      attributes: {}
+- id: proc_20260128_003
+  name: Inside Sales - Acquire (Lead to Quote)
+  type: evolving
+  domain: Sales
+  event_ids:
+  - evt_20260128_014
+  - evt_20260128_015
+  - evt_20260128_016
+  - evt_20260128_017
+  - evt_20260128_018
+  - evt_20260128_019
+  - evt_20260128_020
+  - evt_20260128_021
+  - evt_20260128_022
+  created_at: '2026-01-28T09:50:28.838616'
+  updated_at: '2026-02-03T14:34:02.877273'
+  resolved_at: null
+  annotations_superset:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+- id: proc_20260128_004
+  name: Inside Sales Grow (Cross & Upselling)
+  type: evolving
+  domain: Sales
+  event_ids: []
+  created_at: '2026-01-28T09:52:34.222486'
+  updated_at: '2026-02-03T14:00:47.634888'
+  resolved_at: '2026-02-03T14:00:47.532379'
+  annotations_superset: null
+- id: proc_20260203_001
+  name: Inside Sales - Grow (cross- & upselling)
+  type: evolving
+  domain: Sales
+  event_ids:
+  - evt_20260128_023
+  - evt_20260203_001
+  - evt_20260203_002
+  - evt_20260203_003
+  - evt_20260203_004
+  - evt_20260203_005
+  - evt_20260203_006
+  created_at: '2026-02-03T14:20:00.024816'
+  updated_at: '2026-02-03T14:33:56.851605'
+  resolved_at: null
+  annotations_superset:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+- id: proc_20260203_002
+  name: Inside Sales - Lead to Appointment (Pre-Sales Representative)
+  type: evolving
+  domain: Sales
+  event_ids:
+  - evt_20260203_007
+  - evt_20260203_008
+  - evt_20260203_009
+  - evt_20260203_010
+  - evt_20260203_011
+  - evt_20260203_012
+  - evt_20260203_013
+  - evt_20260203_014
+  - evt_20260203_015
+  - evt_20260203_016
+  - evt_20260203_017
+  created_at: '2026-02-03T14:33:33.249860'
+  updated_at: '2026-02-03T14:33:33.249860'
+  resolved_at: null
+  annotations_superset:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []
+- id: proc_20260203_003
+  name: Inside & Field Sales - Campaign Management
+  type: evolving
+  domain: Sales
+  event_ids:
+  - evt_20260203_018
+  - evt_20260203_019
+  - evt_20260203_020
+  - evt_20260203_021
+  - evt_20260203_022
+  - evt_20260203_023
+  - evt_20260203_024
+  created_at: '2026-02-03T14:46:49.601195'
+  updated_at: '2026-02-03T14:46:49.601195'
+  resolved_at: null
+  annotations_superset:
+    who: []
+    what: []
+    when: []
+    where: []
+    how: []
+    why: []
+    how_many: []

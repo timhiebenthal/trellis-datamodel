@@ -3,10 +3,10 @@ import { nodes as nodesStore, edges as edgesStore, entitySelection, pushHistory 
 import { get } from 'svelte/store';
 
 /**
- * Bulk assign domain to multiple entities
+ * Bulk add domain to multiple entities
  * Updates nodes store in-place, calls pushHistory() once for undo/redo
  * @param entityIds - Array of entity IDs to update
- * @param domain - Domain to assign
+ * @param domain - Domain to add
  */
 export function bulkAssignDomain(entityIds: string[], domain: string): void {
 	if (entityIds.length === 0) return;
@@ -17,11 +17,20 @@ export function bulkAssignDomain(entityIds: string[], domain: string): void {
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
 			modified = true;
+			const currentDomains = Array.isArray(node.data?.domains)
+				? node.data?.domains
+				: node.data?.domain
+					? [node.data?.domain]
+					: [];
+			const nextDomains = Array.from(
+				new Set(currentDomains.map((d) => d.trim()).filter(Boolean).concat(domain.trim()))
+			);
 			return {
 				...node,
 				data: {
 					...node.data,
-					domain,
+					domains: nextDomains.length > 0 ? nextDomains : undefined,
+					domain: nextDomains.length > 0 ? nextDomains[0] : undefined,
 				},
 			};
 		}

@@ -1,8 +1,8 @@
 import type { Entity } from '$lib/types';
 
 /**
- * Group entities by their domain field
- * Entities without a domain go into "Unassigned" group
+ * Group entities by their domain field(s)
+ * Entities without domains go into "Unassigned" group
  * "Unassigned" entities are sorted alphabetically by label
  *
  * @param entities - Array of entities to group
@@ -11,14 +11,39 @@ import type { Entity } from '$lib/types';
 export function groupEntitiesByDomain(entities: Entity[]): Map<string, Entity[]> {
 	const groupMap = new Map<string, Entity[]>();
 
-	entities.forEach((entity) => {
-		const domain = entity.domain || 'Unassigned';
-
-		if (!groupMap.has(domain)) {
-			groupMap.set(domain, []);
+	function getDomainsForGrouping(entity: Entity): string[] {
+		const domains = Array.isArray(entity.domains)
+			? entity.domains.map((domain) => domain.trim()).filter(Boolean)
+			: [];
+		if (domains.length > 0) {
+			return Array.from(new Set(domains));
 		}
+		const singleDomain = entity.domain?.trim();
+		return singleDomain ? [singleDomain] : [];
+	}
 
-		groupMap.get(domain)!.push(entity);
+	entities.forEach((entity) => {
+		const domains = getDomainsForGrouping(entity);
+		const targetDomains = domains.length > 0 ? domains : ['Unassigned'];
+
+		targetDomains.forEach((domain) => {
+			if (!groupMap.has(domain)) {
+				groupMap.set(domain, []);
+			}
+
+			groupMap.get(domain)!.push(entity);
+		});
+	});
+
+	// De-duplicate within groups (multi-domain can add the same entity multiple times)
+	groupMap.forEach((group, key) => {
+		const uniqueMap = new Map<string, Entity>();
+		group.forEach((entity) => {
+			if (!uniqueMap.has(entity.id)) {
+				uniqueMap.set(entity.id, entity);
+			}
+		});
+		groupMap.set(key, Array.from(uniqueMap.values()));
 	});
 
 	// Sort "Unassigned" group alphabetically by label

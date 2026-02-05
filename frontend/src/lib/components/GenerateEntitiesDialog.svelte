@@ -134,7 +134,6 @@
         try {
             creating = true;
             error = null;
-
             // For process mode: collect event-level entity IDs to skip
             const eventLevelEntityIds = new Set<string>();
             if (mode === 'process' && process) {
@@ -180,8 +179,38 @@
                 const edited = editedEntities[i];
                 const original = previewData.entities[i];
                 const trimmedId = edited.id.trim();
+                const inheritedDomain =
+                    mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
 
                 if (existingEntityIds.has(trimmedId)) {
+                    if (inheritedDomain) {
+                        nodesToUse = nodesToUse.map((n) => {
+                            if (n.id === trimmedId) {
+                                const existingDomains = Array.isArray((n.data as any)?.domains)
+                                    ? ((n.data as any)?.domains as string[])
+                                    : (n.data as any)?.domain
+                                        ? [String((n.data as any)?.domain)]
+                                        : [];
+                                const nextDomains = Array.from(
+                                    new Set(
+                                        existingDomains
+                                            .map((domain) => domain.trim())
+                                            .filter(Boolean)
+                                            .concat(inheritedDomain)
+                                    )
+                                );
+                                return {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        domains: nextDomains.length > 0 ? nextDomains : undefined,
+                                        domain: nextDomains.length > 0 ? nextDomains[0] : undefined,
+                                    },
+                                };
+                            }
+                            return n;
+                        });
+                    }
                     // Entity already exists - update its drafted_fields if this is a fact
                     if (edited.entity_type === 'fact' && (original as any).drafted_fields) {
                         nodesToUse = nodesToUse.map((n) => {
@@ -221,7 +250,7 @@
                     };
                 }
 
-                // Create node (include tags, annotation_type, and drafted_fields from preview data)
+                // Create node (include tags, domain, annotation_type, and drafted_fields from preview data)
                 const newNode: Node = {
                     id,
                     type: 'entity',
@@ -233,13 +262,14 @@
                         annotation_type: (original as any).annotation_type || undefined,
                         tags: original.tags || [],
                         drafted_fields: (original as any).drafted_fields || undefined,
+                        domain: inheritedDomain || undefined,
+                        domains: inheritedDomain ? [inheritedDomain] : undefined,
                         width: 280,
                         panelHeight: 200,
                         collapsed: false,
                     },
                     zIndex: maxZIndex + i + 1,
                 };
-
                 // Add new node to the filtered nodes list
                 nodesToUse = [...nodesToUse, newNode];
                 createdEntityIds.push(id);
@@ -318,7 +348,6 @@
             const factEntity = dataModel.entities.find((e: any) => e.entity_type === 'fact');
             console.log('Saving data model - fact entity:', factEntity);
             console.log('Fact has drafted_fields:', factEntity?.drafted_fields);
-
             await saveDataModel(dataModel);
 
             success = true;
@@ -361,6 +390,8 @@
 
                     const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
+                    const domain = ((n.data as any)?.domain) as string | undefined;
+                    const domains = ((n.data as any)?.domains) as string[] | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -375,6 +406,16 @@
                         tags: tagsToPersist,
                         entity_type: entity_type,
                     };
+
+                    if (domain && domain.trim()) {
+                        entity.domain = domain.trim();
+                    }
+                    if (Array.isArray(domains) && domains.length > 0) {
+                        entity.domains = domains;
+                        if (!entity.domain) {
+                            entity.domain = domains[0];
+                        }
+                    }
                     
                     if (!isBound && source_system && source_system.length > 0) {
                         entity.source_system = source_system;

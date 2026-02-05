@@ -12,25 +12,38 @@
 
 	// Local state for form fields
 	let entityName = $state('');
-	let entityDomain = $state('');
+	let entityDomains = $state<string[]>([]);
 	let entityTags = $state<string[]>([]);
 	let entitySourceSystems = $state<string[]>([]);
 	let entityType = $state<'dimension' | 'fact' | 'unclassified'>('unclassified');
 	let annotationType = $state<AnnotationType | undefined>(undefined);
 	let tagInput = $state('');
+	let domainInput = $state('');
 	let sourceInput = $state('');
 	let showDeleteConfirm = $state(false);
 	let isDirty = $state(false);
 	let show7WsDropdown = $state(false);
 
+	function normalizeDomains(domains?: string[], domain?: string): string[] {
+		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
+		return Array.from(new Set(list.map((item) => item.trim()).filter(Boolean)));
+	}
+
 	// Get available domains from existing entities
 	let uniqueDomains = $derived.by(() => {
 		const domains = new Set<string>();
 		$nodes.forEach((node) => {
-			const domain = (node.data as unknown as EntityData)?.domain;
-			if (domain && domain.trim()) {
-				domains.add(domain.trim());
-			}
+			const data = node.data as unknown as EntityData;
+			const domainList = Array.isArray(data.domains) && data.domains.length > 0
+				? data.domains
+				: data.domain
+					? [data.domain]
+					: [];
+			domainList.forEach((domain) => {
+				if (domain && domain.trim()) {
+					domains.add(domain.trim());
+				}
+			});
 		});
 		return Array.from(domains).sort();
 	});
@@ -141,12 +154,13 @@
 		if ($entityDetailModal.open && currentEntity) {
 			const data = currentEntity.data as unknown as EntityData;
 			entityName = data.label || '';
-			entityDomain = data.domain || '';
+			entityDomains = normalizeDomains(data.domains, data.domain);
 			entityTags = [...(data.tags || [])];
 			entitySourceSystems = [...(data.source_system || [])];
 			entityType = data.entity_type || 'unclassified';
 			annotationType = data.annotation_type;
 			tagInput = '';
+			domainInput = '';
 			sourceInput = '';
 			showDeleteConfirm = false;
 			isDirty = false;
@@ -165,9 +179,11 @@
 		if (!currentEntity) return;
 
 		const data = currentEntity.data as unknown as EntityData;
+		const initialDomains = normalizeDomains(data.domains, data.domain);
+		const nextDomains = normalizeDomains(entityDomains);
 		const hasChanges =
 			entityName !== (data.label || '') ||
-			entityDomain !== (data.domain || '') ||
+			JSON.stringify(nextDomains.sort()) !== JSON.stringify(initialDomains.sort()) ||
 			JSON.stringify(entityTags.sort()) !== JSON.stringify([...(data.tags || [])].sort()) ||
 			JSON.stringify(entitySourceSystems.sort()) !==
 				JSON.stringify([...(data.source_system || [])].sort()) ||
@@ -178,6 +194,9 @@
 					JSON.stringify(data?.drafted_fields || []));
 
 		isDirty = hasChanges;
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:isDirtyEffect',message:'Dirty state recalculated',data:{hasChanges,sourceInput,entitySourceSystemsCount:entitySourceSystems.length,initialSourceSystemsCount:(data?.source_system||[]).length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+		// #endregion agent log
 	});
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -228,8 +247,30 @@
 		}
 	}
 
+	function addDomain() {
+		const trimmed = domainInput.trim();
+		if (trimmed && !entityDomains.includes(trimmed)) {
+			entityDomains = [...entityDomains, trimmed];
+			domainInput = '';
+		}
+	}
+
+	function removeDomain(domain: string) {
+		entityDomains = entityDomains.filter((d) => d !== domain);
+	}
+
+	function handleDomainInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addDomain();
+		}
+	}
+
 	function addSourceSystem() {
 		const trimmed = sourceInput.trim();
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:addSourceSystem',message:'Add source system attempt',data:{trimmed,sourceInput,entitySourceSystemsCount:entitySourceSystems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+		// #endregion agent log
 		if (trimmed && !entitySourceSystems.includes(trimmed)) {
 			entitySourceSystems = [...entitySourceSystems, trimmed];
 			sourceInput = '';
@@ -242,13 +283,22 @@
 
 	function handleSourceInputKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:handleSourceInputKeydown',message:'Source input Enter pressed',data:{value:sourceInput},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+			// #endregion agent log
 			event.preventDefault();
 			addSourceSystem();
 		}
 	}
 
 	function handleSave() {
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:handleSave',message:'Save clicked',data:{isDirty,entityName,sourceInput,entitySourceSystemsCount:entitySourceSystems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
+		// #endregion agent log
 		if (!currentEntity || !entityName.trim()) return;
+
+		const normalizedDomains = normalizeDomains(entityDomains);
+		const primaryDomain = normalizedDomains[0];
 
 		// Update the node in the store
 		nodes.update((n) => {
@@ -259,7 +309,8 @@
 						data: {
 							...node.data,
 							label: entityName.trim(),
-							domain: entityDomain.trim() || undefined,
+							domains: normalizedDomains.length > 0 ? normalizedDomains : undefined,
+							domain: primaryDomain || undefined,
 							tags: entityTags.length > 0 ? entityTags : undefined,
 							source_system:
 								entitySourceSystems.length > 0 ? entitySourceSystems : undefined,
@@ -420,26 +471,40 @@
 							/>
 						</div>
 
-						<!-- Domain -->
-						<div>
-							<label for="entity-domain" class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
-								Domain
-							</label>
+					<!-- Domains -->
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+							Domains
+						</label>
+						<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+							{#each entityDomains as domain}
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-md border border-purple-200 font-medium">
+									{domain}
+									<button
+										type="button"
+										onclick={() => removeDomain(domain)}
+										class="text-purple-600 hover:text-purple-900 focus:outline-none"
+										aria-label="Remove {domain}"
+									>
+										<Icon icon="lucide:x" class="w-2.5 h-2.5" />
+									</button>
+								</span>
+							{/each}
 							<input
-								id="entity-domain"
 								type="text"
 								list="domain-suggestions"
-								bind:value={entityDomain}
-								class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-								placeholder="e.g., Sales, Marketing"
+								bind:value={domainInput}
+								onkeydown={handleDomainInputKeydown}
+								class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+								placeholder="Type and press Enter"
 							/>
-							<datalist id="domain-suggestions">
-								<option value="Unassigned" />
-								{#each uniqueDomains as domain}
-									<option value={domain} />
-								{/each}
-							</datalist>
 						</div>
+						<datalist id="domain-suggestions">
+							{#each uniqueDomains as domain}
+								<option value={domain} />
+							{/each}
+						</datalist>
+					</div>
 					</div>
 
 					<!-- Entity Type and 7Ws - Same Row -->
@@ -615,6 +680,11 @@
 									type="text"
 									bind:value={sourceInput}
 									onkeydown={handleSourceInputKeydown}
+									oninput={(e) => {
+										// #region agent log
+										fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:sourceInput',message:'Source input changed',data:{value:(e.target as HTMLInputElement).value,isDirty},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+										// #endregion agent log
+									}}
 									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
 									placeholder="Type and press Enter"
 								/>

@@ -14,7 +14,7 @@ function matchesSearchTerm(label: string, searchTerm: string): boolean {
  * Filter entities based on search term, domains, and tags
  * Logic:
  * - Search term: Case-insensitive substring match on label (must pass)
- * - Domains: OR logic - entity matches if domain is in selectedDomains, or if selectedDomains is empty show all (must pass)
+ * - Domains: OR logic - entity matches if any domain is in selectedDomains, or if selectedDomains is empty show all (must pass)
  * - Tags: OR logic - entity matches if ANY tag in entity.tags matches ANY tag in selectedTags, or if selectedTags is empty show all (must pass)
  * - Combine: AND logic - entity must pass all three filters
  *
@@ -38,8 +38,15 @@ export function filterEntities(
 
 		// Filter by domains (OR logic: if selectedDomains is empty, show all)
 		if (filters.selectedDomains.length > 0) {
-			const entityDomain = entity.domain || '';
-			if (!filters.selectedDomains.includes(entityDomain)) {
+			const entityDomains = Array.isArray(entity.domains) && entity.domains.length > 0
+				? entity.domains
+				: entity.domain !== undefined
+					? [entity.domain]
+					: [];
+			const hasMatchingDomain = entityDomains.some((domain) =>
+				filters.selectedDomains.includes(domain)
+			);
+			if (!hasMatchingDomain) {
 				return false;
 			}
 		}

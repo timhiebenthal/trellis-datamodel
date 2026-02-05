@@ -51,6 +51,7 @@ export interface EntityData {
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     domain?: string; // Optional business domain (supports entities created outside business events)
+    domains?: string[]; // Optional multi-domain assignment (dimension can belong to many)
     // Internal tracking for tag sources (not persisted to YAML)
     _schemaTags?: string[]; // Tags explicitly defined in schema.yml
     _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
@@ -76,6 +77,7 @@ export interface Entity {
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Only for unbound entities (mock sources)
     domain?: string; // Optional business domain (supports entities created outside business events)
+    domains?: string[]; // Optional multi-domain assignment
 }
 
 /**
