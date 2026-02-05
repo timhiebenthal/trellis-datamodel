@@ -146,12 +146,6 @@
 
     let isValid = $derived(validationErrors.length === 0 && !hasError);
 
-    $effect(() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SevenWsForm.svelte:147',message:'validation status',data:{validationErrors,hasError,dimensionIdConflictsCount:dimensionIdConflicts.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
-    });
-
     // Initialize on mount
     $effect(() => {
         annotations = event.annotations || {
@@ -167,9 +161,6 @@
         hasError = false;
         errorMessage = null;
         error = null;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SevenWsForm.svelte:150',message:'event annotations initialized',data:{eventId:event?.id,annotationCounts:{who:annotations.who.length,what:annotations.what.length,when:annotations.when.length,where:annotations.where.length,how:annotations.how.length,how_many:annotations.how_many.length,why:annotations.why.length}},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
-        // #endregion
     });
 
     // Error boundary wrapper
@@ -243,9 +234,6 @@
                 allowedDimensionIdsByType = allowedMap;
                 hasError = false;
                 errorMessage = null;
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SevenWsForm.svelte:186',message:'dimensions and events loaded',data:{dimensionsCount:dimensions.length,eventsCount:events.length,allowedCounts:{who:allowedMap.who.size,what:allowedMap.what.size,when:allowedMap.when.size,where:allowedMap.where.size,how:allowedMap.how.size,how_many:allowedMap.how_many.size,why:allowedMap.why.size}},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
-                // #endregion
             } catch (e) {
                 retryCount++;
                 console.error(`Failed to load dimensions (attempt ${retryCount}):`, e);
@@ -388,9 +376,6 @@
                 e.id === entryId ? { ...e, dimension_id: dimension_id || undefined } : e
             )
         };
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SevenWsForm.svelte:370',message:'dimension id set',data:{annotationType,entryId,dimensionId:dimension_id},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
     }
 
     function handleEntryTextChange(annotationType: AnnotationType, entryId: string, text: string) {
