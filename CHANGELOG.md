@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-beta1] - 2026-02-05
+
+### Added
+- Added `/entity-list` route with a hierarchical list view of entities grouped by domain, tags, and an alphabetical "Unassigned" section.
+- Added entity detail modal from the list view with inline editing (name, domain, tags, source system, entity type, annotation type), "View on Canvas", and delete actions.
+- Added filtering controls (search, domain multi-select, tag multi-select) plus bulk operations (assign domain, add/remove tags, delete) with persistent selection toolbar and local collapse state.
+- Added entity selection stores, modal stores, filtering utilities, and bulk operation helpers along with a bulk edit modal for multi-entity workflows.
+- Added navigation link for the list view and explicit domain persistence in YAML/auto-save flows so domains survive entity generation and manual edits.
+
+### Changed
+- Added optional `domain?: string` to the Entity data model (backend Pydantic model, frontend TypeScript interface, and serialization) and preserved the legacy domain tag for backward compatibility.
+- Updated business event entity generation to write the explicit `domain` field while keeping the domain tag in `tags`.
+- Ensured the new list view reuses canvas modal patterns, derived stores, and auto-save logic so filtering/grouping, modals, and bulk edits stay consistent with existing UI workflows.
+
 ## [0.8.0] - 2026-01-29
 
 ### Added
