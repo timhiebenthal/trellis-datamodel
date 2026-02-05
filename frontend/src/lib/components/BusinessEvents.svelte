@@ -421,6 +421,15 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         dragOverUngroupedDomainKey = null;
 
         if (sourceProcessId === targetProcessId) {
+            try {
+                processActionError = null;
+                await detachEventFromProcess(sourceProcessId, eventId);
+                await reloadEvents();
+            } catch (e) {
+                const errorMessage =
+                    e instanceof Error ? e.message : 'Failed to move event out of process';
+                processActionError = errorMessage;
+            }
             return;
         }
 
@@ -468,6 +477,19 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         }
     }
 
+    async function detachEventFromProcess(processId: string, eventId: string) {
+        const sourceProcess = processes.find((proc) => proc.id === processId);
+        if (!sourceProcess) {
+            return;
+        }
+        const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
+        if (nextSourceIds.length > 0) {
+            await updateBusinessEventProcess(processId, { event_ids: nextSourceIds });
+        } else {
+            await resolveBusinessEventProcess(processId);
+        }
+    }
+
     async function handleUngroupedDrop(domainKey: string, dragEvent: DragEvent) {
         if (!dragState || !dragState.processId) {
             return;
@@ -481,15 +503,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
         try {
             processActionError = null;
-            const sourceProcess = processes.find((proc) => proc.id === sourceProcessId);
-            if (sourceProcess) {
-                const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
-                if (nextSourceIds.length > 0) {
-                    await updateBusinessEventProcess(sourceProcessId, { event_ids: nextSourceIds });
-                } else {
-                    await resolveBusinessEventProcess(sourceProcessId);
-                }
-            }
+            await detachEventFromProcess(sourceProcessId, eventId);
             await reloadEvents();
         } catch (e) {
             const errorMessage =
@@ -943,7 +957,30 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                 </span>
                             </div>
                             {#if isDomainExpanded(domainGroup.domainKey)}
-                                <div class="space-y-3 px-4 py-3" id={`domain-${domainGroup.domainKey}`}>
+                                <div
+                                    class="space-y-3 px-4 py-3"
+                                    id={`domain-${domainGroup.domainKey}`}
+                                    class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    class:bg-primary-50={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    ondragover={(event) =>
+                                        handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                    ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                >
+                                    {#if dragState?.processId}
+                                        <div
+                                            class="sticky top-0 z-10 rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500"
+                                            class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            ondragover={(event) =>
+                                                handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                            ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                        >
+                                            Drop here to ungroup events.
+                                        </div>
+                                    {/if}
                                     {#each domainGroup.processes as processGroup (processGroup.process.id)}
                                         {@const derivedIds = getDerivedEntityIds(processGroup.events)}
                                         <div

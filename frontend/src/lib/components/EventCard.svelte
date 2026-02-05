@@ -136,9 +136,15 @@
 </script>
 
 <div
-    class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
+    class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4 select-none"
     class:bg-primary-50={selected}
     class:border-primary-200={selected}
+    draggable={draggable}
+    ondragstart={(e) => {
+        if (!draggable || !onDragStart) return;
+        onDragStart(event, e);
+    }}
+    ondragend={() => onDragEnd?.()}
     ondragover={(e) => {
         if (!onDragOver) return;
         e.preventDefault();
@@ -157,8 +163,11 @@
         {#if draggable}
             <button
                 class="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                draggable="true"
-                ondragstart={(e) => onDragStart?.(event, e)}
+                draggable={draggable}
+                ondragstart={(e) => {
+                    if (!draggable || !onDragStart) return;
+                    onDragStart(event, e);
+                }}
                 ondragend={() => onDragEnd?.()}
                 aria-label={`Reorder ${event.text}`}
                 title="Drag to reorder"
