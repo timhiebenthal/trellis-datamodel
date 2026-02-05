@@ -91,8 +91,22 @@ export function bulkRemoveTags(entityIds: string[], tagsToRemove: string[]): voi
 
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
-			const currentTags = node.data?.tags || [];
+			const currentTags = node.data?.tags;
 			if (!Array.isArray(currentTags)) return node;
+
+			// If current tags array is empty, set to undefined
+			if (currentTags.length === 0) {
+				if (node.data?.tags !== undefined) {
+					modified = true;
+				}
+				return {
+					...node,
+					data: {
+						...node.data,
+						tags: undefined,
+					},
+				};
+			}
 
 			const newTags = currentTags.filter((tag) => {
 				if (tagsToRemove.includes(tag)) {
@@ -132,8 +146,11 @@ export function bulkDeleteEntities(entityIds: string[]): void {
 	const currentNodes = get(nodesStore);
 	const currentEdges = get(edgesStore);
 
-	// Filter out deleted entities
-	const updatedNodes = currentNodes.filter((node) => !entityIds.includes(node.id));
+	// Filter out deleted entities (only delete entity nodes, preserve other node types)
+	const updatedNodes = currentNodes.filter((node) => {
+		if (node.type !== 'entity') return true; // Keep non-entity nodes
+		return !entityIds.includes(node.id);
+	});
 
 	// Remove edges connected to deleted entities
 	const updatedEdges = currentEdges.filter((edge) => {

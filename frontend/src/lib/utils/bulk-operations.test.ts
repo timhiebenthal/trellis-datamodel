@@ -86,7 +86,7 @@ describe('bulk-operations', () => {
 			expect(updatedNodes[2].data.domain).toBe('Sales');
 		});
 
-		it('should call pushHistory when modifications are made', () => {
+		it('should call pushHistory when modifications are made', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer')];
 			nodesStore.set(nodes);
@@ -96,7 +96,7 @@ describe('bulk-operations', () => {
 			expect(pushHistory).toHaveBeenCalledTimes(1);
 		});
 
-		it('should not call pushHistory when no entities match', () => {
+		it('should not call pushHistory when no entities match', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer')];
 			nodesStore.set(nodes);
@@ -213,7 +213,7 @@ describe('bulk-operations', () => {
 			expect(updatedNodes[0].data.tags).toEqual(['pii']);
 		});
 
-		it('should call pushHistory when modifications are made', () => {
+		it('should call pushHistory when modifications are made', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer')];
 			nodesStore.set(nodes);
@@ -223,7 +223,7 @@ describe('bulk-operations', () => {
 			expect(pushHistory).toHaveBeenCalledTimes(1);
 		});
 
-		it('should not call pushHistory when no new tags added', () => {
+		it('should not call pushHistory when no new tags added', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer', 'Sales', ['pii'])];
 			nodesStore.set(nodes);
@@ -361,7 +361,7 @@ describe('bulk-operations', () => {
 			expect(updatedNodes[0].data.tags).toBeUndefined(); // Empty array becomes undefined
 		});
 
-		it('should call pushHistory when modifications are made', () => {
+		it('should call pushHistory when modifications are made', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer', 'Sales', ['pii'])];
 			nodesStore.set(nodes);
@@ -371,7 +371,7 @@ describe('bulk-operations', () => {
 			expect(pushHistory).toHaveBeenCalledTimes(1);
 		});
 
-		it('should not call pushHistory when no tags removed', () => {
+		it('should not call pushHistory when no tags removed', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer', 'Sales', ['master-data'])];
 			nodesStore.set(nodes);
@@ -503,7 +503,7 @@ describe('bulk-operations', () => {
 			expect(selection.size).toBe(0);
 		});
 
-		it('should call pushHistory when modifications are made', () => {
+		it('should call pushHistory when modifications are made', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer')];
 			nodesStore.set(nodes);
@@ -513,7 +513,7 @@ describe('bulk-operations', () => {
 			expect(pushHistory).toHaveBeenCalledTimes(1);
 		});
 
-		it('should not call pushHistory when no entities deleted', () => {
+		it('should not call pushHistory when no entities deleted', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer')];
 			nodesStore.set(nodes);
@@ -585,7 +585,7 @@ describe('bulk-operations', () => {
 			expect(updatedNodes).toHaveLength(50);
 		});
 
-		it('should handle deletion when only edges change', () => {
+		it('should handle deletion when only edges change', async () => {
 			const { pushHistory } = await import('$lib/stores');
 			const nodes = [createEntityNode('1', 'Customer')];
 			const edges = [createEdge('e1', '999', '1')]; // Edge from non-existent node
