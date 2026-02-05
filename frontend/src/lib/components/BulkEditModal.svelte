@@ -198,9 +198,9 @@
 		aria-modal="true"
 		aria-labelledby="bulk-edit-modal-title"
 	>
-		<!-- Modal Container with geometric design -->
+		<!-- Modal Container with geometric design - Wider for attributes -->
 		<div
-			class="bg-white rounded-lg shadow-2xl w-full mx-4 max-h-[90vh] overflow-hidden max-w-3xl border border-slate-200"
+			class="bg-white rounded-lg shadow-2xl w-full mx-4 max-h-[90vh] overflow-hidden max-w-5xl border border-slate-200"
 			role="document"
 			tabindex="-1"
 		>
@@ -241,49 +241,47 @@
 			</div>
 
 			<!-- Content -->
-			<div class="p-6 overflow-y-auto max-h-[calc(90vh-180px)] space-y-6">
-				<!-- Entity Preview -->
-				<div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-					<div class="flex items-center gap-2 mb-3">
+			<div class="p-6 overflow-y-auto max-h-[calc(90vh-180px)] space-y-5">
+				<!-- Entity Preview - Compact -->
+				<div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+					<div class="flex items-center gap-2 mb-2">
 						<Icon icon="lucide:layers" class="w-4 h-4 text-slate-600" />
-						<h3 class="text-sm font-semibold text-slate-900">Selected Entities</h3>
+						<h3 class="text-xs font-semibold text-slate-900 uppercase tracking-wide">
+							Selected Entities
+						</h3>
 					</div>
-					<div class="space-y-1.5">
+					<div class="flex flex-wrap gap-1.5">
 						{#each previewEntities as entity}
-							<div
-								class="flex items-center gap-2 text-sm px-3 py-2 bg-white rounded border border-slate-200"
+							<span
+								class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 bg-white rounded-md border border-slate-200 font-medium text-slate-700"
 							>
-								<div class="w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
-								<span class="font-medium text-slate-700 flex-1">{entity.label}</span>
+								<div class="w-1 h-1 bg-teal-500 rounded-full"></div>
+								{entity.label}
 								{#if entity.domain}
-									<span
-										class="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-medium"
-									>
+									<span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
 										{entity.domain}
 									</span>
 								{/if}
-							</div>
+							</span>
 						{/each}
 						{#if overflowCount > 0}
-							<div class="text-sm text-slate-500 px-3 py-2 italic">
-								...and {overflowCount} more {overflowCount === 1 ? 'entity' : 'entities'}
-							</div>
+							<span class="text-xs text-slate-500 px-2 py-1 italic">
+								+{overflowCount} more
+							</span>
 						{/if}
 					</div>
 				</div>
 
-				<!-- Domain Assignment -->
-				<div class="space-y-3">
-					<div class="flex items-center gap-2">
-						<Icon icon="lucide:folder" class="w-5 h-5 text-slate-700" />
-						<label for="bulk-domain-select" class="text-sm font-semibold text-slate-900">
-							Assign Domain
-						</label>
-					</div>
+				<!-- Domain Assignment - Compact -->
+				<div>
+					<label for="bulk-domain-select" class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 mb-2 uppercase tracking-wide">
+						<Icon icon="lucide:folder" class="w-4 h-4 text-slate-700" />
+						Domain
+					</label>
 					<select
 						id="bulk-domain-select"
 						bind:value={selectedDomain}
-						class="w-full px-4 py-2.5 border-2 border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-slate-100 disabled:cursor-not-allowed font-medium text-slate-900 bg-white"
+						class="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-slate-100 disabled:cursor-not-allowed font-medium text-slate-900 bg-white"
 						disabled={processing}
 					>
 						<option value="">— No change —</option>
@@ -291,47 +289,44 @@
 							<option value={domain}>{domain}</option>
 						{/each}
 					</select>
-					<p class="text-xs text-slate-500 pl-1">
-						Select a domain to assign to all selected entities
-					</p>
 				</div>
 
-				<!-- Add Tags Section -->
-				<div class="space-y-3">
-					<div class="flex items-center gap-2">
-						<Icon icon="lucide:plus-circle" class="w-5 h-5 text-emerald-600" />
-						<h3 class="text-sm font-semibold text-slate-900">Add Tags</h3>
-					</div>
+				<!-- Add Tags Section - Compact -->
+				<div class="space-y-2">
+					<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 uppercase tracking-wide">
+						<Icon icon="lucide:plus-circle" class="w-4 h-4 text-emerald-600" />
+						Add Tags
+					</label>
 
-					<!-- New tag input -->
+					<!-- New tag input - compact -->
 					<div class="flex gap-2">
 						<input
 							type="text"
 							bind:value={newTagInput}
 							onkeydown={handleNewTagKeydown}
-							placeholder="Type new tag name..."
-							class="flex-1 px-4 py-2 border-2 border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 text-sm font-medium"
+							placeholder="Type new tag..."
+							class="flex-1 px-3 py-1.5 border-2 border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 font-medium"
 							disabled={processing}
 						/>
 						<button
 							onclick={handleAddNewTag}
 							disabled={!newTagInput.trim() || processing}
-							class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center gap-2 shadow-sm"
+							class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center gap-1.5 shadow-sm"
 						>
-							<Icon icon="lucide:plus" class="w-4 h-4" />
+							<Icon icon="lucide:plus" class="w-3.5 h-3.5" />
 							Add
 						</button>
 					</div>
 
-					<!-- Existing tags to add -->
+					<!-- Existing tags to add - compact chips -->
 					{#if allTags.length > 0}
-						<div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-							<p class="text-xs text-slate-600 mb-3 font-medium">Or select from existing tags:</p>
-							<div class="flex flex-wrap gap-2">
+						<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+							<p class="text-[10px] text-slate-600 mb-2 font-medium uppercase tracking-wide">Select existing:</p>
+							<div class="flex flex-wrap gap-1.5">
 								{#each allTags as tag}
 									<button
 										onclick={() => toggleTagToAdd(tag)}
-										class="px-3 py-1.5 text-sm rounded-lg border-2 transition-all font-medium {tagsToAdd.includes(
+										class="px-2 py-1 text-xs rounded-md border transition-all font-medium {tagsToAdd.includes(
 											tag
 										)
 											? 'bg-emerald-100 border-emerald-500 text-emerald-800'
@@ -339,7 +334,7 @@
 										disabled={processing}
 									>
 										{#if tagsToAdd.includes(tag)}
-											<Icon icon="lucide:check" class="w-3 h-3 inline-block mr-1" />
+											<Icon icon="lucide:check" class="w-2.5 h-2.5 inline-block mr-0.5" />
 										{/if}
 										{tag}
 									</button>
@@ -348,22 +343,22 @@
 						</div>
 					{/if}
 
-					<!-- Selected tags to add -->
+					<!-- Selected tags to add - compact -->
 					{#if tagsToAdd.length > 0}
-						<div class="bg-emerald-50 rounded-lg p-4 border-2 border-emerald-200">
-							<p class="text-xs text-emerald-700 mb-2 font-semibold">Will be added:</p>
-							<div class="flex flex-wrap gap-2">
+						<div class="bg-emerald-50 rounded-lg p-2.5 border border-emerald-200">
+							<p class="text-[10px] text-emerald-700 mb-1.5 font-semibold uppercase tracking-wide">Will add:</p>
+							<div class="flex flex-wrap gap-1.5">
 								{#each tagsToAdd as tag}
 									<span
-										class="px-3 py-1 text-sm bg-emerald-600 text-white rounded-full font-medium flex items-center gap-1.5 shadow-sm"
+										class="px-2 py-0.5 text-xs bg-emerald-600 text-white rounded-md font-medium flex items-center gap-1 shadow-sm"
 									>
 										{tag}
 										<button
 											onclick={() => toggleTagToAdd(tag)}
-											class="hover:bg-emerald-700 rounded-full p-0.5"
+											class="hover:bg-emerald-700 rounded p-0.5"
 											disabled={processing}
 										>
-											<Icon icon="lucide:x" class="w-3 h-3" />
+											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
 										</button>
 									</span>
 								{/each}
@@ -372,23 +367,23 @@
 					{/if}
 				</div>
 
-				<!-- Remove Tags Section -->
+				<!-- Remove Tags Section - Compact -->
 				{#if commonTags.length > 0}
-					<div class="space-y-3">
-						<div class="flex items-center gap-2">
-							<Icon icon="lucide:minus-circle" class="w-5 h-5 text-rose-600" />
-							<h3 class="text-sm font-semibold text-slate-900">Remove Tags</h3>
-						</div>
+					<div class="space-y-2">
+						<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 uppercase tracking-wide">
+							<Icon icon="lucide:minus-circle" class="w-4 h-4 text-rose-600" />
+							Remove Tags
+						</label>
 
-						<div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-							<p class="text-xs text-slate-600 mb-3 font-medium">
-								Tags common to all selected entities:
+						<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+							<p class="text-[10px] text-slate-600 mb-2 font-medium uppercase tracking-wide">
+								Common tags:
 							</p>
-							<div class="flex flex-wrap gap-2">
+							<div class="flex flex-wrap gap-1.5">
 								{#each commonTags as tag}
 									<button
 										onclick={() => toggleTagToRemove(tag)}
-										class="px-3 py-1.5 text-sm rounded-lg border-2 transition-all font-medium {tagsToRemove.includes(
+										class="px-2 py-1 text-xs rounded-md border transition-all font-medium {tagsToRemove.includes(
 											tag
 										)
 											? 'bg-rose-100 border-rose-500 text-rose-800'
@@ -396,7 +391,7 @@
 										disabled={processing}
 									>
 										{#if tagsToRemove.includes(tag)}
-											<Icon icon="lucide:check" class="w-3 h-3 inline-block mr-1" />
+											<Icon icon="lucide:check" class="w-2.5 h-2.5 inline-block mr-0.5" />
 										{/if}
 										{tag}
 									</button>
@@ -404,22 +399,22 @@
 							</div>
 						</div>
 
-						<!-- Selected tags to remove -->
+						<!-- Selected tags to remove - compact -->
 						{#if tagsToRemove.length > 0}
-							<div class="bg-rose-50 rounded-lg p-4 border-2 border-rose-200">
-								<p class="text-xs text-rose-700 mb-2 font-semibold">Will be removed:</p>
-								<div class="flex flex-wrap gap-2">
+							<div class="bg-rose-50 rounded-lg p-2.5 border border-rose-200">
+								<p class="text-[10px] text-rose-700 mb-1.5 font-semibold uppercase tracking-wide">Will remove:</p>
+								<div class="flex flex-wrap gap-1.5">
 									{#each tagsToRemove as tag}
 										<span
-											class="px-3 py-1 text-sm bg-rose-600 text-white rounded-full font-medium flex items-center gap-1.5 shadow-sm"
+											class="px-2 py-0.5 text-xs bg-rose-600 text-white rounded-md font-medium flex items-center gap-1 shadow-sm"
 										>
 											{tag}
 											<button
 												onclick={() => toggleTagToRemove(tag)}
-												class="hover:bg-rose-700 rounded-full p-0.5"
+												class="hover:bg-rose-700 rounded p-0.5"
 												disabled={processing}
 											>
-												<Icon icon="lucide:x" class="w-3 h-3" />
+												<Icon icon="lucide:x" class="w-2.5 h-2.5" />
 											</button>
 										</span>
 									{/each}
@@ -428,23 +423,22 @@
 						{/if}
 					</div>
 				{:else}
-					<div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-						<p class="text-sm text-slate-600 flex items-center gap-2">
-							<Icon icon="lucide:info" class="w-4 h-4" />
-							No tags are common to all selected entities
+					<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+						<p class="text-xs text-slate-600 flex items-center gap-1.5">
+							<Icon icon="lucide:info" class="w-3.5 h-3.5" />
+							No common tags
 						</p>
 					</div>
 				{/if}
 
-				<!-- Progress Indicator (shown for 50+ entities) -->
+				<!-- Progress Indicator (shown for 50+ entities) - Compact -->
 				{#if processing && selectedCount >= 50}
-					<div class="bg-teal-50 rounded-lg p-4 border-2 border-teal-200">
-						<div class="flex items-center gap-3">
-							<Icon icon="lucide:loader-2" class="w-5 h-5 text-teal-600 animate-spin" />
+					<div class="bg-teal-50 rounded-lg p-2.5 border border-teal-200">
+						<div class="flex items-center gap-2">
+							<Icon icon="lucide:loader-2" class="w-4 h-4 text-teal-600 animate-spin" />
 							<div class="flex-1">
-								<p class="text-sm font-semibold text-teal-900">Processing bulk operation...</p>
-								<p class="text-xs text-teal-700 mt-1">
-									Updating {selectedCount} entities
+								<p class="text-xs font-semibold text-teal-900">
+									Processing {selectedCount} entities...
 								</p>
 							</div>
 						</div>

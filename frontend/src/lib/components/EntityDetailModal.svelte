@@ -21,6 +21,7 @@
 	let sourceInput = $state('');
 	let showDeleteConfirm = $state(false);
 	let isDirty = $state(false);
+	let show7WsDropdown = $state(false);
 
 	// Get available domains from existing entities
 	let uniqueDomains = $derived.by(() => {
@@ -152,6 +153,13 @@
 		}
 	});
 
+	// Clear annotation type when changing away from dimension
+	$effect(() => {
+		if (entityType !== 'dimension' && annotationType !== undefined) {
+			annotationType = undefined;
+		}
+	});
+
 	// Track changes for dirty state
 	$effect(() => {
 		if (!currentEntity) return;
@@ -174,7 +182,9 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
-			if (showDeleteConfirm) {
+			if (show7WsDropdown) {
+				show7WsDropdown = false;
+			} else if (showDeleteConfirm) {
 				showDeleteConfirm = false;
 			} else {
 				handleCancel();
@@ -187,6 +197,15 @@
 	function handleBackdropClick(event: MouseEvent) {
 		if (event.target === event.currentTarget) {
 			handleCancel();
+		}
+	}
+
+	function handleModalContentClick(event: MouseEvent) {
+		// Close 7Ws dropdown when clicking outside of it
+		const target = event.target as HTMLElement;
+		const dropdown = target.closest('.annotation-dropdown-container');
+		if (!dropdown && show7WsDropdown) {
+			show7WsDropdown = false;
 		}
 	}
 
@@ -348,6 +367,7 @@
 			style="max-width: 1400px; border: 1px solid rgba(209, 213, 219, 0.3);"
 			role="document"
 			tabindex="-1"
+			onclick={handleModalContentClick}
 		>
 			<!-- Header with primary accent -->
 			<div
@@ -382,183 +402,223 @@
 
 			<!-- Scrollable Content -->
 			<div class="px-8 py-6 overflow-y-auto" style="max-height: calc(90vh - 220px);">
-				<div class="space-y-6">
-					<!-- Entity Name -->
-					<div>
-						<label for="entity-name" class="block text-sm font-semibold text-gray-700 mb-2">
-							Entity Name *
-						</label>
-						<input
-							id="entity-name"
-							type="text"
-							bind:value={entityName}
-							class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 font-medium"
-							placeholder="e.g., Customer, Order, Product"
-							required
-						/>
-					</div>
-
-					<!-- Domain -->
-					<div>
-						<label for="entity-domain" class="block text-sm font-semibold text-gray-700 mb-2">
-							Domain
-						</label>
-						<input
-							id="entity-domain"
-							type="text"
-							list="domain-suggestions"
-							bind:value={entityDomain}
-							class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-							placeholder="e.g., Sales, Marketing, Finance (leave blank for Unassigned)"
-						/>
-						<datalist id="domain-suggestions">
-							<option value="Unassigned" />
-							{#each uniqueDomains as domain}
-								<option value={domain} />
-							{/each}
-						</datalist>
-					</div>
-
-					<!-- Entity Type -->
-					<div>
-						<label class="block text-sm font-semibold text-gray-700 mb-3">Entity Type</label>
-						<div class="flex gap-3">
-						<button
-							type="button"
-							class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
-							'dimension'
-								? 'bg-green-50 border-green-500 text-green-700'
-								: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
-							onclick={() => (entityType = 'dimension')}
-						>
-							<Icon icon="lucide:list" class="w-5 h-5 inline-block mr-2" />
-							Dimension
-						</button>
-						<button
-							type="button"
-							class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
-							'fact'
-								? 'bg-blue-50 border-blue-500 text-blue-700'
-								: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
-							onclick={() => (entityType = 'fact')}
-						>
-							<Icon icon="lucide:bar-chart-3" class="w-5 h-5 inline-block mr-2" />
-							Fact
-						</button>
-							<button
-								type="button"
-								class="flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium {entityType ===
-								'unclassified'
-									? 'bg-gray-50 border-gray-500 text-gray-700'
-									: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
-								onclick={() => (entityType = 'unclassified')}
-							>
-								<Icon icon="lucide:circle-help" class="w-5 h-5 inline-block mr-2" />
-								Unclassified
-							</button>
-						</div>
-					</div>
-
-					<!-- Annotation Type (for dimensions only) -->
-					{#if entityType === 'dimension'}
+				<div class="space-y-4">
+					<!-- Entity Name and Domain - Side by Side -->
+					<div class="grid grid-cols-2 gap-4">
+						<!-- Entity Name -->
 						<div>
-							<label
-								for="annotation-type"
-								class="block text-sm font-semibold text-gray-700 mb-3"
-							>
-								Annotation Type (7Ws)
+							<label for="entity-name" class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+								Entity Name *
 							</label>
-							<select
-								id="annotation-type"
-								bind:value={annotationType}
-								class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-							>
-								<option value={undefined}>Select annotation type...</option>
-								{#each annotationTypes as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
-							{#if annotationType}
-								<div class="mt-2">
-									<span
-										class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border {annotationTypes.find(
-											(a) => a.value === annotationType
-										)?.color || ''}"
-									>
-										{annotationTypes.find((a) => a.value === annotationType)?.label}
-									</span>
-								</div>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- Tags -->
-					<div>
-						<label class="block text-sm font-semibold text-gray-700 mb-2">Tags</label>
-						<div
-							class="flex flex-wrap gap-2 min-h-[56px] p-3 border-2 border-gray-200 rounded-lg bg-gray-50"
-						>
-						{#each entityTags as tag}
-							<span
-								class="inline-flex items-center gap-1 px-3 py-1 bg-primary-50 text-primary-700 text-sm rounded-full border border-primary-200 font-medium"
-							>
-								{tag}
-								<button
-									type="button"
-									onclick={() => removeTag(tag)}
-									class="ml-1 text-primary-600 hover:text-primary-900 focus:outline-none"
-									aria-label="Remove {tag}"
-								>
-									<Icon icon="lucide:x" class="w-3 h-3" />
-								</button>
-							</span>
-						{/each}
 							<input
+								id="entity-name"
 								type="text"
-								list="tag-suggestions"
-								bind:value={tagInput}
-								onkeydown={handleTagInputKeydown}
-								class="flex-1 min-w-[120px] px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-0"
-								placeholder="Type and press Enter to add tags"
+								bind:value={entityName}
+								class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 font-medium"
+								placeholder="e.g., Customer, Order, Product"
+								required
 							/>
 						</div>
-						<datalist id="tag-suggestions">
-							{#each uniqueTags as tag}
-								<option value={tag} />
-							{/each}
-						</datalist>
+
+						<!-- Domain -->
+						<div>
+							<label for="entity-domain" class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+								Domain
+							</label>
+							<input
+								id="entity-domain"
+								type="text"
+								list="domain-suggestions"
+								bind:value={entityDomain}
+								class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+								placeholder="e.g., Sales, Marketing"
+							/>
+							<datalist id="domain-suggestions">
+								<option value="Unassigned" />
+								{#each uniqueDomains as domain}
+									<option value={domain} />
+								{/each}
+							</datalist>
+						</div>
 					</div>
 
-					<!-- Source Systems -->
-					<div>
-						<label class="block text-sm font-semibold text-gray-700 mb-2">
-							Source Systems
-						</label>
-						<div
-							class="flex flex-wrap gap-2 min-h-[56px] p-3 border-2 border-gray-200 rounded-lg bg-gray-50"
-						>
-						{#each entitySourceSystems as source}
-							<span
-								class="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full border border-gray-300 font-medium"
-							>
-								{source}
+					<!-- Entity Type and 7Ws - Same Row -->
+					<div class="grid grid-cols-2 gap-4">
+						<!-- Entity Type - Compact Chips -->
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Entity Type</label>
+							<div class="flex gap-2">
 								<button
 									type="button"
-									onclick={() => removeSourceSystem(source)}
-									class="ml-1 text-gray-600 hover:text-gray-900 focus:outline-none"
-									aria-label="Remove {source}"
+									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'dimension'
+										? 'bg-green-50 border-green-500 text-green-700'
+										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+									onclick={() => (entityType = 'dimension')}
 								>
-									<Icon icon="lucide:x" class="w-3 h-3" />
+									<Icon icon="lucide:list" class="w-4 h-4 inline-block mr-1" />
+									Dimension
 								</button>
-							</span>
-						{/each}
-							<input
-								type="text"
-								bind:value={sourceInput}
-								onkeydown={handleSourceInputKeydown}
-								class="flex-1 min-w-[120px] px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-0"
-								placeholder="Type and press Enter to add source"
-							/>
+								<button
+									type="button"
+									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'fact'
+										? 'bg-blue-50 border-blue-500 text-blue-700'
+										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+									onclick={() => (entityType = 'fact')}
+								>
+									<Icon icon="lucide:bar-chart-3" class="w-4 h-4 inline-block mr-1" />
+									Fact
+								</button>
+								<button
+									type="button"
+									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'unclassified'
+										? 'bg-gray-50 border-gray-500 text-gray-700'
+										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
+									onclick={() => (entityType = 'unclassified')}
+								>
+									<Icon icon="lucide:circle-help" class="w-4 h-4 inline-block mr-1" />
+									Unclassified
+								</button>
+							</div>
+						</div>
+
+						<!-- Annotation Type (7Ws) - Chip/Badge style for dimensions only -->
+						{#if entityType === 'dimension'}
+							<div class="relative annotation-dropdown-container">
+								<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+									Annotation Type (7Ws)
+								</label>
+								<!-- Selected chip/badge or placeholder -->
+								<button
+									type="button"
+									class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
+										? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
+										: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200'}"
+									onclick={() => (show7WsDropdown = !show7WsDropdown)}
+								>
+									{#if annotationType}
+										<span>
+											{annotationTypes.find((a) => a.value === annotationType)?.label}
+										</span>
+									{:else}
+										<span>Select 7W...</span>
+									{/if}
+									<Icon
+										icon="lucide:chevron-down"
+										class="w-3 h-3 transition-transform {show7WsDropdown ? 'rotate-180' : ''}"
+									/>
+								</button>
+
+								<!-- Dropdown menu -->
+								{#if show7WsDropdown}
+									<div
+										class="absolute z-10 mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]"
+									>
+										<div class="max-h-60 overflow-y-auto">
+											{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
+												<button
+													type="button"
+													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
+														? option.color
+														: 'text-gray-700'}"
+													onclick={() => {
+														annotationType = option.value;
+														show7WsDropdown = false;
+													}}
+												>
+													{#if annotationType === option.value}
+														<Icon icon="lucide:check" class="w-4 h-4" />
+													{:else}
+														<span class="w-4"></span>
+													{/if}
+													{option.label}
+												</button>
+											{/each}
+											<button
+												type="button"
+												class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
+													? 'bg-gray-50 text-gray-700'
+													: 'text-gray-500'}"
+												onclick={() => {
+													annotationType = undefined;
+													show7WsDropdown = false;
+												}}
+											>
+												{#if annotationType === undefined}
+													<Icon icon="lucide:check" class="w-4 h-4" />
+												{:else}
+													<span class="w-4"></span>
+												{/if}
+												None
+											</button>
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Tags and Source Systems - Side by Side -->
+					<div class="grid grid-cols-2 gap-4">
+						<!-- Tags -->
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Tags</label>
+							<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+								{#each entityTags as tag}
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-md border border-primary-200 font-medium">
+										{tag}
+										<button
+											type="button"
+											onclick={() => removeTag(tag)}
+											class="text-primary-600 hover:text-primary-900 focus:outline-none"
+											aria-label="Remove {tag}"
+										>
+											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
+										</button>
+									</span>
+								{/each}
+								<input
+									type="text"
+									list="tag-suggestions"
+									bind:value={tagInput}
+									onkeydown={handleTagInputKeydown}
+									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+									placeholder="Type and press Enter"
+								/>
+							</div>
+							<datalist id="tag-suggestions">
+								{#each uniqueTags as tag}
+									<option value={tag} />
+								{/each}
+							</datalist>
+						</div>
+
+						<!-- Source Systems -->
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+								Source Systems
+							</label>
+							<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+								{#each entitySourceSystems as source}
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-md border border-gray-300 font-medium">
+										{source}
+										<button
+											type="button"
+											onclick={() => removeSourceSystem(source)}
+											class="text-gray-600 hover:text-gray-900 focus:outline-none"
+											aria-label="Remove {source}"
+										>
+											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
+										</button>
+									</span>
+								{/each}
+								<input
+									type="text"
+									bind:value={sourceInput}
+									onkeydown={handleSourceInputKeydown}
+									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+									placeholder="Type and press Enter"
+								/>
+							</div>
 						</div>
 					</div>
 

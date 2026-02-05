@@ -43,6 +43,35 @@
 		}
 	});
 
+	// 7Ws annotation type badge (for dimensions)
+	const annotationTypeLabel = $derived(() => {
+		if (!entity.annotation_type) return null;
+		const typeMap: Record<string, string> = {
+			who: 'Who',
+			what: 'What',
+			when: 'When',
+			where: 'Where',
+			how: 'How',
+			why: 'Why',
+			how_many: 'How Many'
+		};
+		return typeMap[entity.annotation_type] || null;
+	});
+
+	const annotationTypeColor = $derived(() => {
+		if (!entity.annotation_type) return '';
+		const colorMap: Record<string, string> = {
+			who: 'bg-blue-100 text-blue-800 border-blue-200',
+			what: 'bg-purple-100 text-purple-800 border-purple-200',
+			when: 'bg-green-100 text-green-800 border-green-200',
+			where: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+			how: 'bg-orange-100 text-orange-800 border-orange-200',
+			why: 'bg-red-100 text-red-800 border-red-200',
+			how_many: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+		};
+		return colorMap[entity.annotation_type] || '';
+	});
+
 	// Check if entity is selected
 	const isSelected = $derived($entitySelection.has(entity.id));
 
@@ -115,6 +144,16 @@
 		>
 			{typeLabel()}
 		</span>
+
+		<!-- 7Ws annotation badge (for dimensions) -->
+		{#if annotationTypeLabel()}
+			<span
+				class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {annotationTypeColor()}"
+				title="Annotation Type: {annotationTypeLabel()}"
+			>
+				{annotationTypeLabel()}
+			</span>
+		{/if}
 
 		<!-- Domain badge (if present) -->
 		{#if entity.domain}
