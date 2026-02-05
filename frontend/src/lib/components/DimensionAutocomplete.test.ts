@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import DimensionAutocomplete from './DimensionAutocomplete.svelte';
 import type { Dimension, SevenWType } from '$lib/types';
 
@@ -69,7 +68,6 @@ describe('DimensionAutocomplete', () => {
 
     describe('Text Suggestions', () => {
         it('shows text suggestions from previous annotations when available', async () => {
-            const user = userEvent.setup();
             const onTextChange = vi.fn();
             const onSelectDimension = vi.fn();
             const textSuggestions = new Set(['account', 'customer', 'supplier']);
@@ -87,8 +85,8 @@ describe('DimensionAutocomplete', () => {
             expect(input).toBeInTheDocument();
 
             // Focus and type to trigger dropdown
-            await user.click(input!);
-            await user.type(input!, 'acc');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'acc' } });
 
             // Wait for dropdown to appear
             await waitFor(() => {
@@ -104,7 +102,6 @@ describe('DimensionAutocomplete', () => {
         });
 
         it('filters text suggestions based on search input', async () => {
-            const user = userEvent.setup();
             const onTextChange = vi.fn();
             const textSuggestions = new Set(['account', 'customer', 'supplier', 'employee']);
 
@@ -116,8 +113,8 @@ describe('DimensionAutocomplete', () => {
             });
 
             const input = container.querySelector('input');
-            await user.click(input!);
-            await user.type(input!, 'cust');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'cust' } });
 
             await waitFor(() => {
                 expect(screen.getByText('customer')).toBeInTheDocument();
@@ -130,7 +127,6 @@ describe('DimensionAutocomplete', () => {
         });
 
         it('calls onTextChange when text suggestion is selected', async () => {
-            const user = userEvent.setup();
             const onTextChange = vi.fn();
             const textSuggestions = new Set(['account', 'customer']);
 
@@ -142,8 +138,8 @@ describe('DimensionAutocomplete', () => {
             });
 
             const input = container.querySelector('input');
-            await user.click(input!);
-            await user.type(input!, 'acc');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'acc' } });
 
             await waitFor(() => {
                 expect(screen.getByText('account')).toBeInTheDocument();
@@ -151,14 +147,15 @@ describe('DimensionAutocomplete', () => {
 
             // Click on the suggestion
             const suggestion = screen.getByText('account');
-            await user.click(suggestion);
+            await fireEvent.mouseDown(suggestion);
 
             // Should call onTextChange with the selected text
-            expect(onTextChange).toHaveBeenCalledWith('account');
+            await waitFor(() => {
+                expect(onTextChange).toHaveBeenCalledWith('account');
+            });
         });
 
         it('shows both dimensions and text suggestions together', async () => {
-            const user = userEvent.setup();
             const onTextChange = vi.fn();
             const textSuggestions = new Set(['account', 'customer']);
 
@@ -171,8 +168,8 @@ describe('DimensionAutocomplete', () => {
             });
 
             const input = container.querySelector('input');
-            await user.click(input!);
-            await user.type(input!, 'c');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'c' } });
 
             await waitFor(() => {
                 // Should show dimension
@@ -184,7 +181,6 @@ describe('DimensionAutocomplete', () => {
         });
 
         it('shows text suggestions when no dimensions match but suggestions do', async () => {
-            const user = userEvent.setup();
             const onTextChange = vi.fn();
             const textSuggestions = new Set(['account', 'vendor']);
 
@@ -197,8 +193,8 @@ describe('DimensionAutocomplete', () => {
             });
 
             const input = container.querySelector('input');
-            await user.click(input!);
-            await user.type(input!, 'ven');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'ven' } });
 
             await waitFor(() => {
                 // Should show text suggestion
@@ -210,7 +206,6 @@ describe('DimensionAutocomplete', () => {
         });
 
         it('does not show duplicate text suggestions if they match existing dimensions', async () => {
-            const user = userEvent.setup();
             const onTextChange = vi.fn();
             // "customer" exists both as dimension and text suggestion
             const textSuggestions = new Set(['customer', 'account']);
@@ -224,8 +219,8 @@ describe('DimensionAutocomplete', () => {
             });
 
             const input = container.querySelector('input');
-            await user.click(input!);
-            await user.type(input!, 'cust');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'cust' } });
 
             await waitFor(() => {
                 // Should show dimension "Customer"

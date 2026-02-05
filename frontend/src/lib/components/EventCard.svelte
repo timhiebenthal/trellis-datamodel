@@ -141,11 +141,13 @@
     class:border-primary-200={selected}
     draggable={draggable}
     ondragstart={(e) => {
+        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EventCard.svelte:143',message:'ondragstart fired',data:{eventId:event.id,draggable,hasOnDragStart:!!onDragStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
         if (!draggable || !onDragStart) return;
         onDragStart(event, e);
     }}
     ondragend={() => onDragEnd?.()}
     ondragover={(e) => {
+        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EventCard.svelte:148',message:'ondragover fired',data:{eventId:event.id,hasOnDragOver:!!onDragOver},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
         if (!onDragOver) return;
         e.preventDefault();
         e.stopPropagation();
@@ -165,6 +167,7 @@
                 class="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                 draggable={draggable}
                 ondragstart={(e) => {
+                    fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EventCard.svelte:167',message:'button ondragstart fired',data:{eventId:event.id,draggable,hasOnDragStart:!!onDragStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
                     if (!draggable || !onDragStart) return;
                     onDragStart(event, e);
                 }}
