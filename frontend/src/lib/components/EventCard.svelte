@@ -141,6 +141,7 @@
     class:border-primary-200={selected}
     class:cursor-grab={draggable}
     class:active:cursor-grabbing={draggable}
+    style={draggable ? 'user-select: auto !important; -webkit-user-select: auto !important;' : ''}
     draggable={draggable}
     ondragstart={(e) => {
         if (!draggable || !onDragStart) return;

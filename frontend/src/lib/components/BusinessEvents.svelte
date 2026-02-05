@@ -315,15 +315,26 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         processId: string | null,
         dragEvent: DragEvent
     ) {
-        dragState = { eventId: event.id, processId };
-        dragOverEventId = null;
-        dragOverProcessId = null;
-        dragOverUngroupedDomainKey = null;
-        dropIndicatorPosition = null;
-        if (dragEvent.dataTransfer) {
+        const target = dragEvent.currentTarget as HTMLElement;
+        
+        // Set dataTransfer before any reactive state updates
+        if (dragEvent.dataTransfer && target) {
+            dragEvent.dataTransfer.clearData();
             dragEvent.dataTransfer.effectAllowed = 'move';
             dragEvent.dataTransfer.setData('text/plain', event.id);
         }
+        
+        // Defer reactive state updates to next frame to prevent DOM changes during dragstart.
+        // The browser captures the drag image synchronously during ondragstart. Any DOM mutations
+        // (like inserting the "Drop here to ungroup" div via {#if dragState?.processId}) during this
+        // synchronous phase can cause the browser to cancel the drag operation.
+        requestAnimationFrame(() => {
+            dragState = { eventId: event.id, processId };
+            dragOverEventId = null;
+            dragOverProcessId = null;
+            dragOverUngroupedDomainKey = null;
+            dropIndicatorPosition = null;
+        });
     }
 
     function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent, processGroup: ProcessGroup) {
@@ -400,10 +411,13 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         if (!dragState) {
             return;
         }
+        // CRITICAL: Always call preventDefault() to indicate this is a valid drop zone
+        // Otherwise the browser may cancel the drag operation entirely
+        dragEvent.preventDefault();
         if (dragState.processId === processId) {
+            // Same process - let EventCard handle the reordering
             return;
         }
-        dragEvent.preventDefault();
         dragOverProcessId = processId;
         dragOverUngroupedDomainKey = null;
         if (dragEvent.dataTransfer) {
