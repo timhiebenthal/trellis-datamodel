@@ -269,6 +269,7 @@ export interface ConfigGetResponse {
         hash: string;
         backup_path?: string;
     };
+    trellis_version?: string;
     error?: string;
 }
 

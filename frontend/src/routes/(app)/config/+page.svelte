@@ -13,6 +13,7 @@
     let config: Record<string, any> = {};
     let schema: ConfigSchema = { fields: {}, beta_flags: [] };
     let fileInfo: { path: string; mtime: number; hash: string } | null = null;
+    let trellisVersion: string | null = null;
 
     // Form validation state
     let validationErrors: Record<string, string> = {};
@@ -57,6 +58,7 @@
             config = response.config || {};
             schema = response.schema_metadata;
             fileInfo = response.file_info || null;
+            trellisVersion = response.trellis_version ?? null;
 
             // Ensure defaults when schema metadata is missing
             if (!schema?.fields || Object.keys(schema.fields).length === 0) {
@@ -989,6 +991,7 @@
                                 <div class="mt-6 text-xs text-gray-500">
                                     <p>Config file: {fileInfo.path}</p>
                                     <p>Last modified: {new Date(fileInfo.mtime * 1000).toLocaleString()}</p>
+                                    <p>trellis version: {trellisVersion ?? 'Unknown'}</p>
                                 </div>
                             {/if}
                         </form>

@@ -231,6 +231,7 @@ class ConfigGetResponse(BaseModel):
     config: Dict[str, Any]
     schema_metadata: ConfigSchemaResponse
     file_info: Optional[Dict[str, Any]] = None
+    trellis_version: Optional[str] = None
     error: Optional[str] = None
 
 

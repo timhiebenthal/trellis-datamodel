@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from trellis_datamodel import __version__ as trellis_version
 from trellis_datamodel.config import find_config_file, reload_config
 from trellis_datamodel.exceptions import ConfigurationError, ValidationError
 from trellis_datamodel.models.schemas import (
@@ -48,7 +49,11 @@ async def get_config(
 
         # Add beta flag metadata to response
         response = ConfigGetResponse(
-            config=config, schema_metadata=schema, file_info=file_info, error=None
+            config=config,
+            schema_metadata=schema,
+            file_info=file_info,
+            trellis_version=trellis_version,
+            error=None,
         )
 
         return response
@@ -60,6 +65,7 @@ async def get_config(
             config={},
             schema_metadata=schema,
             file_info=None,
+            trellis_version=trellis_version,
             error=str(e),
         )
     except Exception as e:
