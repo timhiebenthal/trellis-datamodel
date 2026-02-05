@@ -235,12 +235,12 @@
 					<div class="flex flex-wrap gap-1">
 						{#each $entityListFilters.selectedTags as tag}
 							<span
-								class="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium border border-emerald-200"
+								class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium border border-gray-300"
 							>
 								{tag}
 								<button
 									onclick={() => removeTag(tag)}
-									class="text-emerald-600 hover:text-emerald-900 transition-colors"
+									class="text-gray-600 hover:text-gray-900 transition-colors"
 									title="Remove {tag}"
 								>
 									<Icon icon="lucide:x" class="w-3 h-3" />
@@ -291,6 +291,6 @@
 	}
 
 	:global(.inline-input:focus) {
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+		box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
 	}
 </style>

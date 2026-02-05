@@ -88,7 +88,7 @@
 		checked={isSelected}
 		on:change={handleCheckboxToggle}
 		on:click={(e) => e.stopPropagation()}
-		class="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer flex-shrink-0"
+		class="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer flex-shrink-0"
 		title="Select entity"
 	/>
 

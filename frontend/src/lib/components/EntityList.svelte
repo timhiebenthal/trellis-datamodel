@@ -143,7 +143,7 @@
 						checked={allSelected}
 						indeterminate={someSelected}
 						onchange={handleSelectAll}
-						class="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+						class="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer"
 						title="Select all visible entities"
 					/>
 					<span class="text-sm font-medium text-gray-700">
