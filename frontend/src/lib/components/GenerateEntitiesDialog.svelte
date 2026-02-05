@@ -183,6 +183,23 @@
                     mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
 
                 if (existingEntityIds.has(trimmedId)) {
+                    const previewAnnotation =
+                        (original as any)?.annotation_type ||
+                        (original as any)?.metadata?.annotation_type;
+                    if (previewAnnotation) {
+                        nodesToUse = nodesToUse.map((n) => {
+                            if (n.id === trimmedId) {
+                                return {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        annotation_type: (n.data as any)?.annotation_type || previewAnnotation,
+                                    },
+                                };
+                            }
+                            return n;
+                        });
+                    }
                     if (inheritedDomain) {
                         nodesToUse = nodesToUse.map((n) => {
                             if (n.id === trimmedId) {
@@ -259,7 +276,10 @@
                         label: edited.label.trim() || edited.id.trim(),
                         description: original.description || '',
                         entity_type: edited.entity_type,
-                        annotation_type: (original as any).annotation_type || undefined,
+                        annotation_type:
+                            (original as any).annotation_type ||
+                            (original as any)?.metadata?.annotation_type ||
+                            undefined,
                         tags: original.tags || [],
                         drafted_fields: (original as any).drafted_fields || undefined,
                         domain: inheritedDomain || undefined,
@@ -392,6 +412,7 @@
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const domain = ((n.data as any)?.domain) as string | undefined;
                     const domains = ((n.data as any)?.domains) as string[] | undefined;
+                    const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -419,6 +440,10 @@
                     
                     if (!isBound && source_system && source_system.length > 0) {
                         entity.source_system = source_system;
+                    }
+
+                    if (annotation_type) {
+                        entity.annotation_type = annotation_type;
                     }
                     
                     return entity;
