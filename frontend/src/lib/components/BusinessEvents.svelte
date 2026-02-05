@@ -124,7 +124,9 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
     const domainGroups = $derived.by(() => {
         const processLookup = new Map(activeProcesses.map((proc) => [proc.id, proc]));
-        const eventsById = new Map(filteredEvents.map((event) => [event.id, event]));
+        // Use ALL events for process lookup, not just filtered ones
+        // This ensures events in processes are always visible regardless of filters
+        const eventsById = new Map(events.map((event) => [event.id, event]));
 
         const groupsMap = new Map<string, DomainGroup>();
 
@@ -147,6 +149,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             const eventsForProcess = process.event_ids
                 .map((eventId) => eventsById.get(eventId))
                 .filter((event): event is BusinessEvent => Boolean(event));
+            
             if (eventsForProcess.length === 0) {
                 return;
             }
@@ -312,9 +315,6 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         processId: string | null,
         dragEvent: DragEvent
     ) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BusinessEvents.svelte:310',message:'handleEventDragStart called',data:{eventId:event.id,processId,hasDataTransfer:!!dragEvent.dataTransfer},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
         dragState = { eventId: event.id, processId };
         dragOverEventId = null;
         dragOverProcessId = null;
@@ -324,27 +324,15 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             dragEvent.dataTransfer.effectAllowed = 'move';
             dragEvent.dataTransfer.setData('text/plain', event.id);
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BusinessEvents.svelte:324',message:'dragState set',data:{dragState,effectAllowed:dragEvent.dataTransfer?.effectAllowed},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
     }
 
     function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent, processGroup: ProcessGroup) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BusinessEvents.svelte:326',message:'handleEventDragOver called',data:{eventId:event.id,processId,dragState,isSameEvent:dragState?.eventId===event.id,isSameProcess:dragState?.processId===processId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
         // Allow reordering within the same process - only reject if dragging onto itself or no drag state
         if (!dragState || dragState.eventId === event.id) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BusinessEvents.svelte:329',message:'Early return: no dragState or same event',data:{hasDragState:!!dragState,isSameEvent:dragState?.eventId===event.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-            // #endregion
             return;
         }
         // Only allow drag-over if both events are in the same process
         if (dragState.processId !== processId) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BusinessEvents.svelte:333',message:'Early return: different process',data:{dragStateProcessId:dragState.processId,targetProcessId:processId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-            // #endregion
             return;
         }
         dragEvent.preventDefault();
@@ -360,9 +348,6 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         if (dragEvent.dataTransfer) {
             dragEvent.dataTransfer.dropEffect = 'move';
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BusinessEvents.svelte:348',message:'dragOver successful',data:{dragOverEventId,dropIndicatorPosition,draggedIndex,targetIndex},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
     }
 
     async function handleEventDrop(
