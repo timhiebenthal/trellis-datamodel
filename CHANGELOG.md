@@ -70,6 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed node drag event handling to use accurate target tracking and synchronize edges correctly during drag operations.
 - Fixed annotation type ordering for consistency across all form components.
 - Fixed tooltip visibility in SevenWsForm by adjusting z-index layering.
+- Fixed lineage edges disappearing in complex lineage graphs (fixes [#34](https://github.com/timhiebenthal/trellis-datamodel/issues/34)): 
+  - Switched edge state management from regular state to writable store (`lineageEdgesStore`) to ensure proper reactivity with SvelteFlow
+  - Added explicit `DEFAULT_EDGE_STYLE` to all edges to guarantee visibility
+  - Set `zIndex: 5` on all edges to ensure they render above layer bands (which use `zIndex: -1`)
+  - Implemented `flowKey` state variable that increments on graph structure changes to force SvelteFlow re-render
+  - Added `defaultEdgeOptions` prop to SvelteFlow component with default edge type and style
+  - Set `onlyRenderVisibleElements={false}` to ensure all edges are rendered, not just those in viewport
+  - Ensured nodes and edges are updated simultaneously using `lineageEdgesStore.set()` for proper synchronization
 
 ## [0.7.0]
 

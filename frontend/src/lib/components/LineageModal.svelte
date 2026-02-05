@@ -8,6 +8,7 @@
         type Node,
         type Edge,
     } from "@xyflow/svelte";
+    import { writable, get } from "svelte/store";
     import { getLineage } from "$lib/api";
     import type { LineageResponse, LineageNode, LineageEdge } from "$lib/types";
     import Icon from "@iconify/svelte";
@@ -27,9 +28,12 @@
     let error = $state<string | null>(null);
     let lineageData = $state<LineageResponse | null>(null);
     let lineageNodes = $state<Node[]>([]);
-    let lineageEdges = $state<Edge[]>([]);
+    // Use writable store for edges - SvelteFlow's internal reactivity works better with stores
+    const lineageEdgesStore = writable<Edge[]>([]);
     let layerBoundsByLayer = $state<Record<string, { top: number; bottom: number }>>({});
     let layerBandMeta = $state<Array<{ id: string; bandX: number }>>([]);
+    // Key to force SvelteFlow re-render when graph structure changes significantly
+    let flowKey = $state(0);
 
     const nodeTypes = {
         source: LineageSourceNode,
@@ -38,12 +42,19 @@
         layerBand: LineageLayerBandNode,
     };
 
-    // Edge type constant - use bezier curves (default) for all lineage edges
-    const LINEAGE_EDGE_TYPE = "default";
+    // Edge type constant - bezier for curved edges
+    // The {#key flowKey} wrapper ensures proper re-rendering on graph changes
+    const LINEAGE_EDGE_TYPE = "bezier";
+    const DEFAULT_EDGE_STYLE = "stroke: #94a3b8; stroke-width: 2;";
+    const HIGHLIGHT_EDGE_STYLE =
+        "stroke: #2dd4bf; stroke-width: 3.25; filter: drop-shadow(0 0 4px rgba(13, 148, 136, 0.3));";
+    const DIM_EDGE_STYLE = DEFAULT_EDGE_STYLE;
+    const CONNECTED_NODE_CLASS = "ring-2 ring-primary-400";
 
     // Progressive display state (per-node expansion)
     // Rule: root + direct parents + all sources are always visible; everything else is collapsed by default.
     let expandedNodeIds = $state<Set<string>>(new Set());
+    let selectedNodeId = $state<string | null>(null);
 
     // Fetch lineage when modal opens
     $effect(() => {
@@ -53,9 +64,10 @@
             // Reset state when modal closes
             lineageData = null;
             lineageNodes = [];
-            lineageEdges = [];
+            lineageEdgesStore.set([]);
             error = null;
             expandedNodeIds = new Set();
+            selectedNodeId = null;
         }
     });
 
@@ -73,7 +85,7 @@
             }
 
             lineageData = data;
-            updateGraphDisplay();
+            await updateGraphDisplay();
         } catch (e) {
             console.error("Error loading lineage:", e);
             error = e instanceof Error ? e.message : "Failed to load lineage";
@@ -82,7 +94,7 @@
         }
     }
 
-    function updateGraphDisplay() {
+    async function updateGraphDisplay() {
         if (!lineageData) return;
 
         const rootId = lineageData.metadata?.root_model_id ?? modelId ?? "";
@@ -291,6 +303,8 @@
                     // Temporary; we'll reposition "centrically" once we know upstream connections.
                     y: targetFlowNode.position.y,
                 },
+                width: 120,
+                height: 32,
                 data: {
                     label: "...",
                     onClick: () => expandNode(targetId),
@@ -352,6 +366,8 @@
                         source: upstreamId,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
+                        zIndex: 5, // Ensure edges render above layer bands (zIndex: -1)
+                        style: DEFAULT_EDGE_STYLE, // Ensure edges are visible
                     });
                     continue;
                 }
@@ -368,6 +384,8 @@
                     source: upstreamId,
                     target: placeholderId,
                     type: LINEAGE_EDGE_TYPE,
+                    zIndex: 5,
+                    style: DEFAULT_EDGE_STYLE, // Ensure edges are visible
                 });
 
                 const key = `${placeholderId}=>${targetId}`;
@@ -378,6 +396,8 @@
                         source: placeholderId,
                         target: targetId,
                         type: LINEAGE_EDGE_TYPE,
+                        zIndex: 5,
+                    style: DEFAULT_EDGE_STYLE, // Ensure edges are visible
                     });
                 }
             }
@@ -433,18 +453,19 @@
             }
         }
 
-        lineageNodes = visibleNodes;
-        lineageEdges = visibleEdges;
-
         // Prepend background "layer band" nodes (graph-space), so they pan/zoom with everything else.
+        let finalNodes: Node[];
         if (layersConfigured && layerOrder.length > 0) {
-            // Create an "infinite" horizontal strip that spans the entire canvas
+            // Create a wide horizontal strip that spans the canvas
             const xs = visibleNodes.map((n) => n.position.x);
             const minX = Math.min(...xs, 0);
-            
-            // Use massive width to create seamless infinite bands
-            const BAND_WIDTH = 100000;
-            const bandX = minX - 50000;
+            const maxX = Math.max(...xs, 0);
+
+            // Use reasonable width based on actual node spread (with generous padding)
+            // Avoids massive DOM elements that can interfere with edge visibility calculations
+            const BAND_PADDING = 2000;
+            const BAND_WIDTH = Math.max(5000, (maxX - minX) + BAND_PADDING * 2);
+            const bandX = minX - BAND_PADDING;
 
             const bandNodes: Node[] = layerOrder.map((layer) => {
                 const bounds = layerBounds.get(layer);
@@ -467,12 +488,20 @@
 
             // Ensure layer bands are behind edges and nodes
             // Order: layers (zIndex: -1) < edges (default ~0-5) < nodes (zIndex: 10+)
-            lineageNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
+            finalNodes = [...bandNodes, ...visibleNodes.map((n) => ({ ...n, zIndex: n.zIndex ?? 10 }))];
             layerBandMeta = bandNodes.map((b) => ({ id: b.id as string, bandX }));
         } else {
-            lineageNodes = visibleNodes;
+            finalNodes = visibleNodes;
             layerBandMeta = [];
         }
+
+        // Set nodes and edges SIMULTANEOUSLY - SvelteFlow needs both at once
+        // Use store.set() for edges to ensure proper reactivity with SvelteFlow
+        lineageNodes = finalNodes;
+        lineageEdgesStore.set([...visibleEdges]);
+        // Increment key to force SvelteFlow to re-render with new graph structure
+        flowKey++;
+        applyConnectionHighlight(selectedNodeId);
     }
 
     function createFlowNode(
@@ -490,6 +519,8 @@
                 id: node.id,
                 type: node.isSource ? "source" : "default",
                 position: { x: 0, y: 0 },
+                width: node.isSource ? 160 : 150,
+                height: node.isSource ? 60 : 36,
                 data: {
                     label: node.label,
                     level: node.level,
@@ -567,6 +598,8 @@
             id: node.id,
             type: node.isSource ? "source" : "default",
             position: { x: xPosition, y: yPosition },
+            width: node.isSource ? 160 : 150,
+            height: node.isSource ? 60 : 36,
             data: {
                 label: node.label,
                 level: node.level,
@@ -608,9 +641,110 @@
         });
     }
 
-    function expandNode(nodeId: string) {
+    async function expandNode(nodeId: string) {
         expandedNodeIds = new Set([...expandedNodeIds, nodeId]);
-        updateGraphDisplay();
+        await updateGraphDisplay();
+    }
+
+    function applyConnectionHighlight(selectedId: string | null) {
+        const edges = get(lineageEdgesStore);
+        if (edges.length === 0 || lineageNodes.length === 0) return;
+        if (!selectedId) {
+            lineageEdgesStore.set(
+                edges.map((edge) => ({
+                    ...edge,
+                    style: DEFAULT_EDGE_STYLE,
+                })),
+            );
+            lineageNodes = lineageNodes.map((node) => {
+                if (typeof node.id === "string" && node.id.startsWith("layer-band-")) return node;
+                return {
+                    ...node,
+                    class: undefined,
+                    style: "opacity: 1;",
+                };
+            });
+            return;
+        }
+
+        const connectedEdgeIds = new Set<string>();
+        const connectedNodeIds = new Set<string>();
+
+        // Build full upstream closure from raw lineage (not just visible edges).
+        const upstreamOf = new Map<string, string[]>();
+        for (const e of lineageData?.edges ?? []) {
+            const list = upstreamOf.get(e.target) ?? [];
+            list.push(e.source);
+            upstreamOf.set(e.target, list);
+        }
+
+        const queue: string[] = [selectedId];
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (!current || connectedNodeIds.has(current)) continue;
+            connectedNodeIds.add(current);
+            for (const up of upstreamOf.get(current) ?? []) {
+                if (!connectedNodeIds.has(up)) queue.push(up);
+            }
+        }
+
+        for (const edge of edges) {
+            const sourceId = edge.source.toString();
+            const targetId = edge.target.toString();
+            const sourceInSet = connectedNodeIds.has(sourceId);
+            const targetInSet = connectedNodeIds.has(targetId);
+
+            if (sourceInSet && targetInSet) {
+                connectedEdgeIds.add(edge.id);
+                continue;
+            }
+
+            const isPlaceholderSource = sourceId.startsWith("placeholder-");
+            const isPlaceholderTarget = targetId.startsWith("placeholder-");
+            if ((sourceInSet && isPlaceholderTarget) || (targetInSet && isPlaceholderSource)) {
+                connectedEdgeIds.add(edge.id);
+                connectedNodeIds.add(isPlaceholderSource ? sourceId : targetId);
+            }
+        }
+
+        lineageEdgesStore.set(
+            edges.map((edge) => {
+                if (connectedEdgeIds.has(edge.id)) {
+                    return {
+                        ...edge,
+                        style: HIGHLIGHT_EDGE_STYLE,
+                    };
+                }
+                return {
+                    ...edge,
+                    style: DIM_EDGE_STYLE,
+                };
+            }),
+        );
+
+        lineageNodes = lineageNodes.map((node) => {
+            if (typeof node.id === "string" && node.id.startsWith("layer-band-")) return node;
+            const id = node.id.toString();
+            const isConnected = connectedNodeIds.has(id);
+            return {
+                ...node,
+                class: isConnected ? CONNECTED_NODE_CLASS : undefined,
+                style: "opacity: 1;",
+            };
+        });
+    }
+
+    function handleNodeClick(event: { node: Node }) {
+        const nextSelected = event.node?.id?.toString() ?? null;
+        if (nextSelected === selectedNodeId) return;
+        selectedNodeId = nextSelected;
+        applyConnectionHighlight(selectedNodeId);
+    }
+
+    function handlePaneClick() {
+        if (!selectedNodeId) return;
+        selectedNodeId = null;
+        applyConnectionHighlight(selectedNodeId);
     }
 
     function handleBackdropClick(event: MouseEvent) {
@@ -708,11 +842,15 @@
                         </button>
                     </div>
                 {:else if lineageData && lineageNodes.length > 0}
+                    {#key flowKey}
                     <SvelteFlow
                         bind:nodes={lineageNodes}
-                        edges={lineageEdges}
+                        edges={$lineageEdgesStore}
                         nodeTypes={nodeTypes}
-                        defaultEdgeOptions={{ type: LINEAGE_EDGE_TYPE }}
+                        defaultEdgeOptions={{
+                            type: LINEAGE_EDGE_TYPE,
+                            style: DEFAULT_EDGE_STYLE
+                        }}
                         fitView
                         fitViewOptions={{
                             // Only fit the nodes that are NOT background bands
@@ -723,7 +861,11 @@
                         selectionOnDrag={false}
                         nodesDraggable={true}
                         nodesConnectable={false}
+                        onlyRenderVisibleElements={false}
+                        elevateEdgesOnSelect={true}
                         onnodedragstop={handleNodeDragStop}
+                        onnodeclick={handleNodeClick}
+                        onpaneclick={handlePaneClick}
                         class="w-full h-full"
                     >
                         <Controls />
@@ -733,6 +875,7 @@
                         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                         <MiniMap />
                     </SvelteFlow>
+                    {/key}
                 {:else if lineageData}
                     <div class="p-5 text-center text-gray-500 text-sm">
                         No upstream dependencies found for this model.

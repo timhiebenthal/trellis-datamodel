@@ -6,6 +6,10 @@
     import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
 
+    const loadingStore =
+        getContext<Readable<boolean>>('loading') ?? readable(false);
+    const loading = $derived($loadingStore);
+
     const guidanceConfigStore =
         getContext<Readable<GuidanceConfig>>('guidanceConfig') ??
         readable({
@@ -47,11 +51,22 @@
     <meta name="description" content="Visual data modeling canvas - design and document your data models" />
 </svelte:head>
 
-<Canvas
-    guidanceConfig={guidanceConfig}
-    lineageEnabled={lineageEnabled}
-    exposuresEnabled={exposuresEnabled}
-    hasExposuresData={hasExposuresData}
-    filteredEntityIds={filteredEntityIds}
-    filterEventText={filterEventText}
-/>
+{#if loading}
+    <div class="flex items-center justify-center w-full h-full">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+            <p class="text-sm text-gray-600">Loading data model...</p>
+        </div>
+    </div>
+{:else}
+    <div data-testid="canvas-ready">
+        <Canvas
+            guidanceConfig={guidanceConfig}
+            lineageEnabled={lineageEnabled}
+            exposuresEnabled={exposuresEnabled}
+            hasExposuresData={hasExposuresData}
+            filteredEntityIds={filteredEntityIds}
+            filterEventText={filterEventText}
+        />
+    </div>
+{/if}

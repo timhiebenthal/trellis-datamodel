@@ -105,10 +105,12 @@ import {
     const lineageEnabledStore = writable(lineageEnabled);
     const exposuresEnabledStore = writable(exposuresEnabled);
     const hasExposuresDataStore = writable(hasExposuresData);
+    const loadingStore = writable(loading);
     setContext('guidanceConfig', guidanceConfigStore);
     setContext('lineageEnabled', lineageEnabledStore);
     setContext('exposuresEnabled', exposuresEnabledStore);
     setContext('hasExposuresData', hasExposuresDataStore);
+    setContext('loading', loadingStore);
 
     // Provide autoSaveService to child components (for EntityDetailModal)
     const autoSaveServiceContext = $state<{ current: AutoSaveService | null }>({ current: null });
@@ -159,6 +161,7 @@ import {
         lineageEnabledStore.set(lineageEnabled);
         exposuresEnabledStore.set(exposuresEnabled);
         hasExposuresDataStore.set(hasExposuresData);
+        loadingStore.set(loading);
     });
 
     // Show warning modal for incomplete entities and wait for user decision
@@ -519,7 +522,6 @@ import {
     onMount(() => {
         (async () => {
             try {
-                console.log(`[${Date.now()}] Page onMount starting...`);
                 // Check Config Status
                 const status = await getConfigStatus();
                 $configStatus = status;
@@ -723,7 +725,7 @@ import {
                 lastSyncedState = autoSaveService.getLastSavedState();
                 initHistory();
             } catch (e) {
-                console.error("Initialization error:", e);
+                console.error(e);
                 alert("Failed to initialize. Check backend connection.");
             } finally {
                 loading = false;

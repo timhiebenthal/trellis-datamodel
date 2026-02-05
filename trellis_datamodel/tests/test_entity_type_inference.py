@@ -1,71 +1,297 @@
 """Tests for entity type inference logic."""
 
+import json
+import os
 import pytest
+from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
+from trellis_datamodel import config as cfg
 
-# TODO: Implement tests when config loading issues are resolved
-# The inference logic works but test setup has issues with config module reloading
-# For now, these are placeholder tests that verify the code structure
 
 class TestEntityTypeInference:
     """Test entity type inference based on model naming patterns."""
 
-    def test_dimension_prefix(self):
+    @pytest.fixture(autouse=True)
+    def setup_config(self):
+        """Set up dimensional modeling config for tests."""
+        # Save original config
+        original_enabled = cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+        original_dim_prefix = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+        original_fact_prefix = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix
+
+        # Enable dimensional modeling with standard prefixes
+        cfg.DIMENSIONAL_MODELING_CONFIG.enabled = True
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = ["dim_", "d_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fct_", "fact_"]
+
+        yield
+
+        # Restore original config
+        cfg.DIMENSIONAL_MODELING_CONFIG.enabled = original_enabled
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = original_dim_prefix
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = original_fact_prefix
+        # Clear inference cache after tests
+        DbtCoreAdapter.reset_inference_cache()
+
+    def _create_manifest_with_models(self, tmp_path, model_names):
+        """Helper to create a manifest.json with the given model names."""
+        manifest = {
+            "nodes": {
+                f"model.test.{name}": {
+                    "resource_type": "model",
+                    "name": name,
+                    "unique_id": f"model.test.{name}",
+                    "schema": "public",
+                    "alias": name,
+                    "columns": {},
+                }
+                for name in model_names
+            }
+        }
+
+        manifest_path = tmp_path / "manifest.json"
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f)
+
+        return str(manifest_path)
+
+    def test_dimension_prefix(self, tmp_path):
         """Test dimension inference with dim_ prefix."""
-        # Should infer "dimension" for models starting with "dim_"
-        assert True
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["dim_customer", "dim_product"]
+        )
 
-    def test_dimension_short_prefix(self):
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["dim_customer"] == "dimension"
+        assert entity_types["dim_product"] == "dimension"
+
+    def test_dimension_short_prefix(self, tmp_path):
         """Test dimension inference with d_ prefix."""
-        # Should infer "dimension" for models starting with "d_"
-        assert True
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["d_customer", "d_product"]
+        )
 
-    def test_dimension_single_letter(self):
-        """Test dimension inference with d prefix."""
-        # Should infer "dimension" for models starting with "d"
-        assert True
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
 
-    def test_fact_prefix(self):
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["d_customer"] == "dimension"
+        assert entity_types["d_product"] == "dimension"
+
+    def test_fact_prefix(self, tmp_path):
         """Test fact inference with fct_ prefix."""
-        # Should infer "fact" for models starting with "fct_"
-        assert True
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["fct_orders", "fct_sales"]
+        )
 
-    def test_fact_full_word(self):
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["fct_orders"] == "fact"
+        assert entity_types["fct_sales"] == "fact"
+
+    def test_fact_full_word(self, tmp_path):
         """Test fact inference with fact_ prefix."""
-        # Should infer "fact" for models starting with "fact_"
-        assert True
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fact_", "fct_"]
 
-    def test_fact_single_letter(self):
-        """Test fact inference with f prefix."""
-        # Should infer "fact" for models starting with "f"
-        assert True
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["fact_orders", "fact_sales"]
+        )
 
-    def test_case_insensitive(self):
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["fact_orders"] == "fact"
+        assert entity_types["fact_sales"] == "fact"
+
+    def test_case_insensitive(self, tmp_path):
         """Test case-insensitive pattern matching."""
-        # Should match "Dim_Customer" as dimension, "FCT_ORDERS" as fact
-        assert True
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["Dim_Customer", "FCT_ORDERS", "D_Product"]
+        )
 
-    def test_multiple_prefixes(self):
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["Dim_Customer"] == "dimension"
+        assert entity_types["FCT_ORDERS"] == "fact"
+        assert entity_types["D_Product"] == "dimension"
+
+    def test_multiple_prefixes(self, tmp_path):
         """Test multiple prefixes per entity type."""
-        # Should support ["dim_", "d_", "d"] for dimensions
-        # Should support ["fct_", "fact_", "f"] for facts
-        assert True
+        # Set up multiple prefixes
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = ["dim_", "d_", "dimension_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fct_", "fact_", "f_"]
 
-    def test_no_match_returns_unclassified(self):
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["dim_customer", "d_product", "dimension_location", "fct_orders", "fact_sales", "f_revenue"]
+        )
+
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        # All dimension prefixes should work
+        assert entity_types["dim_customer"] == "dimension"
+        assert entity_types["d_product"] == "dimension"
+        assert entity_types["dimension_location"] == "dimension"
+
+        # All fact prefixes should work
+        assert entity_types["fct_orders"] == "fact"
+        assert entity_types["fact_sales"] == "fact"
+        assert entity_types["f_revenue"] == "fact"
+
+    def test_no_match_returns_unclassified(self, tmp_path):
         """Test unclassified for non-matching names."""
-        # Models like "orders", "customers" should return "unclassified"
-        assert True
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["orders", "customers", "raw_data", "staging_users"]
+        )
 
-    def test_empty_manifest(self):
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["orders"] == "unclassified"
+        assert entity_types["customers"] == "unclassified"
+        assert entity_types["raw_data"] == "unclassified"
+        assert entity_types["staging_users"] == "unclassified"
+
+    def test_empty_manifest(self, tmp_path):
         """Test behavior with empty manifest."""
-        # Should return empty dict or handle gracefully
-        assert True
+        manifest_path = self._create_manifest_with_models(tmp_path, [])
 
-    def test_only_runs_when_dimensional_model_mode(self):
-        """Test inference only runs in dimensional_model mode."""
-        # Inference should only apply when modeling_style == "dimensional_model"
-        assert True
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
 
-    def test_dimension_prefix_takes_precedence(self):
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types == {}
+
+    def test_only_runs_when_dimensional_modeling_enabled(self, tmp_path):
+        """Test inference only runs when dimensional modeling is enabled."""
+        # Disable dimensional modeling
+        cfg.DIMENSIONAL_MODELING_CONFIG.enabled = False
+
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["dim_customer", "fct_orders"]
+        )
+
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        # Should return empty dict when disabled
+        assert entity_types == {}
+
+    def test_dimension_prefix_takes_precedence(self, tmp_path):
         """Test dimension prefixes checked before fact prefixes."""
-        # "dim_test" should match as dimension, not fact
-        assert True
+        # Create a model that could match both (if we had overlapping prefixes)
+        # In practice, dim_ is checked before fct_, so dim_test should be dimension
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, ["dim_test", "d_test"]
+        )
+
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        # Should be classified as dimension, not fact
+        assert entity_types["dim_test"] == "dimension"
+        assert entity_types["d_test"] == "dimension"
+
+    def test_mixed_entity_types(self, tmp_path):
+        """Test that mixed entity types are all classified correctly."""
+        manifest_path = self._create_manifest_with_models(
+            tmp_path, [
+                "dim_customer",
+                "fct_orders",
+                "staging_data",
+                "d_product",
+                "fact_sales",
+                "raw_users"
+            ]
+        )
+
+        # Add fact_ to prefixes
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fct_", "fact_"]
+
+        adapter = DbtCoreAdapter(
+            manifest_path=manifest_path,
+            catalog_path=str(tmp_path / "catalog.json"),
+            project_path=str(tmp_path),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=[]
+        )
+
+        entity_types = adapter.infer_entity_types()
+
+        assert entity_types["dim_customer"] == "dimension"
+        assert entity_types["d_product"] == "dimension"
+        assert entity_types["fct_orders"] == "fact"
+        assert entity_types["fact_sales"] == "fact"
+        assert entity_types["staging_data"] == "unclassified"
+        assert entity_types["raw_users"] == "unclassified"

@@ -1,5 +1,6 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
+    import { toTitleCase } from "$lib/utils";
 
     type Props = {
         domain: string;
@@ -8,13 +9,6 @@
     };
 
     let { domain, size = "medium", onclick }: Props = $props();
-
-    /**
-     * Convert domain to title case (trimmed, first letter uppercase, rest lowercase).
-     */
-    function toTitleCase(str: string): string {
-        return str.trim().charAt(0).toUpperCase() + str.trim().slice(1).toLowerCase();
-    }
 
     const displayDomain = $derived(toTitleCase(domain));
 
