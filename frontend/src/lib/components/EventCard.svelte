@@ -169,6 +169,7 @@
                 ondragstart={(e) => {
                     fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EventCard.svelte:167',message:'button ondragstart fired',data:{eventId:event.id,draggable,hasOnDragStart:!!onDragStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
                     if (!draggable || !onDragStart) return;
+                    e.stopPropagation();
                     onDragStart(event, e);
                 }}
                 ondragend={() => onDragEnd?.()}

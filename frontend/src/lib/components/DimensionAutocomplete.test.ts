@@ -229,5 +229,33 @@ describe('DimensionAutocomplete', () => {
                 expect(screen.getByText('dim_customer')).toBeInTheDocument();
             });
         });
+
+        it('supports workflow of annotating multiple events before generating entities', async () => {
+            const onTextChange = vi.fn();
+            // Simulates text from Event A's annotations appearing as suggestions for Event B
+            const textSuggestions = new Set(['customer', 'account', 'product', 'lead']);
+
+            const { container } = render(DimensionAutocomplete, {
+                textValue: '',
+                onTextChange,
+                dimensions: [], // No entities generated yet
+                textSuggestions,
+                filterBy: 'who'
+            });
+
+            const input = container.querySelector('input');
+            await fireEvent.focus(input!);
+            await fireEvent.input(input!, { target: { value: 'c' } });
+
+            await waitFor(() => {
+                // Should show suggestions from previous event annotations
+                expect(screen.getByText('customer')).toBeInTheDocument();
+                expect(screen.getByText('account')).toBeInTheDocument();
+            });
+
+            // Verify "product" and "lead" are not shown (don't match "c")
+            expect(screen.queryByText('product')).not.toBeInTheDocument();
+            expect(screen.queryByText('lead')).not.toBeInTheDocument();
+        });
     });
 });
