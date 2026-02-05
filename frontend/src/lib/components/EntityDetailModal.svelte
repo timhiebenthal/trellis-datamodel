@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
+	import { getSourceSystemSuggestions } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
 	import { goto } from '$app/navigation';
@@ -20,6 +21,14 @@
 	let tagInput = $state('');
 	let domainInput = $state('');
 	let sourceInput = $state('');
+	let sourceSuggestions = $state<string[]>([]);
+	let showSourceSuggestions = $state(false);
+	let activeSourceSuggestionIndex = $state(0);
+	let filteredSourceSuggestions = $derived(
+		sourceSuggestions.filter((s) =>
+			s.toLowerCase().includes(sourceInput.toLowerCase())
+		)
+	);
 	let showDeleteConfirm = $state(false);
 	let isDirty = $state(false);
 	let show7WsDropdown = $state(false);
@@ -162,10 +171,29 @@
 			tagInput = '';
 			domainInput = '';
 			sourceInput = '';
+			sourceSuggestions = [];
+			showSourceSuggestions = false;
+			activeSourceSuggestionIndex = 0;
 			showDeleteConfirm = false;
 			isDirty = false;
 		}
 	});
+
+	// Load source system suggestions when modal opens
+	$effect(() => {
+		if ($entityDetailModal.open) {
+			loadSourceSuggestions();
+		}
+	});
+
+	async function loadSourceSuggestions() {
+		try {
+			sourceSuggestions = await getSourceSystemSuggestions();
+		} catch (error) {
+			console.error('Failed to load source system suggestions:', error);
+			sourceSuggestions = [];
+		}
+	}
 
 	// Clear annotation type when changing away from dimension
 	$effect(() => {
@@ -187,6 +215,7 @@
 			JSON.stringify(entityTags.sort()) !== JSON.stringify([...(data.tags || [])].sort()) ||
 			JSON.stringify(entitySourceSystems.sort()) !==
 				JSON.stringify([...(data.source_system || [])].sort()) ||
+			sourceInput.trim().length > 0 ||
 			entityType !== (data.entity_type || 'unclassified') ||
 			annotationType !== data.annotation_type ||
 			(!isBoundEntity &&
@@ -194,9 +223,6 @@
 					JSON.stringify(data?.drafted_fields || []));
 
 		isDirty = hasChanges;
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:isDirtyEffect',message:'Dirty state recalculated',data:{hasChanges,sourceInput,entitySourceSystemsCount:entitySourceSystems.length,initialSourceSystemsCount:(data?.source_system||[]).length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-		// #endregion agent log
 	});
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -266,11 +292,8 @@
 		}
 	}
 
-	function addSourceSystem() {
-		const trimmed = sourceInput.trim();
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:addSourceSystem',message:'Add source system attempt',data:{trimmed,sourceInput,entitySourceSystemsCount:entitySourceSystems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-		// #endregion agent log
+	function addSourceSystem(source = sourceInput) {
+		const trimmed = source.trim();
 		if (trimmed && !entitySourceSystems.includes(trimmed)) {
 			entitySourceSystems = [...entitySourceSystems, trimmed];
 			sourceInput = '';
@@ -282,20 +305,60 @@
 	}
 
 	function handleSourceInputKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:handleSourceInputKeydown',message:'Source input Enter pressed',data:{value:sourceInput},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
-			// #endregion agent log
+		if (event.key === 'Escape' && showSourceSuggestions) {
+			showSourceSuggestions = false;
 			event.preventDefault();
-			addSourceSystem();
+		} else if (event.key === 'Enter') {
+			if (showSourceSuggestions && filteredSourceSuggestions.length > 0) {
+				event.preventDefault();
+				selectSourceSuggestion(filteredSourceSuggestions[activeSourceSuggestionIndex]);
+			} else {
+				event.preventDefault();
+				addSourceSystem();
+			}
+		} else if (event.key === 'ArrowDown' && showSourceSuggestions) {
+			event.preventDefault();
+			activeSourceSuggestionIndex = Math.min(
+				activeSourceSuggestionIndex + 1,
+				filteredSourceSuggestions.length - 1
+			);
+		} else if (event.key === 'ArrowUp' && showSourceSuggestions) {
+			event.preventDefault();
+			activeSourceSuggestionIndex = Math.max(activeSourceSuggestionIndex - 1, 0);
+		} else if (event.key === 'Tab' && showSourceSuggestions && filteredSourceSuggestions.length > 0) {
+			event.preventDefault();
+			selectSourceSuggestion(filteredSourceSuggestions[activeSourceSuggestionIndex]);
 		}
 	}
 
+	function handleSourceInputFocus() {
+		showSourceSuggestions = true;
+		activeSourceSuggestionIndex = 0;
+	}
+
+	function handleSourceInputBlur() {
+		setTimeout(() => {
+			showSourceSuggestions = false;
+		}, 200);
+	}
+
+	function handleSourceInput() {
+		showSourceSuggestions = true;
+		activeSourceSuggestionIndex = 0;
+	}
+
+	function selectSourceSuggestion(suggestion: string) {
+		addSourceSystem(suggestion);
+		showSourceSuggestions = false;
+		sourceInput = '';
+		activeSourceSuggestionIndex = 0;
+	}
+
 	function handleSave() {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:handleSave',message:'Save clicked',data:{isDirty,entityName,sourceInput,entitySourceSystemsCount:entitySourceSystems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
-		// #endregion agent log
 		if (!currentEntity || !entityName.trim()) return;
+		if (sourceInput.trim().length > 0) {
+			addSourceSystem();
+		}
 
 		const normalizedDomains = normalizeDomains(entityDomains);
 		const primaryDomain = normalizedDomains[0];
@@ -680,15 +743,30 @@
 									type="text"
 									bind:value={sourceInput}
 									onkeydown={handleSourceInputKeydown}
-									oninput={(e) => {
-										// #region agent log
-										fetch('http://127.0.0.1:7242/ingest/24cc0f53-14db-4775-8467-7fbdba4920ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EntityDetailModal.svelte:sourceInput',message:'Source input changed',data:{value:(e.target as HTMLInputElement).value,isDirty},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-										// #endregion agent log
-									}}
+									onfocus={handleSourceInputFocus}
+									onblur={handleSourceInputBlur}
+									oninput={handleSourceInput}
 									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
 									placeholder="Type and press Enter"
 								/>
 							</div>
+							{#if showSourceSuggestions && filteredSourceSuggestions.length > 0}
+								<div class="mt-2 border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto">
+									{#each filteredSourceSuggestions as suggestion, index}
+										<button
+											class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none {index === activeSourceSuggestionIndex ? 'bg-gray-50' : ''}"
+											onmousedown={(e) => e.preventDefault()}
+											onclick={() => selectSourceSuggestion(suggestion)}
+											aria-label="Add {suggestion}"
+										>
+											{suggestion}
+											{#if entitySourceSystems.includes(suggestion)}
+												<span class="ml-2 text-xs text-gray-400">(added)</span>
+											{/if}
+										</button>
+									{/each}
+								</div>
+							{/if}
 						</div>
 					</div>
 
