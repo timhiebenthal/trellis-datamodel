@@ -16,21 +16,20 @@ export function bulkAssignDomain(entityIds: string[], domain: string): void {
 
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
-			modified = true;
-			const currentDomains = Array.isArray(node.data?.domains)
-				? node.data?.domains
-				: node.data?.domain
-					? [node.data?.domain]
-					: [];
-			const nextDomains = Array.from(
-				new Set(currentDomains.map((d) => d.trim()).filter(Boolean).concat(domain.trim()))
-			);
+			const trimmedDomain = domain.trim();
+			const currentDomain = node.data?.domain;
+
+			// Only mark as modified if domain actually changes
+			if (currentDomain !== trimmedDomain) {
+				modified = true;
+			}
+
 			return {
 				...node,
 				data: {
 					...node.data,
-					domains: nextDomains.length > 0 ? nextDomains : undefined,
-					domain: nextDomains.length > 0 ? nextDomains[0] : undefined,
+					domains: trimmedDomain ? [trimmedDomain] : undefined,
+					domain: trimmedDomain || undefined,
 				},
 			};
 		}

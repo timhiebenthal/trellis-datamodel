@@ -62,7 +62,12 @@
         if (!textSuggestions || textSuggestions.size === 0) return [];
         const searchLower = searchInput.toLowerCase();
         return Array.from(textSuggestions)
-            .filter(text => text.toLowerCase().includes(searchLower))
+            .filter(text => {
+                const textLower = text.toLowerCase();
+                const index = textLower.indexOf(searchLower);
+                // Match if search term appears at start or very near start (within first 2 chars)
+                return index >= 0 && index <= 1;
+            })
             .sort();
     });
 
