@@ -222,7 +222,7 @@ test.describe('Business Events - E2E', () => {
             // If route doesn't exist yet, skip test
             test.skip();
         });
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         // Check for empty state message
         const emptyState = page.getByText(/no business events/i);
@@ -772,7 +772,7 @@ test.describe('Business Events - E2E', () => {
         await page.goto('/business-events').catch(() => {
             test.skip();
         });
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         // Check if there are any processes displayed
         const processRow = page.locator('[class*="process"]').or(
