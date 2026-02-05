@@ -105,17 +105,19 @@ export function closeSourceEditorModal() {
 export const deleteConfirmModal = writable<{
     open: boolean;
     entityLabel: string;
+    entityIds: string[];
 }>({
     open: false,
     entityLabel: '',
+    entityIds: [],
 });
 
-export function openDeleteConfirmModal(entityLabel: string) {
-    deleteConfirmModal.set({ open: true, entityLabel });
+export function openDeleteConfirmModal(entityLabel: string, entityIds: string[]) {
+    deleteConfirmModal.set({ open: true, entityLabel, entityIds });
 }
 
 export function closeDeleteConfirmModal() {
-    deleteConfirmModal.set({ open: false, entityLabel: '' });
+    deleteConfirmModal.set({ open: false, entityLabel: '', entityIds: [] });
 }
 
 // Undo/Redo history management

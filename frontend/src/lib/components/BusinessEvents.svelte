@@ -1034,16 +1034,20 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                             {/if}
                                         </div>
                                     {/each}
-                                    {#if domainGroup.ungroupedEvents.length > 0}
-                                        <div
-                                            class="space-y-2 pt-2"
-                                            class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
-                                            class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
-                                            class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
-                                            ondragover={(event) =>
-                                                handleUngroupedDragOver(domainGroup.domainKey, event)}
-                                            ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
-                                        >
+                                    <div
+                                        class="space-y-2 pt-2"
+                                        class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                        class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                        class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                        ondragover={(event) =>
+                                            handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                        ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                    >
+                                        {#if domainGroup.ungroupedEvents.length === 0}
+                                            <div class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                                                Drop here to ungroup events.
+                                            </div>
+                                        {:else}
                                             {#each domainGroup.ungroupedEvents as event (event.id)}
                                                 <EventCard
                                                     {event}
@@ -1059,8 +1063,8 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                     onDragEnd={handleEventDragEnd}
                                                 />
                                             {/each}
-                                        </div>
-                                    {/if}
+                                        {/if}
+                                    </div>
                                 </div>
                             {/if}
                         </div>

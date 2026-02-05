@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { nodes, entityListFilters, entitySelection, entityListCollapseState, bulkEditModal } from '$lib/stores';
+	import {
+		nodes,
+		entityListFilters,
+		entitySelection,
+		entityListCollapseState,
+		bulkEditModal,
+		openDeleteConfirmModal,
+	} from '$lib/stores';
 	import type { Node } from '@xyflow/svelte';
 	import type { Entity, EntityData } from '$lib/types';
 	import { filterEntities } from '$lib/utils/entity-filtering';
@@ -118,11 +125,17 @@
 	const handleBulkAddTags = handleBulkEdit;
 	const handleBulkRemoveTags = handleBulkEdit;
 
-	// Handle bulk delete - TODO: implement separate delete confirmation modal
+	// Handle bulk delete with confirmation modal
 	function handleBulkDelete() {
-		// For now, open bulk edit modal (which will need delete functionality added)
-		console.log('Bulk delete:', Array.from($entitySelection));
-		// TODO: Open separate delete confirmation dialog
+		const selectedIds = Array.from($entitySelection);
+		if (selectedIds.length === 0) return;
+
+		const selectedLabel =
+			selectedIds.length === 1
+				? entities.find((entity) => entity.id === selectedIds[0])?.label ?? 'Entity'
+				: `${selectedIds.length} entities`;
+
+		openDeleteConfirmModal(selectedLabel, selectedIds);
 	}
 
 	// Clear selection

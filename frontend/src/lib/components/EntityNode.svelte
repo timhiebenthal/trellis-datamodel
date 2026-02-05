@@ -665,7 +665,7 @@
 
     function handleDeleteClick(event: MouseEvent) {
         event.stopPropagation(); // Prevent collapse toggle
-        openDeleteConfirmModal(data.label || "Entity");
+        openDeleteConfirmModal(data.label || "Entity", [id]);
     }
 
     function deleteEntity() {

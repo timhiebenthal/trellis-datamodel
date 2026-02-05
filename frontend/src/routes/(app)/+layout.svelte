@@ -18,6 +18,7 @@
     folderFilter,
     tagFilter,
     groupByFolder,
+    entitySelection,
         modelingStyle,
         labelPrefixes,
         dimensionPrefixes,
@@ -1064,12 +1065,19 @@ import {
     <DeleteConfirmModal
         open={$deleteConfirmModal.open}
         entityLabel={$deleteConfirmModal.entityLabel}
+        entityCount={$deleteConfirmModal.entityIds.length}
         onConfirm={() => {
-            // Find and delete the entity from the store
-            const nodeToDelete = $nodes.find(n => n.data.label === $deleteConfirmModal.entityLabel);
-            if (nodeToDelete) {
-                nodes.update((list) => list.filter((n) => n.id !== nodeToDelete.id));
-                edges.update((list) => list.filter((e) => e.source !== nodeToDelete.id && e.target !== nodeToDelete.id));
+            const idsToDelete = new Set($deleteConfirmModal.entityIds);
+            if (idsToDelete.size > 0) {
+                nodes.update((list) => list.filter((n) => !idsToDelete.has(n.id)));
+                edges.update((list) =>
+                    list.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target))
+                );
+                entitySelection.update((selection) => {
+                    const nextSelection = new Set(selection);
+                    idsToDelete.forEach((id) => nextSelection.delete(id));
+                    return nextSelection;
+                });
             }
             closeDeleteConfirmModal();
         }}
