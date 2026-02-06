@@ -12,7 +12,7 @@ from trellis_datamodel.models.business_event import (
     BusinessEventAnnotations,
     AnnotationEntry,
 )
-from trellis_datamodel.exceptions import ValidationError
+import trellis_datamodel.exceptions as domain_exceptions
 
 
 class TestAnnotationEntryRoleField:
@@ -49,14 +49,14 @@ class TestAnnotationEntryRoleField:
 
     def test_role_field_validates_type(self):
         """Test that role field validates type (must be string or None)."""
-        with pytest.raises(ValidationError, match="role must be a string"):
+        with pytest.raises(domain_exceptions.ValidationError, match="role must be a string"):
             AnnotationEntry(
                 id="entry_test",
                 text="Customer",
                 role=123  # Invalid: not a string
             )
 
-        with pytest.raises(ValidationError, match="role must be a string"):
+        with pytest.raises(domain_exceptions.ValidationError, match="role must be a string"):
             AnnotationEntry(
                 id="entry_test",
                 text="Customer",
@@ -311,17 +311,21 @@ class TestRolesFieldValidation:
         _validate_roles(["dimension", "primary"])
 
         # Invalid cases
-        with pytest.raises(ValidationError, match="must be a list"):
+        with pytest.raises(Exception, match="must be a list") as exc_info:
             _validate_roles("dimension")  # String not list
+        assert exc_info.type.__name__ == "ValidationError"
 
-        with pytest.raises(ValidationError, match="must be a list"):
+        with pytest.raises(Exception, match="must be a list") as exc_info:
             _validate_roles(123)  # Number not list
+        assert exc_info.type.__name__ == "ValidationError"
 
-        with pytest.raises(ValidationError, match="must be a list of strings"):
+        with pytest.raises(Exception, match="must be a list of strings") as exc_info:
             _validate_roles([123])  # List with non-string
+        assert exc_info.type.__name__ == "ValidationError"
 
-        with pytest.raises(ValidationError, match="must be a list of strings"):
+        with pytest.raises(Exception, match="must be a list of strings") as exc_info:
             _validate_roles(["dimension", 123])  # Mixed types
+        assert exc_info.type.__name__ == "ValidationError"
 
 
 class TestBackwardCompatibility:

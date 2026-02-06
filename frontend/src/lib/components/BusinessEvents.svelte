@@ -15,6 +15,7 @@ import type {
 } from '$lib/types';
 import { toTitleCase } from '$lib/utils';
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
     import CollapseChevron from './CollapseChevron.svelte';
@@ -281,10 +282,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         params.push(`processName=${encodeURIComponent(process.name)}`);
 
         const canvasUrl = `/canvas?${params.join('&')}`;
-
-        if (typeof window !== 'undefined') {
-            window.open(canvasUrl, '_blank');
-        }
+        goto(canvasUrl);
     }
 
     async function handleProcessResolve(processId: string) {

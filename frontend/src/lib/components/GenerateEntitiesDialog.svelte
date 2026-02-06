@@ -426,6 +426,7 @@
                     const domain = ((n.data as any)?.domain) as string | undefined;
                     const domains = ((n.data as any)?.domains) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
+                    const roles = ((n.data as any)?.roles) as string[] | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -457,6 +458,9 @@
 
                     if (annotation_type) {
                         entity.annotation_type = annotation_type;
+                    }
+                    if (roles !== undefined) {
+                        entity.roles = roles;
                     }
                     
                     return entity;

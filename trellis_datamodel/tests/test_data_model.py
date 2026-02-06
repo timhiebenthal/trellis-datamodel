@@ -217,3 +217,45 @@ class TestSaveDataModel:
         # source_colors should be present but empty when not configured
         assert "source_colors" in data
         assert data["source_colors"] == {}
+
+    def test_preserves_existing_roles_when_omitted_from_payload(
+        self, test_client, temp_data_model_path
+    ):
+        with open(temp_data_model_path, "w") as f:
+            yaml.safe_dump(
+                {
+                    "version": 0.1,
+                    "entities": [
+                        {
+                            "id": "dim_employee",
+                            "label": "Employee",
+                            "entity_type": "dimension",
+                            "roles": ["Sales Agent"],
+                        }
+                    ],
+                    "relationships": [],
+                },
+                f,
+                sort_keys=False,
+            )
+
+        # Simulate an older/stale client payload that does not include `roles`.
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim_employee",
+                    "label": "Employee",
+                    "entity_type": "dimension",
+                }
+            ],
+            "relationships": [],
+        }
+        response = test_client.post("/api/data-model", json=payload)
+        assert response.status_code == 200
+
+        with open(temp_data_model_path, "r") as f:
+            saved = yaml.safe_load(f)
+
+        assert saved["entities"][0]["id"] == "dim_employee"
+        assert saved["entities"][0]["roles"] == ["Sales Agent"]
