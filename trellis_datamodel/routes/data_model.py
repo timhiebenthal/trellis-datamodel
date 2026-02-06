@@ -274,6 +274,8 @@ def _split_model_and_layout(
             model_entity["entity_type"] = entity["entity_type"]
         if "annotation_type" in entity:
             model_entity["annotation_type"] = entity["annotation_type"]
+        if "roles" in entity:
+            model_entity["roles"] = entity["roles"]
         # Only persist source_system for unbound entities (not for bound entities)
         if "source_system" in entity and not entity.get("dbt_model"):
             model_entity["source_system"] = entity["source_system"]
@@ -442,18 +444,41 @@ def _validate_entity_type(entity_type: str) -> None:
         )
 
 
+def _validate_roles(roles) -> None:
+    """
+    Validate that roles field is a list of strings or None.
+
+    Raises ValidationError if invalid.
+    """
+    from trellis_datamodel.exceptions import ValidationError
+
+    if roles is None:
+        return
+
+    if not isinstance(roles, list):
+        raise ValidationError("roles must be a list of strings or null/undefined")
+
+    for role in roles:
+        if not isinstance(role, str):
+            raise ValidationError("roles must be a list of strings or null/undefined")
+
+
 @router.post("/data-model")
 async def save_data_model(data: DataModelUpdate):
     """Save data model, splitting model and layout into separate files."""
     try:
         content = data.dict()  # Pydantic v1 (required by dbt-core==1.10)
 
-        # Validate entity_type values in all entities
+        # Validate entity_type and roles values in all entities
         entities = content.get("entities", [])
         for entity in entities:
             entity_type = entity.get("entity_type")
             if entity_type:
                 _validate_entity_type(entity_type)
+
+            roles = entity.get("roles")
+            if roles is not None:
+                _validate_roles(roles)
 
         # Split into model and layout
         model_data, layout_data = _split_model_and_layout(content)

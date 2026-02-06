@@ -78,6 +78,31 @@ export interface Entity {
     source_system?: string[]; // Only for unbound entities (mock sources)
     domain?: string; // Optional business domain (supports entities created outside business events)
     domains?: string[]; // Optional multi-domain assignment
+    /**
+     * Role-playing dimensions: list of role names this dimension can play in business processes.
+     *
+     * Allows a single dimension entity to represent multiple contextual uses in the business domain,
+     * bridging business language and technical dimensional modeling.
+     *
+     * Examples:
+     * - A "Calendar" dimension might have roles: ["order_date", "ship_date", "delivery_date"]
+     * - An "Employee" dimension might have roles: ["sales_agent", "manager", "team_lead"]
+     * - A "Location" dimension might have roles: ["store_location", "warehouse_location", "delivery_address"]
+     *
+     * When users annotate business events:
+     * - They can select a dimension (e.g., "Calendar")
+     * - And optionally assign a specific role (e.g., "order_date")
+     * - This creates a richer semantic representation: "Calendar (Order Date)"
+     *
+     * Roles are purely optional and additive. Existing dimensions and annotations work unchanged.
+     *
+     * @remarks
+     * - Roles are defined by the dimension owner and stored here
+     * - Annotations reference these roles via the `role` field in AnnotationEntry
+     * - Roles are simple string labels with no additional metadata (Phase 1 implementation)
+     * - Deleting a role does not break existing annotations that reference it
+     */
+    roles?: string[];
 }
 
 /**
@@ -303,6 +328,28 @@ export interface AnnotationEntry {
     text: string;
     description?: string;
     attributes?: Record<string, any>;
+    /**
+     * Role name when this annotation represents a specific use of a role-playing dimension.
+     *
+     * When a dimension supports multiple roles (via Entity.roles), users can specify which role
+     * this annotation represents. This adds semantic richness to the business process description.
+     *
+     * Examples:
+     * - dimension_id: "dim_calendar", role: "order_date" → "Calendar (Order Date)"
+     * - dimension_id: "dim_employee", role: "sales_agent" → "Employee (Sales Agent)"
+     * - dimension_id: "dim_location", role: "warehouse_location" → "Location (Warehouse)"
+     *
+     * Optional field. When not specified, only the dimension is displayed.
+     * The role must be one of the values in the corresponding Entity.roles array (though
+     * enforcement is soft - freeform values are allowed for flexibility).
+     *
+     * @remarks
+     * - Role selection is always optional in the UI
+     * - Roles are only relevant when dimension_id is specified
+     * - Role display format: "Dimension (Role)" in cards and lists
+     * - Removing a role from Entity.roles does not break existing annotations
+     */
+    role?: string;
 }
 
 export interface BusinessEventAnnotations {

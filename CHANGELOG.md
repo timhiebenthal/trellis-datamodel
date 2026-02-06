@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-02-07
+
+### Added
+- **Role-Playing Dimensions:** Added support for role-playing dimensions, allowing dimensions to represent multiple contextual uses in business processes. Users can define roles for dimension entities (e.g., Calendar with roles: order_date, ship_date, delivery_date) and assign specific roles when annotating business events.
+- Added role management UI in EntityDetailModal: users can define, edit, and delete roles for dimension entities with simple inline interface.
+- Added role selection dropdown in SevenWsForm: when annotating business events, users can optionally assign a role to dimension references for richer semantic representation.
+- Added role display in event cards and process rows: annotations display as "Dimension (Role)" when roles are assigned, e.g., "Calendar (Order Date)".
+- Added comprehensive role-playing dimensions user guide with step-by-step instructions, common examples (Calendar dates, Employee job roles, Location place types), and best practices.
+- Added enhanced JSDoc documentation for role-related fields in TypeScript type definitions with practical examples and use cases.
+- Added `roles?: string[]` field to Entity type for storing available roles at the dimension level.
+- Added `role?: string` field to AnnotationEntry type for storing role assignments in business event annotations.
+- Full backward compatibility: existing projects without roles continue to work unchanged; roles are entirely optional and can be adopted incrementally.
+
+### Changed
+- Enhanced EntityDetailModal to display Roles section for dimension entities with add/edit/remove functionality.
+- Enhanced SevenWsForm with role selection state management and dimension role caching for improved performance.
+- Enhanced EventCard and ProcessRow components to display role information alongside dimension names for better semantic clarity.
+- Enhanced DimensionAutocomplete to load and display available roles when a dimension is selected in annotation forms.
+
 ## [0.9.0-beta3] - 2026-02-06
 
 ### Added

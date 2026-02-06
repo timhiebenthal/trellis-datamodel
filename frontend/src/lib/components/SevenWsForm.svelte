@@ -1,9 +1,9 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
+    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, Entity } from "$lib/types";
     import { onMount } from "svelte";
     import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
-    import { getBusinessEventProcesses, getBusinessEvents, getDimensions } from "$lib/api";
+    import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel } from "$lib/api";
 
     type Props = {
         event: BusinessEvent;
@@ -75,8 +75,17 @@
         why: false
     });
 
-    // Entry editing state
-    let editingEntries = $state<Record<string, { text: string; description?: string; dimension_id?: string }>>({});
+    // Entry editing state: maintains working copy of annotation entries being edited
+    let editingEntries = $state<Record<string, { text: string; description?: string; dimension_id?: string; role?: string }>>({});
+
+    // Role state: tracks the currently selected role for each annotation entry (by entry ID)
+    // Used to manage role selection in the UI before saving to the annotation
+    let selectedRoles = $state<Record<string, string | undefined>>({});
+
+    // Dimension roles cache: maps dimension_id -> roles array for quick lookup
+    // Caches dimension role definitions to avoid repeated API calls during role selection
+    // Structure: { "dim_calendar": ["order_date", "ship_date", "delivery_date"], ... }
+    let dimensionRolesCache = $state<Record<string, string[]>>({});
 
     // Calculate filled annotations count
     let filledAnnotationsCount = $derived(
@@ -151,6 +160,18 @@
             errors.push(`Dimension type mismatch detected: ${conflictDetails}. Please review dimension assignments.`);
         }
 
+        // Validate role selections
+        for (const annotationType of ANNOTATION_TYPES.filter(a => a.type !== 'how_many')) {
+            for (const entry of annotations[annotationType.type]) {
+                if (entry.role && entry.dimension_id) {
+                    const roles = dimensionRolesCache[entry.dimension_id];
+                    if (roles && roles.length > 0 && !roles.includes(entry.role)) {
+                        errors.push(`Invalid role "${entry.role}" for dimension "${entry.text}". Please select a valid role.`);
+                    }
+                }
+            }
+        }
+
         return errors;
     });
 
@@ -167,6 +188,20 @@
             how_many: [],
             why: []
         };
+
+        // Initialize role state from existing annotations
+        for (const annotationType of ANNOTATION_TYPES) {
+            for (const entry of annotations[annotationType.type]) {
+                if (entry.role) {
+                    selectedRoles[entry.id] = entry.role;
+                }
+                // Prefetch roles for dimensions that already have dimension_id
+                if (entry.dimension_id) {
+                    fetchDimensionRoles(entry.dimension_id);
+                }
+            }
+        }
+
         // Reset error state when event changes
         hasError = false;
         errorMessage = null;
@@ -315,17 +350,16 @@
             id: `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             text: "",
             description: "",
-            dimension_id: undefined
+            dimension_id: undefined,
+            role: undefined
         };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: [...annotations[annotationType], newEntry]
-        };
-        
+
+        annotations[annotationType] = [...annotations[annotationType], newEntry];
+
         // Initialize editing state for new entry
-        editingEntries[newEntry.id] = { text: "", description: "" };
-        
+        editingEntries[newEntry.id] = { text: "", description: "", role: undefined };
+        selectedRoles[newEntry.id] = undefined;
+
         // Expand section when adding entry
         collapsedState[annotationType] = false;
     }
@@ -344,13 +378,11 @@
     }
 
     function performDelete(annotationType: AnnotationType, entryId: string) {
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].filter(e => e.id !== entryId)
-        };
+        annotations[annotationType] = annotations[annotationType].filter(e => e.id !== entryId);
 
-        // Remove from editing state
+        // Remove from editing state and role state
         delete editingEntries[entryId];
+        delete selectedRoles[entryId];
     }
 
     function handleDeleteConfirm() {
@@ -373,41 +405,109 @@
         clearDimensionId: boolean = true,
     ) {
         editingEntries[entryId] = { ...editingEntries[entryId], text };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId
-                    ? {
-                        ...e,
-                        text,
-                        dimension_id: clearDimensionId ? undefined : e.dimension_id,
-                    }
-                    : e
-            )
-        };
+
+        // Clear role when dimension is cleared
+        if (clearDimensionId) {
+            selectedRoles[entryId] = undefined;
+        }
+
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId
+                ? {
+                    ...e,
+                    text,
+                    dimension_id: clearDimensionId ? undefined : e.dimension_id,
+                    role: clearDimensionId ? undefined : e.role,
+                }
+                : e
+        );
     }
 
     function updateEntryDescription(annotationType: AnnotationType, entryId: string, description: string) {
         editingEntries[entryId] = { ...editingEntries[entryId], description };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId ? { ...e, description } : e
-            )
-        };
+
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { ...e, description } : e
+        );
     }
 
-    function updateEntryDimensionId(annotationType: AnnotationType, entryId: string, dimension_id: string) {
+    async function updateEntryDimensionId(annotationType: AnnotationType, entryId: string, dimension_id: string) {
         editingEntries[entryId] = { ...editingEntries[entryId], dimension_id };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId ? { ...e, dimension_id: dimension_id || undefined } : e
-            )
-        };
+
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { ...e, dimension_id: dimension_id || undefined } : e
+        );
+
+        // Fetch dimension roles when dimension is selected
+        // This allows the role dropdown to display available roles for this dimension
+        if (dimension_id) {
+            await fetchDimensionRoles(dimension_id);
+        } else {
+            // Clear role when dimension is deselected - no dimension means no role context
+            selectedRoles[entryId] = undefined;
+            updateEntryRole(annotationType, entryId, undefined);
+        }
+    }
+
+    /**
+     * Updates the role assignment for a single annotation entry.
+     * This is part of the role-playing dimensions feature, allowing annotations to specify
+     * which semantic role a dimension plays in the business process.
+     *
+     * Example: For a Calendar dimension annotated as "when", the role might be "order_date"
+     * resulting in display text "Calendar (order_date)"
+     *
+     * @param annotationType - The 7W category (who, what, when, where, how, why, how_many)
+     * @param entryId - The unique ID of the annotation entry being updated
+     * @param role - The role name to assign, or undefined to clear the role
+     */
+    function updateEntryRole(annotationType: AnnotationType, entryId: string, role: string | undefined) {
+        // Update the editing entry copy
+        editingEntries[entryId] = { ...editingEntries[entryId], role };
+
+        // Update the main annotations object
+        // This triggers re-rendering of the annotation display with updated role text
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { ...e, role: role || undefined } : e
+        );
+    }
+
+    /**
+     * Fetches available roles for a dimension from the data model.
+     * Implements caching to avoid repeated API calls during the same form session.
+     *
+     * When a user selects a dimension with available roles (e.g., Calendar has roles:
+     * ["order_date", "ship_date", "delivery_date"]), this function fetches those roles
+     * so the role dropdown can be populated.
+     *
+     * @param dimension_id - The ID of the dimension entity (e.g., "dim_calendar")
+     */
+    async function fetchDimensionRoles(dimension_id: string): Promise<void> {
+        // Check cache first to avoid redundant API calls
+        // If we've already loaded roles for this dimension in this session, reuse them
+        if (dimensionRolesCache[dimension_id]) {
+            return;
+        }
+
+        try {
+            // Fetch the entire data model and extract this specific dimension's roles
+            const dataModel = await getDataModel();
+            const entity = dataModel.entities.find(e => e.id === dimension_id);
+
+            // Cache the roles array if it exists, or empty array if no roles defined
+            if (entity && entity.roles && entity.roles.length > 0) {
+                // Dimension has roles defined - cache them for role dropdown population
+                dimensionRolesCache[dimension_id] = entity.roles;
+            } else {
+                // No roles defined for this dimension - cache empty array to avoid refetching
+                dimensionRolesCache[dimension_id] = [];
+            }
+        } catch (e) {
+            // Graceful error handling: if role fetch fails, cache empty array and continue
+            // This prevents the form from breaking; the role dropdown simply won't show
+            console.error(`Failed to fetch roles for dimension ${dimension_id}:`, e);
+            dimensionRolesCache[dimension_id] = [];
+        }
     }
 
     function handleEntryTextChange(annotationType: AnnotationType, entryId: string, text: string) {
@@ -644,6 +744,39 @@
                                                         disabled={loading}
                                                         loading={dimensionsLoading || businessEventsLoading || processesLoading}
                                                     />
+
+                                                    <!-- Role Dropdown (only show if dimension has roles) -->
+                                                    {#if entry.dimension_id && dimensionRolesCache[entry.dimension_id] && dimensionRolesCache[entry.dimension_id].length > 0}
+                                                        <div class="ml-4 mt-2">
+                                                            <label
+                                                                for={`role-select-${entry.id}`}
+                                                                class="block text-xs font-medium text-gray-600 mb-1"
+                                                            >
+                                                                Role (optional)
+                                                            </label>
+                                                            <select
+                                                                id={`role-select-${entry.id}`}
+                                                                value={selectedRoles[entry.id] || ''}
+                                                                onchange={(e) => {
+                                                                    const value = e.currentTarget.value;
+                                                                    selectedRoles[entry.id] = value || undefined;
+                                                                    updateEntryRole(
+                                                                        annotationType.type,
+                                                                        entry.id,
+                                                                        value || undefined
+                                                                    );
+                                                                }}
+                                                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                                                                disabled={loading}
+                                                                aria-label="Select role for dimension"
+                                                            >
+                                                                <option value="">No role</option>
+                                                                {#each dimensionRolesCache[entry.dimension_id] as role}
+                                                                    <option value={role}>{role}</option>
+                                                                {/each}
+                                                            </select>
+                                                        </div>
+                                                    {/if}
                                                 {/if}
                                                 <!-- Description Input -->
                                                 <input

@@ -38,6 +38,13 @@
 	let isCopyingMarkdown = $state(false);
 	let showMarkdownSuccess = $state(false);
 
+	// Role management state
+	let entityRoles = $state<string[]>([]);
+	let roleInput = $state('');
+	let editingRoleIndex = $state<number | null>(null);
+	let editingRoleValue = $state('');
+	let deletingRoleIndex = $state<number | null>(null);
+
 	function normalizeDomains(domains?: string[], domain?: string): string[] {
 		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
 		return Array.from(new Set(list.map((item) => item.trim()).filter(Boolean)));
@@ -173,9 +180,14 @@
 			entitySourceSystems = [...(data.source_system || [])];
 			entityType = data.entity_type || 'unclassified';
 			annotationType = data.annotation_type;
+			entityRoles = [...((data as any).roles || [])];
 			tagInput = '';
 			domainInput = '';
 			sourceInput = '';
+			roleInput = '';
+			editingRoleIndex = null;
+			editingRoleValue = '';
+			deletingRoleIndex = null;
 			sourceSuggestions = [];
 			showSourceSuggestions = false;
 			activeSourceSuggestionIndex = 0;
@@ -223,6 +235,7 @@
 			sourceInput.trim().length > 0 ||
 			entityType !== (data.entity_type || 'unclassified') ||
 			annotationType !== data.annotation_type ||
+			JSON.stringify(entityRoles.sort()) !== JSON.stringify([...((data as any).roles || [])].sort()) ||
 			(!isBoundEntity &&
 				JSON.stringify(editableDraftedFields) !==
 					JSON.stringify(data?.drafted_fields || []));
@@ -238,6 +251,8 @@
 				showExportDropdown = false;
 			} else if (showDeleteConfirm) {
 				showDeleteConfirm = false;
+			} else if (deletingRoleIndex !== null) {
+				deletingRoleIndex = null;
 			} else {
 				handleCancel();
 			}
@@ -366,6 +381,84 @@
 		activeSourceSuggestionIndex = 0;
 	}
 
+	// Role management functions
+	function addRole() {
+		const trimmed = roleInput.trim();
+		if (!trimmed) return;
+
+		if (entityRoles.includes(trimmed)) {
+			alert(`Role "${trimmed}" already exists`);
+			return;
+		}
+
+		entityRoles = [...entityRoles, trimmed];
+		roleInput = '';
+	}
+
+	function handleRoleInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addRole();
+		}
+	}
+
+	function startEditingRole(index: number) {
+		editingRoleIndex = index;
+		editingRoleValue = entityRoles[index];
+	}
+
+	function saveEditingRole() {
+		if (editingRoleIndex === null) return;
+
+		const trimmed = editingRoleValue.trim();
+		if (!trimmed) {
+			alert('Role name cannot be empty');
+			return;
+		}
+
+		// Check for duplicates (excluding the current role being edited)
+		const duplicate = entityRoles.find((role, idx) => idx !== editingRoleIndex && role === trimmed);
+		if (duplicate) {
+			alert(`Role "${trimmed}" already exists`);
+			return;
+		}
+
+		entityRoles = entityRoles.map((role, idx) =>
+			idx === editingRoleIndex ? trimmed : role
+		);
+		editingRoleIndex = null;
+		editingRoleValue = '';
+	}
+
+	function cancelEditingRole() {
+		editingRoleIndex = null;
+		editingRoleValue = '';
+	}
+
+	function handleEditRoleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			saveEditingRole();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			cancelEditingRole();
+		}
+	}
+
+	function confirmDeleteRole(index: number) {
+		deletingRoleIndex = index;
+	}
+
+	function deleteRole() {
+		if (deletingRoleIndex === null) return;
+		entityRoles = entityRoles.filter((_, idx) => idx !== deletingRoleIndex);
+		deletingRoleIndex = null;
+	}
+
+	function cancelDeleteRole() {
+		deletingRoleIndex = null;
+	}
+
 	function handleSave() {
 		if (!currentEntity || !entityName.trim()) return;
 		if (sourceInput.trim().length > 0) {
@@ -391,6 +484,7 @@
 								entitySourceSystems.length > 0 ? entitySourceSystems : undefined,
 							entity_type: entityType,
 							annotation_type: entityType === 'dimension' ? annotationType : undefined,
+							roles: entityType === 'dimension' && entityRoles.length > 0 ? entityRoles : undefined,
 							drafted_fields:
 								!isBoundEntity && editableDraftedFields.length > 0
 									? editableDraftedFields
@@ -837,6 +931,105 @@
 						</div>
 					</div>
 
+					<!-- Roles (for dimensions only) -->
+					{#if entityType === 'dimension'}
+						<div>
+							<div class="flex items-center gap-2 mb-3">
+								<label class="block text-sm font-semibold text-gray-700">
+									Roles ({entityRoles.length})
+								</label>
+								<button
+									type="button"
+									class="text-gray-400 hover:text-gray-600 transition-colors"
+									title="Role-playing dimensions: Track different contextual uses of the same dimension (e.g., 'order_date', 'ship_date', 'delivery_date' for a Date dimension)"
+								>
+									<Icon icon="lucide:info" class="w-4 h-4" />
+								</button>
+							</div>
+
+							{#if entityRoles.length === 0 && !roleInput}
+								<!-- Empty state -->
+								<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
+									<Icon icon="lucide:users" class="w-8 h-8 text-gray-400 mx-auto mb-2" />
+									<p class="text-sm text-gray-600 mb-1">No roles defined for this dimension</p>
+									<p class="text-xs text-gray-500">Roles track different contextual uses (e.g., order_date, ship_date)</p>
+								</div>
+							{:else}
+								<!-- Role list -->
+								<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+									{#if entityRoles.length > 0}
+										<div class="divide-y divide-gray-200">
+											{#each entityRoles as role, index}
+												<div class="px-4 py-3 hover:bg-gray-50 transition-colors group flex items-center justify-between">
+													{#if editingRoleIndex === index}
+														<!-- Edit mode -->
+														<input
+															type="text"
+															bind:value={editingRoleValue}
+															onkeydown={handleEditRoleKeydown}
+															onblur={saveEditingRole}
+															class="flex-1 px-3 py-1.5 border-2 border-blue-500 rounded-lg text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+															placeholder="e.g., order_date, ship_date"
+															autofocus
+														/>
+													{:else}
+														<!-- View mode -->
+														<button
+															type="button"
+															onclick={() => startEditingRole(index)}
+															class="flex-1 text-left px-2 py-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors rounded"
+															title="Click to edit"
+														>
+															{role}
+														</button>
+														<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+															<button
+																type="button"
+																onclick={() => startEditingRole(index)}
+																class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+																title="Edit role"
+															>
+																<Icon icon="lucide:pencil" class="w-4 h-4" />
+															</button>
+															<button
+																type="button"
+																onclick={() => confirmDeleteRole(index)}
+																class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+																title="Delete role"
+															>
+																<Icon icon="lucide:trash-2" class="w-4 h-4" />
+															</button>
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{/if}
+
+							<!-- Add role input -->
+							<div class="mt-3 flex gap-2">
+								<input
+									type="text"
+									bind:value={roleInput}
+									onkeydown={handleRoleInputKeydown}
+									class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+									placeholder="e.g., Sales Agent, Manager, Team Lead"
+								/>
+								<button
+									type="button"
+									onclick={addRole}
+									disabled={!roleInput.trim()}
+									class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									<Icon icon="lucide:plus" class="w-4 h-4" />
+									Add Role
+								</button>
+							</div>
+						</div>
+					{/if}
+
 					<!-- Attributes -->
 					{#if isBoundEntity}
 						<!-- Read-only attributes for bound entities -->
@@ -1101,6 +1294,37 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- Delete Role Confirmation Modal -->
+			{#if deletingRoleIndex !== null}
+				<div class="absolute inset-0 bg-gray-900/50 flex items-center justify-center z-10 rounded-xl">
+					<div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4 border-2 border-red-200">
+						<div class="flex items-start gap-3 mb-4">
+							<Icon icon="lucide:alert-triangle" class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+							<div>
+								<h3 class="text-lg font-bold text-gray-900 mb-1">Remove Role?</h3>
+								<p class="text-sm text-gray-600">
+									Are you sure you want to remove the role <span class="font-semibold text-gray-900">"{entityRoles[deletingRoleIndex]}"</span>?
+								</p>
+							</div>
+						</div>
+						<div class="flex gap-2 justify-end">
+							<button
+								onclick={cancelDeleteRole}
+								class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								onclick={deleteRole}
+								class="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+							>
+								Remove Role
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

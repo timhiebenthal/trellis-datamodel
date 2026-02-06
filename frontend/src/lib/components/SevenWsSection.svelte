@@ -2,6 +2,7 @@
     import Icon from "@iconify/svelte";
     import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
     import type { SevenWsEntry, Dimension, SevenWType } from "$lib/types";
+    import { formatAnnotationText } from "$lib/utils";
 
     type Props = {
         w_type: SevenWType;
@@ -156,10 +157,16 @@
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex-1 space-y-2">
                             <!-- Text -->
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium text-gray-900">{entry.text}</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-medium text-gray-900 break-words">
+                                    {#if entry.role}
+                                        {entry.text} <span class="text-gray-500 italic break-words">({entry.role})</span>
+                                    {:else}
+                                        {entry.text}
+                                    {/if}
+                                </span>
                                 {#if entry.dimension_id}
-                                    <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                    <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded whitespace-nowrap">
                                         Dimension: {entry.dimension_id}
                                     </span>
                                 {/if}

@@ -489,14 +489,14 @@ export function detectFieldSemantics(
     if (otherSchema) {
         for (const column of otherSchema.columns) {
             if (!column.data_tests) continue;
-            
+
             for (const test of column.data_tests) {
                 if (test.relationships) {
                     const rel = test.relationships;
                     // Support both recommended arguments block and legacy top-level keys
                     const toRef = rel.arguments?.to || rel.to;
                     const refField = rel.arguments?.field || rel.field;
-                    
+
                     // Check if this relationship references our model and field
                     if (toRef && refField === fieldName) {
                         // Parse ref('model_name') format
@@ -511,5 +511,26 @@ export function detectFieldSemantics(
     }
 
     return 'unknown';
+}
+
+/**
+ * Format an annotation entry text with optional role display.
+ *
+ * For role-playing dimensions, displays the dimension name followed by the role
+ * in parentheses. For regular dimensions, displays just the dimension name.
+ *
+ * @param entry - The annotation entry containing text and optional role
+ * @returns Formatted text: "Dimension (Role)" if role exists, otherwise "Dimension"
+ *
+ * @example
+ * formatAnnotationText({ id: "1", text: "Date", role: "order_date" }) // "Date (order_date)"
+ * formatAnnotationText({ id: "2", text: "Customer" }) // "Customer"
+ * formatAnnotationText({ id: "3", text: "Date", role: "" }) // "Date" (empty role ignored)
+ */
+export function formatAnnotationText(entry: { text: string; role?: string }): string {
+    if (entry.role && entry.role.trim() !== '') {
+        return `${entry.text} (${entry.role})`;
+    }
+    return entry.text;
 }
 
