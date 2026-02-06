@@ -639,6 +639,9 @@ async def update_business_event_process(
                 )
             updates["event_ids"] = request.event_ids
 
+        if request.derived_entities is not None:
+            updates["derived_entities"] = request.derived_entities
+
         if not updates:
             raise HTTPException(status_code=400, detail="No fields provided to update")
 
