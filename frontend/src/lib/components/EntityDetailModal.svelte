@@ -36,6 +36,7 @@
 	let isExporting = $state(false);
 	let showExportDropdown = $state(false);
 	let isCopyingMarkdown = $state(false);
+	let showMarkdownSuccess = $state(false);
 
 	function normalizeDomains(domains?: string[], domain?: string): string[] {
 		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
@@ -487,7 +488,12 @@
 				entityId
 			);
 			await navigator.clipboard.writeText(markdown);
-			alert('Entity copied to clipboard as Markdown!');
+			
+			// Show success message
+			showMarkdownSuccess = true;
+			setTimeout(() => {
+				showMarkdownSuccess = false;
+			}, 3000);
 		} catch (error) {
 			console.error('Copy failed:', error);
 			alert(`Failed to copy: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -566,6 +572,14 @@
 					</button>
 				</div>
 			</div>
+
+			<!-- Success Message -->
+			{#if showMarkdownSuccess}
+				<div class="mx-8 mt-4 px-4 py-3 bg-green-50 border-2 border-green-200 rounded-lg flex items-center gap-3 animate-fade-in">
+					<Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600 flex-shrink-0" />
+					<span class="text-sm font-medium text-green-800">Entity copied to clipboard as Markdown!</span>
+				</div>
+			{/if}
 
 			<!-- Scrollable Content -->
 			<div class="px-8 py-6 overflow-y-auto" style="max-height: calc(90vh - 220px);">
@@ -1090,3 +1104,20 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.animate-fade-in {
+		animation: fade-in 0.3s ease-out;
+	}
+</style>
