@@ -121,16 +121,16 @@
 <div
 	class="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer group"
 	role="row"
-	on:click={handleRowClick}
-	on:keydown={(e) => e.key === "Enter" && handleRowClick()}
+	onclick={handleRowClick}
+	onkeydown={(e) => e.key === "Enter" && handleRowClick()}
 	tabindex="0"
 >
 	<!-- Checkbox (always visible for selection) -->
 	<input
 		type="checkbox"
 		checked={isSelected}
-		on:change={handleCheckboxToggle}
-		on:click={(e) => e.stopPropagation()}
+		onchange={handleCheckboxToggle}
+		onclick={(e) => e.stopPropagation()}
 		class="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer flex-shrink-0"
 		title="Select entity"
 	/>
