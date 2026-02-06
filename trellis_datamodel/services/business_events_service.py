@@ -1065,6 +1065,7 @@ def create_process(
         updated_at=now,
         resolved_at=None,
         annotations_superset=annotations_superset,
+        derived_entities=[],
     )
 
     # Update events to link them to this process
@@ -1136,6 +1137,13 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
             process.annotations_superset = annotations_value
         else:
             process.annotations_superset = BusinessEventAnnotations(**annotations_value)
+
+    if "derived_entities" in updates:
+        from trellis_datamodel.models.business_event import DerivedEntity
+
+        process.derived_entities = [
+            DerivedEntity(**de) for de in updates["derived_entities"]
+        ]
 
     old_event_ids = set(process.event_ids)
     if "event_ids" in updates:
@@ -1223,6 +1231,7 @@ def resolve_process(process_id: str) -> BusinessEventProcess:
     process.resolved_at = datetime.now()
     process.updated_at = datetime.now()
     process.annotations_superset = None
+    process.derived_entities = []  # Clear derived entities when resolving
     processes[process_index] = process
     save_processes(processes)
 

@@ -16,6 +16,8 @@
 
     let resolving = $state(false);
 
+    const hasDerivedEntities = $derived((process.derived_entities?.length ?? 0) > 0);
+
     async function handleResolve() {
         if (!onResolve || resolving) return;
         resolving = true;
@@ -43,6 +45,16 @@
                 <span>{process.type}</span>
             </div>
         </div>
+    </div>
+    <div class="flex items-center gap-2">
+        {#if hasDerivedEntities}
+            <span
+                class="p-1 rounded bg-green-100 text-green-800 border border-green-300 flex items-center"
+                title="Entities have been generated from this process"
+            >
+                <Icon icon="lucide:check-circle" class="w-3.5 h-3.5" />
+            </span>
+        {/if}
     </div>
     <div class="flex items-center gap-1">
         <button

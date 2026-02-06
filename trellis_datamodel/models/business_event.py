@@ -233,6 +233,9 @@ class BusinessEventProcess(BaseModel):
         None,
         description="Union of all member event annotations (computed or persisted)",
     )
+    derived_entities: List[DerivedEntity] = Field(
+        default_factory=list, description="Entities generated from this process"
+    )
 
     @model_validator(mode="after")
     def validate_event_ids_not_empty(self) -> "BusinessEventProcess":

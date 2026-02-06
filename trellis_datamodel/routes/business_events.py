@@ -103,6 +103,7 @@ class UpdateProcessRequest(BaseModel):
     domain: str | None = None
     annotations_superset: BusinessEventAnnotations | None = None
     event_ids: list[str] | None = None
+    derived_entities: list[dict] | None = None
 
 
 class AttachEventsRequest(BaseModel):
