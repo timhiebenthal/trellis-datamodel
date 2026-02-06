@@ -7,6 +7,7 @@
 	import { goto } from '$app/navigation';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
+	import { exportEntityToExcel } from '$lib/utils/excel-export';
 
 	// Get autoSaveService from parent context (set in +layout.svelte)
 	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
@@ -32,6 +33,7 @@
 	let showDeleteConfirm = $state(false);
 	let isDirty = $state(false);
 	let show7WsDropdown = $state(false);
+	let isExporting = $state(false);
 
 	function normalizeDomains(domains?: string[], domain?: string): string[] {
 		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
@@ -442,6 +444,32 @@
 		// Navigate to canvas with entity filter
 		goto(`/canvas?entities=${currentEntity.id}`);
 		closeModal();
+	}
+
+	async function handleExportToExcel() {
+		if (!currentEntity) return;
+
+		isExporting = true;
+		try {
+			// Extract entity ID from currentEntity
+			const entityId = currentEntity.id;
+
+			// Call export function with all required data
+			exportEntityToExcel(
+				currentEntity.data as unknown as EntityData,
+				entityAttributes,
+				$edges,
+				$nodes,
+				entityId
+			);
+
+			// Success - file downloads automatically
+		} catch (error) {
+			console.error('Export failed:', error);
+			alert(`Failed to export entity: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		} finally {
+			isExporting = false;
+		}
 	}
 
 	function closeModal() {
@@ -951,6 +979,19 @@
 							>
 								<Icon icon="lucide:eye" class="w-4 h-4" />
 								View on Canvas
+							</button>
+							<button
+								onclick={handleExportToExcel}
+								disabled={isExporting}
+								class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+								aria-label="Export entity to Excel"
+							>
+								{#if isExporting}
+									<Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+								{:else}
+									<Icon icon="lucide:download" class="w-4 h-4" />
+								{/if}
+								Export to Excel
 							</button>
 							<button
 								onclick={handleCancel}
