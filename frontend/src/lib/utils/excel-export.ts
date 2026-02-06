@@ -95,6 +95,7 @@ export function formatRelationshipType(type: string): string {
  * Generates Overview sheet with entity metadata in key-value format
  * @param entity - Entity data from EntityDetailModal
  * @returns Configured XLSX worksheet with bold headers and column widths
+ * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
 export function generateOverviewSheet(entity: EntityData): XLSX.WorkSheet {
 	// Create 2-column array: Field | Value
@@ -103,19 +104,25 @@ export function generateOverviewSheet(entity: EntityData): XLSX.WorkSheet {
 		['Entity Name', entity.label],
 		['Entity Type', formatEntityType(entity.entity_type)],
 		['Annotation (7W)', formatAnnotationType(entity.annotation_type)],
-		['Domain(s)', entity.domains?.join(', ') || entity.domain || 'None'],
-		['Tags', entity.tags?.join(', ') || 'None'],
-		['Source Systems', entity.source_system?.join(', ') || 'None'],
-		['Description', entity.description || 'None'],
-		['dbt Model', entity.dbt_model || 'Not bound'],
-		['Additional Models', entity.additional_models?.join(', ') || 'None']
+		['Domain(s)', entity.domains?.join(', ') || entity.domain || '-'],
+		['Tags', entity.tags?.join(', ') || '-'],
+		['Source Systems', entity.source_system?.join(', ') || '-'],
+		['Description', entity.description || '-'],
+		['dbt Model', entity.dbt_model || '-'],
+		['Additional Models', entity.additional_models?.join(', ') || '-']
 	];
 
 	const ws = XLSX.utils.aoa_to_sheet(overviewData);
 
-	// Bold first row (headers)
-	if (ws['A1']) ws['A1'].s = { font: { bold: true } };
-	if (ws['B1']) ws['B1'].s = { font: { bold: true } };
+	// Attempt to set bold headers (requires SheetJS Pro for cell styling)
+	// This code is kept for future compatibility but has no effect in Community Edition
+	const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+	for (let col = range.s.c; col <= range.e.c; col++) {
+		const cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+		if (!ws[cell_address]) continue;
+		if (!ws[cell_address].s) ws[cell_address].s = {};
+		ws[cell_address].s.font = { bold: true };
+	}
 
 	// Set column widths
 	ws['!cols'] = [{ wch: 20 }, { wch: 60 }];
@@ -129,6 +136,7 @@ export function generateOverviewSheet(entity: EntityData): XLSX.WorkSheet {
  * @param entityId - Current entity ID to filter relationships
  * @param allNodes - All nodes for looking up entity labels
  * @returns Configured XLSX worksheet with bold headers and column widths
+ * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
 export function generateRelationshipsSheet(
 	edges: any[], // Edge type from @xyflow/svelte
@@ -150,7 +158,7 @@ export function generateRelationshipsSheet(
 
 			return [
 				relatedEntity?.data?.label || relatedEntityId,
-				edge.label || 'None',
+				edge.label || '-',
 				formatRelationshipType(edge.data?.type || 'unknown'),
 				isOutgoing ? 'Outgoing' : 'Incoming'
 			];
@@ -164,10 +172,15 @@ export function generateRelationshipsSheet(
 
 	const ws = XLSX.utils.aoa_to_sheet(relationshipsData);
 
-	// Bold header row
-	['A1', 'B1', 'C1', 'D1'].forEach(cell => {
-		if (ws[cell]) ws[cell].s = { font: { bold: true } };
-	});
+	// Attempt to set bold headers (requires SheetJS Pro for cell styling)
+	// This code is kept for future compatibility but has no effect in Community Edition
+	const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+	for (let col = range.s.c; col <= range.e.c; col++) {
+		const cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+		if (!ws[cell_address]) continue;
+		if (!ws[cell_address].s) ws[cell_address].s = {};
+		ws[cell_address].s.font = { bold: true };
+	}
 
 	// Set column widths
 	ws['!cols'] = [{ wch: 25 }, { wch: 30 }, { wch: 20 }, { wch: 15 }];
@@ -179,6 +192,7 @@ export function generateRelationshipsSheet(
  * Generates Attributes sheet with tabular list of entity fields
  * @param attributes - Array of attributes from entityAttributes derived state
  * @returns Configured XLSX worksheet with bold headers and column widths
+ * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
 export function generateAttributesSheet(
 	attributes: Array<{ name: string; type: string; description?: string }>
@@ -200,10 +214,15 @@ export function generateAttributesSheet(
 
 	const ws = XLSX.utils.aoa_to_sheet(attributesData);
 
-	// Bold header row
-	['A1', 'B1', 'C1'].forEach(cell => {
-		if (ws[cell]) ws[cell].s = { font: { bold: true } };
-	});
+	// Attempt to set bold headers (requires SheetJS Pro for cell styling)
+	// This code is kept for future compatibility but has no effect in Community Edition
+	const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+	for (let col = range.s.c; col <= range.e.c; col++) {
+		const cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+		if (!ws[cell_address]) continue;
+		if (!ws[cell_address].s) ws[cell_address].s = {};
+		ws[cell_address].s.font = { bold: true };
+	}
 
 	// Set column widths
 	ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 50 }];
