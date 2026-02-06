@@ -49,7 +49,8 @@ describe('BusinessEvents - Grouping Logic', () => {
         id: string,
         name: string,
         domain: string,
-        eventIds: string[]
+        eventIds: string[],
+        derivedEntities?: Array<{ entity_id: string; created_at: string }>
     ): BusinessEventProcess => ({
         id,
         name,
@@ -57,7 +58,8 @@ describe('BusinessEvents - Grouping Logic', () => {
         domain,
         event_ids: eventIds,
         created_at: '2026-01-27T10:00:00Z',
-        updated_at: '2026-01-27T10:00:00Z'
+        updated_at: '2026-01-27T10:00:00Z',
+        derived_entities: derivedEntities ?? []
     });
 
     it('groups events by domain → process → events hierarchy', async () => {

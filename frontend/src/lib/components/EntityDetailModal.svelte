@@ -4,9 +4,10 @@
 	import { getSourceSystemSuggestions } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
-	import { goto } from '$app/navigation';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
+	import { exportEntityToExcel } from '$lib/utils/excel-export';
+	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
 
 	// Get autoSaveService from parent context (set in +layout.svelte)
 	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
@@ -32,6 +33,10 @@
 	let showDeleteConfirm = $state(false);
 	let isDirty = $state(false);
 	let show7WsDropdown = $state(false);
+	let isExporting = $state(false);
+	let showExportDropdown = $state(false);
+	let isCopyingMarkdown = $state(false);
+	let showMarkdownSuccess = $state(false);
 
 	function normalizeDomains(domains?: string[], domain?: string): string[] {
 		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
@@ -229,6 +234,8 @@
 		if (event.key === 'Escape') {
 			if (show7WsDropdown) {
 				show7WsDropdown = false;
+			} else if (showExportDropdown) {
+				showExportDropdown = false;
 			} else if (showDeleteConfirm) {
 				showDeleteConfirm = false;
 			} else {
@@ -246,11 +253,16 @@
 	}
 
 	function handleModalContentClick(event: MouseEvent) {
-		// Close 7Ws dropdown when clicking outside of it
+		// Close dropdowns when clicking outside of them
 		const target = event.target as HTMLElement;
-		const dropdown = target.closest('.annotation-dropdown-container');
-		if (!dropdown && show7WsDropdown) {
+		const annotationDropdown = target.closest('.annotation-dropdown-container');
+		if (!annotationDropdown && show7WsDropdown) {
 			show7WsDropdown = false;
+		}
+
+		const exportDropdown = target.closest('.export-dropdown-container');
+		if (!exportDropdown && showExportDropdown) {
+			showExportDropdown = false;
 		}
 	}
 
@@ -436,12 +448,59 @@
 		showDeleteConfirm = false;
 	}
 
-	function handleViewOnCanvas() {
+
+	async function handleExportToExcel() {
 		if (!currentEntity) return;
 
-		// Navigate to canvas with entity filter
-		goto(`/canvas?entities=${currentEntity.id}`);
-		closeModal();
+		isExporting = true;
+		try {
+			// Extract entity ID from currentEntity
+			const entityId = currentEntity.id;
+
+			// Call export function with all required data
+			exportEntityToExcel(
+				currentEntity.data as unknown as EntityData,
+				entityAttributes,
+				$edges,
+				$nodes,
+				entityId
+			);
+
+			// Success - file downloads automatically
+		} catch (error) {
+			console.error('Export failed:', error);
+			alert(`Failed to export entity: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		} finally {
+			isExporting = false;
+		}
+	}
+
+	async function handleCopyAsMarkdown() {
+		if (!currentEntity) return;
+		isCopyingMarkdown = true;
+		try {
+			const entityId = currentEntity.id;
+			const markdown = formatEntityAsMarkdown(
+				currentEntity.data as unknown as EntityData,
+				entityAttributes,
+				$edges,
+				$nodes,
+				entityId
+			);
+			await navigator.clipboard.writeText(markdown);
+			
+			// Show success message
+			showMarkdownSuccess = true;
+			setTimeout(() => {
+				showMarkdownSuccess = false;
+			}, 3000);
+		} catch (error) {
+			console.error('Copy failed:', error);
+			alert(`Failed to copy: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		} finally {
+			isCopyingMarkdown = false;
+			showExportDropdown = false;
+		}
 	}
 
 	function closeModal() {
@@ -513,6 +572,14 @@
 					</button>
 				</div>
 			</div>
+
+			<!-- Success Message -->
+			{#if showMarkdownSuccess}
+				<div class="mx-8 mt-4 px-4 py-3 bg-green-50 border-2 border-green-200 rounded-lg flex items-center gap-3 animate-fade-in">
+					<Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600 flex-shrink-0" />
+					<span class="text-sm font-medium text-green-800">Entity copied to clipboard as Markdown!</span>
+				</div>
+			{/if}
 
 			<!-- Scrollable Content -->
 			<div class="px-8 py-6 overflow-y-auto" style="max-height: calc(90vh - 220px);">
@@ -945,13 +1012,51 @@
 						</button>
 
 						<div class="flex gap-3">
-							<button
-								onclick={handleViewOnCanvas}
-								class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2"
-							>
-								<Icon icon="lucide:eye" class="w-4 h-4" />
-								View on Canvas
-							</button>
+							<div class="relative export-dropdown-container">
+								<button
+									onclick={() => (showExportDropdown = !showExportDropdown)}
+									disabled={isExporting}
+									class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+									aria-label="Export options"
+								>
+									{#if isExporting}
+										<Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+									{:else}
+										<Icon icon="lucide:download" class="w-4 h-4" />
+									{/if}
+									Export
+									<Icon icon="lucide:chevron-down" class="w-3 h-3 transition-transform {showExportDropdown ? 'rotate-180' : ''}" />
+								</button>
+
+								<!-- Dropdown Menu -->
+								{#if showExportDropdown}
+									<div class="absolute bottom-full mb-2 right-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[200px] z-10">
+										<button
+											onclick={() => {
+												handleExportToExcel();
+												showExportDropdown = false;
+											}}
+											class="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
+										>
+											<Icon icon="lucide:file-spreadsheet" class="w-4 h-4 text-green-600" />
+											Download as Excel
+										</button>
+										<button
+											onclick={() => { handleCopyAsMarkdown(); }}
+											disabled={isCopyingMarkdown}
+											class="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+										>
+											{#if isCopyingMarkdown}
+												<Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin text-blue-600" />
+											{:else}
+												<Icon icon="lucide:clipboard-copy" class="w-4 h-4 text-blue-600" />
+											{/if}
+											Copy as Markdown
+										</button>
+									</div>
+								{/if}
+							</div>
+
 							<button
 								onclick={handleCancel}
 								class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
@@ -999,3 +1104,20 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.animate-fade-in {
+		animation: fade-in 0.3s ease-out;
+	}
+</style>

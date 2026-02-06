@@ -790,6 +790,58 @@ class TestEventRelink:
             reloaded = next(e for e in events if e.id == event_id)
             assert reloaded.process_id == process.id
 
+    def test_update_process_sets_derived_entities(self, temp_dir, monkeypatch):
+        """Test that updating process derived_entities persists correctly."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        process = business_events_service.create_process(
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id],
+        )
+
+        from trellis_datamodel.models.business_event import DerivedEntity
+        from datetime import datetime
+
+        derived_entities = [
+            DerivedEntity(entity_id="entity1", created_at=datetime.now()),
+            DerivedEntity(entity_id="entity2", created_at=datetime.now()),
+        ]
+
+        updated = business_events_service.update_process(
+            process.id,
+            {"derived_entities": [de.model_dump() for de in derived_entities]},
+        )
+
+        assert len(updated.derived_entities) == 2
+        assert updated.derived_entities[0].entity_id == "entity1"
+        assert updated.derived_entities[1].entity_id == "entity2"
+
+        # Reload and verify persistence
+        processes = business_events_service.load_processes()
+        reloaded = next(p for p in processes if p.id == process.id)
+        assert len(reloaded.derived_entities) == 2
+        assert reloaded.derived_entities[0].entity_id == "entity1"
+
+    def test_process_defaults_to_empty_derived_entities(self, temp_dir, monkeypatch):
+        """Test that new processes have empty derived_entities list."""
+        events_path = os.path.join(temp_dir, "business_events.yml")
+        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+
+        event1 = business_events_service.create_event("event 1", BusinessEventType.DISCRETE)
+        process = business_events_service.create_process(
+            "Test Process",
+            BusinessEventType.DISCRETE,
+            TEST_PROCESS_DOMAIN,
+            [event1.id],
+        )
+
+        assert process.derived_entities == []
+
 
 class TestSupersetRecompute:
     """Test superset recomputation when events change."""

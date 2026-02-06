@@ -1,0 +1,274 @@
+import * as XLSX from 'xlsx';
+import type { Node } from '@xyflow/svelte';
+import type { AnnotationType, EntityData } from '$lib/types';
+
+/**
+ * Sanitizes a filename by removing or replacing special characters.
+ * Removes: & / \ : * ? " < > |
+ * Keeps: spaces, alphanumeric characters, hyphens, underscores
+ * Truncates to 200 characters if needed.
+ *
+ * @param name - The filename to sanitize
+ * @returns A safe filename string
+ */
+export function sanitizeFilename(name: string): string {
+	// Replace special characters with empty string or safe alternatives
+	let sanitized = name
+		.replace(/[&/\\:*?"<>|]/g, '')
+		.trim();
+
+	// Truncate to 200 characters if needed
+	if (sanitized.length > 200) {
+		sanitized = sanitized.substring(0, 200);
+	}
+
+	return sanitized;
+}
+
+/**
+ * Returns the current date in YYYYMMDD format.
+ *
+ * @returns Date string in YYYYMMDD format (e.g., "20250205")
+ */
+export function getDateString(): string {
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = String(now.getMonth() + 1).padStart(2, '0');
+	const day = String(now.getDate()).padStart(2, '0');
+	return `${year}${month}${day}`;
+}
+
+/**
+ * Formats an entity type string to a human-readable format.
+ *
+ * @param type - The entity type ('dimension', 'fact', 'unclassified', or undefined)
+ * @returns Formatted entity type string
+ */
+export function formatEntityType(type?: string): string {
+	const typeMap: Record<string, string> = {
+		dimension: 'Dimension',
+		fact: 'Fact',
+		unclassified: 'Unclassified'
+	};
+
+	return typeMap[type || ''] || 'Unclassified';
+}
+
+/**
+ * Formats an annotation type to a human-readable format.
+ *
+ * @param type - The annotation type or undefined
+ * @returns Formatted annotation type string
+ */
+export function formatAnnotationType(type?: AnnotationType): string {
+	const typeMap: Record<string, string> = {
+		who: 'Who',
+		what: 'What',
+		when: 'When',
+		where: 'Where',
+		how: 'How',
+		why: 'Why',
+		how_many: 'How Many'
+	};
+
+	return typeMap[type || ''] || 'None';
+}
+
+/**
+ * Formats a relationship type to a standard notation.
+ *
+ * @param type - The relationship type string
+ * @returns Formatted relationship type (e.g., '1:N', 'N:1', '1:1', 'N:N')
+ */
+export function formatRelationshipType(type: string): string {
+	const typeMap: Record<string, string> = {
+		one_to_many: '1:N',
+		many_to_one: 'N:1',
+		one_to_one: '1:1',
+		many_to_many: 'N:N'
+	};
+
+	return typeMap[type] || 'Unknown';
+}
+
+/**
+ * Generates Overview sheet with entity metadata in key-value format
+ * @param entity - Entity data from EntityDetailModal
+ * @returns Configured XLSX worksheet with bold headers and column widths
+ * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
+ */
+export function generateOverviewSheet(entity: EntityData): XLSX.WorkSheet {
+	// Create 2-column array: Field | Value
+	const overviewData = [
+		['Field', 'Value'],
+		['Entity Name', entity.label],
+		['Entity Type', formatEntityType(entity.entity_type)],
+		['Annotation (7W)', formatAnnotationType(entity.annotation_type)],
+		['Domain(s)', entity.domains?.join(', ') || entity.domain || '-'],
+		['Tags', entity.tags?.join(', ') || '-'],
+		['Source Systems', entity.source_system?.join(', ') || '-'],
+		['Description', entity.description || '-'],
+		['dbt Model', entity.dbt_model || '-'],
+		['Additional Models', entity.additional_models?.join(', ') || '-']
+	];
+
+	const ws = XLSX.utils.aoa_to_sheet(overviewData);
+
+	// Attempt to set bold headers (requires SheetJS Pro for cell styling)
+	// This code is kept for future compatibility but has no effect in Community Edition
+	const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+	for (let col = range.s.c; col <= range.e.c; col++) {
+		const cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+		if (!ws[cell_address]) continue;
+		if (!ws[cell_address].s) ws[cell_address].s = {};
+		ws[cell_address].s.font = { bold: true };
+	}
+
+	// Set column widths
+	ws['!cols'] = [{ wch: 20 }, { wch: 60 }];
+
+	return ws;
+}
+
+/**
+ * Generates Relationships sheet showing connected entities
+ * @param edges - All edges from edges store
+ * @param entityId - Current entity ID to filter relationships
+ * @param allNodes - All nodes for looking up entity labels
+ * @returns Configured XLSX worksheet with bold headers and column widths
+ * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
+ */
+export function generateRelationshipsSheet(
+	edges: any[], // Edge type from @xyflow/svelte
+	entityId: string,
+	allNodes: Node[]
+): XLSX.WorkSheet {
+	// Filter edges where source or target matches entityId
+	const relevantEdges = edges.filter(
+		edge => edge.source === entityId || edge.target === entityId
+	);
+
+	// Create 4-column array: Related Entity | Relationship Label | Relationship Type | Direction
+	const relationshipsData = [
+		['Related Entity', 'Relationship Label', 'Relationship Type', 'Direction'],
+		...relevantEdges.map(edge => {
+			const isOutgoing = edge.source === entityId;
+			const relatedEntityId = isOutgoing ? edge.target : edge.source;
+			const relatedEntity = allNodes.find(n => n.id === relatedEntityId);
+
+			return [
+				relatedEntity?.data?.label || relatedEntityId,
+				edge.label || '-',
+				formatRelationshipType(edge.data?.type || 'unknown'),
+				isOutgoing ? 'Outgoing' : 'Incoming'
+			];
+		})
+	];
+
+	// If no relationships, show message
+	if (relevantEdges.length === 0) {
+		relationshipsData.push(['No relationships defined', '', '', '']);
+	}
+
+	const ws = XLSX.utils.aoa_to_sheet(relationshipsData);
+
+	// Attempt to set bold headers (requires SheetJS Pro for cell styling)
+	// This code is kept for future compatibility but has no effect in Community Edition
+	const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+	for (let col = range.s.c; col <= range.e.c; col++) {
+		const cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+		if (!ws[cell_address]) continue;
+		if (!ws[cell_address].s) ws[cell_address].s = {};
+		ws[cell_address].s.font = { bold: true };
+	}
+
+	// Set column widths
+	ws['!cols'] = [{ wch: 25 }, { wch: 30 }, { wch: 20 }, { wch: 15 }];
+
+	return ws;
+}
+
+/**
+ * Generates Attributes sheet with tabular list of entity fields
+ * @param attributes - Array of attributes from entityAttributes derived state
+ * @returns Configured XLSX worksheet with bold headers and column widths
+ * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
+ */
+export function generateAttributesSheet(
+	attributes: Array<{ name: string; type: string; description?: string }>
+): XLSX.WorkSheet {
+	// Create 3-column array: Name | Type | Description
+	const attributesData = [
+		['Name', 'Type', 'Description'],
+		...attributes.map(attr => [
+			attr.name,
+			attr.type,
+			attr.description || ''
+		])
+	];
+
+	// If no attributes, show message
+	if (attributes.length === 0) {
+		attributesData.push(['No attributes defined', '', '']);
+	}
+
+	const ws = XLSX.utils.aoa_to_sheet(attributesData);
+
+	// Attempt to set bold headers (requires SheetJS Pro for cell styling)
+	// This code is kept for future compatibility but has no effect in Community Edition
+	const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+	for (let col = range.s.c; col <= range.e.c; col++) {
+		const cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+		if (!ws[cell_address]) continue;
+		if (!ws[cell_address].s) ws[cell_address].s = {};
+		ws[cell_address].s.font = { bold: true };
+	}
+
+	// Set column widths
+	ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 50 }];
+
+	return ws;
+}
+
+/**
+ * Exports entity data to Excel (.xlsx) file with three sheets
+ * @param entity - Entity data from EntityDetailModal
+ * @param attributes - Attributes array from entityAttributes derived state
+ * @param edges - All edges from edges store
+ * @param allNodes - All nodes for relationship lookup
+ * @param entityId - The entity ID (fallback if not in entity object)
+ * @throws Error if Excel generation or download fails
+ */
+export function exportEntityToExcel(
+	entity: EntityData,
+	attributes: Array<{ name: string; type: string; description?: string }>,
+	edges: any[],
+	allNodes: Node[],
+	entityId: string
+): void {
+	try {
+		// Generate three sheets using generators
+		const overviewSheet = generateOverviewSheet(entity);
+		const attributesSheet = generateAttributesSheet(attributes);
+		const relationshipsSheet = generateRelationshipsSheet(edges, entityId, allNodes);
+
+		// Create workbook
+		const wb = XLSX.utils.book_new();
+
+		// Append sheets with proper names
+		XLSX.utils.book_append_sheet(wb, overviewSheet, 'Overview');
+		XLSX.utils.book_append_sheet(wb, attributesSheet, 'Attributes');
+		XLSX.utils.book_append_sheet(wb, relationshipsSheet, 'Relationships');
+
+		// Generate filename with sanitized entity name and date
+		const filename = `${sanitizeFilename(entity.label)}_export_${getDateString()}.xlsx`;
+
+		// Trigger download
+		XLSX.writeFile(wb, filename);
+	} catch (error) {
+		console.error('Excel export failed:', error);
+		throw new Error(
+			`Failed to export entity to Excel: ${error instanceof Error ? error.message : 'Unknown error'}`
+		);
+	}
+}

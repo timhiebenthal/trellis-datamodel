@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { generateEntitiesFromEvent, generateEntitiesFromProcess, updateBusinessEvent, saveDataModel, getBusinessEvents } from '$lib/api';
+    import { generateEntitiesFromEvent, generateEntitiesFromProcess, updateBusinessEvent, updateBusinessEventProcess, saveDataModel, getBusinessEvents } from '$lib/api';
     import type { BusinessEvent, BusinessEventProcess, GeneratedEntitiesResult } from '$lib/types';
     import { nodes, edges, modelingStyle, sourceColors } from '$lib/stores';
     import { generateSlug, mergeRelationshipIntoEdges, normalizeTags } from '$lib/utils';
@@ -351,6 +351,19 @@
                     derived_entities: derivedEntities,
                 });
             } else if (mode === 'process' && process) {
+                // Set derived_entities for the process
+                const uniqueDerivedIds = Array.from(
+                    new Set([...entityIdByIndex, ...createdEntityIds].filter(Boolean))
+                );
+                const derivedEntities = uniqueDerivedIds.map((id) => ({
+                    entity_id: id,
+                    created_at: new Date().toISOString(),
+                }));
+
+                await updateBusinessEventProcess(process.id, {
+                    derived_entities: derivedEntities,
+                });
+
                 // Clear derived_entities for all events in the process
                 const allEvents = await getBusinessEvents();
                 const processEvents = allEvents.filter(e => e.process_id === process.id);

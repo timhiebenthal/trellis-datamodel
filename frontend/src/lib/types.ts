@@ -370,6 +370,7 @@ export interface BusinessEventProcess {
     updated_at: string; // ISO timestamp
     resolved_at?: string; // ISO timestamp, when the process was resolved (ungrouped)
     annotations_superset?: BusinessEventAnnotations; // Union of all member event annotations
+    derived_entities?: DerivedEntity[]; // Entities generated from this process
 }
 
 // Process API request types
@@ -386,6 +387,7 @@ export interface UpdateProcessRequest {
     domain?: string | null;
     annotations_superset?: BusinessEventAnnotations | null;
     event_ids?: string[];
+    derived_entities?: DerivedEntity[];
 }
 
 export interface AttachEventsRequest {
