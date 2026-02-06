@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-beta3] - 2026-02-06
+
+### Added
+- Added Excel export functionality for entities: users can download entity details as formatted Excel (.xlsx) files with three structured sheets (Overview, Attributes, Relationships).
+- Added Markdown export functionality: users can copy entity details as formatted Markdown to clipboard for easy documentation workflows.
+- Added export dropdown menu in EntityDetailModal with "Download as Excel" and "Copy as Markdown" options.
+- Added comprehensive test coverage for both Excel and Markdown export formats (unit and integration tests).
+- Added utility functions for filename sanitization, date formatting, and type formatting shared across export formats.
+
 ## [0.9.0-beta2] - 2026-02-05
 
 ### Added
