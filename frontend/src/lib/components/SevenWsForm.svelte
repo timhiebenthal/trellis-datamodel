@@ -87,6 +87,12 @@
     // Structure: { "dim_calendar": ["order_date", "ship_date", "delivery_date"], ... }
     let dimensionRolesCache = $state<Record<string, string[]>>({});
 
+    // Role management UI state
+    let managingRolesForEntry = $state<string | null>(null); // entry ID currently managing roles
+    let roleInputValue = $state<string>(''); // temporary input for new role
+    let roleSaving = $state(false); // saving state for role updates
+    let roleSuccessMessage = $state<string | null>(null); // success feedback
+
     // Calculate filled annotations count
     let filledAnnotationsCount = $derived(
         ANNOTATION_TYPES.filter(a => annotations[a.type].length > 0).length
@@ -510,6 +516,137 @@
         }
     }
 
+    /**
+     * Toggle the role management UI for a specific entry
+     */
+    function toggleRoleManagement(entryId: string) {
+        if (managingRolesForEntry === entryId) {
+            // Close if already open
+            managingRolesForEntry = null;
+            roleInputValue = '';
+        } else {
+            // Open for this entry
+            managingRolesForEntry = entryId;
+            roleInputValue = '';
+        }
+    }
+
+    /**
+     * Add a new role to the dimension
+     */
+    async function addRoleToDimension(dimensionId: string, roleName: string) {
+        if (!roleName.trim()) return;
+
+        // Validation: check for duplicates
+        const currentRoles = dimensionRolesCache[dimensionId] || [];
+        if (currentRoles.includes(roleName.trim())) {
+            error = `Role "${roleName.trim()}" already exists for this dimension`;
+            setTimeout(() => { error = null; }, 3000);
+            return;
+        }
+
+        roleSaving = true;
+        error = null;
+
+        try {
+            // Fetch the full data model
+            const dataModel = await getDataModel();
+
+            // Find the dimension entity
+            const entityIndex = dataModel.entities.findIndex(e => e.id === dimensionId);
+            if (entityIndex === -1) {
+                throw new Error(`Dimension ${dimensionId} not found in data model`);
+            }
+
+            // Update the roles array
+            const entity = dataModel.entities[entityIndex];
+            const updatedRoles = [...(entity.roles || []), roleName.trim()];
+
+            dataModel.entities[entityIndex] = {
+                ...entity,
+                roles: updatedRoles
+            };
+
+            // Save the data model
+            await saveDataModel(dataModel);
+
+            // Update cache
+            dimensionRolesCache[dimensionId] = updatedRoles;
+
+            // Clear input
+            roleInputValue = '';
+
+            // Show success message
+            const dimensionLabel = dimensions.find(d => d.id === dimensionId)?.label || dimensionId;
+            roleSuccessMessage = `Role added to ${dimensionLabel}`;
+            setTimeout(() => { roleSuccessMessage = null; }, 2000);
+        } catch (e) {
+            console.error('Failed to add role:', e);
+            error = e instanceof Error ? e.message : 'Failed to add role';
+            setTimeout(() => { error = null; }, 3000);
+        } finally {
+            roleSaving = false;
+        }
+    }
+
+    /**
+     * Remove a role from the dimension
+     */
+    async function removeRoleFromDimension(dimensionId: string, roleName: string) {
+        roleSaving = true;
+        error = null;
+
+        try {
+            // Fetch the full data model
+            const dataModel = await getDataModel();
+
+            // Find the dimension entity
+            const entityIndex = dataModel.entities.findIndex(e => e.id === dimensionId);
+            if (entityIndex === -1) {
+                throw new Error(`Dimension ${dimensionId} not found in data model`);
+            }
+
+            // Update the roles array (remove the role)
+            const entity = dataModel.entities[entityIndex];
+            const updatedRoles = (entity.roles || []).filter(r => r !== roleName);
+
+            dataModel.entities[entityIndex] = {
+                ...entity,
+                roles: updatedRoles
+            };
+
+            // Save the data model
+            await saveDataModel(dataModel);
+
+            // Update cache
+            dimensionRolesCache[dimensionId] = updatedRoles;
+
+            // Show success message
+            const dimensionLabel = dimensions.find(d => d.id === dimensionId)?.label || dimensionId;
+            roleSuccessMessage = `Role removed from ${dimensionLabel}`;
+            setTimeout(() => { roleSuccessMessage = null; }, 2000);
+        } catch (e) {
+            console.error('Failed to remove role:', e);
+            error = e instanceof Error ? e.message : 'Failed to remove role';
+            setTimeout(() => { error = null; }, 3000);
+        } finally {
+            roleSaving = false;
+        }
+    }
+
+    /**
+     * Handle keyboard events in role input
+     */
+    function handleRoleInputKeydown(e: KeyboardEvent, dimensionId: string) {
+        if (e.key === 'Enter' && roleInputValue.trim()) {
+            e.preventDefault();
+            addRoleToDimension(dimensionId, roleInputValue);
+        } else if (e.key === 'Escape') {
+            managingRolesForEntry = null;
+            roleInputValue = '';
+        }
+    }
+
     function handleEntryTextChange(annotationType: AnnotationType, entryId: string, text: string) {
         updateEntryText(annotationType, entryId, text, true);
     }
@@ -745,36 +882,144 @@
                                                         loading={dimensionsLoading || businessEventsLoading || processesLoading}
                                                     />
 
-                                                    <!-- Role Dropdown (only show if dimension has roles) -->
-                                                    {#if entry.dimension_id && dimensionRolesCache[entry.dimension_id] && dimensionRolesCache[entry.dimension_id].length > 0}
-                                                        <div class="ml-4 mt-2">
-                                                            <label
-                                                                for={`role-select-${entry.id}`}
-                                                                class="block text-xs font-medium text-gray-600 mb-1"
-                                                            >
-                                                                Role (optional)
-                                                            </label>
-                                                            <select
-                                                                id={`role-select-${entry.id}`}
-                                                                value={selectedRoles[entry.id] || ''}
-                                                                onchange={(e) => {
-                                                                    const value = e.currentTarget.value;
-                                                                    selectedRoles[entry.id] = value || undefined;
-                                                                    updateEntryRole(
-                                                                        annotationType.type,
-                                                                        entry.id,
-                                                                        value || undefined
-                                                                    );
-                                                                }}
-                                                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
-                                                                disabled={loading}
-                                                                aria-label="Select role for dimension"
-                                                            >
-                                                                <option value="">No role</option>
-                                                                {#each dimensionRolesCache[entry.dimension_id] as role}
-                                                                    <option value={role}>{role}</option>
-                                                                {/each}
-                                                            </select>
+                                                    <!-- Role Section: Dropdown + Management -->
+                                                    {#if entry.dimension_id}
+                                                        <div class="ml-4 mt-2 space-y-2">
+                                                            <!-- Role Dropdown (if dimension has roles) -->
+                                                            {#if dimensionRolesCache[entry.dimension_id] && dimensionRolesCache[entry.dimension_id].length > 0}
+                                                                <div>
+                                                                    <div class="flex items-center justify-between mb-1">
+                                                                        <label
+                                                                            for={`role-select-${entry.id}`}
+                                                                            class="text-xs font-medium text-gray-600"
+                                                                        >
+                                                                            Role (optional)
+                                                                        </label>
+                                                                        <button
+                                                                            type="button"
+                                                                            onclick={() => toggleRoleManagement(entry.id)}
+                                                                            class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                                                            disabled={loading || roleSaving}
+                                                                        >
+                                                                            {managingRolesForEntry === entry.id ? 'Close' : 'Manage roles...'}
+                                                                        </button>
+                                                                    </div>
+                                                                    <select
+                                                                        id={`role-select-${entry.id}`}
+                                                                        value={selectedRoles[entry.id] || ''}
+                                                                        onchange={(e) => {
+                                                                            const value = e.currentTarget.value;
+                                                                            selectedRoles[entry.id] = value || undefined;
+                                                                            updateEntryRole(
+                                                                                annotationType.type,
+                                                                                entry.id,
+                                                                                value || undefined
+                                                                            );
+                                                                        }}
+                                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                                                                        disabled={loading || roleSaving}
+                                                                        aria-label="Select role for dimension"
+                                                                    >
+                                                                        <option value="">No role</option>
+                                                                        {#each dimensionRolesCache[entry.dimension_id] as role}
+                                                                            <option value={role}>{role}</option>
+                                                                        {/each}
+                                                                    </select>
+                                                                </div>
+                                                            {:else}
+                                                                <!-- No roles yet - show add roles link -->
+                                                                <button
+                                                                    type="button"
+                                                                    onclick={() => toggleRoleManagement(entry.id)}
+                                                                    class="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                                    disabled={loading || roleSaving}
+                                                                >
+                                                                    <Icon icon="lucide:plus" class="w-4 h-4" />
+                                                                    <span>Add roles to this dimension</span>
+                                                                </button>
+                                                            {/if}
+
+                                                            <!-- Role Management Interface (collapsible) -->
+                                                            {#if managingRolesForEntry === entry.id && entry.dimension_id}
+                                                                <div class="border border-blue-200 rounded-md p-3 bg-blue-50 space-y-3">
+                                                                    <div class="flex items-center justify-between">
+                                                                        <h4 class="text-xs font-semibold text-gray-700">
+                                                                            Manage Roles
+                                                                        </h4>
+                                                                        <button
+                                                                            type="button"
+                                                                            onclick={() => toggleRoleManagement(entry.id)}
+                                                                            class="text-gray-400 hover:text-gray-600"
+                                                                            aria-label="Close role management"
+                                                                        >
+                                                                            <Icon icon="lucide:x" class="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <!-- Current Roles (if any) -->
+                                                                    {#if dimensionRolesCache[entry.dimension_id] && dimensionRolesCache[entry.dimension_id].length > 0}
+                                                                        <div class="space-y-1">
+                                                                            <label class="text-xs text-gray-600 font-medium">Current roles:</label>
+                                                                            <div class="flex flex-wrap gap-2">
+                                                                                {#each dimensionRolesCache[entry.dimension_id] as role}
+                                                                                    <div class="flex items-center gap-1 px-2 py-1 bg-white border border-gray-300 rounded text-xs">
+                                                                                        <span class="text-gray-800">{role}</span>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onclick={() => removeRoleFromDimension(entry.dimension_id!, role)}
+                                                                                            class="text-gray-400 hover:text-red-600"
+                                                                                            disabled={roleSaving}
+                                                                                            aria-label={`Remove role ${role}`}
+                                                                                        >
+                                                                                            <Icon icon="lucide:x" class="w-3 h-3" />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                {/each}
+                                                                            </div>
+                                                                        </div>
+                                                                    {/if}
+
+                                                                    <!-- Add New Role -->
+                                                                    <div class="space-y-1">
+                                                                        <label class="text-xs text-gray-600 font-medium">Add new role:</label>
+                                                                        <div class="flex gap-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                bind:value={roleInputValue}
+                                                                                onkeydown={(e) => handleRoleInputKeydown(e, entry.dimension_id!)}
+                                                                                placeholder="e.g., order_date, ship_date"
+                                                                                class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                                disabled={roleSaving}
+                                                                                maxlength={100}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onclick={() => addRoleToDimension(entry.dimension_id!, roleInputValue)}
+                                                                                disabled={!roleInputValue.trim() || roleSaving}
+                                                                                class="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-sm font-medium"
+                                                                            >
+                                                                                {#if roleSaving}
+                                                                                    <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+                                                                                {:else}
+                                                                                    <Icon icon="lucide:plus" class="w-4 h-4" />
+                                                                                {/if}
+                                                                                <span>Add</span>
+                                                                            </button>
+                                                                        </div>
+                                                                        <p class="text-xs text-gray-500 italic">
+                                                                            Press Enter to add, Escape to close
+                                                                        </p>
+                                                                    </div>
+
+                                                                    <!-- Info message -->
+                                                                    <div class="flex items-start gap-2 text-xs text-gray-600 bg-white p-2 rounded">
+                                                                        <Icon icon="lucide:info" class="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                                                        <span>
+                                                                            Roles help specify how this dimension is used in different contexts (e.g., "order_date" vs "ship_date" for Calendar).
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            {/if}
                                                         </div>
                                                     {/if}
                                                 {/if}
@@ -933,6 +1178,18 @@
             >
                 <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
                 <span class="text-sm font-medium text-green-800">Annotations saved successfully!</span>
+            </div>
+        {/if}
+
+        <!-- Role Success Notification -->
+        {#if roleSuccessMessage}
+            <div
+                class="fixed top-4 right-4 z-[70] bg-green-100 border border-green-300 rounded-lg px-6 py-4 shadow-xl flex items-center gap-3 animate-slide-in"
+                role="alert"
+                aria-live="polite"
+            >
+                <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
+                <span class="text-sm font-medium text-green-800">{roleSuccessMessage}</span>
             </div>
         {/if}
     {/if}
