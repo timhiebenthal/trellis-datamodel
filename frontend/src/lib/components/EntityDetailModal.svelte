@@ -4,7 +4,6 @@
 	import { getSourceSystemSuggestions } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
-	import { goto } from '$app/navigation';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
 	import { exportEntityToExcel } from '$lib/utils/excel-export';
@@ -438,13 +437,6 @@
 		showDeleteConfirm = false;
 	}
 
-	function handleViewOnCanvas() {
-		if (!currentEntity) return;
-
-		// Navigate to canvas with entity filter
-		goto(`/canvas?entities=${currentEntity.id}`);
-		closeModal();
-	}
 
 	async function handleExportToExcel() {
 		if (!currentEntity) return;
@@ -973,13 +965,6 @@
 						</button>
 
 						<div class="flex gap-3">
-							<button
-								onclick={handleViewOnCanvas}
-								class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2"
-							>
-								<Icon icon="lucide:eye" class="w-4 h-4" />
-								View on Canvas
-							</button>
 							<button
 								onclick={handleExportToExcel}
 								disabled={isExporting}
