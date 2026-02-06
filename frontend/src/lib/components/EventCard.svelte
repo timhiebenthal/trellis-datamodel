@@ -139,6 +139,15 @@
     class="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors duration-150 py-3 px-4"
     class:bg-primary-50={selected}
     class:border-primary-200={selected}
+    class:cursor-grab={draggable}
+    class:active:cursor-grabbing={draggable}
+    style={draggable ? 'user-select: auto !important; -webkit-user-select: auto !important;' : ''}
+    draggable={draggable}
+    ondragstart={(e) => {
+        if (!draggable || !onDragStart) return;
+        onDragStart(event, e);
+    }}
+    ondragend={() => onDragEnd?.()}
     ondragover={(e) => {
         if (!onDragOver) return;
         e.preventDefault();
@@ -155,16 +164,13 @@
     <!-- List-like row layout -->
     <div class="flex items-center gap-4">
         {#if draggable}
-            <button
+            <div
                 class="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                draggable="true"
-                ondragstart={(e) => onDragStart?.(event, e)}
-                ondragend={() => onDragEnd?.()}
                 aria-label={`Reorder ${event.text}`}
                 title="Drag to reorder"
             >
                 <Icon icon="lucide:grip-vertical" class="w-4 h-4" />
-            </button>
+            </div>
         {/if}
         <!-- Selection checkbox -->
         {#if onSelect}

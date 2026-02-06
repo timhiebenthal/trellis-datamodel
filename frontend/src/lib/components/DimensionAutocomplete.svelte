@@ -9,6 +9,7 @@
         dimensions: Dimension[];
         filterBy?: SevenWType;
         allowedIds?: Set<string> | null;
+        textSuggestions?: Set<string>;
         onCreateNew?: (text: string) => void;
         disabled?: boolean;
         placeholder?: string;
@@ -22,6 +23,7 @@
         dimensions,
         filterBy,
         allowedIds = null,
+        textSuggestions,
         onCreateNew,
         disabled = false,
         placeholder = "Select or create dimension...",
@@ -55,6 +57,20 @@
         });
     });
 
+    // Filtered text suggestions (when no dimensions match)
+    let filteredTextSuggestions = $derived.by(() => {
+        if (!textSuggestions || textSuggestions.size === 0) return [];
+        const searchLower = searchInput.toLowerCase();
+        return Array.from(textSuggestions)
+            .filter(text => {
+                const textLower = text.toLowerCase();
+                const index = textLower.indexOf(searchLower);
+                // Match if search term appears at start or very near start (within first 2 chars)
+                return index >= 0 && index <= 1;
+            })
+            .sort();
+    });
+
     // Check if text already exists
     let existingDimension = $derived.by(() => {
         return filteredDimensions.find((d) =>
@@ -62,9 +78,19 @@
         );
     });
 
+    let existingTextSuggestion = $derived.by(() => {
+        return filteredTextSuggestions.find((text) =>
+            text.toLowerCase() === searchInput.toLowerCase()
+        );
+    });
+
     // Should show dropdown
     let shouldShowDropdown = $derived.by(() => {
-        return showDropdown && (filteredDimensions.length > 0 || (searchInput.trim() && !existingDimension));
+        return showDropdown && (
+            filteredDimensions.length > 0 || 
+            filteredTextSuggestions.length > 0 ||
+            (searchInput.trim() && !existingDimension && !existingTextSuggestion)
+        );
     });
 
     function handleInputFocus() {
@@ -102,6 +128,12 @@
         }
     }
 
+    function selectTextSuggestion(text: string) {
+        searchInput = text;
+        onTextChange(text);
+        showDropdown = false;
+    }
+
     function handleKeydown(event: KeyboardEvent) {
         if (event.key === "Escape") {
             showDropdown = false;
@@ -109,7 +141,8 @@
         } else if (event.key === "ArrowDown") {
             if (showDropdown) {
                 event.preventDefault();
-                const maxIndex = filteredDimensions.length + (searchInput.trim() && !existingDimension ?1 : 0) - 1;
+                const totalItems = filteredDimensions.length + filteredTextSuggestions.length + (searchInput.trim() && !existingDimension && !existingTextSuggestion ? 1 : 0);
+                const maxIndex = totalItems - 1;
                 activeIndex = Math.min(activeIndex + 1, maxIndex);
             }
         } else if (event.key === "ArrowUp") {
@@ -120,10 +153,17 @@
         } else if (event.key === "Enter") {
             if (showDropdown) {
                 event.preventDefault();
-                // Select from list or create new
+                // Select from dimensions
                 if (activeIndex < filteredDimensions.length) {
                     selectDimension(filteredDimensions[activeIndex]);
-                } else if (searchInput.trim() && onCreateNew) {
+                }
+                // Select from text suggestions
+                else if (activeIndex < filteredDimensions.length + filteredTextSuggestions.length) {
+                    const textIndex = activeIndex - filteredDimensions.length;
+                    selectTextSuggestion(filteredTextSuggestions[textIndex]);
+                }
+                // Create new
+                else if (searchInput.trim() && onCreateNew) {
                     createNewDimension();
                 }
             }
@@ -228,8 +268,25 @@
                 </button>
             {/each}
 
+            <!-- Text suggestions from previous annotations -->
+            {#each filteredTextSuggestions as text, idx}
+                {@const index = filteredDimensions.length + idx}
+                <button
+                    type="button"
+                    class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 focus:bg-gray-50 focus:outline-none {index === activeIndex ? 'bg-gray-50' : ''}"
+                    onmousedown={() => selectTextSuggestion(text)}
+                    onkeydown={(e) => e.key === 'Enter' && selectTextSuggestion(text)}
+                >
+                    <div class="flex items-center gap-2">
+                        <Icon icon="lucide:clock" class="w-3.5 h-3.5 text-gray-400" />
+                        <span class="text-gray-700">{text}</span>
+                        <span class="text-xs text-gray-400 ml-auto">from annotations</span>
+                    </div>
+                </button>
+            {/each}
+
             <!-- Create new option -->
-            {#if searchInput.trim() && !existingDimension && onCreateNew}
+            {#if searchInput.trim() && !existingDimension && !existingTextSuggestion && onCreateNew}
                 <button
                     type="button"
                     class="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-t border-gray-200"

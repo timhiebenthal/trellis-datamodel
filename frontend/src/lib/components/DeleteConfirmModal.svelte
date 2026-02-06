@@ -2,11 +2,12 @@
     type Props = {
         open: boolean;
         entityLabel: string;
+        entityCount: number;
         onConfirm: () => void;
         onCancel: () => void;
     };
 
-    let { open, entityLabel, onConfirm, onCancel }: Props = $props();
+    let { open, entityLabel, entityCount, onConfirm, onCancel }: Props = $props();
 
     function handleKeydown(event: KeyboardEvent) {
         if (event.key === 'Escape') {
@@ -46,8 +47,13 @@
                 Delete Entity?
             </h2>
             <p class="text-sm text-gray-600 mb-8">
-                Are you sure you want to delete <span class="font-medium">'{entityLabel}'</span>? 
-                This will also remove all relationships connected to this entity.
+                {#if entityCount > 1}
+                    Are you sure you want to delete <span class="font-medium">these {entityCount} entities</span>?
+                    This will also remove all relationships connected to them.
+                {:else}
+                    Are you sure you want to delete <span class="font-medium">'{entityLabel}'</span>?
+                    This will also remove all relationships connected to this entity.
+                {/if}
             </p>
             <div class="flex justify-end gap-3">
                 <button

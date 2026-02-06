@@ -1,0 +1,61 @@
+version: 0.1
+entities:
+  dim_customer:
+    position:
+      x: 71.30081620149707
+      y: 1030.2822972171316
+    width: 280
+    panel_height: 200
+    collapsed: true
+  dim_account:
+    position:
+      x: -497.1115299525456
+      y: 1284.5775810683715
+    width: 280
+    panel_height: 200
+    collapsed: true
+  dim_product:
+    position:
+      x: -445.70593570184656
+      y: 1641.5688111542843
+    width: 280
+    panel_height: 200
+    collapsed: true
+  dim_lead:
+    position:
+      x: 270.1882694289348
+      y: 1602.0279248108475
+    width: 280
+    panel_height: 200
+    collapsed: true
+  fact_field_sales_acquire_lead_to_quote:
+    position:
+      x: -90.91344626154302
+      y: 1461.2867245888563
+    width: 280
+    panel_height: 200
+    collapsed: true
+  fact_field_sales_growth:
+    position:
+      x: -267.6115744893298
+      y: 1166.0551693597167
+    width: 280
+    panel_height: 200
+    collapsed: false
+relationships:
+  dim_customer-fact_field_sales_acquire_lead_to_quote-0:
+    label_dx: 0
+    label_dy: 0
+  dim_account-fact_field_sales_acquire_lead_to_quote-1:
+    label_dx: 0
+    label_dy: 0
+  dim_product-fact_field_sales_acquire_lead_to_quote-2:
+    label_dx: 0
+    label_dy: 0
+  dim_lead-fact_field_sales_acquire_lead_to_quote-3:
+    label_dx: 0
+    label_dy: 0
+  dim_customer-fact_field_sales_growth-4:
+    label_dx: 0
+    label_dy: 0
+source_colors: {}

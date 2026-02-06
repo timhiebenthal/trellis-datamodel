@@ -259,6 +259,8 @@ export class AutoSaveService {
                     const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
+                    const domain = ((n.data as any)?.domain) as string | undefined;
+					const domains = ((n.data as any)?.domains) as string[] | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -275,18 +277,29 @@ export class AutoSaveService {
                         // Include entity_type with default "unclassified" if not set
                         entity_type: entity_type,
                     };
-                    
+
+                    // Include domain if present
+                    if (domain && domain.trim()) {
+                        entity.domain = domain.trim();
+                    }
+					if (Array.isArray(domains) && domains.length > 0) {
+						entity.domains = domains;
+						if (!entity.domain) {
+							entity.domain = domains[0];
+						}
+					}
+
                     // Include annotation_type if present (for dimensions created from business events)
                     if (annotation_type) {
                         entity.annotation_type = annotation_type;
                     }
-                    
+
                     // Only persist source_system for unbound entities
                     // Bound entities get source_system from lineage
                     if (!isBound && source_system && source_system.length > 0) {
                         entity.source_system = source_system;
                     }
-                    
+
                     return entity;
                 }),
             relationships: currentEdges.flatMap((e) => {

@@ -1,0 +1,1001 @@
+<script lang="ts">
+	import Icon from '@iconify/svelte';
+	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
+	import { getSourceSystemSuggestions } from '$lib/api';
+	import type { EntityData, AnnotationType, DraftedField } from '$lib/types';
+	import type { Node } from '@xyflow/svelte';
+	import { goto } from '$app/navigation';
+	import { getContext } from 'svelte';
+	import type { AutoSaveService } from '$lib/services/auto-save';
+
+	// Get autoSaveService from parent context (set in +layout.svelte)
+	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
+
+	// Local state for form fields
+	let entityName = $state('');
+	let entityDomains = $state<string[]>([]);
+	let entityTags = $state<string[]>([]);
+	let entitySourceSystems = $state<string[]>([]);
+	let entityType = $state<'dimension' | 'fact' | 'unclassified'>('unclassified');
+	let annotationType = $state<AnnotationType | undefined>(undefined);
+	let tagInput = $state('');
+	let domainInput = $state('');
+	let sourceInput = $state('');
+	let sourceSuggestions = $state<string[]>([]);
+	let showSourceSuggestions = $state(false);
+	let activeSourceSuggestionIndex = $state(0);
+	let filteredSourceSuggestions = $derived(
+		sourceSuggestions.filter((s) =>
+			s.toLowerCase().includes(sourceInput.toLowerCase())
+		)
+	);
+	let showDeleteConfirm = $state(false);
+	let isDirty = $state(false);
+	let show7WsDropdown = $state(false);
+
+	function normalizeDomains(domains?: string[], domain?: string): string[] {
+		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
+		return Array.from(new Set(list.map((item) => item.trim()).filter(Boolean)));
+	}
+
+	// Get available domains from existing entities
+	let uniqueDomains = $derived.by(() => {
+		const domains = new Set<string>();
+		$nodes.forEach((node) => {
+			const data = node.data as unknown as EntityData;
+			const domainList = Array.isArray(data.domains) && data.domains.length > 0
+				? data.domains
+				: data.domain
+					? [data.domain]
+					: [];
+			domainList.forEach((domain) => {
+				if (domain && domain.trim()) {
+					domains.add(domain.trim());
+				}
+			});
+		});
+		return Array.from(domains).sort();
+	});
+
+	// Get available tags from existing entities
+	let uniqueTags = $derived.by(() => {
+		const tags = new Set<string>();
+		$nodes.forEach((node) => {
+			const nodeTags = (node.data as unknown as EntityData)?.tags || [];
+			nodeTags.forEach((tag) => {
+				if (tag && tag.trim()) {
+					tags.add(tag.trim());
+				}
+			});
+		});
+		return Array.from(tags).sort();
+	});
+
+	// Current entity data
+	let currentEntity = $derived.by(() => {
+		if (!$entityDetailModal.open || !$entityDetailModal.entityId) return null;
+		return $nodes.find((n) => n.id === $entityDetailModal.entityId) || null;
+	});
+
+	// Entity attributes (from dbt model or drafted fields)
+	let entityAttributes = $derived.by(() => {
+		if (!currentEntity) return [];
+
+		const data = currentEntity.data as unknown as EntityData;
+		const dbtModelId = data?.dbt_model;
+		const draftedFields = data?.drafted_fields || [];
+
+		// If bound to dbt model, get columns from dbtModels store
+		if (dbtModelId) {
+			const model = $dbtModels.find((m) => m.unique_id === dbtModelId);
+			if (model && model.columns) {
+				return model.columns.map((col) => ({
+					name: col.name,
+					type: col.type || 'unknown',
+					description: ''
+				}));
+			}
+		}
+
+		// Otherwise, show drafted fields
+		return draftedFields.map((field) => ({
+			name: field.name,
+			type: field.datatype || 'unknown',
+			description: field.description || ''
+		}));
+	});
+
+	// Check if entity is bound to dbt model (attributes are read-only if bound)
+	let isBoundEntity = $derived.by(() => {
+		if (!currentEntity) return false;
+		const data = currentEntity.data as unknown as EntityData;
+		return !!data?.dbt_model;
+	});
+
+	// Editable drafted fields state
+	let editableDraftedFields = $state<DraftedField[]>([]);
+
+	// Initialize editable drafted fields when modal opens
+	$effect(() => {
+		if ($entityDetailModal.open && currentEntity && !isBoundEntity) {
+			const data = currentEntity.data as unknown as EntityData;
+			editableDraftedFields = [...(data?.drafted_fields || [])];
+		}
+	});
+
+	function updateDraftedField(index: number, updates: Partial<DraftedField>) {
+		editableDraftedFields = editableDraftedFields.map((field, i) =>
+			i === index ? { ...field, ...updates } : field
+		);
+	}
+
+	function addDraftedField() {
+		editableDraftedFields = [
+			...editableDraftedFields,
+			{ name: '', datatype: 'text', description: '' }
+		];
+	}
+
+	function deleteDraftedField(index: number) {
+		editableDraftedFields = editableDraftedFields.filter((_, i) => i !== index);
+	}
+
+	// Bound dbt models
+	let boundModels = $derived.by(() => {
+		if (!currentEntity) return [];
+
+		const data = currentEntity.data as unknown as EntityData;
+		const models: string[] = [];
+
+		if (data?.dbt_model) {
+			models.push(data.dbt_model);
+		}
+
+		if (data?.additional_models) {
+			models.push(...data.additional_models);
+		}
+
+		return models;
+	});
+
+	// Initialize form when modal opens
+	$effect(() => {
+		if ($entityDetailModal.open && currentEntity) {
+			const data = currentEntity.data as unknown as EntityData;
+			entityName = data.label || '';
+			entityDomains = normalizeDomains(data.domains, data.domain);
+			entityTags = [...(data.tags || [])];
+			entitySourceSystems = [...(data.source_system || [])];
+			entityType = data.entity_type || 'unclassified';
+			annotationType = data.annotation_type;
+			tagInput = '';
+			domainInput = '';
+			sourceInput = '';
+			sourceSuggestions = [];
+			showSourceSuggestions = false;
+			activeSourceSuggestionIndex = 0;
+			showDeleteConfirm = false;
+			isDirty = false;
+		}
+	});
+
+	// Load source system suggestions when modal opens
+	$effect(() => {
+		if ($entityDetailModal.open) {
+			loadSourceSuggestions();
+		}
+	});
+
+	async function loadSourceSuggestions() {
+		try {
+			sourceSuggestions = await getSourceSystemSuggestions();
+		} catch (error) {
+			console.error('Failed to load source system suggestions:', error);
+			sourceSuggestions = [];
+		}
+	}
+
+	// Clear annotation type when changing away from dimension
+	$effect(() => {
+		if (entityType !== 'dimension' && annotationType !== undefined) {
+			annotationType = undefined;
+		}
+	});
+
+	// Track changes for dirty state
+	$effect(() => {
+		if (!currentEntity) return;
+
+		const data = currentEntity.data as unknown as EntityData;
+		const initialDomains = normalizeDomains(data.domains, data.domain);
+		const nextDomains = normalizeDomains(entityDomains);
+		const hasChanges =
+			entityName !== (data.label || '') ||
+			JSON.stringify(nextDomains.sort()) !== JSON.stringify(initialDomains.sort()) ||
+			JSON.stringify(entityTags.sort()) !== JSON.stringify([...(data.tags || [])].sort()) ||
+			JSON.stringify(entitySourceSystems.sort()) !==
+				JSON.stringify([...(data.source_system || [])].sort()) ||
+			sourceInput.trim().length > 0 ||
+			entityType !== (data.entity_type || 'unclassified') ||
+			annotationType !== data.annotation_type ||
+			(!isBoundEntity &&
+				JSON.stringify(editableDraftedFields) !==
+					JSON.stringify(data?.drafted_fields || []));
+
+		isDirty = hasChanges;
+	});
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			if (show7WsDropdown) {
+				show7WsDropdown = false;
+			} else if (showDeleteConfirm) {
+				showDeleteConfirm = false;
+			} else {
+				handleCancel();
+			}
+		} else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+			handleSave();
+		}
+	}
+
+	function handleBackdropClick(event: MouseEvent) {
+		if (event.target === event.currentTarget) {
+			handleCancel();
+		}
+	}
+
+	function handleModalContentClick(event: MouseEvent) {
+		// Close 7Ws dropdown when clicking outside of it
+		const target = event.target as HTMLElement;
+		const dropdown = target.closest('.annotation-dropdown-container');
+		if (!dropdown && show7WsDropdown) {
+			show7WsDropdown = false;
+		}
+	}
+
+	function addTag() {
+		const trimmed = tagInput.trim();
+		if (trimmed && !entityTags.includes(trimmed)) {
+			entityTags = [...entityTags, trimmed];
+			tagInput = '';
+		}
+	}
+
+	function removeTag(tag: string) {
+		entityTags = entityTags.filter((t) => t !== tag);
+	}
+
+	function handleTagInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addTag();
+		}
+	}
+
+	function addDomain() {
+		const trimmed = domainInput.trim();
+		if (trimmed && !entityDomains.includes(trimmed)) {
+			entityDomains = [...entityDomains, trimmed];
+			domainInput = '';
+		}
+	}
+
+	function removeDomain(domain: string) {
+		entityDomains = entityDomains.filter((d) => d !== domain);
+	}
+
+	function handleDomainInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addDomain();
+		}
+	}
+
+	function addSourceSystem(source = sourceInput) {
+		const trimmed = source.trim();
+		if (trimmed && !entitySourceSystems.includes(trimmed)) {
+			entitySourceSystems = [...entitySourceSystems, trimmed];
+			sourceInput = '';
+		}
+	}
+
+	function removeSourceSystem(source: string) {
+		entitySourceSystems = entitySourceSystems.filter((s) => s !== source);
+	}
+
+	function handleSourceInputKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape' && showSourceSuggestions) {
+			showSourceSuggestions = false;
+			event.preventDefault();
+		} else if (event.key === 'Enter') {
+			if (showSourceSuggestions && filteredSourceSuggestions.length > 0) {
+				event.preventDefault();
+				selectSourceSuggestion(filteredSourceSuggestions[activeSourceSuggestionIndex]);
+			} else {
+				event.preventDefault();
+				addSourceSystem();
+			}
+		} else if (event.key === 'ArrowDown' && showSourceSuggestions) {
+			event.preventDefault();
+			activeSourceSuggestionIndex = Math.min(
+				activeSourceSuggestionIndex + 1,
+				filteredSourceSuggestions.length - 1
+			);
+		} else if (event.key === 'ArrowUp' && showSourceSuggestions) {
+			event.preventDefault();
+			activeSourceSuggestionIndex = Math.max(activeSourceSuggestionIndex - 1, 0);
+		} else if (event.key === 'Tab' && showSourceSuggestions && filteredSourceSuggestions.length > 0) {
+			event.preventDefault();
+			selectSourceSuggestion(filteredSourceSuggestions[activeSourceSuggestionIndex]);
+		}
+	}
+
+	function handleSourceInputFocus() {
+		showSourceSuggestions = true;
+		activeSourceSuggestionIndex = 0;
+	}
+
+	function handleSourceInputBlur() {
+		setTimeout(() => {
+			showSourceSuggestions = false;
+		}, 200);
+	}
+
+	function handleSourceInput() {
+		showSourceSuggestions = true;
+		activeSourceSuggestionIndex = 0;
+	}
+
+	function selectSourceSuggestion(suggestion: string) {
+		addSourceSystem(suggestion);
+		showSourceSuggestions = false;
+		sourceInput = '';
+		activeSourceSuggestionIndex = 0;
+	}
+
+	function handleSave() {
+		if (!currentEntity || !entityName.trim()) return;
+		if (sourceInput.trim().length > 0) {
+			addSourceSystem();
+		}
+
+		const normalizedDomains = normalizeDomains(entityDomains);
+		const primaryDomain = normalizedDomains[0];
+
+		// Update the node in the store
+		nodes.update((n) => {
+			return n.map((node) => {
+				if (node.id === currentEntity.id) {
+					return {
+						...node,
+						data: {
+							...node.data,
+							label: entityName.trim(),
+							domains: normalizedDomains.length > 0 ? normalizedDomains : undefined,
+							domain: primaryDomain || undefined,
+							tags: entityTags.length > 0 ? entityTags : undefined,
+							source_system:
+								entitySourceSystems.length > 0 ? entitySourceSystems : undefined,
+							entity_type: entityType,
+							annotation_type: entityType === 'dimension' ? annotationType : undefined,
+							drafted_fields:
+								!isBoundEntity && editableDraftedFields.length > 0
+									? editableDraftedFields
+									: undefined
+						}
+					};
+				}
+				return node;
+			});
+		});
+
+		// Push to history for undo/redo
+		pushHistory();
+
+		// Trigger auto-save
+		if (autoSaveServiceContext?.current) {
+			autoSaveServiceContext.current.saveNow($nodes, $edges);
+		}
+
+		// Close modal
+		closeModal();
+	}
+
+	function handleCancel() {
+		if (isDirty) {
+			const confirmed = confirm('You have unsaved changes. Are you sure you want to cancel?');
+			if (!confirmed) return;
+		}
+		closeModal();
+	}
+
+	function handleDelete() {
+		showDeleteConfirm = true;
+	}
+
+	function confirmDelete() {
+		if (!currentEntity) return;
+
+		// Remove node from store
+		nodes.update((n) => n.filter((node) => node.id !== currentEntity.id));
+
+		// Push to history
+		pushHistory();
+
+		// Trigger auto-save
+		if (autoSaveServiceContext?.current) {
+			autoSaveServiceContext.current.saveNow($nodes, $edges);
+		}
+
+		// Close modal
+		closeModal();
+	}
+
+	function cancelDelete() {
+		showDeleteConfirm = false;
+	}
+
+	function handleViewOnCanvas() {
+		if (!currentEntity) return;
+
+		// Navigate to canvas with entity filter
+		goto(`/canvas?entities=${currentEntity.id}`);
+		closeModal();
+	}
+
+	function closeModal() {
+		$entityDetailModal = { open: false, entityId: null };
+	}
+
+	// Annotation type options for dimensions
+	const annotationTypes: { value: AnnotationType; label: string; color: string }[] = [
+		{ value: 'who', label: 'Who', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+		{ value: 'what', label: 'What', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+		{ value: 'when', label: 'When', color: 'bg-green-100 text-green-800 border-green-200' },
+		{ value: 'where', label: 'Where', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+		{ value: 'how', label: 'How', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+		{ value: 'why', label: 'Why', color: 'bg-red-100 text-red-800 border-red-200' },
+		{
+			value: 'how_many',
+			label: 'How Many',
+			color: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+		}
+	];
+</script>
+
+{#if $entityDetailModal.open && currentEntity}
+	<!-- Backdrop -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-gray-900/85"
+		onclick={handleBackdropClick}
+		onkeydown={handleKeydown}
+		role="dialog"
+		tabindex="-1"
+		aria-modal="true"
+		aria-labelledby="entity-detail-modal-title"
+	>
+		<!-- Modal Container -->
+		<div
+			class="relative bg-white rounded-xl shadow-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
+			style="max-width: 1400px; border: 1px solid rgba(209, 213, 219, 0.3);"
+			role="document"
+			tabindex="-1"
+			onclick={handleModalContentClick}
+		>
+			<!-- Header with primary accent -->
+			<div
+				class="relative px-8 pt-8 pb-6 bg-gray-50"
+			>
+				<div
+					class="absolute top-0 left-0 right-0 h-1 bg-primary-600"
+				></div>
+
+				<div class="flex items-start justify-between">
+					<div class="flex-1">
+						<h2
+							id="entity-detail-modal-title"
+							class="text-2xl font-bold text-gray-900 mb-2"
+							style="letter-spacing: -0.02em;"
+						>
+							Entity Details
+						</h2>
+						<p class="text-sm text-gray-600">
+							{entityType === 'dimension' ? 'Dimension' : entityType === 'fact' ? 'Fact' : 'Unclassified'} entity
+						</p>
+					</div>
+					<button
+						class="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
+						onclick={handleCancel}
+						aria-label="Close"
+					>
+						<Icon icon="lucide:x" class="w-5 h-5" />
+					</button>
+				</div>
+			</div>
+
+			<!-- Scrollable Content -->
+			<div class="px-8 py-6 overflow-y-auto" style="max-height: calc(90vh - 220px);">
+				<div class="space-y-4">
+					<!-- Entity Name and Domain - Side by Side -->
+					<div class="grid grid-cols-2 gap-4">
+						<!-- Entity Name -->
+						<div>
+							<label for="entity-name" class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+								Entity Name *
+							</label>
+							<input
+								id="entity-name"
+								type="text"
+								bind:value={entityName}
+								class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 font-medium"
+								placeholder="e.g., Customer, Order, Product"
+								required
+							/>
+						</div>
+
+					<!-- Domains -->
+					<div>
+						<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+							Domains
+						</label>
+						<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+							{#each entityDomains as domain}
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-md border border-purple-200 font-medium">
+									{domain}
+									<button
+										type="button"
+										onclick={() => removeDomain(domain)}
+										class="text-purple-600 hover:text-purple-900 focus:outline-none"
+										aria-label="Remove {domain}"
+									>
+										<Icon icon="lucide:x" class="w-2.5 h-2.5" />
+									</button>
+								</span>
+							{/each}
+							<input
+								type="text"
+								list="domain-suggestions"
+								bind:value={domainInput}
+								onkeydown={handleDomainInputKeydown}
+								class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+								placeholder="Type and press Enter"
+							/>
+						</div>
+						<datalist id="domain-suggestions">
+							{#each uniqueDomains as domain}
+								<option value={domain} />
+							{/each}
+						</datalist>
+					</div>
+					</div>
+
+					<!-- Entity Type and 7Ws - Same Row -->
+					<div class="grid grid-cols-2 gap-4">
+						<!-- Entity Type - Compact Chips -->
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Entity Type</label>
+							<div class="flex gap-2">
+								<button
+									type="button"
+									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'dimension'
+										? 'bg-green-50 border-green-500 text-green-700'
+										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+									onclick={() => (entityType = 'dimension')}
+								>
+									<Icon icon="lucide:list" class="w-4 h-4 inline-block mr-1" />
+									Dimension
+								</button>
+								<button
+									type="button"
+									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'fact'
+										? 'bg-blue-50 border-blue-500 text-blue-700'
+										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+									onclick={() => (entityType = 'fact')}
+								>
+									<Icon icon="lucide:bar-chart-3" class="w-4 h-4 inline-block mr-1" />
+									Fact
+								</button>
+								<button
+									type="button"
+									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'unclassified'
+										? 'bg-gray-50 border-gray-500 text-gray-700'
+										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
+									onclick={() => (entityType = 'unclassified')}
+								>
+									<Icon icon="lucide:circle-help" class="w-4 h-4 inline-block mr-1" />
+									Unclassified
+								</button>
+							</div>
+						</div>
+
+						<!-- Annotation Type (7Ws) - Chip/Badge style for dimensions only -->
+						{#if entityType === 'dimension'}
+							<div class="relative annotation-dropdown-container">
+								<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+									Annotation Type (7Ws)
+								</label>
+								<!-- Selected chip/badge or placeholder -->
+								<button
+									type="button"
+									class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
+										? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
+										: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200'}"
+									onclick={() => (show7WsDropdown = !show7WsDropdown)}
+								>
+									{#if annotationType}
+										<span>
+											{annotationTypes.find((a) => a.value === annotationType)?.label}
+										</span>
+									{:else}
+										<span>Select 7W...</span>
+									{/if}
+									<Icon
+										icon="lucide:chevron-down"
+										class="w-3 h-3 transition-transform {show7WsDropdown ? 'rotate-180' : ''}"
+									/>
+								</button>
+
+								<!-- Dropdown menu -->
+								{#if show7WsDropdown}
+									<div
+										class="absolute z-10 mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]"
+									>
+										<div class="max-h-60 overflow-y-auto">
+											{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
+												<button
+													type="button"
+													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
+														? option.color
+														: 'text-gray-700'}"
+													onclick={() => {
+														annotationType = option.value;
+														show7WsDropdown = false;
+													}}
+												>
+													{#if annotationType === option.value}
+														<Icon icon="lucide:check" class="w-4 h-4" />
+													{:else}
+														<span class="w-4"></span>
+													{/if}
+													{option.label}
+												</button>
+											{/each}
+											<button
+												type="button"
+												class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
+													? 'bg-gray-50 text-gray-700'
+													: 'text-gray-500'}"
+												onclick={() => {
+													annotationType = undefined;
+													show7WsDropdown = false;
+												}}
+											>
+												{#if annotationType === undefined}
+													<Icon icon="lucide:check" class="w-4 h-4" />
+												{:else}
+													<span class="w-4"></span>
+												{/if}
+												None
+											</button>
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Tags and Source Systems - Side by Side -->
+					<div class="grid grid-cols-2 gap-4">
+						<!-- Tags -->
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Tags</label>
+							<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+								{#each entityTags as tag}
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-md border border-primary-200 font-medium">
+										{tag}
+										<button
+											type="button"
+											onclick={() => removeTag(tag)}
+											class="text-primary-600 hover:text-primary-900 focus:outline-none"
+											aria-label="Remove {tag}"
+										>
+											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
+										</button>
+									</span>
+								{/each}
+								<input
+									type="text"
+									list="tag-suggestions"
+									bind:value={tagInput}
+									onkeydown={handleTagInputKeydown}
+									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+									placeholder="Type and press Enter"
+								/>
+							</div>
+							<datalist id="tag-suggestions">
+								{#each uniqueTags as tag}
+									<option value={tag} />
+								{/each}
+							</datalist>
+						</div>
+
+						<!-- Source Systems -->
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+								Source Systems
+							</label>
+							<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+								{#each entitySourceSystems as source}
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-md border border-gray-300 font-medium">
+										{source}
+										<button
+											type="button"
+											onclick={() => removeSourceSystem(source)}
+											class="text-gray-600 hover:text-gray-900 focus:outline-none"
+											aria-label="Remove {source}"
+										>
+											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
+										</button>
+									</span>
+								{/each}
+								<input
+									type="text"
+									bind:value={sourceInput}
+									onkeydown={handleSourceInputKeydown}
+									onfocus={handleSourceInputFocus}
+									onblur={handleSourceInputBlur}
+									oninput={handleSourceInput}
+									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+									placeholder="Type and press Enter"
+								/>
+							</div>
+							{#if showSourceSuggestions && filteredSourceSuggestions.length > 0}
+								<div class="mt-2 border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto">
+									{#each filteredSourceSuggestions as suggestion, index}
+										<button
+											class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none {index === activeSourceSuggestionIndex ? 'bg-gray-50' : ''}"
+											onmousedown={(e) => e.preventDefault()}
+											onclick={() => selectSourceSuggestion(suggestion)}
+											aria-label="Add {suggestion}"
+										>
+											{suggestion}
+											{#if entitySourceSystems.includes(suggestion)}
+												<span class="ml-2 text-xs text-gray-400">(added)</span>
+											{/if}
+										</button>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Attributes -->
+					{#if isBoundEntity}
+						<!-- Read-only attributes for bound entities -->
+						{#if entityAttributes.length > 0}
+							<div>
+								<label class="block text-sm font-semibold text-gray-700 mb-3">
+									Attributes ({entityAttributes.length}) - Read Only
+								</label>
+								<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+									<table class="w-full text-sm">
+										<thead class="bg-gray-100">
+											<tr>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700">Type</th>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700"
+													>Description</th
+												>
+											</tr>
+										</thead>
+										<tbody class="divide-y divide-gray-200">
+											{#each entityAttributes as attr}
+												<tr class="hover:bg-gray-50">
+													<td class="px-4 py-2 font-medium text-gray-900">{attr.name}</td>
+													<td class="px-4 py-2 text-gray-600 font-mono text-xs"
+														>{attr.type}</td
+													>
+													<td class="px-4 py-2 text-gray-600"
+														>{attr.description || '—'}</td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								<p class="mt-2 text-xs text-gray-500 italic">
+									Attributes are managed in the dbt schema file. Edit them on the canvas in logical
+									view.
+								</p>
+							</div>
+						{/if}
+					{:else}
+						<!-- Editable attributes for unbound entities -->
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 mb-3">
+								Attributes ({editableDraftedFields.length})
+							</label>
+							<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+								{#if editableDraftedFields.length > 0}
+									<!-- Header row -->
+									<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
+										<div class="col-span-3">Name</div>
+										<div class="col-span-2">Type</div>
+										<div class="col-span-6">Description</div>
+										<div class="col-span-1"></div>
+									</div>
+									<!-- Attribute rows -->
+									<div class="divide-y divide-gray-200">
+										{#each editableDraftedFields as field, index}
+											<div class="px-3 py-2 hover:bg-gray-50 group">
+												<div class="grid grid-cols-12 gap-2 items-center">
+													<!-- Name (narrower) -->
+													<div class="col-span-3">
+														<input
+															type="text"
+															value={field.name}
+															oninput={(e) =>
+																updateDraftedField(index, {
+																	name: (e.target as HTMLInputElement).value
+																})}
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+															placeholder="attribute_name"
+														/>
+													</div>
+													<!-- Type -->
+													<div class="col-span-2">
+														<select
+															value={field.datatype}
+															onchange={(e) =>
+																updateDraftedField(index, {
+																	datatype: (e.target as HTMLSelectElement)
+																		.value as any
+																})}
+															class="w-full px-2 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
+														>
+															<option value="text">text</option>
+															<option value="int">int</option>
+															<option value="float">float</option>
+															<option value="bool">bool</option>
+															<option value="date">date</option>
+															<option value="timestamp">timestamp</option>
+														</select>
+													</div>
+													<!-- Description (wider) -->
+													<div class="col-span-6">
+														<input
+															type="text"
+															value={field.description || ''}
+															oninput={(e) =>
+																updateDraftedField(index, {
+																	description: (e.target as HTMLInputElement).value
+																})}
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+															placeholder="Description (optional)"
+														/>
+													</div>
+													<!-- Delete button -->
+													<div class="col-span-1 flex justify-end">
+														<button
+															type="button"
+															onclick={() => deleteDraftedField(index)}
+															class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+															title="Delete attribute"
+														>
+															<Icon icon="lucide:trash-2" class="w-4 h-4" />
+														</button>
+													</div>
+												</div>
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<div class="p-6 text-center text-gray-400 text-sm italic">
+										No attributes defined
+									</div>
+								{/if}
+							</div>
+							<button
+								type="button"
+								onclick={addDraftedField}
+								class="mt-3 w-full px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center justify-center gap-2"
+							>
+								<Icon icon="lucide:plus" class="w-4 h-4" />
+								Add Attribute
+							</button>
+						</div>
+					{/if}
+
+					<!-- Bound dbt Models (Read-only) -->
+					{#if boundModels.length > 0}
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 mb-3">
+								Bound dbt Models ({boundModels.length})
+							</label>
+							<div class="space-y-2">
+							{#each boundModels as model}
+								<div
+									class="px-4 py-3 bg-primary-50 border border-primary-200 rounded-lg"
+								>
+									<div class="flex items-center gap-2">
+										<Icon icon="lucide:layers" class="w-4 h-4 text-primary-600" />
+										<span class="font-mono text-sm text-gray-900">{model}</span>
+									</div>
+								</div>
+							{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Footer Actions -->
+			<div
+				class="px-8 py-6 border-t-2 border-gray-100 bg-gray-50"
+			>
+				{#if !showDeleteConfirm}
+					<div class="flex items-center justify-between gap-4">
+						<button
+							onclick={handleDelete}
+							class="px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border-2 border-red-200 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all flex items-center gap-2"
+						>
+							<Icon icon="lucide:trash-2" class="w-4 h-4" />
+							Delete Entity
+						</button>
+
+						<div class="flex gap-3">
+							<button
+								onclick={handleViewOnCanvas}
+								class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2"
+							>
+								<Icon icon="lucide:eye" class="w-4 h-4" />
+								View on Canvas
+							</button>
+							<button
+								onclick={handleCancel}
+								class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
+							>
+								Cancel
+							</button>
+							<button
+								onclick={handleSave}
+								disabled={!isDirty || !entityName.trim()}
+								class="px-5 py-2.5 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								<Icon icon="lucide:save" class="w-4 h-4" />
+								Save Changes
+							</button>
+						</div>
+					</div>
+				{:else}
+					<!-- Delete Confirmation -->
+					<div
+						class="flex items-center justify-between p-4 bg-red-50 border-2 border-red-300 rounded-lg"
+					>
+						<div class="flex items-center gap-3">
+							<Icon icon="lucide:alert-triangle" class="w-5 h-5 text-red-600" />
+							<span class="text-sm font-medium text-red-900"
+								>Are you sure you want to delete this entity? This action cannot be undone.</span
+							>
+						</div>
+						<div class="flex gap-2">
+							<button
+								onclick={cancelDelete}
+								class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								onclick={confirmDelete}
+								class="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+							>
+								Delete
+							</button>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}

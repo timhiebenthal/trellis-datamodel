@@ -563,3 +563,103 @@ class TestGenerateEntitiesFromSevenWs:
         assert len(result.entities) == 0
         assert len(result.errors) == 1
         assert "annotation" in result.errors[0].lower()
+
+
+class TestDomainFieldGeneration:
+    """Test that explicit domain field is stored on generated entities."""
+
+    def test_stores_explicit_domain_field_from_business_event(self, monkeypatch):
+        """Test that entities generated from business event have explicit domain field."""
+        mock_config = Mock()
+        mock_config.dimension_prefix = ["dim_"]
+        mock_config.fact_prefix = ["fct_"]
+
+        now = datetime.now()
+        event = BusinessEvent(
+            domain="Sales Operations",  # Explicit domain on event
+            id="evt_20260101_001",
+            text="customer buys product",
+            type=BusinessEventType.DISCRETE,
+            created_at=now,
+            updated_at=now,
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                what=[AnnotationEntry(id="w2", text="product", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w3", text="quantity", dimension_id=None, description=None, attributes={})],
+            ),
+            derived_entities=[],
+        )
+
+        result = entity_generator.generate_entities_from_event(event, mock_config)
+
+        assert len(result.entities) == 3
+        assert len(result.errors) == 0
+
+        # Check all entities have explicit domain field
+        for entity in result.entities:
+            assert "domain" in entity
+            assert entity["domain"] == "Sales Operations"
+
+        # Check domain tag is also present for backward compatibility
+        for entity in result.entities:
+            assert "tags" in entity
+            assert "sales-operations" in entity["tags"]
+
+    def test_domain_matches_event_domain(self, monkeypatch):
+        """Test that domain value matches event.domain exactly."""
+        mock_config = Mock()
+        mock_config.dimension_prefix = ["dim_"]
+        mock_config.fact_prefix = ["fct_"]
+
+        now = datetime.now()
+        event = BusinessEvent(
+            domain="Finance & Accounting",  # Domain with special characters
+            id="evt_20260101_001",
+            text="expense approved",
+            type=BusinessEventType.DISCRETE,
+            created_at=now,
+            updated_at=now,
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="manager", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w2", text="amount", dimension_id=None, description=None, attributes={})],
+            ),
+            derived_entities=[],
+        )
+
+        result = entity_generator.generate_entities_from_event(event, mock_config)
+
+        # Verify domain field matches original event.domain (not slugified)
+        for entity in result.entities:
+            assert entity["domain"] == "Finance & Accounting"
+
+        # Verify tags contain slugified version
+        for entity in result.entities:
+            assert "finance-accounting" in entity["tags"]
+
+    def test_no_domain_field_when_event_has_no_domain(self, monkeypatch):
+        """Test that entities without domain on event don't have domain field."""
+        mock_config = Mock()
+        mock_config.dimension_prefix = ["dim_"]
+        mock_config.fact_prefix = ["fct_"]
+
+        now = datetime.now()
+        event = BusinessEvent(
+            domain=None,  # No domain
+            id="evt_20260101_001",
+            text="customer buys product",
+            type=BusinessEventType.DISCRETE,
+            created_at=now,
+            updated_at=now,
+            annotations=BusinessEventAnnotations(
+                who=[AnnotationEntry(id="w1", text="customer", dimension_id=None, description=None, attributes={})],
+                how_many=[AnnotationEntry(id="w2", text="quantity", dimension_id=None, description=None, attributes={})],
+            ),
+            derived_entities=[],
+        )
+
+        result = entity_generator.generate_entities_from_event(event, mock_config)
+
+        # Verify no domain field when event has no domain
+        for entity in result.entities:
+            assert "domain" not in entity
+            assert "tags" not in entity  # No tags either since no domain

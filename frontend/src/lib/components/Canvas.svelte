@@ -123,6 +123,8 @@
                 // Force store update so autosave reacts in filtered mode.
                 $nodes = [...$nodes];
             }
+        } else if (displayNodes !== $nodes) {
+            $nodes = displayNodes;
         }
     });
 

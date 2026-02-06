@@ -52,7 +52,7 @@
     <button
         onclick={onclick}
         class="inline-flex items-center gap-1.5 {colorClasses.bg} {colorClasses.text} border rounded font-medium hover:opacity-80 transition-opacity {sizeClasses} focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400"
-        title={displayDomain}
+        title={`Domain: ${displayDomain}`}
     >
         <Icon icon="lucide:tag" class={iconSize} />
         <span>{displayDomain}</span>
@@ -60,7 +60,7 @@
 {:else}
     <span
         class="inline-flex items-center gap-1.5 {colorClasses.bg} {colorClasses.text} border rounded font-medium {sizeClasses}"
-        title={displayDomain}
+        title={`Domain: ${displayDomain}`}
     >
         <Icon icon="lucide:tag" class={iconSize} />
         <span>{displayDomain}</span>

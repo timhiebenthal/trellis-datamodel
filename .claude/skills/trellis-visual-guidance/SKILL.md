@@ -8,9 +8,10 @@ description: Applies Trellis visual guidance for UI work, including color scheme
 ## Quick Rules (Checklist)
 
 - Use the existing Trellis brand palette; do not introduce new core colors
-- Use green styling for dimensions: `bg-green-200`, `text-green-900`, icon `lucide:list`
-- Use blue styling for facts: `bg-blue-200`, `text-blue-900`, icon `lucide:bar-chart-3`
-- Keep dimension/fact colors consistent across canvas, annotations, badges, and lists
+- **NO rainbow gradients or multi-color gradients** - use solid colors or subtle single-color gradients only
+- Use green styling for dimensions: `bg-green-100`, `text-green-700` (badges), `text-green-600` (icons), icon `lucide:list`
+- Use blue styling for facts: `bg-blue-100`, `text-blue-700` (badges), `text-blue-600` (icons), icon `lucide:bar-chart-3`
+- Keep dimension/fact colors consistent across canvas, sidebar, annotations, badges, and lists
 - Prefer Tailwind utility classes over custom CSS for UI styling
 - Avoid introducing new color tokens unless required by an existing design system
 
@@ -18,8 +19,10 @@ description: Applies Trellis visual guidance for UI work, including color scheme
 
 Apply these rules to all UI changes in the app, especially:
 - Canvas and lineage views
+- Sidebar entity/model items
 - Node badges, labels, and annotations
-- Lists, cards, and detail panels where entity types are shown
+- Entity lists, cards, and detail panels where entity types are shown
+- Dropdown menus and type selectors
 
 ## Brand Colors
 
@@ -45,9 +48,88 @@ Use simple, outline icons (lucide) to keep the UI lightweight and consistent:
 - Dimension icon: `lucide:list`; fact icon: `lucide:bar-chart-3`
 - Only add new icons when they map cleanly to an entity type or action
 
+## Dimension & Fact Color Reference
+
+### Dimensions (green)
+- **Icons**: `text-green-600` (standalone icons, sidebar items)
+- **Badges**: `bg-green-100 text-green-700 border-green-300`
+- **Node badges**: `bg-green-100 text-green-800`
+- **Icon**: `lucide:list`
+
+### Facts (blue)
+- **Icons**: `text-blue-600` (standalone icons, sidebar items)
+- **Badges**: `bg-blue-100 text-blue-700 border-blue-300`
+- **Node badges**: `bg-blue-100 text-blue-800`
+- **Icon**: `lucide:bar-chart-3`
+
+### Examples
+
+```svelte
+<!-- Sidebar/List Icon -->
+<Icon icon="lucide:list" class="w-5 h-5 text-green-600" />
+<Icon icon="lucide:bar-chart-3" class="w-5 h-5 text-blue-600" />
+
+<!-- Type Badge -->
+<span class="bg-green-100 text-green-700 border-green-300 px-2 py-1 rounded border">
+  Dimension
+</span>
+<span class="bg-blue-100 text-blue-700 border-blue-300 px-2 py-1 rounded border">
+  Fact
+</span>
+
+<!-- Entity Node Badge (canvas) -->
+<button class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+  <Icon icon="lucide:list" class="w-3 h-3" />
+</button>
+```
+
 ## Glass Areas (Frosted Surfaces)
 
 Glass surfaces are used sparingly to separate overlays and focus areas:
 - Use translucency and subtle blur (frosted effect), not opaque cards
 - Keep borders light and avoid heavy shadows
 - Ensure text contrast remains readable on glass surfaces
+
+## Forbidden Patterns
+
+**DO NOT USE:**
+- Rainbow gradients (e.g., `linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%)`)
+- Multi-color gradients combining blue → purple → pink or similar
+- Gradient backgrounds on tags/badges (use solid colors: `bg-primary-50`, `bg-gray-100`)
+- Decorative gradients on headers or accent bars (use solid `bg-primary-600` instead)
+
+**USE INSTEAD:**
+- Solid colors from the brand palette
+- Subtle single-color gradients for depth (e.g., `from-gray-50 to-gray-100` for backgrounds)
+- Primary teal (`primary-600`) for accent bars and primary actions
+- Neutral grays for secondary surfaces
+
+### Before/After Examples
+
+```svelte
+<!-- ❌ BAD: Rainbow gradient header accent -->
+<div style="background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);"></div>
+
+<!-- ✅ GOOD: Solid primary accent -->
+<div class="bg-primary-600"></div>
+
+<!-- ❌ BAD: Multi-color gradient tag -->
+<span class="bg-gradient-to-r from-blue-100 to-purple-100 text-gray-800 border-blue-200">
+  sales
+</span>
+
+<!-- ✅ GOOD: Solid primary tag -->
+<span class="bg-primary-50 text-primary-700 border-primary-200">
+  sales
+</span>
+
+<!-- ❌ BAD: Gradient save button -->
+<button style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);">
+  Save
+</button>
+
+<!-- ✅ GOOD: Solid primary button -->
+<button class="bg-primary-600 hover:bg-primary-700 text-white">
+  Save
+</button>
+```

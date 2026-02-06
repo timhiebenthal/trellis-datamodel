@@ -3,7 +3,7 @@
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
     import { onMount } from "svelte";
     import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
-    import { getBusinessEvents, getDimensions } from "$lib/api";
+    import { getBusinessEventProcesses, getBusinessEvents, getDimensions } from "$lib/api";
 
     type Props = {
         event: BusinessEvent;
@@ -45,7 +45,17 @@
     let dimensions = $state<Dimension[]>([]);
     let dimensionsLoading = $state(false);
     let businessEventsLoading = $state(false);
+    let processesLoading = $state(false);
     let allowedDimensionIdsByType = $state<Record<AnnotationType, Set<string>> | null>(null);
+    let annotationTextSuggestions = $state<Record<AnnotationType, Set<string>>>({
+        who: new Set(),
+        what: new Set(),
+        when: new Set(),
+        where: new Set(),
+        how: new Set(),
+        how_many: new Set(),
+        why: new Set(),
+    });
 
     // Delete confirmation state
     let showDeleteConfirm = $state(false);
@@ -121,7 +131,7 @@
         const allDimensionIds = ANNOTATION_TYPES
             .filter(a => a.type !== 'how_many')
             .flatMap(a => annotations[a.type].map(e => e.dimension_id))
-            .filter((id): id is string => id !== undefined);
+            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
         const uniqueIds = new Set(allDimensionIds);
         if (allDimensionIds.length !== uniqueIds.size) {
@@ -188,7 +198,11 @@
                 dimensionsLoading = true;
                 dimensions = await getDimensions();
                 businessEventsLoading = true;
-                const events = await getBusinessEvents();
+                processesLoading = true;
+                const [events, processes] = await Promise.all([
+                    getBusinessEvents(),
+                    getBusinessEventProcesses(),
+                ]);
                 const dimensionLookup = new Map<string, Dimension>();
                 dimensions.forEach((dimension) => {
                     dimensionLookup.set(dimension.id, dimension);
@@ -213,9 +227,17 @@
                     how_many: new Set(),
                     why: new Set(),
                 };
-                for (const businessEvent of events) {
-                    const annotations = businessEvent.annotations;
-                    if (!annotations) continue;
+                const textSuggestions: Record<AnnotationType, Set<string>> = {
+                    who: new Set(),
+                    what: new Set(),
+                    when: new Set(),
+                    where: new Set(),
+                    how: new Set(),
+                    how_many: new Set(),
+                    why: new Set(),
+                };
+                const addAnnotationsToAllowed = (annotations?: BusinessEventAnnotations | null) => {
+                    if (!annotations) return;
                     for (const annotationType of Object.keys(allowedMap) as AnnotationType[]) {
                         for (const entry of annotations[annotationType] || []) {
                             if (entry.dimension_id && dimensionLookup.has(entry.dimension_id)) {
@@ -227,10 +249,19 @@
                                 if (matchedId) {
                                     allowedMap[annotationType].add(matchedId);
                                 }
+                                // Also collect text suggestions for autocomplete
+                                textSuggestions[annotationType].add(entry.text.trim());
                             }
                         }
                     }
+                };
+                for (const businessEvent of events) {
+                    addAnnotationsToAllowed(businessEvent.annotations);
                 }
+                for (const process of processes) {
+                    addAnnotationsToAllowed(process.annotations_superset);
+                }
+                annotationTextSuggestions = textSuggestions;
                 allowedDimensionIdsByType = allowedMap;
                 hasError = false;
                 errorMessage = null;
@@ -253,6 +284,7 @@
                 if (retryCount >= maxRetries || !hasError) {
                     dimensionsLoading = false;
                     businessEventsLoading = false;
+                    processesLoading = false;
                 }
             }
         }
@@ -607,9 +639,10 @@
                                                         dimensions={dimensions}
                                                         filterBy={annotationType.type}
                                                         allowedIds={allowedDimensionIdsByType ? allowedDimensionIdsByType[annotationType.type] : null}
+                                                        textSuggestions={annotationTextSuggestions[annotationType.type]}
                                                         placeholder={annotationType.placeholder}
                                                         disabled={loading}
-                                                        loading={dimensionsLoading || businessEventsLoading}
+                                                        loading={dimensionsLoading || businessEventsLoading || processesLoading}
                                                     />
                                                 {/if}
                                                 <!-- Description Input -->

@@ -1,0 +1,79 @@
+version: 0.1
+entities:
+  - id: dim_customer
+    label: Customer
+    description: 'Dimension: customer'
+    tags:
+      - sales
+    domain: Sales
+    entity_type: dimension
+  - id: dim_account
+    label: Account
+    description: 'Dimension: account'
+    tags:
+      - sales
+    domain: Sales
+    entity_type: dimension
+  - id: dim_product
+    label: Product
+    description: 'Dimension: product'
+    tags:
+      - sales
+    domain: Sales
+    entity_type: dimension
+  - id: dim_lead
+    label: Lead
+    description: 'Dimension: lead'
+    tags:
+      - sales
+    domain: Sales
+    entity_type: dimension
+  - id: fact_field_sales_acquire_lead_to_quote
+    label: Field Sales Acquire (lead To Quote)
+    description: 'Fact: Field Sales Acquire (lead To Quote) (evolving process)'
+    drafted_fields:
+      - name: lead_count
+        datatype: unknown
+      - name: days_in_stage
+        datatype: unknown
+      - name: process_id
+        datatype: text
+        description: ID of the process this record belongs to
+    tags:
+      - sales
+    domain: Sales
+    entity_type: fact
+  - id: fact_field_sales_growth
+    label: Field Sales Growth
+    description: 'Fact: Field Sales Growth (evolving process)'
+    drafted_fields:
+      - name: amount
+        datatype: unknown
+      - name: process_id
+        datatype: text
+        description: ID of the process this record belongs to
+    tags:
+      - sales
+    domain: Sales
+    entity_type: fact
+relationships:
+  - source: dim_customer
+    target: fact_field_sales_acquire_lead_to_quote
+    label: ''
+    type: one_to_many
+  - source: dim_account
+    target: fact_field_sales_acquire_lead_to_quote
+    label: ''
+    type: one_to_many
+  - source: dim_product
+    target: fact_field_sales_acquire_lead_to_quote
+    label: ''
+    type: one_to_many
+  - source: dim_lead
+    target: fact_field_sales_acquire_lead_to_quote
+    label: ''
+    type: one_to_many
+  - source: dim_customer
+    target: fact_field_sales_growth
+    label: ''
+    type: one_to_many

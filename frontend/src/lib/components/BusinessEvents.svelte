@@ -124,7 +124,9 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
     const domainGroups = $derived.by(() => {
         const processLookup = new Map(activeProcesses.map((proc) => [proc.id, proc]));
-        const eventsById = new Map(filteredEvents.map((event) => [event.id, event]));
+        // Use ALL events for process lookup, not just filtered ones
+        // This ensures events in processes are always visible regardless of filters
+        const eventsById = new Map(events.map((event) => [event.id, event]));
 
         const groupsMap = new Map<string, DomainGroup>();
 
@@ -147,6 +149,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             const eventsForProcess = process.event_ids
                 .map((eventId) => eventsById.get(eventId))
                 .filter((event): event is BusinessEvent => Boolean(event));
+            
             if (eventsForProcess.length === 0) {
                 return;
             }
@@ -312,15 +315,26 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         processId: string | null,
         dragEvent: DragEvent
     ) {
-        dragState = { eventId: event.id, processId };
-        dragOverEventId = null;
-        dragOverProcessId = null;
-        dragOverUngroupedDomainKey = null;
-        dropIndicatorPosition = null;
-        if (dragEvent.dataTransfer) {
+        const target = dragEvent.currentTarget as HTMLElement;
+        
+        // Set dataTransfer before any reactive state updates
+        if (dragEvent.dataTransfer && target) {
+            dragEvent.dataTransfer.clearData();
             dragEvent.dataTransfer.effectAllowed = 'move';
             dragEvent.dataTransfer.setData('text/plain', event.id);
         }
+        
+        // Defer reactive state updates to next frame to prevent DOM changes during dragstart.
+        // The browser captures the drag image synchronously during ondragstart. Any DOM mutations
+        // (like inserting the "Drop here to ungroup" div via {#if dragState?.processId}) during this
+        // synchronous phase can cause the browser to cancel the drag operation.
+        requestAnimationFrame(() => {
+            dragState = { eventId: event.id, processId };
+            dragOverEventId = null;
+            dragOverProcessId = null;
+            dragOverUngroupedDomainKey = null;
+            dropIndicatorPosition = null;
+        });
     }
 
     function handleEventDragOver(event: BusinessEvent, processId: string, dragEvent: DragEvent, processGroup: ProcessGroup) {
@@ -397,10 +411,13 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         if (!dragState) {
             return;
         }
+        // CRITICAL: Always call preventDefault() to indicate this is a valid drop zone
+        // Otherwise the browser may cancel the drag operation entirely
+        dragEvent.preventDefault();
         if (dragState.processId === processId) {
+            // Same process - let EventCard handle the reordering
             return;
         }
-        dragEvent.preventDefault();
         dragOverProcessId = processId;
         dragOverUngroupedDomainKey = null;
         if (dragEvent.dataTransfer) {
@@ -421,6 +438,15 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         dragOverUngroupedDomainKey = null;
 
         if (sourceProcessId === targetProcessId) {
+            try {
+                processActionError = null;
+                await detachEventFromProcess(sourceProcessId, eventId);
+                await reloadEvents();
+            } catch (e) {
+                const errorMessage =
+                    e instanceof Error ? e.message : 'Failed to move event out of process';
+                processActionError = errorMessage;
+            }
             return;
         }
 
@@ -468,6 +494,19 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         }
     }
 
+    async function detachEventFromProcess(processId: string, eventId: string) {
+        const sourceProcess = processes.find((proc) => proc.id === processId);
+        if (!sourceProcess) {
+            return;
+        }
+        const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
+        if (nextSourceIds.length > 0) {
+            await updateBusinessEventProcess(processId, { event_ids: nextSourceIds });
+        } else {
+            await resolveBusinessEventProcess(processId);
+        }
+    }
+
     async function handleUngroupedDrop(domainKey: string, dragEvent: DragEvent) {
         if (!dragState || !dragState.processId) {
             return;
@@ -481,15 +520,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
         try {
             processActionError = null;
-            const sourceProcess = processes.find((proc) => proc.id === sourceProcessId);
-            if (sourceProcess) {
-                const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
-                if (nextSourceIds.length > 0) {
-                    await updateBusinessEventProcess(sourceProcessId, { event_ids: nextSourceIds });
-                } else {
-                    await resolveBusinessEventProcess(sourceProcessId);
-                }
-            }
+            await detachEventFromProcess(sourceProcessId, eventId);
             await reloadEvents();
         } catch (e) {
             const errorMessage =
@@ -943,7 +974,30 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                 </span>
                             </div>
                             {#if isDomainExpanded(domainGroup.domainKey)}
-                                <div class="space-y-3 px-4 py-3" id={`domain-${domainGroup.domainKey}`}>
+                                <div
+                                    class="space-y-3 px-4 py-3"
+                                    id={`domain-${domainGroup.domainKey}`}
+                                    class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    class:bg-primary-50={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                    ondragover={(event) =>
+                                        handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                    ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                >
+                                    {#if dragState?.processId}
+                                        <div
+                                            class="sticky top-0 z-10 rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500"
+                                            class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                            ondragover={(event) =>
+                                                handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                            ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                        >
+                                            Drop here to ungroup events.
+                                        </div>
+                                    {/if}
                                     {#each domainGroup.processes as processGroup (processGroup.process.id)}
                                         {@const derivedIds = getDerivedEntityIds(processGroup.events)}
                                         <div
@@ -1034,16 +1088,20 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                             {/if}
                                         </div>
                                     {/each}
-                                    {#if domainGroup.ungroupedEvents.length > 0}
-                                        <div
-                                            class="space-y-2 pt-2"
-                                            class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
-                                            class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
-                                            class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
-                                            ondragover={(event) =>
-                                                handleUngroupedDragOver(domainGroup.domainKey, event)}
-                                            ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
-                                        >
+                                    <div
+                                        class="space-y-2 pt-2"
+                                        class:border-primary-300={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                        class:ring-2={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                        class:ring-primary-200={dragOverUngroupedDomainKey === domainGroup.domainKey}
+                                        ondragover={(event) =>
+                                            handleUngroupedDragOver(domainGroup.domainKey, event)}
+                                        ondrop={(event) => handleUngroupedDrop(domainGroup.domainKey, event)}
+                                    >
+                                        {#if domainGroup.ungroupedEvents.length === 0}
+                                            <div class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                                                Drop here to ungroup events.
+                                            </div>
+                                        {:else}
                                             {#each domainGroup.ungroupedEvents as event (event.id)}
                                                 <EventCard
                                                     {event}
@@ -1059,8 +1117,8 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                     onDragEnd={handleEventDragEnd}
                                                 />
                                             {/each}
-                                        </div>
-                                    {/if}
+                                        {/if}
+                                    </div>
                                 </div>
                             {/if}
                         </div>

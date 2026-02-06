@@ -18,6 +18,7 @@
     folderFilter,
     tagFilter,
     groupByFolder,
+    entitySelection,
         modelingStyle,
         labelPrefixes,
         dimensionPrefixes,
@@ -51,6 +52,7 @@ import {
     import UndescribedAttributesWarningModal from "$lib/components/UndescribedAttributesWarningModal.svelte";
     import SourceEditorModal from "$lib/components/SourceEditorModal.svelte";
     import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
+    import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, DbtModel, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
@@ -111,6 +113,10 @@ import {
     setContext('hasExposuresData', hasExposuresDataStore);
     setContext('loading', loadingStore);
 
+    // Provide autoSaveService to child components (for EntityDetailModal)
+    const autoSaveServiceContext = $state<{ current: AutoSaveService | null }>({ current: null });
+    setContext('autoSaveService', autoSaveServiceContext);
+
     let warningModalOpen = $state(false);
     let incompleteEntitiesForWarning = $state<Node[]>([]);
     let warningModalResolve: ((value: boolean) => void) | null = null;
@@ -137,6 +143,8 @@ import {
             if ($viewMode !== 'business_events') {
                 $viewMode = 'business_events';
             }
+        } else if (currentPath === '/entity-list') {
+            // Entity list view doesn't change viewMode - maintains current mode
         }
     });
 
@@ -610,6 +618,8 @@ import {
                             _manifestTags: hasDbtBinding ? entityTags : [],
                             entity_type: e.entity_type,
                             source_system: e.source_system,
+                            annotation_type: e.annotation_type,
+                            domain: e.domain,
                         },
                         parentId: undefined,
                     };
@@ -711,6 +721,7 @@ import {
                     autoSaveService = new AutoSaveService(400);
                     autoSaveService.clearLastSavedState();
                     autoSaveService.saveNow($nodes, $edges);
+                    autoSaveServiceContext.current = autoSaveService;
                 }
                 lastSyncedState = autoSaveService.getLastSavedState();
                 initHistory();
@@ -753,6 +764,7 @@ import {
         
         if (!autoSaveService) {
             autoSaveService = new AutoSaveService(400, (isSaving) => {});
+            autoSaveServiceContext.current = autoSaveService;
             return;
         }
         
@@ -872,6 +884,18 @@ import {
             >
                 <Icon icon="lucide:layout-dashboard" class="w-3.5 h-3.5" />
                 Canvas
+            </a>
+            <a
+                href="/entity-list"
+                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                class:bg-white={$page.url.pathname === '/entity-list'}
+                class:text-primary-600={$page.url.pathname === '/entity-list'}
+                class:shadow-sm={$page.url.pathname === '/entity-list'}
+                class:text-gray-500={$page.url.pathname !== '/entity-list'}
+                class:hover:text-gray-900={$page.url.pathname !== '/entity-list'}
+            >
+                <Icon icon="lucide:list-tree" class="w-3.5 h-3.5" />
+                Entity List
             </a>
             {#if exposuresEnabled && hasExposuresData}
                 <a
@@ -1041,12 +1065,19 @@ import {
     <DeleteConfirmModal
         open={$deleteConfirmModal.open}
         entityLabel={$deleteConfirmModal.entityLabel}
+        entityCount={$deleteConfirmModal.entityIds.length}
         onConfirm={() => {
-            // Find and delete the entity from the store
-            const nodeToDelete = $nodes.find(n => n.data.label === $deleteConfirmModal.entityLabel);
-            if (nodeToDelete) {
-                nodes.update((list) => list.filter((n) => n.id !== nodeToDelete.id));
-                edges.update((list) => list.filter((e) => e.source !== nodeToDelete.id && e.target !== nodeToDelete.id));
+            const idsToDelete = new Set($deleteConfirmModal.entityIds);
+            if (idsToDelete.size > 0) {
+                nodes.update((list) => list.filter((n) => !idsToDelete.has(n.id)));
+                edges.update((list) =>
+                    list.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target))
+                );
+                entitySelection.update((selection) => {
+                    const nextSelection = new Set(selection);
+                    idsToDelete.forEach((id) => nextSelection.delete(id));
+                    return nextSelection;
+                });
             }
             closeDeleteConfirmModal();
         }}
@@ -1074,4 +1105,6 @@ import {
         }}
         onCancel={closeSourceEditorModal}
     />
+
+    <EntityDetailModal />
 </div>

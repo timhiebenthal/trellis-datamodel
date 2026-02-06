@@ -266,6 +266,10 @@ def _split_model_and_layout(
             model_entity["drafted_fields"] = entity["drafted_fields"]
         if "tags" in entity:
             model_entity["tags"] = entity["tags"]
+        if "domain" in entity:
+            model_entity["domain"] = entity["domain"]
+        if "domains" in entity:
+            model_entity["domains"] = entity["domains"]
         if "entity_type" in entity:
             model_entity["entity_type"] = entity["entity_type"]
         if "annotation_type" in entity:
