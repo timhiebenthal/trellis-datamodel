@@ -16,12 +16,21 @@ vi.mock('xlsx', () => ({
   utils: {
     aoa_to_sheet: vi.fn((data) => ({
       data,
+      '!ref': 'A1:D2',
       '!cols': [],
       A1: { s: {} },
       B1: { s: {} },
       C1: { s: {} },
       D1: { s: {} }
     })),
+    decode_range: vi.fn(() => ({
+      s: { c: 0, r: 0 },
+      e: { c: 3, r: 0 }
+    })),
+    encode_cell: vi.fn(({ r, c }: { r: number; c: number }) => {
+      const col = String.fromCharCode(65 + c);
+      return `${col}${r + 1}`;
+    }),
     book_new: vi.fn(() => ({})),
     book_append_sheet: vi.fn(),
     writeFile: vi.fn()

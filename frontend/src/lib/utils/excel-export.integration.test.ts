@@ -9,6 +9,14 @@ import type { EntityData } from '$lib/types';
 import type { Node } from '@xyflow/svelte';
 import * as XLSX from 'xlsx';
 
+vi.mock('xlsx', async () => {
+  const actual = await vi.importActual<typeof import('xlsx')>('xlsx');
+  return {
+    ...actual,
+    writeFile: vi.fn()
+  };
+});
+
 describe('excel-export integration tests', () => {
   describe('generateOverviewSheet', () => {
     it('should generate complete overview sheet with all entity data', () => {
@@ -262,8 +270,8 @@ describe('excel-export integration tests', () => {
 
   describe('exportEntityToExcel', () => {
     beforeEach(() => {
-      // Mock XLSX writeFile to prevent actual file writes
-      vi.spyOn(XLSX, 'writeFile').mockImplementation(() => {});
+      vi.mocked(XLSX.writeFile).mockReset();
+      vi.mocked(XLSX.writeFile).mockImplementation(() => {});
     });
 
     it('should create complete workbook with all three sheets', () => {
@@ -343,7 +351,7 @@ describe('excel-export integration tests', () => {
 
     it('should handle errors gracefully', () => {
       // Mock writeFile to throw error
-      vi.spyOn(XLSX, 'writeFile').mockImplementation(() => {
+      vi.mocked(XLSX.writeFile).mockImplementation(() => {
         throw new Error('Write failed');
       });
 
