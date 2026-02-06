@@ -508,18 +508,19 @@ def _validate_roles(roles) -> None:
         return
 
     if not isinstance(roles, list):
-        raise ValidationError("roles must be a list")
+        raise ValidationError("roles must be a list of strings or null/undefined")
 
     for role in roles:
         if not isinstance(role, str):
-            raise ValidationError("roles must be a list of strings")
+            raise ValidationError("roles must be a list of strings or null/undefined")
 
 
 @router.post("/data-model")
 async def save_data_model(data: DataModelUpdate):
     """Save data model, splitting model and layout into separate files."""
     try:
-        content = data.dict()  # Pydantic v1 (required by dbt-core==1.10)
+        # Prefer model_dump() to avoid Pydantic v2 dict() deprecation warnings.
+        content = data.model_dump() if hasattr(data, "model_dump") else data.dict()
 
         # Validate entity_type and roles values in all entities
         entities = content.get("entities", [])

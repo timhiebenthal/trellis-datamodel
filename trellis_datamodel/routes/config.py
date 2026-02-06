@@ -139,8 +139,12 @@ async def update_config(request: ConfigUpdateRequest) -> Dict[str, Any]:
                 expected_mtime=request.expected_mtime,
                 expected_hash=request.expected_hash,
             )
-            # Use dict() for Pydantic v1/v2 compatibility
-            conflict_dict = conflict_info.dict() if hasattr(conflict_info, 'dict') else conflict_info.model_dump()
+            # Prefer model_dump() to avoid Pydantic v2 dict() deprecation warnings.
+            conflict_dict = (
+                conflict_info.model_dump()
+                if hasattr(conflict_info, "model_dump")
+                else conflict_info.dict()
+            )
             
             raise HTTPException(
                 status_code=409,

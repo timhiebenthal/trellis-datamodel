@@ -261,7 +261,7 @@ export class AutoSaveService {
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
                     const roles = ((n.data as any)?.roles) as string[] | undefined;
                     const domain = ((n.data as any)?.domain) as string | undefined;
-						const domains = ((n.data as any)?.domains) as string[] | undefined;
+                    const domains = ((n.data as any)?.domains) as string[] | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -283,12 +283,12 @@ export class AutoSaveService {
                     if (domain && domain.trim()) {
                         entity.domain = domain.trim();
                     }
-					if (Array.isArray(domains) && domains.length > 0) {
-						entity.domains = domains;
-						if (!entity.domain) {
-							entity.domain = domains[0];
-						}
-					}
+                    if (Array.isArray(domains) && domains.length > 0) {
+                        entity.domains = domains;
+                        if (!entity.domain) {
+                            entity.domain = domains[0];
+                        }
+                    }
 
                     // Include annotation_type if present (for dimensions created from business events)
                     if (annotation_type) {
