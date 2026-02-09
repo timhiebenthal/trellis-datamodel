@@ -14,6 +14,34 @@ from trellis_datamodel.models.business_event import (
 )
 
 
+class TestDimensionReuseAnnotationType:
+    """Test annotation type behavior when reusing existing dimensions."""
+
+    def test_existing_dimension_without_annotation_type_gets_inferred_type(self):
+        entry = AnnotationEntry(
+            id="w1", text="employee", dimension_id="dim_employee", description=None, attributes={}
+        )
+        existing_entities = {
+            "dim_employee": {
+                "id": "dim_employee",
+                "label": "Employee",
+                "entity_type": "dimension",
+                "description": "Employee dimension",
+                # annotation_type intentionally missing
+            }
+        }
+
+        result = entity_generator._create_dimension_from_annotation_entry(
+            entry=entry,
+            annotation_type="who",
+            prefixes=["dim_"],
+            existing_entities=existing_entities,
+        )
+
+        assert result["id"] == "dim_employee"
+        assert result["annotation_type"] == "who"
+
+
 class TestTextToSnakeCase:
     """Test _text_to_snake_case() helper function."""
 
