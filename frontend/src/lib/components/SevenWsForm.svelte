@@ -95,6 +95,7 @@
     // New dimension creation state
     let creatingDimensionForEntry = $state<string | null>(null);
     let newDimensionName = $state<string>('');
+    let activeSuggestionEntryId = $state<string | null>(null);
 
     // Calculate filled annotations count
     let filledAnnotationsCount = $derived(
@@ -176,7 +177,7 @@
 
     // Initialize on mount
     $effect(() => {
-        annotations = event.annotations || {
+        const sourceAnnotations = event.annotations || {
             who: [],
             what: [],
             when: [],
@@ -185,13 +186,15 @@
             how_many: [],
             why: []
         };
+        annotations = sourceAnnotations;
 
         // Initialize role state from existing annotations
         const newShowGeneralize = new Set<string>();
+        const nextSelectedRoles: Record<string, string | undefined> = {};
         for (const annotationType of ANNOTATION_TYPES) {
-            for (const entry of annotations[annotationType.type]) {
+            for (const entry of sourceAnnotations[annotationType.type]) {
                 if (entry.role) {
-                    selectedRoles[entry.id] = entry.role;
+                    nextSelectedRoles[entry.id] = entry.role;
                 }
                 // Prefetch roles for dimensions that already have dimension_id
                 if (entry.dimension_id) {
@@ -201,6 +204,7 @@
                 }
             }
         }
+        selectedRoles = nextSelectedRoles;
         showGeneralizeForEntry = newShowGeneralize;
 
         // Reset error state when event changes
@@ -276,6 +280,14 @@
                     if (!annotations) return;
                     for (const annotationType of Object.keys(allowedMap) as AnnotationType[]) {
                         for (const entry of annotations[annotationType] || []) {
+                            if (entry.text) {
+                                // Collect text suggestions for autocomplete regardless of dimension linkage
+                                textSuggestions[annotationType].add(entry.text.trim());
+                            }
+                            if (entry.role) {
+                                // Also suggest explicit role names for role-playing dimensions
+                                textSuggestions[annotationType].add(entry.role.trim());
+                            }
                             if (entry.dimension_id && dimensionLookup.has(entry.dimension_id)) {
                                 allowedMap[annotationType].add(entry.dimension_id);
                                 continue;
@@ -285,8 +297,6 @@
                                 if (matchedId) {
                                     allowedMap[annotationType].add(matchedId);
                                 }
-                                // Also collect text suggestions for autocomplete
-                                textSuggestions[annotationType].add(entry.text.trim());
                             }
                         }
                     }
@@ -524,6 +534,10 @@
         updateEntryText(annotationType, entryId, text, true);
     }
 
+    function handleEntryTextInput(annotationType: AnnotationType, entryId: string, text: string) {
+        updateEntryText(annotationType, entryId, text, false);
+    }
+
     function toggleGeneralizeSection(entryId: string) {
         const newSet = new Set(showGeneralizeForEntry);
         if (newSet.has(entryId)) {
@@ -595,6 +609,53 @@
             // Normal dimension selection
             updateEntryDimensionId(annotationType, entryId, value);
         }
+    }
+
+    function getAllowedDimensionsForType(annotationType: AnnotationType): Dimension[] {
+        const allowedSet = allowedDimensionIdsByType?.[annotationType];
+        return dimensions.filter((dimension) => {
+            // Show dimension if:
+            // 1. It has no annotation_type set (generic dimension), OR
+            // 2. Its annotation_type matches this section, OR
+            // 3. It has been used in this annotation type before (in allowedDimensionIdsByType)
+            return !dimension.annotation_type ||
+                dimension.annotation_type === annotationType ||
+                (allowedSet ? allowedSet.has(dimension.id) : false);
+        });
+    }
+
+    function getTextSuggestionsForType(annotationType: AnnotationType): string[] {
+        const suggestions = annotationTextSuggestions[annotationType];
+        if (!suggestions || suggestions.size === 0) {
+            return [];
+        }
+        const dedupedByLower = new Map<string, string>();
+        for (const value of Array.from(suggestions)
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)) {
+            const key = value.toLowerCase();
+            if (!dedupedByLower.has(key)) {
+                dedupedByLower.set(key, value);
+            }
+        }
+        return Array.from(dedupedByLower.values())
+            .sort((a, b) => a.localeCompare(b));
+    }
+
+    function getVisibleSuggestions(annotationType: AnnotationType, currentText: string): string[] {
+        const allSuggestions = getTextSuggestionsForType(annotationType);
+        const query = currentText.trim().toLowerCase();
+        if (!query) {
+            return allSuggestions.slice(0, 12);
+        }
+        return allSuggestions
+            .filter((suggestion) => suggestion.toLowerCase().includes(query))
+            .slice(0, 12);
+    }
+
+    function applySuggestion(annotationType: AnnotationType, entryId: string, suggestion: string) {
+        updateEntryText(annotationType, entryId, suggestion, false);
+        activeSuggestionEntryId = null;
     }
 
     function cancelCreateDimension() {
@@ -773,6 +834,13 @@
                                  <!-- Section Content -->
                         {#if !collapsedState[annotationType.type]}
                             <div id={`section-${annotationType.type}`} class="p-4 space-y-3 rounded-b-lg">
+                                {#if annotationType.type !== 'how_many'}
+                                    <datalist id={`annotation-suggestions-${annotationType.type}`}>
+                                        {#each getTextSuggestionsForType(annotationType.type) as suggestion}
+                                            <option value={suggestion}></option>
+                                        {/each}
+                                    </datalist>
+                                {/if}
                                 <!-- Entries List -->
                                 {#if dimensionsLoading && annotations[annotationType.type].length === 0}
                                     <!-- Skeleton Loader -->
@@ -811,12 +879,25 @@
                                                     <input
                                                         type="text"
                                                         value={entry.text}
+                                                        list={`annotation-suggestions-${annotationType.type}`}
+                                                        onfocus={() => { activeSuggestionEntryId = entry.id; }}
+                                                        onblur={() => {
+                                                            setTimeout(() => {
+                                                                if (activeSuggestionEntryId === entry.id) {
+                                                                    activeSuggestionEntryId = null;
+                                                                }
+                                                            }, 120);
+                                                        }}
+                                                        onkeydown={(e) => {
+                                                            if (e.key === 'Escape') {
+                                                                activeSuggestionEntryId = null;
+                                                            }
+                                                        }}
                                                         oninput={(e) =>
-                                                            updateEntryText(
+                                                            handleEntryTextInput(
                                                                 annotationType.type,
                                                                 entry.id,
                                                                 e.currentTarget.value,
-                                                                false,
                                                             )
                                                         }
                                                         placeholder={annotationType.placeholder}
@@ -824,6 +905,25 @@
                                                         maxlength={200}
                                                         disabled={loading}
                                                     />
+                                                    {#if activeSuggestionEntryId === entry.id}
+                                                        {@const visibleSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
+                                                        {#if visibleSuggestions.length > 0}
+                                                            <div class="mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-44 overflow-y-auto">
+                                                                {#each visibleSuggestions as suggestion}
+                                                                    <button
+                                                                        type="button"
+                                                                        class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-blue-50"
+                                                                        onmousedown={(e) => {
+                                                                            e.preventDefault();
+                                                                            applySuggestion(annotationType.type, entry.id, suggestion);
+                                                                        }}
+                                                                    >
+                                                                        {suggestion}
+                                                                    </button>
+                                                                {/each}
+                                                            </div>
+                                                        {/if}
+                                                    {/if}
 
                                                     <!-- Collapsible Dimension Link (generalization) -->
                                                     {#if showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
@@ -894,7 +994,7 @@
                                                                         disabled={loading || dimensionsLoading}
                                                                     >
                                                                         <option value="">None (keep as free text)</option>
-                                                                        {#each dimensions.filter(d => !d.annotation_type || d.annotation_type === annotationType.type) as dimension}
+                                                                        {#each getAllowedDimensionsForType(annotationType.type) as dimension}
                                                                             <option value={dimension.id}>{dimension.label}</option>
                                                                         {/each}
                                                                         <option value="__create_new__" class="text-blue-600 font-medium">+ Create new dimension...</option>
