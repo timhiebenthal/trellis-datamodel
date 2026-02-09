@@ -770,7 +770,20 @@
                 </div>
             {:else}
                 <div class="text-center py-8 text-gray-500">
-                    <p>No entities to generate. Please add annotations to the event first.</p>
+                    {#if previewData?.errors && previewData.errors.length > 0}
+                        <p class="font-medium text-red-700 mb-2">
+                            No entities could be generated from this {mode === 'process' ? 'process' : 'event'}.
+                        </p>
+                        <ul class="text-sm text-red-700 list-disc list-inside space-y-1 text-left max-w-2xl mx-auto">
+                            {#each previewData.errors as generationError}
+                                <li>{generationError}</li>
+                            {/each}
+                        </ul>
+                    {:else}
+                        <p>
+                            No entities to generate. Please add annotations to the {mode === 'process' ? 'process' : 'event'} first.
+                        </p>
+                    {/if}
                 </div>
                 <div class="flex justify-end gap-2 pt-4">
                     <button
