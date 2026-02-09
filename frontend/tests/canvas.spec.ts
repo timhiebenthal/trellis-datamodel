@@ -51,8 +51,9 @@ test.describe('Canvas Interactions', () => {
 
         // 3. Delete Entity
         // Hover to see delete button
-        await page.locator('.svelte-flow__node-entity').hover();
-        await page.getByRole('button', { name: 'Delete entity Orders', exact: true }).click();
+        const editedEntityNode = page.locator('.svelte-flow__node-entity').filter({ has: entity }).first();
+        await editedEntityNode.hover();
+        await editedEntityNode.getByRole('button', { name: 'Delete entity Orders', exact: true }).click();
 
         // Confirm modal
         await expect(page.getByRole('dialog', { name: /delete entity/i })).toBeVisible();

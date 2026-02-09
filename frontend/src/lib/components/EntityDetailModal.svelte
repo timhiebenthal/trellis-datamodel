@@ -2,7 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses } from '$lib/api';
-	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess } from '$lib/types';
+	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
@@ -230,8 +230,8 @@
 	function getProcessesForRole(dimensionId: string, roleName: string): BusinessEventProcess[] {
 		return processes.filter(proc => {
 			if (!proc.annotations_superset) return false;
-			return Object.values(proc.annotations_superset).some(annotations =>
-				annotations.some(ann =>
+			return Object.values(proc.annotations_superset).some((annotations: AnnotationEntry[]) =>
+				annotations.some((ann: AnnotationEntry) =>
 					ann.dimension_id === dimensionId && ann.role === roleName
 				)
 			);
