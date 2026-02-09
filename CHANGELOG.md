@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2026-02-07
+## [0.9.0-beta4] - 2026-02-09
 
 ### Added
 - **Role-Playing Dimensions:** Added support for role-playing dimensions, allowing dimensions to represent multiple contextual uses in business processes. Users can define roles for dimension entities (e.g., Calendar with roles: order_date, ship_date, delivery_date) and assign specific roles when annotating business events.
@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced SevenWsForm with role selection state management and dimension role caching for improved performance.
 - Enhanced EventCard and ProcessRow components to display role information alongside dimension names for better semantic clarity.
 - Enhanced DimensionAutocomplete to load and display available roles when a dimension is selected in annotation forms.
+
+### Fixed
+- Fixed 7W annotation suggestion UX: existing values now appear on input focus (without requiring initial typing), and suggestion matching/filtering is more robust during entry editing.
+- Fixed role suggestion coverage in 7W annotations by including role-linked labels (for example, `Sales Agent`) in Who suggestions.
+- Fixed process entity generation dialog messaging to show backend validation errors directly when generation returns no entities, instead of always showing the generic event-only message.
 
 ## [0.9.0-beta3] - 2026-02-06
 
