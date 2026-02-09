@@ -426,6 +426,7 @@
                     const domain = ((n.data as any)?.domain) as string | undefined;
                     const domains = ((n.data as any)?.domains) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
+                    const roles = ((n.data as any)?.roles) as string[] | undefined;
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -457,6 +458,9 @@
 
                     if (annotation_type) {
                         entity.annotation_type = annotation_type;
+                    }
+                    if (roles !== undefined) {
+                        entity.roles = roles;
                     }
                     
                     return entity;
@@ -661,9 +665,9 @@
                                         <td class="px-4 py-3">
                                             <span
                                                 class="px-2 py-1 text-xs font-medium rounded {entity.entity_type === 'dimension'
-                                                    ? 'bg-blue-100 text-blue-800'
+                                                    ? 'bg-green-100 text-green-700'
                                                     : entity.entity_type === 'fact'
-                                                      ? 'bg-green-100 text-green-800'
+                                                      ? 'bg-blue-100 text-blue-700'
                                                       : 'bg-gray-100 text-gray-800'}"
                                             >
                                                 {entity.entity_type === 'dimension'
@@ -766,7 +770,20 @@
                 </div>
             {:else}
                 <div class="text-center py-8 text-gray-500">
-                    <p>No entities to generate. Please add annotations to the event first.</p>
+                    {#if previewData?.errors && previewData.errors.length > 0}
+                        <p class="font-medium text-red-700 mb-2">
+                            No entities could be generated from this {mode === 'process' ? 'process' : 'event'}.
+                        </p>
+                        <ul class="text-sm text-red-700 list-disc list-inside space-y-1 text-left max-w-2xl mx-auto">
+                            {#each previewData.errors as generationError}
+                                <li>{generationError}</li>
+                            {/each}
+                        </ul>
+                    {:else}
+                        <p>
+                            No entities to generate. Please add annotations to the {mode === 'process' ? 'process' : 'event'} first.
+                        </p>
+                    {/if}
                 </div>
                 <div class="flex justify-end gap-2 pt-4">
                     <button

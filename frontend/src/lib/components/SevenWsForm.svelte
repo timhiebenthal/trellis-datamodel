@@ -2,8 +2,7 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
     import { onMount } from "svelte";
-    import DimensionAutocomplete from "./DimensionAutocomplete.svelte";
-    import { getBusinessEventProcesses, getBusinessEvents, getDimensions } from "$lib/api";
+    import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
 
     type Props = {
         event: BusinessEvent;
@@ -75,8 +74,28 @@
         why: false
     });
 
-    // Entry editing state
-    let editingEntries = $state<Record<string, { text: string; description?: string; dimension_id?: string }>>({});
+    // Entry editing state: maintains working copy of annotation entries being edited
+    let editingEntries = $state<Record<string, { text: string; description?: string; dimension_id?: string; role?: string }>>({});
+
+    // Role state: tracks the currently selected role for each annotation entry (by entry ID)
+    // Used to manage role selection in the UI before saving to the annotation
+    let selectedRoles = $state<Record<string, string | undefined>>({});
+
+    // Dimension roles cache: maps dimension_id -> roles array for quick lookup
+    // Caches dimension role definitions to avoid repeated API calls during role selection
+    // Structure: { "dim_calendar": ["order_date", "ship_date", "delivery_date"], ... }
+    let dimensionRolesCache = $state<Record<string, string[]>>({});
+
+    // Role success feedback
+    let roleSuccessMessage = $state<string | null>(null);
+
+    // Generalize toggle state: tracks which entries have the "Generalize to" section expanded
+    let showGeneralizeForEntry = $state<Set<string>>(new Set());
+
+    // New dimension creation state
+    let creatingDimensionForEntry = $state<string | null>(null);
+    let newDimensionName = $state<string>('');
+    let activeSuggestionEntryId = $state<string | null>(null);
 
     // Calculate filled annotations count
     let filledAnnotationsCount = $derived(
@@ -158,7 +177,7 @@
 
     // Initialize on mount
     $effect(() => {
-        annotations = event.annotations || {
+        const sourceAnnotations = event.annotations || {
             who: [],
             what: [],
             when: [],
@@ -167,6 +186,27 @@
             how_many: [],
             why: []
         };
+        annotations = sourceAnnotations;
+
+        // Initialize role state from existing annotations
+        const newShowGeneralize = new Set<string>();
+        const nextSelectedRoles: Record<string, string | undefined> = {};
+        for (const annotationType of ANNOTATION_TYPES) {
+            for (const entry of sourceAnnotations[annotationType.type]) {
+                if (entry.role) {
+                    nextSelectedRoles[entry.id] = entry.role;
+                }
+                // Prefetch roles for dimensions that already have dimension_id
+                if (entry.dimension_id) {
+                    fetchDimensionRoles(entry.dimension_id);
+                    // Auto-expand generalize section for entries with dimension already linked
+                    newShowGeneralize.add(entry.id);
+                }
+            }
+        }
+        selectedRoles = nextSelectedRoles;
+        showGeneralizeForEntry = newShowGeneralize;
+
         // Reset error state when event changes
         hasError = false;
         errorMessage = null;
@@ -240,6 +280,14 @@
                     if (!annotations) return;
                     for (const annotationType of Object.keys(allowedMap) as AnnotationType[]) {
                         for (const entry of annotations[annotationType] || []) {
+                            if (entry.text) {
+                                // Collect text suggestions for autocomplete regardless of dimension linkage
+                                textSuggestions[annotationType].add(entry.text.trim());
+                            }
+                            if (entry.role) {
+                                // Also suggest explicit role names for role-playing dimensions
+                                textSuggestions[annotationType].add(entry.role.trim());
+                            }
                             if (entry.dimension_id && dimensionLookup.has(entry.dimension_id)) {
                                 allowedMap[annotationType].add(entry.dimension_id);
                                 continue;
@@ -249,8 +297,6 @@
                                 if (matchedId) {
                                     allowedMap[annotationType].add(matchedId);
                                 }
-                                // Also collect text suggestions for autocomplete
-                                textSuggestions[annotationType].add(entry.text.trim());
                             }
                         }
                     }
@@ -315,17 +361,16 @@
             id: `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             text: "",
             description: "",
-            dimension_id: undefined
+            dimension_id: undefined,
+            role: undefined
         };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: [...annotations[annotationType], newEntry]
-        };
-        
+
+        annotations[annotationType] = [...annotations[annotationType], newEntry];
+
         // Initialize editing state for new entry
-        editingEntries[newEntry.id] = { text: "", description: "" };
-        
+        editingEntries[newEntry.id] = { text: "", description: "", role: undefined };
+        selectedRoles[newEntry.id] = undefined;
+
         // Expand section when adding entry
         collapsedState[annotationType] = false;
     }
@@ -344,13 +389,11 @@
     }
 
     function performDelete(annotationType: AnnotationType, entryId: string) {
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].filter(e => e.id !== entryId)
-        };
+        annotations[annotationType] = annotations[annotationType].filter(e => e.id !== entryId);
 
-        // Remove from editing state
+        // Remove from editing state and role state
         delete editingEntries[entryId];
+        delete selectedRoles[entryId];
     }
 
     function handleDeleteConfirm() {
@@ -373,45 +416,257 @@
         clearDimensionId: boolean = true,
     ) {
         editingEntries[entryId] = { ...editingEntries[entryId], text };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId
-                    ? {
-                        ...e,
-                        text,
-                        dimension_id: clearDimensionId ? undefined : e.dimension_id,
-                    }
-                    : e
-            )
-        };
+
+        // Clear role when dimension is cleared
+        if (clearDimensionId) {
+            selectedRoles[entryId] = undefined;
+        }
+
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId
+                ? {
+                    ...e,
+                    text,
+                    dimension_id: clearDimensionId ? undefined : e.dimension_id,
+                    role: clearDimensionId ? undefined : e.role,
+                }
+                : e
+        );
     }
 
     function updateEntryDescription(annotationType: AnnotationType, entryId: string, description: string) {
         editingEntries[entryId] = { ...editingEntries[entryId], description };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId ? { ...e, description } : e
-            )
-        };
+
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { ...e, description } : e
+        );
     }
 
-    function updateEntryDimensionId(annotationType: AnnotationType, entryId: string, dimension_id: string) {
+    async function updateEntryDimensionId(annotationType: AnnotationType, entryId: string, dimension_id: string) {
+        console.log('updateEntryDimensionId called:', { annotationType, entryId, dimension_id });
         editingEntries[entryId] = { ...editingEntries[entryId], dimension_id };
-        
-        annotations = {
-            ...annotations,
-            [annotationType]: annotations[annotationType].map(e => 
-                e.id === entryId ? { ...e, dimension_id: dimension_id || undefined } : e
-            )
-        };
+
+        // When linking to a dimension, the current text becomes the role
+        const entry = annotations[annotationType].find(e => e.id === entryId);
+        const role = dimension_id && entry ? entry.text : undefined;
+
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { 
+                ...e, 
+                dimension_id: dimension_id || undefined,
+                role: role
+            } : e
+        );
+
+        // Update selected roles state
+        selectedRoles[entryId] = role;
+
+        // Fetch dimension roles when dimension is selected (for future reference)
+        if (dimension_id) {
+            await fetchDimensionRoles(dimension_id);
+        }
     }
+
+    /**
+     * Updates the role assignment for a single annotation entry.
+     * This is part of the role-playing dimensions feature, allowing annotations to specify
+     * which semantic role a dimension plays in the business process.
+     *
+     * Example: For a Calendar dimension annotated as "when", the role might be "order_date"
+     * resulting in display text "Calendar (order_date)"
+     *
+     * @param annotationType - The 7W category (who, what, when, where, how, why, how_many)
+     * @param entryId - The unique ID of the annotation entry being updated
+     * @param role - The role name to assign, or undefined to clear the role
+     */
+    function updateEntryRole(annotationType: AnnotationType, entryId: string, role: string | undefined) {
+        // Update the editing entry copy
+        editingEntries[entryId] = { ...editingEntries[entryId], role };
+
+        // Update the main annotations object
+        // This triggers re-rendering of the annotation display with updated role text
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { ...e, role: role || undefined } : e
+        );
+    }
+
+    /**
+     * Fetches available roles for a dimension from the data model.
+     * Implements caching to avoid repeated API calls during the same form session.
+     *
+     * When a user selects a dimension with available roles (e.g., Calendar has roles:
+     * ["order_date", "ship_date", "delivery_date"]), this function fetches those roles
+     * so the role dropdown can be populated.
+     *
+     * @param dimension_id - The ID of the dimension entity (e.g., "dim_calendar")
+     */
+    async function fetchDimensionRoles(dimension_id: string): Promise<void> {
+        // Check cache first to avoid redundant API calls
+        // If we've already loaded roles for this dimension in this session, reuse them
+        if (dimensionRolesCache[dimension_id]) {
+            return;
+        }
+
+        try {
+            // Fetch the entire data model and extract this specific dimension's roles
+            const dataModel = await getDataModel();
+            const entity = dataModel.entities.find(e => e.id === dimension_id);
+
+            // Cache the roles array if it exists, or empty array if no roles defined
+            if (entity && entity.roles && entity.roles.length > 0) {
+                // Dimension has roles defined - cache them for role dropdown population
+                dimensionRolesCache[dimension_id] = entity.roles;
+            } else {
+                // No roles defined for this dimension - cache empty array to avoid refetching
+                dimensionRolesCache[dimension_id] = [];
+            }
+            console.log('Roles cached for dimension:', dimension_id, dimensionRolesCache[dimension_id]);
+        } catch (e) {
+            // Graceful error handling: if role fetch fails, cache empty array and continue
+            // This prevents the form from breaking; the role dropdown simply won't show
+            console.error(`Failed to fetch roles for dimension ${dimension_id}:`, e);
+            dimensionRolesCache[dimension_id] = [];
+        }
+    }
+
 
     function handleEntryTextChange(annotationType: AnnotationType, entryId: string, text: string) {
         updateEntryText(annotationType, entryId, text, true);
+    }
+
+    function handleEntryTextInput(annotationType: AnnotationType, entryId: string, text: string) {
+        updateEntryText(annotationType, entryId, text, false);
+    }
+
+    function toggleGeneralizeSection(entryId: string) {
+        const newSet = new Set(showGeneralizeForEntry);
+        if (newSet.has(entryId)) {
+            newSet.delete(entryId);
+        } else {
+            newSet.add(entryId);
+        }
+        showGeneralizeForEntry = newSet;
+    }
+
+    async function createNewDimension(annotationType: AnnotationType, entryId: string, dimensionLabel: string) {
+        try {
+            error = null;
+            loading = true;
+
+            // Fetch current data model
+            const dataModel = await getDataModel();
+
+            // Generate dimension ID from label
+            const dimensionId = `dim_${dimensionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+
+            // Check if dimension already exists
+            if (dataModel.entities.find(e => e.id === dimensionId)) {
+                error = `Dimension "${dimensionId}" already exists`;
+                return;
+            }
+
+            // Create new dimension entity
+            const newDimension = {
+                id: dimensionId,
+                label: dimensionLabel,
+                description: `${dimensionLabel} dimension`,
+                entity_type: 'dimension' as const,
+                annotation_type: annotationType,
+                position: { x: 100, y: 100 }, // Default position
+                roles: [] // Empty roles array
+            };
+
+            // Add to data model
+            dataModel.entities.push(newDimension);
+
+            // Save data model
+            await saveDataModel(dataModel);
+
+            // Reload dimensions to get the new one
+            dimensions = await getDimensions();
+
+            // Link the annotation to the new dimension
+            await updateEntryDimensionId(annotationType, entryId, dimensionId);
+
+            // Clear creation state
+            creatingDimensionForEntry = null;
+            newDimensionName = '';
+
+        } catch (e) {
+            console.error('Failed to create dimension:', e);
+            error = e instanceof Error ? e.message : 'Failed to create dimension';
+        } finally {
+            loading = false;
+        }
+    }
+
+    function handleDimensionSelectChange(annotationType: AnnotationType, entryId: string, value: string) {
+        if (value === '__create_new__') {
+            // Show create new dimension input
+            creatingDimensionForEntry = entryId;
+            newDimensionName = '';
+        } else {
+            // Normal dimension selection
+            updateEntryDimensionId(annotationType, entryId, value);
+        }
+    }
+
+    function getAllowedDimensionsForType(annotationType: AnnotationType): Dimension[] {
+        const allowedSet = allowedDimensionIdsByType?.[annotationType];
+        return dimensions.filter((dimension) => {
+            // Show dimension if:
+            // 1. It has no annotation_type set (generic dimension), OR
+            // 2. Its annotation_type matches this section, OR
+            // 3. It has been used in this annotation type before (in allowedDimensionIdsByType)
+            return !dimension.annotation_type ||
+                dimension.annotation_type === annotationType ||
+                (allowedSet ? allowedSet.has(dimension.id) : false);
+        });
+    }
+
+    function getTextSuggestionsForType(annotationType: AnnotationType): string[] {
+        const suggestions = annotationTextSuggestions[annotationType];
+        if (!suggestions || suggestions.size === 0) {
+            return [];
+        }
+        const dedupedByLower = new Map<string, string>();
+        for (const value of Array.from(suggestions)
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)) {
+            const key = value.toLowerCase();
+            if (!dedupedByLower.has(key)) {
+                dedupedByLower.set(key, value);
+            }
+        }
+        return Array.from(dedupedByLower.values())
+            .sort((a, b) => a.localeCompare(b));
+    }
+
+    function getVisibleSuggestions(annotationType: AnnotationType, currentText: string): string[] {
+        const allSuggestions = getTextSuggestionsForType(annotationType);
+        const query = currentText.trim().toLowerCase();
+        if (!query) {
+            return allSuggestions.slice(0, 12);
+        }
+        return allSuggestions
+            .filter((suggestion) => suggestion.toLowerCase().includes(query))
+            .slice(0, 12);
+    }
+
+    function applySuggestion(annotationType: AnnotationType, entryId: string, suggestion: string) {
+        updateEntryText(annotationType, entryId, suggestion, false);
+        activeSuggestionEntryId = null;
+    }
+
+    function cancelCreateDimension() {
+        creatingDimensionForEntry = null;
+        newDimensionName = '';
+    }
+
+    async function submitCreateDimension(annotationType: AnnotationType, entryId: string) {
+        if (newDimensionName.trim()) {
+            await createNewDimension(annotationType, entryId, newDimensionName.trim());
+        }
     }
 
     async function handleSave() {
@@ -579,6 +834,13 @@
                                  <!-- Section Content -->
                         {#if !collapsedState[annotationType.type]}
                             <div id={`section-${annotationType.type}`} class="p-4 space-y-3 rounded-b-lg">
+                                {#if annotationType.type !== 'how_many'}
+                                    <datalist id={`annotation-suggestions-${annotationType.type}`}>
+                                        {#each getTextSuggestionsForType(annotationType.type) as suggestion}
+                                            <option value={suggestion}></option>
+                                        {/each}
+                                    </datalist>
+                                {/if}
                                 <!-- Entries List -->
                                 {#if dimensionsLoading && annotations[annotationType.type].length === 0}
                                     <!-- Skeleton Loader -->
@@ -613,37 +875,140 @@
                                                         disabled={loading}
                                                     />
                                                 {:else}
-                                                    <!-- Text Input + Autocomplete -->
-                                                    <DimensionAutocomplete
-                                                        textValue={entry.text}
-                                                        onTextChange={(val) =>
-                                                            handleEntryTextChange(
+                                                    <!-- Primary Text Input (becomes the role) -->
+                                                    <input
+                                                        type="text"
+                                                        value={entry.text}
+                                                        list={`annotation-suggestions-${annotationType.type}`}
+                                                        onfocus={() => { activeSuggestionEntryId = entry.id; }}
+                                                        onblur={() => {
+                                                            setTimeout(() => {
+                                                                if (activeSuggestionEntryId === entry.id) {
+                                                                    activeSuggestionEntryId = null;
+                                                                }
+                                                            }, 120);
+                                                        }}
+                                                        onkeydown={(e) => {
+                                                            if (e.key === 'Escape') {
+                                                                activeSuggestionEntryId = null;
+                                                            }
+                                                        }}
+                                                        oninput={(e) =>
+                                                            handleEntryTextInput(
                                                                 annotationType.type,
                                                                 entry.id,
-                                                                val,
+                                                                e.currentTarget.value,
                                                             )
                                                         }
-                                                        onSelectDimension={(dimension) => {
-                                                            updateEntryText(
-                                                                annotationType.type,
-                                                                entry.id,
-                                                                dimension.label,
-                                                                false,
-                                                            );
-                                                            updateEntryDimensionId(
-                                                                annotationType.type,
-                                                                entry.id,
-                                                                dimension.id,
-                                                            );
-                                                        }}
-                                                        dimensions={dimensions}
-                                                        filterBy={annotationType.type}
-                                                        allowedIds={allowedDimensionIdsByType ? allowedDimensionIdsByType[annotationType.type] : null}
-                                                        textSuggestions={annotationTextSuggestions[annotationType.type]}
                                                         placeholder={annotationType.placeholder}
+                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        maxlength={200}
                                                         disabled={loading}
-                                                        loading={dimensionsLoading || businessEventsLoading || processesLoading}
                                                     />
+                                                    {#if activeSuggestionEntryId === entry.id}
+                                                        {@const visibleSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
+                                                        {#if visibleSuggestions.length > 0}
+                                                            <div class="mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-44 overflow-y-auto">
+                                                                {#each visibleSuggestions as suggestion}
+                                                                    <button
+                                                                        type="button"
+                                                                        class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-blue-50"
+                                                                        onmousedown={(e) => {
+                                                                            e.preventDefault();
+                                                                            applySuggestion(annotationType.type, entry.id, suggestion);
+                                                                        }}
+                                                                    >
+                                                                        {suggestion}
+                                                                    </button>
+                                                                {/each}
+                                                            </div>
+                                                        {/if}
+                                                    {/if}
+
+                                                    <!-- Collapsible Dimension Link (generalization) -->
+                                                    {#if showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
+                                                        <div class="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
+                                                            {#if creatingDimensionForEntry === entry.id}
+                                                                <!-- Create new dimension inline -->
+                                                                <div class="space-y-2">
+                                                                    <label class="text-xs font-medium text-gray-600">
+                                                                        Create new dimension
+                                                                    </label>
+                                                                    <div class="flex items-center gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            bind:value={newDimensionName}
+                                                                            placeholder="e.g., Employee, Date, Location"
+                                                                            class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                                            disabled={loading}
+                                                                            onkeydown={(e) => {
+                                                                                if (e.key === 'Enter') {
+                                                                                    submitCreateDimension(annotationType.type, entry.id);
+                                                                                } else if (e.key === 'Escape') {
+                                                                                    cancelCreateDimension();
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onclick={() => submitCreateDimension(annotationType.type, entry.id)}
+                                                                            disabled={!newDimensionName.trim() || loading}
+                                                                            class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                        >
+                                                                            Create
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onclick={cancelCreateDimension}
+                                                                            class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                    <p class="text-xs text-gray-500 italic">
+                                                                        Press Enter to create, Escape to cancel
+                                                                    </p>
+                                                                </div>
+                                                            {:else}
+                                                                <!-- Normal dimension selection -->
+                                                                <div class="flex items-center gap-2">
+                                                                    <label
+                                                                        for={`dimension-select-${entry.id}`}
+                                                                        class="text-xs font-medium text-gray-600 whitespace-nowrap"
+                                                                    >
+                                                                        Generalize to
+                                                                    </label>
+                                                                    <select
+                                                                        id={`dimension-select-${entry.id}`}
+                                                                        value={entry.dimension_id || ''}
+                                                                        onchange={(e) => {
+                                                                            const value = e.currentTarget.value;
+                                                                            handleDimensionSelectChange(
+                                                                                annotationType.type,
+                                                                                entry.id,
+                                                                                value
+                                                                            );
+                                                                        }}
+                                                                        class="flex-1 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+                                                                        disabled={loading || dimensionsLoading}
+                                                                    >
+                                                                        <option value="">None (keep as free text)</option>
+                                                                        {#each getAllowedDimensionsForType(annotationType.type) as dimension}
+                                                                            <option value={dimension.id}>{dimension.label}</option>
+                                                                        {/each}
+                                                                        <option value="__create_new__" class="text-blue-600 font-medium">+ Create new dimension...</option>
+                                                                    </select>
+                                                                </div>
+                                                                {#if entry.dimension_id}
+                                                                    {@const linkedDim = dimensions.find(d => d.id === entry.dimension_id)}
+                                                                    <div class="text-xs text-gray-500 italic">
+                                                                        Will display as: <span class="font-medium text-gray-700">{linkedDim?.label || entry.dimension_id} ({entry.text})</span>
+                                                                    </div>
+                                                                {/if}
+                                                            {/if}
+                                                        </div>
+                                                    {/if}
                                                 {/if}
                                                 <!-- Description Input -->
                                                 <input
@@ -656,15 +1021,37 @@
                                                     disabled={loading}
                                                 />
                                             </div>
-                                            <button
-                                                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors mt-1"
-                                                onclick={() => removeEntry(annotationType.type, entry.id)}
-                                                aria-label="Remove entry"
-                                                disabled={loading}
-                                                title="Remove entry"
-                                            >
-                                                <Icon icon="lucide:trash-2" class="w-4 h-4" />
-                                            </button>
+                                            <div class="flex flex-col gap-1">
+                                                {#if annotationType.type !== 'how_many'}
+                                                    <!-- Generalize to dimension button -->
+                                                    <div class="group relative">
+                                                        <button
+                                                            type="button"
+                                                            class="p-2 rounded-md transition-colors {entry.dimension_id ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}"
+                                                            onclick={() => toggleGeneralizeSection(entry.id)}
+                                                            aria-label="Generalize to a dimension"
+                                                            disabled={loading}
+                                                        >
+                                                            <Icon icon="material-symbols:groups" class="w-4 h-4" />
+                                                        </button>
+                                                        <div class="absolute right-0 bottom-full mb-2 w-[300px] p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
+                                                            Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date).
+                                                            <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                                        </div>
+                                                    </div>
+                                                {/if}
+                                                <!-- Delete button -->
+                                                <button
+                                                    type="button"
+                                                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                    onclick={() => removeEntry(annotationType.type, entry.id)}
+                                                    aria-label="Remove entry"
+                                                    disabled={loading}
+                                                    title="Remove entry"
+                                                >
+                                                    <Icon icon="lucide:trash-2" class="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     {/each}
                                 {:else}
@@ -800,6 +1187,18 @@
             >
                 <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
                 <span class="text-sm font-medium text-green-800">Annotations saved successfully!</span>
+            </div>
+        {/if}
+
+        <!-- Role Success Notification -->
+        {#if roleSuccessMessage}
+            <div
+                class="fixed top-4 right-4 z-[70] bg-green-100 border border-green-300 rounded-lg px-6 py-4 shadow-xl flex items-center gap-3 animate-slide-in"
+                role="alert"
+                aria-live="polite"
+            >
+                <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
+                <span class="text-sm font-medium text-green-800">{roleSuccessMessage}</span>
             </div>
         {/if}
     {/if}

@@ -708,6 +708,9 @@
 
     // Tag editing functionality
     let entityTags = $derived(normalizeTags(data.tags));
+    
+    // Roles display (for dimensions)
+    let entityRoles = $derived(((data as any).roles || []) as string[]);
 
     function handleTagsUpdate(newTags: string[]) {
         const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
@@ -1350,6 +1353,27 @@
                             ></TagEditor>
                         </div>
                     </div>
+                    
+                    <!-- Roles Display (for dimensions only, read-only in node view) -->
+                    {#if entityRoles && entityRoles.length > 0}
+                        <div class="mb-2.5">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span
+                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
+                                    >Roles</span>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {#each entityRoles as role}
+                                        <span
+                                            class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-semibold border border-green-200"
+                                            title="Role: {role}"
+                                        >
+                                            {role}
+                                        </span>
+                                    {/each}
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
 
                     {#if schemaState.isLoading}
                         <div
@@ -1574,6 +1598,27 @@
                                 ></TagEditor>
                             </div>
                         </div>
+                        
+                        <!-- Roles Display (for dimensions only, read-only in node view) -->
+                        {#if entityRoles && entityRoles.length > 0}
+                            <div class="mb-2.5">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span
+                                        class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
+                                        >Roles</span>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {#each entityRoles as role}
+                                            <span
+                                                class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-semibold border border-green-200"
+                                                title="Role: {role}"
+                                            >
+                                                {role}
+                                            </span>
+                                        {/each}
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
 
                         <!-- Source Systems Editor for Unbound Entities (Logical View Only) -->
                         {#if $viewMode === "logical" && !isBound}
@@ -1795,6 +1840,27 @@
                             ></TagEditor>
                         </div>
                     </div>
+                    
+                    <!-- Roles Display (for dimensions only, read-only in node view) -->
+                    {#if entityRoles && entityRoles.length > 0}
+                        <div class="mt-2.5">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span
+                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
+                                    >Roles</span>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {#each entityRoles as role}
+                                        <span
+                                            class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-semibold border border-green-200"
+                                            title="Role: {role}"
+                                        >
+                                            {role}
+                                        </span>
+                                    {/each}
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
                     {#if isBound}
                         <div class="mt-2 space-y-1.5">
                             <div

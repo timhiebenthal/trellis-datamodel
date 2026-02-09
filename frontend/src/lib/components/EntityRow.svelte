@@ -116,6 +116,12 @@
 		const hidden = Math.max(0, unique.length - 2);
 		return { visibleDomains: visible, hiddenDomainCount: hidden };
 	});
+
+	// Get roles (for dimensions only)
+	const entityRoles = $derived.by(() => {
+		if (entity.entity_type !== 'dimension') return [];
+		return (entity as any).roles || [];
+	});
 </script>
 
 <div
@@ -207,6 +213,16 @@
 						+{hiddenCount}
 					</span>
 				{/if}
+			</div>
+		{/if}
+
+		<!-- Roles (for dimensions only) -->
+		{#if entityRoles.length > 0}
+			<div class="flex items-center gap-1.5 flex-shrink-0">
+				<span class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Roles:</span>
+				<span class="text-[11px] text-gray-600 font-medium truncate max-w-[200px]" title={entityRoles.join(', ')}>
+					{entityRoles.join(', ')}
+				</span>
 			</div>
 		{/if}
 	</div>

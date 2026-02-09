@@ -619,6 +619,7 @@ import {
                             entity_type: e.entity_type,
                             source_system: e.source_system,
                             annotation_type: e.annotation_type,
+                            roles: e.roles,
                             domain: e.domain,
                         },
                         parentId: undefined,

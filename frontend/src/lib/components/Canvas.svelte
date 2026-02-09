@@ -200,12 +200,37 @@
             return nodesToLayout;
         }
 
-        const factNodes = entityNodes.filter(
-            (node) => node.data?.entity_type === "fact",
-        );
-        const dimensionNodes = entityNodes.filter(
-            (node) => node.data?.entity_type !== "fact",
-        );
+        const annotationOrder: Record<string, number> = {
+            who: 0,
+            what: 1,
+            when: 2,
+            where: 3,
+            how: 4,
+            why: 5,
+        };
+
+        const byLabel = (a: Node, b: Node) => {
+            const labelA = String(a.data?.label ?? a.id).toLowerCase();
+            const labelB = String(b.data?.label ?? b.id).toLowerCase();
+            if (labelA !== labelB) {
+                return labelA.localeCompare(labelB);
+            }
+            return a.id.localeCompare(b.id);
+        };
+
+        const factNodes = entityNodes
+            .filter((node) => node.data?.entity_type === "fact")
+            .sort(byLabel);
+        const dimensionNodes = entityNodes
+            .filter((node) => node.data?.entity_type !== "fact")
+            .sort((a, b) => {
+                const orderA = annotationOrder[String(a.data?.annotation_type ?? "")] ?? 99;
+                const orderB = annotationOrder[String(b.data?.annotation_type ?? "")] ?? 99;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return byLabel(a, b);
+            });
 
         const center = positioner.calculateCenter([]);
 

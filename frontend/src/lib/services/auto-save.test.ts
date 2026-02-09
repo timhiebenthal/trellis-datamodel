@@ -481,6 +481,28 @@ describe('AutoSaveService', () => {
             expect(entity.tags).toEqual(['tag1', 'tag2']);
         });
 
+        it('should preserve roles in entity payload', () => {
+            const nodes: Node[] = [
+                {
+                    id: 'dim_employee',
+                    type: 'entity',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        label: 'Employee',
+                        entity_type: 'dimension',
+                        roles: ['Sales Agent'],
+                    },
+                },
+            ];
+            const edges: Edge[] = [];
+
+            service.save(nodes, edges);
+            vi.advanceTimersByTime(400);
+
+            const dataModelArg = vi.mocked(apiSaveDataModel).mock.calls[0][0];
+            expect(dataModelArg.entities[0].roles).toEqual(['Sales Agent']);
+        });
+
         it('should handle edges without models', () => {
             const nodes: Node[] = [
                 { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },

@@ -163,6 +163,9 @@ def _create_dimension_from_annotation_entry(
         and entry.dimension_id in existing_entities
     ):
         existing_entity = existing_entities[entry.dimension_id]
+        existing_annotation_type = existing_entity.get("annotation_type") or (
+            existing_entity.get("metadata", {}) or {}
+        ).get("annotation_type")
         entity = {
             "id": existing_entity["id"],
             "label": existing_entity.get("label", entry.text),
@@ -170,6 +173,8 @@ def _create_dimension_from_annotation_entry(
             "description": existing_entity.get(
                 "description", entry.description or f"Dimension: {entry.text}"
             ),
+            # Keep existing annotation type when present; otherwise infer from current 7W bucket.
+            "annotation_type": existing_annotation_type or annotation_type,
         }
         # Add explicit domain field if provided
         if domain:

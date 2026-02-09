@@ -15,6 +15,47 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 router = APIRouter(prefix="/api", tags=["data-model"])
 
 
+def load_data_model_raw() -> Dict[str, Any]:
+    """
+    Load the raw data model from YAML file without layout merging.
+    
+    Returns:
+        Dictionary with version, entities, and relationships
+    """
+    if not os.path.exists(cfg.DATA_MODEL_PATH):
+        return {
+            "version": 0.1,
+            "entities": [],
+            "relationships": [],
+        }
+    
+    try:
+        with open(cfg.DATA_MODEL_PATH, "r") as f:
+            model_data = yaml.safe_load(f) or {}
+        
+        if not model_data.get("entities"):
+            model_data["entities"] = []
+        if not model_data.get("relationships"):
+            model_data["relationships"] = []
+        
+        return model_data
+    except Exception as e:
+        raise RuntimeError(f"Error loading data model: {e}") from e
+
+
+def save_data_model_raw(model_data: Dict[str, Any]) -> None:
+    """
+    Save the raw data model to YAML file.
+    
+    Args:
+        model_data: Dictionary with version, entities, and relationships
+    """
+    try:
+        YamlHandler().save_file(cfg.DATA_MODEL_PATH, model_data)
+    except Exception as e:
+        raise RuntimeError(f"Error saving data model: {e}") from e
+
+
 def _load_canvas_layout() -> Dict[str, Any]:
     """Load canvas layout file if it exists."""
     if not os.path.exists(cfg.CANVAS_LAYOUT_PATH):
@@ -228,6 +269,7 @@ async def get_data_model():
 
 def _split_model_and_layout(
     content: Dict[str, Any],
+    existing_model_data: Dict[str, Any] | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Split incoming data into model-only and layout-only dictionaries."""
     model_data = {
@@ -242,6 +284,14 @@ def _split_model_and_layout(
         "relationships": {},
         "source_colors": {},
     }
+
+    # Preserve existing roles when older clients omit the field.
+    existing_roles_by_id: Dict[str, Any] = {}
+    if existing_model_data:
+        for existing_entity in existing_model_data.get("entities", []):
+            existing_entity_id = existing_entity.get("id")
+            if existing_entity_id and "roles" in existing_entity:
+                existing_roles_by_id[existing_entity_id] = existing_entity.get("roles")
 
     # Split entities
     entities = content.get("entities", [])
@@ -274,6 +324,10 @@ def _split_model_and_layout(
             model_entity["entity_type"] = entity["entity_type"]
         if "annotation_type" in entity:
             model_entity["annotation_type"] = entity["annotation_type"]
+        if "roles" in entity:
+            model_entity["roles"] = entity["roles"]
+        elif entity_id in existing_roles_by_id:
+            model_entity["roles"] = existing_roles_by_id[entity_id]
         # Only persist source_system for unbound entities (not for bound entities)
         if "source_system" in entity and not entity.get("dbt_model"):
             model_entity["source_system"] = entity["source_system"]
@@ -442,21 +496,47 @@ def _validate_entity_type(entity_type: str) -> None:
         )
 
 
+def _validate_roles(roles) -> None:
+    """
+    Validate that roles field is a list of strings or None.
+
+    Raises ValidationError if invalid.
+    """
+    from trellis_datamodel.exceptions import ValidationError
+
+    if roles is None:
+        return
+
+    if not isinstance(roles, list):
+        raise ValidationError("roles must be a list of strings or null/undefined")
+
+    for role in roles:
+        if not isinstance(role, str):
+            raise ValidationError("roles must be a list of strings or null/undefined")
+
+
 @router.post("/data-model")
 async def save_data_model(data: DataModelUpdate):
     """Save data model, splitting model and layout into separate files."""
     try:
-        content = data.dict()  # Pydantic v1 (required by dbt-core==1.10)
+        # Prefer model_dump() to avoid Pydantic v2 dict() deprecation warnings.
+        content = data.model_dump() if hasattr(data, "model_dump") else data.dict()
 
-        # Validate entity_type values in all entities
+        # Validate entity_type and roles values in all entities
         entities = content.get("entities", [])
         for entity in entities:
             entity_type = entity.get("entity_type")
             if entity_type:
                 _validate_entity_type(entity_type)
 
-        # Split into model and layout
-        model_data, layout_data = _split_model_and_layout(content)
+            roles = entity.get("roles")
+            if roles is not None:
+                _validate_roles(roles)
+
+        # Split into model and layout. Preserve selected fields from existing model
+        # when omitted by older frontend payloads.
+        existing_model_data = load_data_model_raw()
+        model_data, layout_data = _split_model_and_layout(content, existing_model_data)
 
         # Save model file
         print(f"Saving data model to: {cfg.DATA_MODEL_PATH}")

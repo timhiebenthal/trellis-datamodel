@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from trellis_datamodel.exceptions import ValidationError
 
 
 class BusinessEventType(str, Enum):
@@ -26,9 +27,20 @@ class AnnotationEntry(BaseModel):
     description: Optional[str] = Field(
         None, description="Optional description for the entry"
     )
+    role: Optional[str] = Field(
+        None, description="Optional role classification for dimensional modeling (e.g., 'dimension', 'fact')"
+    )
     attributes: Dict[str, Any] = Field(
         default_factory=dict, description="Additional attributes (future-proofing)"
     )
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def validate_role(cls, v: Any) -> Optional[str]:
+        """Validate that role is a string or None using domain ValidationError."""
+        if v is not None and not isinstance(v, str):
+            raise ValidationError("role must be a string or null/undefined")
+        return v
 
 
 class BusinessEventAnnotations(BaseModel):

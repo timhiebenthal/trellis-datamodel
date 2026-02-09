@@ -278,6 +278,8 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
 
     if "annotations" in updates:
         event.annotations = BusinessEventAnnotations(**updates["annotations"])
+        # Sync roles from annotations to dimension entities
+        _sync_roles_to_dimensions(event.annotations)
 
     # Track if we need to recompute process superset
     old_process_id = event.process_id
@@ -631,6 +633,73 @@ def _collect_all_entry_ids(annotations: BusinessEventAnnotations) -> set:
             if hasattr(entry, "id"):
                 entry_ids.add(entry.id)
     return entry_ids
+
+
+def _sync_roles_to_dimensions(annotations: BusinessEventAnnotations) -> None:
+    """
+    Sync roles from business event annotations to dimension entities in the data model.
+    
+    When an annotation has both dimension_id and role set, this ensures the dimension
+    entity has that role in its roles array. This keeps the data model in sync with
+    how dimensions are being used in business events.
+    
+    Args:
+        annotations: BusinessEventAnnotations object containing dimension references with roles
+    """
+    try:
+        # Import here to avoid circular dependency
+        from trellis_datamodel.routes.data_model import load_data_model_raw, save_data_model_raw
+        
+        # Collect all dimension_id + role pairs from annotations
+        dimension_roles: Dict[str, set] = {}  # dimension_id -> set of roles
+        
+        for annotation_type in ["who", "what", "when", "where", "how", "why"]:
+            category_list = getattr(annotations, annotation_type, [])
+            for entry in category_list:
+                dim_id = getattr(entry, "dimension_id", None)
+                role = getattr(entry, "role", None)
+                
+                if dim_id and role:
+                    if dim_id not in dimension_roles:
+                        dimension_roles[dim_id] = set()
+                    dimension_roles[dim_id].add(role)
+        
+        if not dimension_roles:
+            return  # No roles to sync
+        
+        # Load data model
+        data_model = load_data_model_raw()
+        modified = False
+        
+        # Update each dimension entity
+        entities = data_model.get("entities", [])
+        for entity in entities:
+            entity_id = entity.get("id")
+            if entity_id in dimension_roles:
+                # Get current roles (or empty list)
+                current_roles = entity.get("roles", [])
+                if current_roles is None:
+                    current_roles = []
+                current_roles_set = set(current_roles)
+                
+                # Add new roles
+                new_roles = dimension_roles[entity_id]
+                for role in new_roles:
+                    if role not in current_roles_set:
+                        current_roles.append(role)
+                        modified = True
+                
+                # Update entity
+                entity["roles"] = current_roles
+        
+        # Save if modified
+        if modified:
+            save_data_model_raw(data_model)
+            logger.info(f"Synced roles to {len(dimension_roles)} dimension(s)")
+    
+    except Exception as e:
+        # Don't fail the annotation save if role sync fails
+        logger.warning(f"Failed to sync roles to dimensions: {e}")
 
 
 
@@ -1135,8 +1204,12 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
             process.annotations_superset = None
         elif isinstance(annotations_value, BusinessEventAnnotations):
             process.annotations_superset = annotations_value
+            # Sync roles from process annotations to dimension entities
+            _sync_roles_to_dimensions(annotations_value)
         else:
             process.annotations_superset = BusinessEventAnnotations(**annotations_value)
+            # Sync roles from process annotations to dimension entities
+            _sync_roles_to_dimensions(process.annotations_superset)
 
     if "derived_entities" in updates:
         from trellis_datamodel.models.business_event import DerivedEntity
@@ -1300,6 +1373,10 @@ def recompute_process_superset(process_id: str) -> BusinessEventProcess:
     # Recompute superset
     process.annotations_superset = _compute_annotation_union(process_events)
     process.updated_at = datetime.now()
+    
+    # Sync roles from recomputed superset to dimension entities
+    if process.annotations_superset:
+        _sync_roles_to_dimensions(process.annotations_superset)
 
     processes[process_index] = process
     save_processes(processes)
