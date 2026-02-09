@@ -16,6 +16,7 @@ import type {
 import { toTitleCase } from '$lib/utils';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
     import Icon from '@iconify/svelte';
     import CreateEventModal from './CreateEventModal.svelte';
     import CollapseChevron from './CollapseChevron.svelte';
@@ -76,6 +77,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     let sevenWsEvent = $state<BusinessEvent | null>(null);
     let generateEntitiesEvent = $state<BusinessEvent | null>(null);
     let generateEntitiesProcess = $state<BusinessEventProcess | null>(null);
+    let handledProcessParam = $state<string | null>(null); // Track which process param we've handled
 
     // Filter events based on selected type and domain (combined filters)
     let filteredEvents = $derived.by(() => {
@@ -581,6 +583,52 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             domains = [];
         } finally {
             loading = false;
+        }
+    });
+
+    // Handle URL parameter for process navigation
+    $effect(() => {
+        if (loading || processes.length === 0) return;
+        
+        const processId = $page.url.searchParams.get('process');
+        // Skip if we've already handled this process ID
+        if (processId && processId === handledProcessParam) return;
+        
+        if (processId) {
+            // Mark this process as handled
+            handledProcessParam = processId;
+            
+            // Set the selected process filter
+            selectedProcess = processId;
+            
+            // Expand the domain and process if collapsed
+            const process = processes.find(p => p.id === processId);
+            if (process) {
+                const domainKey = process.domain ?? UNASSIGNED_DOMAIN_KEY;
+                domainCollapseState = { ...domainCollapseState, [domainKey]: true };
+                processCollapseState = { ...processCollapseState, [processId]: true };
+                
+                // Scroll to process after a short delay to ensure DOM is ready
+                setTimeout(() => {
+                    const element = document.getElementById(`process-${processId}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Add highlight class temporarily
+                        element.classList.add('ring-2', 'ring-blue-500', 'rounded-lg');
+                        setTimeout(() => {
+                            element.classList.remove('ring-2', 'ring-blue-500', 'rounded-lg');
+                        }, 3000);
+                    }
+                }, 100);
+            }
+            
+            // Clean up URL parameter after handling
+            const url = new URL($page.url);
+            url.searchParams.delete('process');
+            goto(url.pathname + url.search, { replaceState: true, noScroll: true });
+        } else {
+            // Reset handledProcessParam when there's no process param
+            handledProcessParam = null;
         }
     });
 

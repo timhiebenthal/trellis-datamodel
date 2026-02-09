@@ -1,13 +1,14 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
-	import { getSourceSystemSuggestions } from '$lib/api';
-	import type { EntityData, AnnotationType, DraftedField } from '$lib/types';
+	import { getSourceSystemSuggestions, getBusinessEventProcesses } from '$lib/api';
+	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
 	import { exportEntityToExcel } from '$lib/utils/excel-export';
 	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
+	import { goto } from '$app/navigation';
 
 	// Get autoSaveService from parent context (set in +layout.svelte)
 	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
@@ -44,6 +45,10 @@
 	let editingRoleIndex = $state<number | null>(null);
 	let editingRoleValue = $state('');
 	let deletingRoleIndex = $state<number | null>(null);
+	
+	// Process linking state
+	let processes = $state<BusinessEventProcess[]>([]);
+	let expandedRoles = $state<Set<string>>(new Set());
 
 	function normalizeDomains(domains?: string[], domain?: string): string[] {
 		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
@@ -200,6 +205,7 @@
 	$effect(() => {
 		if ($entityDetailModal.open) {
 			loadSourceSuggestions();
+			loadProcesses();
 		}
 	});
 
@@ -210,6 +216,42 @@
 			console.error('Failed to load source system suggestions:', error);
 			sourceSuggestions = [];
 		}
+	}
+
+	async function loadProcesses() {
+		try {
+			processes = await getBusinessEventProcesses();
+		} catch (error) {
+			console.error('Failed to load business event processes:', error);
+			processes = [];
+		}
+	}
+
+	function getProcessesForRole(dimensionId: string, roleName: string): BusinessEventProcess[] {
+		return processes.filter(proc => {
+			if (!proc.annotations_superset) return false;
+			return Object.values(proc.annotations_superset).some(annotations =>
+				annotations.some(ann =>
+					ann.dimension_id === dimensionId && ann.role === roleName
+				)
+			);
+		});
+	}
+
+	function toggleRoleExpansion(role: string) {
+		if (expandedRoles.has(role)) {
+			expandedRoles.delete(role);
+		} else {
+			expandedRoles.add(role);
+		}
+		expandedRoles = new Set(expandedRoles); // Trigger reactivity
+	}
+
+	function navigateToProcess(processId: string) {
+		// Close modal
+		closeModal();
+		// Navigate to business events view with process highlighted/filtered
+		goto(`/business-events?process=${processId}`);
 	}
 
 	// Clear annotation type when changing away from dimension
@@ -960,28 +1002,49 @@
 									{#if entityRoles.length > 0}
 										<div class="divide-y divide-gray-200">
 											{#each entityRoles as role, index}
-												<div class="px-4 py-3 hover:bg-gray-50 transition-colors group flex items-center justify-between">
-													{#if editingRoleIndex === index}
-														<!-- Edit mode -->
-														<input
-															type="text"
-															bind:value={editingRoleValue}
-															onkeydown={handleEditRoleKeydown}
-															onblur={saveEditingRole}
-															class="flex-1 px-3 py-1.5 border-2 border-blue-500 rounded-lg text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-															placeholder="e.g., order_date, ship_date"
-															autofocus
-														/>
-													{:else}
-														<!-- View mode -->
-														<button
-															type="button"
-															onclick={() => startEditingRole(index)}
-															class="flex-1 text-left px-2 py-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors rounded"
-															title="Click to edit"
-														>
-															{role}
-														</button>
+												<div class="border-b border-gray-200 last:border-b-0">
+													<!-- Role header -->
+													<div class="px-4 py-3 hover:bg-gray-50 transition-colors group flex items-center justify-between">
+														<div class="flex items-center gap-2 flex-1">
+															<button
+																type="button"
+																onclick={() => toggleRoleExpansion(role)}
+																class="text-gray-400 hover:text-gray-600 transition-colors"
+																title={expandedRoles.has(role) ? 'Collapse processes' : 'Expand to see processes'}
+															>
+																<Icon
+																	icon={expandedRoles.has(role) ? 'lucide:chevron-down' : 'lucide:chevron-right'}
+																	class="w-4 h-4"
+																/>
+															</button>
+
+															{#if editingRoleIndex === index}
+																<!-- Edit mode -->
+																<input
+																	type="text"
+																	bind:value={editingRoleValue}
+																	onkeydown={handleEditRoleKeydown}
+																	onblur={saveEditingRole}
+																	class="flex-1 px-3 py-1.5 border-2 border-blue-500 rounded-lg text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+																	placeholder="e.g., order_date, ship_date"
+																	autofocus
+																/>
+															{:else}
+																<!-- View mode -->
+																<button
+																	type="button"
+																	onclick={() => startEditingRole(index)}
+																	class="flex-1 text-left px-2 py-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors rounded"
+																	title="Click to edit"
+																>
+																	{role}
+																</button>
+																<span class="text-xs text-gray-500">
+																	({getProcessesForRole(currentEntity?.id || '', role).length} processes)
+																</span>
+															{/if}
+														</div>
+
 														<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 															<button
 																type="button"
@@ -999,6 +1062,31 @@
 															>
 																<Icon icon="lucide:trash-2" class="w-4 h-4" />
 															</button>
+														</div>
+													</div>
+
+													<!-- Expandable process list -->
+													{#if expandedRoles.has(role)}
+														<div class="px-4 pb-3 pl-12 bg-gray-50">
+															{#each getProcessesForRole(currentEntity?.id || '', role) as process}
+																<button
+																	type="button"
+																	onclick={() => navigateToProcess(process.id)}
+																	class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-white hover:text-blue-600 rounded transition-colors mb-1 last:mb-0"
+																>
+																	<div class="flex items-center gap-2">
+																		<Icon icon="lucide:workflow" class="w-4 h-4" />
+																		<span>{process.name}</span>
+																		<span class="text-xs text-gray-500">({process.event_ids.length} events)</span>
+																	</div>
+																</button>
+															{/each}
+
+															{#if getProcessesForRole(currentEntity?.id || '', role).length === 0}
+																<p class="text-xs text-gray-500 italic px-3 py-2">
+																	No processes use this role yet
+																</p>
+															{/if}
 														</div>
 													{/if}
 												</div>
