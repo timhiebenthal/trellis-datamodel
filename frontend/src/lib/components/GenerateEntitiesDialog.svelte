@@ -665,9 +665,9 @@
                                         <td class="px-4 py-3">
                                             <span
                                                 class="px-2 py-1 text-xs font-medium rounded {entity.entity_type === 'dimension'
-                                                    ? 'bg-blue-100 text-blue-800'
+                                                    ? 'bg-green-100 text-green-700'
                                                     : entity.entity_type === 'fact'
-                                                      ? 'bg-green-100 text-green-800'
+                                                      ? 'bg-blue-100 text-blue-700'
                                                       : 'bg-gray-100 text-gray-800'}"
                                             >
                                                 {entity.entity_type === 'dimension'

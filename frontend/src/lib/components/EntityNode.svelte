@@ -1355,7 +1355,7 @@
                     </div>
                     
                     <!-- Roles Display (for dimensions only, read-only in node view) -->
-                    {#if isDimensionalModeling && data.entity_type === 'dimension' && entityRoles.length > 0}
+                    {#if entityRoles && entityRoles.length > 0}
                         <div class="mb-2.5">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span
@@ -1600,7 +1600,7 @@
                         </div>
                         
                         <!-- Roles Display (for dimensions only, read-only in node view) -->
-                        {#if isDimensionalModeling && data.entity_type === 'dimension' && entityRoles.length > 0}
+                        {#if entityRoles && entityRoles.length > 0}
                             <div class="mb-2.5">
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <span
@@ -1842,7 +1842,7 @@
                     </div>
                     
                     <!-- Roles Display (for dimensions only, read-only in node view) -->
-                    {#if isDimensionalModeling && data.entity_type === 'dimension' && entityRoles.length > 0}
+                    {#if entityRoles && entityRoles.length > 0}
                         <div class="mt-2.5">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span
