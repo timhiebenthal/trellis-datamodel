@@ -589,8 +589,9 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     // Handle URL parameter for process navigation
     $effect(() => {
         if (loading || processes.length === 0) return;
-        
-        const processId = $page.url.searchParams.get('process');
+
+        const currentUrl = $page?.url;
+        const processId = currentUrl?.searchParams?.get('process') ?? null;
         // Skip if we've already handled this process ID
         if (processId && processId === handledProcessParam) return;
         
@@ -623,9 +624,11 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             }
             
             // Clean up URL parameter after handling
-            const url = new URL($page.url);
-            url.searchParams.delete('process');
-            goto(url.pathname + url.search, { replaceState: true, noScroll: true });
+            if (currentUrl) {
+                const url = new URL(currentUrl);
+                url.searchParams.delete('process');
+                goto(url.pathname + url.search, { replaceState: true, noScroll: true });
+            }
         } else {
             // Reset handledProcessParam when there's no process param
             handledProcessParam = null;
