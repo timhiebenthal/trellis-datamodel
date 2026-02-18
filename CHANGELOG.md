@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0-beta4] - 2026-02-09
+## [0.9.0] - 2026-02-18
 
 ### Added
 - **Role-Playing Dimensions:** Added support for role-playing dimensions, allowing dimensions to represent multiple contextual uses in business processes. Users can define roles for dimension entities (e.g., Calendar with roles: order_date, ship_date, delivery_date) and assign specific roles when annotating business events.
