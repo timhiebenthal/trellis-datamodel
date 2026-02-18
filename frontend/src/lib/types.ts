@@ -378,6 +378,7 @@ export interface DerivedEntity {
 export interface BusinessEvent {
     id: string; // e.g., "evt_YYYYMMDD_NNN"
     text: string;
+    description?: string; // Optional longer description providing more context
     type: BusinessEventType;
     domain?: string; // Optional business domain (e.g., "Sales", "Marketing")
     process_id?: string; // Optional ID of the process this event belongs to
@@ -410,6 +411,7 @@ export interface GeneratedEntitiesResult {
 export interface BusinessEventProcess {
     id: string; // e.g., "proc_YYYYMMDD_NNN"
     name: string;
+    description?: string; // Optional longer description providing more context
     type: BusinessEventType;
     domain?: string;
     event_ids: string[];
@@ -424,6 +426,7 @@ export interface BusinessEventProcess {
 export interface CreateProcessRequest {
     name: string;
     type: BusinessEventType;
+    description?: string;
     domain: string;
     event_ids?: string[];
 }
@@ -431,6 +434,7 @@ export interface CreateProcessRequest {
 export interface UpdateProcessRequest {
     name?: string;
     type?: BusinessEventType;
+    description?: string | null;
     domain?: string | null;
     annotations_superset?: BusinessEventAnnotations | null;
     event_ids?: string[];

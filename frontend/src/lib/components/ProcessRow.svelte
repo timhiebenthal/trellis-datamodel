@@ -38,6 +38,11 @@
             <span class="text-sm font-semibold text-slate-800 truncate">
                 {process.name}
             </span>
+            {#if process.description}
+                <span class="text-xs text-slate-500 truncate mt-0.5" title={process.description}>
+                    {process.description}
+                </span>
+            {/if}
             <span class="text-xs font-medium text-slate-600 uppercase tracking-wide">
                 Process of {eventCount} event{eventCount === 1 ? "" : "s"}
             </span>

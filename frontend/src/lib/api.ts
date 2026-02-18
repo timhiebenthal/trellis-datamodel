@@ -530,10 +530,14 @@ export async function createBusinessEvent(
     text: string,
     type: BusinessEventType,
     domain?: string,
-    annotations?: BusinessEventAnnotations
+    annotations?: BusinessEventAnnotations,
+    description?: string
 ): Promise<BusinessEvent> {
     try {
         const body: any = { text, type, domain: domain || null };
+        if (description) {
+            body.description = description;
+        }
         if (annotations) {
             body.annotations = annotations;
         }

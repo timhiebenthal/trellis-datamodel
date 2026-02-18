@@ -15,6 +15,7 @@
 
     // Form state
     let eventText = $state("");
+    let eventDescription = $state("");
     let eventType = $state<BusinessEventType>("discrete");
     let eventDomain = $state<string | null>(null);
     let loading = $state(false);
@@ -23,6 +24,7 @@
 
     // Character limit
     const MAX_TEXT_LENGTH = 500;
+    const MAX_DESCRIPTION_LENGTH = 2000;
     let characterCount = $derived(eventText.length);
     let remainingChars = $derived(MAX_TEXT_LENGTH - characterCount);
 
@@ -52,11 +54,13 @@
             if (event) {
                 // Edit mode: populate form with existing event data
                 eventText = event.text;
+                eventDescription = event.description || "";
                 eventType = event.type;
                 eventDomain = event.domain || null;
             } else {
                 // Create mode: reset form
                 eventText = "";
+                eventDescription = "";
                 eventType = "discrete";
                 eventDomain = null;
             }
@@ -97,6 +101,7 @@
                 // Update existing event
                 await updateBusinessEvent(event.id, {
                     text: eventText.trim(),
+                    description: eventDescription.trim() || undefined,
                     type: eventType,
                     domain: eventDomain ?? undefined
                 });
@@ -105,7 +110,9 @@
                 await createBusinessEvent(
                     eventText.trim(),
                     eventType,
-                    eventDomain ?? undefined
+                    eventDomain ?? undefined,
+                    undefined,
+                    eventDescription.trim() || undefined
                 );
                 // Annotations can be added via the dedicated annotations modal after creation
             }
@@ -193,6 +200,25 @@
                         {:else if eventText.length > MAX_TEXT_LENGTH}
                             <span class="text-xs text-red-600">Event text cannot exceed {MAX_TEXT_LENGTH} characters</span>
                         {/if}
+                    </div>
+                </div>
+
+                <!-- Event Description (optional) -->
+                <div>
+                    <label for="event-description" class="block text-sm font-medium text-gray-700 mb-2">
+                        Description <span class="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                        id="event-description"
+                        bind:value={eventDescription}
+                        maxlength={MAX_DESCRIPTION_LENGTH}
+                        rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Add more context about this event..."
+                        disabled={loading}
+                    ></textarea>
+                    <div class="flex justify-end mt-1">
+                        <span class="text-xs text-gray-400">{eventDescription.length}/{MAX_DESCRIPTION_LENGTH}</span>
                     </div>
                 </div>
 
