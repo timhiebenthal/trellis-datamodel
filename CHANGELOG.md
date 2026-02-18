@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EventCard displays event description in muted text below event title (truncated with full text visible on hover).
 - ProcessRow displays process description below process name (truncated with full text visible on hover).
 - Backend service layer (`create_event`, `create_process`, `update_event`, `update_process`) fully supports description handling with proper trimming and null-safety.
+- Added entity description editing in `EntityDetailModal`: users can now edit and save entity descriptions directly from the entity-list view.
 
 ### Changed
 - Enhanced business events UI to show descriptions in card/row views for better context at a glance.
