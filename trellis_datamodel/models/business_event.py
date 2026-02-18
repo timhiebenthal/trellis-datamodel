@@ -203,6 +203,9 @@ class BusinessEvent(BaseModel):
 
     id: str = Field(..., description="Unique event ID (e.g., evt_YYYYMMDD_NNN)")
     text: str = Field(..., description="Event description text")
+    description: Optional[str] = Field(
+        None, description="Optional longer description providing more context about the event"
+    )
     type: BusinessEventType = Field(..., description="Event type classification")
     domain: Optional[str] = Field(
         None, description="Optional business domain (e.g., 'Sales', 'Marketing')"
@@ -226,6 +229,9 @@ class BusinessEventProcess(BaseModel):
 
     id: str = Field(..., description="Unique process ID (e.g., proc_YYYYMMDD_NNN)")
     name: str = Field(..., description="Process name")
+    description: Optional[str] = Field(
+        None, description="Optional longer description providing more context about the process"
+    )
     type: BusinessEventType = Field(
         ..., description="Process type classification (discrete, evolving, or recurring)"
     )

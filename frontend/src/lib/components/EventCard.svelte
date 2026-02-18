@@ -184,8 +184,13 @@
         {/if}
         
         <!-- Event text (flex-1 to take available space) -->
-        <div class="flex-1 min-w-0 text-sm text-gray-700 leading-relaxed">
-            {event.text}
+        <div class="flex-1 min-w-0">
+            <div class="text-sm text-gray-700 leading-relaxed">{event.text}</div>
+            {#if event.description}
+                <div class="text-xs text-gray-400 mt-0.5 leading-relaxed truncate" title={event.description}>
+                    {event.description}
+                </div>
+            {/if}
         </div>
 
         <!-- Status badges -->

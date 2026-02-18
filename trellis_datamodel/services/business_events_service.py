@@ -164,7 +164,7 @@ def get_unique_domains() -> List[str]:
 
 
 def create_event(
-    text: str, type: BusinessEventType, domain: Optional[str] = None
+    text: str, type: BusinessEventType, domain: Optional[str] = None, description: Optional[str] = None
 ) -> BusinessEvent:
     """
     Create a new business event with auto-generated ID.
@@ -202,6 +202,7 @@ def create_event(
     new_event = BusinessEvent(
         id=new_id,
         text=text.strip(),
+        description=description.strip() if description else None,
         type=type,
         domain=domain.strip() if domain else None,
         created_at=now,
@@ -250,6 +251,10 @@ def update_event(event_id: str, updates: dict) -> BusinessEvent:
         if not text or not text.strip():
             raise ValidationError("Event text cannot be empty")
         event.text = text.strip()
+
+    if "description" in updates:
+        description_value = updates["description"]
+        event.description = description_value.strip() if description_value and isinstance(description_value, str) else None
 
     if "type" in updates:
         try:
@@ -1070,6 +1075,7 @@ def create_process(
     type: BusinessEventType,
     domain: str,
     event_ids: List[str],
+    description: Optional[str] = None,
 ) -> BusinessEventProcess:
     """
     Create a new business event process with auto-generated ID.
@@ -1127,6 +1133,7 @@ def create_process(
     new_process = BusinessEventProcess(
         id=new_id,
         name=name.strip(),
+        description=description.strip() if description else None,
         type=type,
         domain=domain_value,
         event_ids=event_ids,
@@ -1188,6 +1195,10 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
         if not name or not name.strip():
             raise ValidationError("Process name cannot be empty")
         process.name = name.strip()
+
+    if "description" in updates:
+        description_value = updates["description"]
+        process.description = description_value.strip() if description_value and isinstance(description_value, str) else None
 
     if "type" in updates:
         try:

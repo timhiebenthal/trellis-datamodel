@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0-beta1] - Unreleased
+
+### Added
+- **Description Fields:** Added optional `description` field to both BusinessEvent and BusinessEventProcess models, persisted to `business_events.yml` and exposed through the full API stack.
+- Business events and processes now support longer, richer descriptions for additional context beyond the main name/text field.
+- `CreateEventModal` and `ProcessEditModal` now include description textarea fields (optional, 2000 character limit) for enriched event and process documentation.
+- `ProcessGroupModal` includes description textarea when creating new processes from selected events.
+- EventCard displays event description in muted text below event title (truncated with full text visible on hover).
+- ProcessRow displays process description below process name (truncated with full text visible on hover).
+- Backend service layer (`create_event`, `create_process`, `update_event`, `update_process`) fully supports description handling with proper trimming and null-safety.
+
+### Changed
+- Enhanced business events UI to show descriptions in card/row views for better context at a glance.
+- Improved visual hierarchy in EventCard and ProcessRow by displaying descriptions as secondary text.
+
 ## [0.9.0] - 2026-02-18
 
 ### Added

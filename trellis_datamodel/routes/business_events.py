@@ -47,6 +47,7 @@ class CreateEventRequest(BaseModel):
 
     text: str
     type: str
+    description: str | None = None
     domain: str | None = None
     annotations: BusinessEventAnnotations | None = None
 
@@ -56,6 +57,7 @@ class UpdateEventRequest(BaseModel):
 
     text: str | None = None
     type: str | None = None
+    description: str | None = None
     domain: str | None = None
     derived_entities: list[dict] | None = None
     annotations: BusinessEventAnnotations | dict | None = None
@@ -91,6 +93,7 @@ class CreateProcessRequest(BaseModel):
 
     name: str
     type: str
+    description: str | None = None
     domain: str
     event_ids: list[str] | None = None
 
@@ -100,6 +103,7 @@ class UpdateProcessRequest(BaseModel):
 
     name: str | None = None
     type: str | None = None
+    description: str | None = None
     domain: str | None = None
     annotations_superset: BusinessEventAnnotations | None = None
     event_ids: list[str] | None = None
@@ -205,7 +209,7 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
                 detail=f"Invalid event type: {request.type}. Must be one of: discrete, evolving, recurring",
             )
 
-        event = create_event(request.text, event_type, domain=request.domain)
+        event = create_event(request.text, event_type, domain=request.domain, description=request.description)
 
         # If annotations provided, update the event with it
         if request.annotations is not None:
@@ -250,6 +254,8 @@ async def update_business_event(event_id: str, request: UpdateEventRequest = Bod
             updates["text"] = request.text
         if request.type is not None:
             updates["type"] = request.type
+        if request.description is not None:
+            updates["description"] = request.description
         if request.domain is not None:
             updates["domain"] = request.domain
         if request.derived_entities is not None:
@@ -573,6 +579,7 @@ async def create_business_event_process(request: CreateProcessRequest = Body(...
             process_type,
             request.domain.strip(),
             event_ids=request.event_ids,
+            description=request.description,
         )
         return process
     except NotFoundError as e:
@@ -611,6 +618,8 @@ async def update_business_event_process(
         updates = {}
         if request.name is not None:
             updates["name"] = request.name
+        if request.description is not None:
+            updates["description"] = request.description
         if request.type is not None:
             # Validate process type
             try:

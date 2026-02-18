@@ -15,6 +15,7 @@
 
     // Form state
     let processName = $state("");
+    let processDescription = $state("");
     let processType = $state<BusinessEventType>("discrete");
     let domain = $state("");
     let loading = $state(false);
@@ -22,6 +23,7 @@
 
     // Character limit
     const MAX_NAME_LENGTH = 200;
+    const MAX_DESCRIPTION_LENGTH = 2000;
     let characterCount = $derived(processName.length);
     let remainingChars = $derived(MAX_NAME_LENGTH - characterCount);
 
@@ -39,6 +41,7 @@
     $effect(() => {
         if (open) {
             processName = "";
+            processDescription = "";
             processType = "discrete";
             domain = "";
             error = null;
@@ -75,6 +78,7 @@
         try {
             const request: CreateProcessRequest = {
                 name: processName.trim(),
+                description: processDescription.trim() || undefined,
                 type: processType,
                 domain: domain.trim(),
                 event_ids: eventIds,
@@ -178,6 +182,25 @@
                         {:else if processName.length > MAX_NAME_LENGTH}
                             <span class="text-xs text-red-600">Process name cannot exceed {MAX_NAME_LENGTH} characters</span>
                         {/if}
+                    </div>
+                </div>
+
+                <!-- Process Description (optional) -->
+                <div>
+                    <label for="process-description" class="block text-sm font-medium text-gray-700 mb-2">
+                        Description <span class="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                        id="process-description"
+                        bind:value={processDescription}
+                        maxlength={MAX_DESCRIPTION_LENGTH}
+                        rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Add more context about this process..."
+                        disabled={loading}
+                    ></textarea>
+                    <div class="flex justify-end mt-1">
+                        <span class="text-xs text-gray-400">{processDescription.length}/{MAX_DESCRIPTION_LENGTH}</span>
                     </div>
                 </div>
 
