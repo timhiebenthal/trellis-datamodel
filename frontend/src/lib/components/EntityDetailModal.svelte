@@ -20,6 +20,7 @@
 	let entitySourceSystems = $state<string[]>([]);
 	let entityType = $state<'dimension' | 'fact' | 'unclassified'>('unclassified');
 	let annotationType = $state<AnnotationType | undefined>(undefined);
+	let entityDescription = $state('');
 	let tagInput = $state('');
 	let domainInput = $state('');
 	let sourceInput = $state('');
@@ -180,6 +181,7 @@
 		if ($entityDetailModal.open && currentEntity) {
 			const data = currentEntity.data as unknown as EntityData;
 			entityName = data.label || '';
+			entityDescription = data.description || '';
 			entityDomains = normalizeDomains(data.domains, data.domain);
 			entityTags = [...(data.tags || [])];
 			entitySourceSystems = [...(data.source_system || [])];
@@ -270,6 +272,7 @@
 		const nextDomains = normalizeDomains(entityDomains);
 		const hasChanges =
 			entityName !== (data.label || '') ||
+			entityDescription !== (data.description || '') ||
 			JSON.stringify(nextDomains.sort()) !== JSON.stringify(initialDomains.sort()) ||
 			JSON.stringify(entityTags.sort()) !== JSON.stringify([...(data.tags || [])].sort()) ||
 			JSON.stringify(entitySourceSystems.sort()) !==
@@ -519,6 +522,7 @@
 						data: {
 							...node.data,
 							label: entityName.trim(),
+							description: entityDescription.trim() || undefined,
 							domains: normalizedDomains.length > 0 ? normalizedDomains : undefined,
 							domain: primaryDomain || undefined,
 							tags: entityTags.length > 0 ? entityTags : undefined,
@@ -770,7 +774,20 @@
 								<option value={domain} />
 							{/each}
 						</datalist>
+						</div>
 					</div>
+
+					<div>
+						<label for="entity-description" class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+							Description
+						</label>
+						<textarea
+							id="entity-description"
+							bind:value={entityDescription}
+							rows="3"
+							class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 resize-y"
+							placeholder="Description..."
+						></textarea>
 					</div>
 
 					<!-- Entity Type and 7Ws - Same Row -->
