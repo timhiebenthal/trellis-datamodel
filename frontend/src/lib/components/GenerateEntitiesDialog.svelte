@@ -167,9 +167,6 @@
             // Create entities on canvas (skip ones that already exist)
             const createdEntityIds: string[] = [];
             const entityIdByIndex: string[] = [];
-            const existingEntityIds = new Set(
-                nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
-            );
             const maxZIndex = Math.max(
                 ...nodesToUse.map((n) => n.zIndex || (n.type === 'group' ? 1 : 10)),
                 10
@@ -182,7 +179,13 @@
                 const inheritedDomain =
                     mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
 
-                if (existingEntityIds.has(trimmedId)) {
+                // Check against current nodesToUse (updated in-loop) to avoid duplicates
+                // when the same generation is run more than once
+                const currentEntityIds = new Set(
+                    nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
+                );
+
+                if (currentEntityIds.has(trimmedId)) {
                     const previewAnnotation =
                         (original as any)?.annotation_type ||
                         (original as any)?.metadata?.annotation_type;
@@ -310,7 +313,7 @@
                         idMapping.set(originalId, mappedId);
                     }
                 }
-                const allEntityIds = new Set([...existingEntityIds, ...createdEntityIds]);
+                const allEntityIds = new Set(nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id));
 
                 // Create edges for relationships
                 let updatedEdges = edgesToUse;
