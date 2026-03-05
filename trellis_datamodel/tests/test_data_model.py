@@ -218,6 +218,35 @@ class TestSaveDataModel:
         assert "source_colors" in data
         assert data["source_colors"] == {}
 
+    def test_deduplicates_entities_with_same_id(
+        self, test_client, temp_data_model_path
+    ):
+        """POST with duplicate entity IDs keeps only the first occurrence."""
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {"id": "orders", "label": "Orders (first)"},
+                {"id": "orders", "label": "Orders (duplicate — should be ignored)"},
+                {"id": "users", "label": "Users"},
+            ],
+            "relationships": [],
+        }
+        response = test_client.post("/api/data-model", json=payload)
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+        with open(temp_data_model_path, "r") as f:
+            saved = yaml.safe_load(f)
+
+        entity_ids = [e["id"] for e in saved["entities"]]
+        # Exactly one "orders" entry must be present
+        assert entity_ids.count("orders") == 1
+        # The first occurrence's label must be preserved
+        orders_entity = next(e for e in saved["entities"] if e["id"] == "orders")
+        assert orders_entity["label"] == "Orders (first)"
+        # The other unique entity is unaffected
+        assert "users" in entity_ids
+
     def test_preserves_existing_roles_when_omitted_from_payload(
         self, test_client, temp_data_model_path
     ):
