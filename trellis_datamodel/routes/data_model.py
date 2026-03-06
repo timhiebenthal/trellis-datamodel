@@ -295,11 +295,15 @@ def _split_model_and_layout(
 
     # Split entities
     entities = content.get("entities", [])
+    seen_entity_ids: set = set()
 
     for entity in entities:
         entity_id = entity.get("id")
         if not entity_id:
             continue
+        if entity_id in seen_entity_ids:
+            continue
+        seen_entity_ids.add(entity_id)
 
         # Model-only properties
         model_entity = {

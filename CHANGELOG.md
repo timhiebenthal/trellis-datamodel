@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0-beta1] - Unreleased
+## [0.10.0] - 2026-03-05
 
 ### Added
 - **Description Fields:** Added optional `description` field to both BusinessEvent and BusinessEventProcess models, persisted to `business_events.yml` and exposed through the full API stack.
@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Enhanced business events UI to show descriptions in card/row views for better context at a glance.
 - Improved visual hierarchy in EventCard and ProcessRow by displaying descriptions as secondary text.
+
+### Fixed
+- Fixed duplicate entity creation in `GenerateEntitiesDialog`: the existing-entity ID set is now recomputed each loop iteration so entities added earlier in the same generation call are correctly detected as duplicates and skipped.
+- Fixed duplicate entity persistence in `POST /api/data-model`: entities are now deduplicated by ID before writing to `data_model.yml`, preventing duplicate entries regardless of how duplicates entered the payload.
 
 ## [0.9.0] - 2026-02-18
 
