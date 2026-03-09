@@ -2,7 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses } from '$lib/api';
-	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry } from '$lib/types';
+	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
@@ -41,11 +41,12 @@
 	let showMarkdownSuccess = $state(false);
 
 	// Role management state
-	let entityRoles = $state<string[]>([]);
+	let entityRoles = $state<EntityRole[]>([]);
 	let roleInput = $state('');
 	let editingRoleIndex = $state<number | null>(null);
 	let editingRoleValue = $state('');
 	let deletingRoleIndex = $state<number | null>(null);
+	let autoRoles = $derived(entityRoles.filter(r => r.source));
 	
 	// Process linking state
 	let processes = $state<BusinessEventProcess[]>([]);
@@ -229,7 +230,8 @@
 		}
 	}
 
-	function getProcessesForRole(dimensionId: string, roleName: string): BusinessEventProcess[] {
+	function getProcessesForRole(dimensionId: string, role: EntityRole): BusinessEventProcess[] {
+		const roleName = role.role;
 		return processes.filter(proc => {
 			if (!proc.annotations_superset) return false;
 			return Object.values(proc.annotations_superset).some((annotations: AnnotationEntry[]) =>
@@ -240,11 +242,12 @@
 		});
 	}
 
-	function toggleRoleExpansion(role: string) {
-		if (expandedRoles.has(role)) {
-			expandedRoles.delete(role);
+	function toggleRoleExpansion(role: EntityRole) {
+		const roleName = role.role || '';
+		if (expandedRoles.has(roleName)) {
+			expandedRoles.delete(roleName);
 		} else {
-			expandedRoles.add(role);
+			expandedRoles.add(roleName);
 		}
 		expandedRoles = new Set(expandedRoles); // Trigger reactivity
 	}
@@ -431,12 +434,12 @@
 		const trimmed = roleInput.trim();
 		if (!trimmed) return;
 
-		if (entityRoles.includes(trimmed)) {
+		if (entityRoles.some(r => r.role === trimmed)) {
 			alert(`Role "${trimmed}" already exists`);
 			return;
 		}
 
-		entityRoles = [...entityRoles, trimmed];
+		entityRoles = [...entityRoles, { role: trimmed }];
 		roleInput = '';
 	}
 
@@ -449,7 +452,7 @@
 
 	function startEditingRole(index: number) {
 		editingRoleIndex = index;
-		editingRoleValue = entityRoles[index];
+		editingRoleValue = entityRoles[index].role || '';
 	}
 
 	function saveEditingRole() {
@@ -462,14 +465,14 @@
 		}
 
 		// Check for duplicates (excluding the current role being edited)
-		const duplicate = entityRoles.find((role, idx) => idx !== editingRoleIndex && role === trimmed);
+		const duplicate = entityRoles.find((role, idx) => idx !== editingRoleIndex && role.role === trimmed);
 		if (duplicate) {
 			alert(`Role "${trimmed}" already exists`);
 			return;
 		}
 
 		entityRoles = entityRoles.map((role, idx) =>
-			idx === editingRoleIndex ? trimmed : role
+			idx === editingRoleIndex ? { ...role, role: trimmed } : role
 		);
 		editingRoleIndex = null;
 		editingRoleValue = '';
@@ -990,6 +993,30 @@
 						</div>
 					</div>
 
+					<!-- Role aliases (read-only auto-generated) -->
+					{#if entityType === 'dimension' && autoRoles.length > 0}
+						<div>
+							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+								Role aliases
+							</label>
+							<div class="space-y-1">
+								{#each autoRoles as role}
+									<div class="flex items-center gap-1.5 text-sm text-gray-600">
+										<span class="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></span>
+										<span class="font-medium text-gray-800">{role.label || role.role}</span>
+										{#if role.role && role.label}
+											<span class="text-gray-400">({role.role})</span>
+										{/if}
+										{#if role.source}
+											<span class="text-gray-400">·</span>
+											<span class="text-gray-500 text-xs">{role.source}</span>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
 					<!-- Roles (for dimensions only) -->
 					{#if entityType === 'dimension'}
 						<div>
@@ -1027,10 +1054,10 @@
 																type="button"
 																onclick={() => toggleRoleExpansion(role)}
 																class="text-gray-400 hover:text-gray-600 transition-colors"
-																title={expandedRoles.has(role) ? 'Collapse processes' : 'Expand to see processes'}
+																title={expandedRoles.has(role.role || '') ? 'Collapse processes' : 'Expand to see processes'}
 															>
 																<Icon
-																	icon={expandedRoles.has(role) ? 'lucide:chevron-down' : 'lucide:chevron-right'}
+																	icon={expandedRoles.has(role.role || '') ? 'lucide:chevron-down' : 'lucide:chevron-right'}
 																	class="w-4 h-4"
 																/>
 															</button>
@@ -1054,7 +1081,7 @@
 																	class="flex-1 text-left px-2 py-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors rounded"
 																	title="Click to edit"
 																>
-																	{role}
+																	{role.role}
 																</button>
 																<span class="text-xs text-gray-500">
 																	({getProcessesForRole(currentEntity?.id || '', role).length} processes)
@@ -1083,7 +1110,7 @@
 													</div>
 
 													<!-- Expandable process list -->
-													{#if expandedRoles.has(role)}
+													{#if expandedRoles.has(role.role || '')}
 														<div class="px-4 pb-3 pl-12 bg-gray-50">
 															{#each getProcessesForRole(currentEntity?.id || '', role) as process}
 																<button

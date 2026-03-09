@@ -28,15 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0] - 2026-02-18
 
 ### Added
-- **Role-Playing Dimensions:** Added support for role-playing dimensions, allowing dimensions to represent multiple contextual uses in business processes. Users can define roles for dimension entities (e.g., Calendar with roles: order_date, ship_date, delivery_date) and assign specific roles when annotating business events.
-- Added role management UI in EntityDetailModal: users can define, edit, and delete roles for dimension entities with simple inline interface.
-- Added role selection dropdown in SevenWsForm: when annotating business events, users can optionally assign a role to dimension references for richer semantic representation.
-- Added role display in event cards and process rows: annotations display as "Dimension (Role)" when roles are assigned, e.g., "Calendar (Order Date)".
-- Added comprehensive role-playing dimensions user guide with step-by-step instructions, common examples (Calendar dates, Employee job roles, Location place types), and best practices.
-- Added enhanced JSDoc documentation for role-related fields in TypeScript type definitions with practical examples and use cases.
-- Added `roles?: string[]` field to Entity type for storing available roles at the dimension level.
-- Added `role?: string` field to AnnotationEntry type for storing role assignments in business event annotations.
-- Full backward compatibility: existing projects without roles continue to work unchanged; roles are entirely optional and can be adopted incrementally.
+- **Role-Playing Dimensions (Sprint 2 Stream B):** Auto-derived role context from entity dimension references. When `dimension_id` references an entity that doesn't exist yet, the entity generator creates the entity from the `dimension_id` value (e.g., `dim__employee`) instead of from annotation text (e.g., `dim__sales_agent`). Entities automatically accumulate `roles` as structured objects `{label, role, source}` in `data_model.yml`.
+- Entity generator now creates missing entities from `dimension_id` references: when an annotation references a dimension entity that doesn't exist, the system derives the entity ID from `dimension_id` instead of annotation text, enabling consistent entity naming.
+- Added role merging: repeated entity generation runs accumulate roles without duplicating entries, deduplicating by role key.
+- Updated `roles` schema from flat strings to structured objects with fields: `label` (display name), `role` (role type), `source` (derivation source).
+- Added read-only role display in entity detail modal: auto-derived roles show label, role type, and source process (e.g., "Sales Agent / agent / entity_generation").
+- Full backward compatibility: existing projects without roles continue to work unchanged; roles are auto-derived and entirely read-only.
 
 ### Changed
 - Enhanced EntityDetailModal to display Roles section for dimension entities with add/edit/remove functionality.

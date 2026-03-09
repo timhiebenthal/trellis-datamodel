@@ -30,6 +30,12 @@ export interface ColumnLink {
     targetColumn: string;      // e.g., "team_id"
 }
 
+export interface EntityRole {
+    label?: string;
+    role?: string;
+    source?: string;
+}
+
 export interface DraftedField {
     name: string;
     datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp' | 'unknown';
@@ -79,15 +85,15 @@ export interface Entity {
     domain?: string; // Optional business domain (supports entities created outside business events)
     domains?: string[]; // Optional multi-domain assignment
     /**
-     * Role-playing dimensions: list of role names this dimension can play in business processes.
+     * Role-playing dimensions: list of role objects this dimension can play in business processes.
      *
      * Allows a single dimension entity to represent multiple contextual uses in the business domain,
      * bridging business language and technical dimensional modeling.
      *
      * Examples:
-     * - A "Calendar" dimension might have roles: ["order_date", "ship_date", "delivery_date"]
-     * - An "Employee" dimension might have roles: ["sales_agent", "manager", "team_lead"]
-     * - A "Location" dimension might have roles: ["store_location", "warehouse_location", "delivery_address"]
+     * - A "Calendar" dimension might have roles: [{ role: "order_date" }, { role: "ship_date" }, { role: "delivery_date" }]
+     * - An "Employee" dimension might have roles: [{ role: "sales_agent" }, { role: "manager" }, { role: "team_lead" }]
+     * - A "Location" dimension might have roles: [{ role: "store_location" }, { role: "warehouse_location" }, { role: "delivery_address" }]
      *
      * When users annotate business events:
      * - They can select a dimension (e.g., "Calendar")
@@ -97,12 +103,12 @@ export interface Entity {
      * Roles are purely optional and additive. Existing dimensions and annotations work unchanged.
      *
      * @remarks
-     * - Roles are defined by the dimension owner and stored here
+     * - Roles are defined by the dimension owner and stored here as EntityRole objects
      * - Annotations reference these roles via the `role` field in AnnotationEntry
-     * - Roles are simple string labels with no additional metadata (Phase 1 implementation)
+     * - Each role object contains label, role, and source fields for extensibility
      * - Deleting a role does not break existing annotations that reference it
      */
-    roles?: string[];
+    roles?: EntityRole[];
 }
 
 /**

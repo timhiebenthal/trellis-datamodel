@@ -134,6 +134,18 @@ def _load_existing_entities() -> Dict[str, dict]:
         return {}
 
 
+def _merge_role_entries(existing: list, incoming: list) -> list:
+    """Union two roles lists, deduplicating by (label, source)."""
+    seen = {(r.get("label"), r.get("source")) for r in existing}
+    result = list(existing)
+    for r in incoming:
+        key = (r.get("label"), r.get("source"))
+        if key not in seen:
+            result.append(r)
+            seen.add(key)
+    return result
+
+
 def _create_dimension_from_annotation_entry(
     entry: AnnotationEntry,
     annotation_type: str,
@@ -141,6 +153,7 @@ def _create_dimension_from_annotation_entry(
     domain_tag: Optional[str] = None,
     domain: Optional[str] = None,
     existing_entities: Optional[Dict[str, dict]] = None,
+    source_id: Optional[str] = None,
 ) -> dict:
     """
     Create a dimension entity dictionary from an annotation entry.
@@ -162,6 +175,7 @@ def _create_dimension_from_annotation_entry(
         and existing_entities
         and entry.dimension_id in existing_entities
     ):
+        # Path A: dimension_id set + entity exists
         existing_entity = existing_entities[entry.dimension_id]
         existing_annotation_type = existing_entity.get("annotation_type") or (
             existing_entity.get("metadata", {}) or {}
@@ -182,9 +196,43 @@ def _create_dimension_from_annotation_entry(
         # Add domain tag if provided (backward compatibility)
         if domain_tag:
             entity["tags"] = [domain_tag]
+        # Attach role entry for dimension_id path
+        role_entry = {k: v for k, v in {"label": entry.text, "role": entry.role, "source": source_id}.items() if v is not None}
+        entity.setdefault("roles", []).append(role_entry)
+        return entity
+    elif entry.dimension_id:
+        # Path B: dimension_id set + entity does NOT exist — create from dimension_id
+        dim_id = entry.dimension_id
+        # Derive label: strip known prefix, title-case the remainder
+        remainder = dim_id
+        # Sort prefixes longest-first so dim__ is tried before dim_
+        sorted_prefixes = sorted(prefixes, key=len, reverse=True)
+        for prefix in sorted_prefixes:
+            if dim_id.lower().startswith(prefix.lower()):
+                remainder = dim_id[len(prefix):]
+                break
+        label = _text_to_title_case(remainder) if remainder else _text_to_title_case(dim_id)
+        entity = {
+            "id": dim_id,
+            "label": label,
+            "entity_type": "dimension",
+            "description": entry.description or f"Dimension: {entry.text}",
+            "metadata": {
+                "annotation_type": annotation_type,
+            },
+        }
+        # Add explicit domain field if provided
+        if domain:
+            entity["domain"] = domain
+        # Add domain tag if provided (backward compatibility)
+        if domain_tag:
+            entity["tags"] = [domain_tag]
+        # Attach role entry for dimension_id path
+        role_entry = {k: v for k, v in {"label": entry.text, "role": entry.role, "source": source_id}.items() if v is not None}
+        entity.setdefault("roles", []).append(role_entry)
         return entity
 
-    # Otherwise, create a new dimension
+    # Path C: no dimension_id — create a new dimension from annotation text
     base_name = _text_to_snake_case(entry.text)
     label = _text_to_title_case(entry.text)
 
@@ -408,11 +456,19 @@ def _generate_from_annotations(
             domain_tag=domain_tag,
             domain=domain,
             existing_entities=existing_entities,
+            source_id=event.id,
         )
         # Avoid duplicates (same dimension_id referenced multiple times)
         if entity["id"] not in dimension_ids:
             dimension_entities.append(entity)
             dimension_ids.append(entity["id"])
+        else:
+            # Merge roles from duplicate into existing entity
+            existing = dimension_entities[dimension_ids.index(entity["id"])]
+            if "roles" in entity:
+                existing["roles"] = _merge_role_entries(
+                    existing.get("roles", []), entity["roles"]
+                )
 
     # Generate fact entity from how_many entries
     fact_entity = _create_fact_from_annotation_entries(
@@ -553,11 +609,19 @@ def generate_entities_from_process(
             domain_tag=domain_tag,
             domain=domain,
             existing_entities=existing_entities,
+            source_id=process.id,
         )
         # Avoid duplicates (same dimension_id referenced multiple times)
         if entity["id"] not in dimension_ids:
             dimension_entities.append(entity)
             dimension_ids.append(entity["id"])
+        else:
+            # Merge roles from duplicate into existing entity
+            existing = dimension_entities[dimension_ids.index(entity["id"])]
+            if "roles" in entity:
+                existing["roles"] = _merge_role_entries(
+                    existing.get("roles", []), entity["roles"]
+                )
 
     # Generate fact entity based on process type
     if process.type.value == "discrete" or process.type.value == "recurring":

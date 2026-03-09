@@ -1,6 +1,6 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
+    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
     import { onMount } from "svelte";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
 
@@ -83,8 +83,8 @@
 
     // Dimension roles cache: maps dimension_id -> roles array for quick lookup
     // Caches dimension role definitions to avoid repeated API calls during role selection
-    // Structure: { "dim_calendar": ["order_date", "ship_date", "delivery_date"], ... }
-    let dimensionRolesCache = $state<Record<string, string[]>>({});
+    // Structure: { "dim_calendar": [{ role: "order_date" }, { role: "ship_date" }, { role: "delivery_date" }], ... }
+    let dimensionRolesCache = $state<Record<string, EntityRole[]>>({});
 
     // Role success feedback
     let roleSuccessMessage = $state<string | null>(null);

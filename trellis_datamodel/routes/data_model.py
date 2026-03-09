@@ -329,8 +329,19 @@ def _split_model_and_layout(
         if "annotation_type" in entity:
             model_entity["annotation_type"] = entity["annotation_type"]
         if "roles" in entity:
-            model_entity["roles"] = entity["roles"]
+            incoming_roles = entity["roles"]
+            existing_roles = existing_roles_by_id.get(entity_id)
+            if existing_roles is not None and incoming_roles is not None:
+                # Merge: union incoming roles with existing, deduplicated by (label, source)
+                model_entity["roles"] = _merge_roles(existing_roles, incoming_roles)
+            elif incoming_roles is not None:
+                # No existing roles — take incoming as-is (filter to dicts only for new format)
+                model_entity["roles"] = incoming_roles
+            # If incoming_roles is None and existing_roles exist: fall through to elif below
+            elif existing_roles is not None:
+                model_entity["roles"] = existing_roles
         elif entity_id in existing_roles_by_id:
+            # Incoming payload omitted the roles field entirely — preserve existing
             model_entity["roles"] = existing_roles_by_id[entity_id]
         # Only persist source_system for unbound entities (not for bound entities)
         if "source_system" in entity and not entity.get("dbt_model"):
@@ -500,9 +511,45 @@ def _validate_entity_type(entity_type: str) -> None:
         )
 
 
+def _merge_roles(existing: list, incoming: list) -> list:
+    """Union two roles lists, deduplicating by (label, source).
+
+    Handles mixed formats: entries that are dicts (new format) are deduplicated
+    by (label, source) key. Entries that are plain strings (old format) are
+    skipped during merge to avoid TypeError — they are preserved as-is from the
+    existing list only.
+
+    Args:
+        existing: Roles list currently persisted in data_model.yml.
+        incoming: Roles list arriving in the save payload.
+
+    Returns:
+        Merged list without duplicates.
+    """
+    if not incoming:
+        return list(existing) if existing else []
+    if not existing:
+        return [r for r in incoming if isinstance(r, dict)]
+
+    seen = {
+        (r.get("label"), r.get("source"))
+        for r in existing
+        if isinstance(r, dict)
+    }
+    result = list(existing)
+    for r in incoming:
+        if not isinstance(r, dict):
+            continue  # skip flat strings (old format)
+        key = (r.get("label"), r.get("source"))
+        if key not in seen:
+            result.append(r)
+            seen.add(key)
+    return result
+
+
 def _validate_roles(roles) -> None:
     """
-    Validate that roles field is a list of strings or None.
+    Validate that roles field is a list of strings, dicts, or None.
 
     Raises ValidationError if invalid.
     """
@@ -515,7 +562,7 @@ def _validate_roles(roles) -> None:
         raise ValidationError("roles must be a list of strings or null/undefined")
 
     for role in roles:
-        if not isinstance(role, str):
+        if not isinstance(role, (str, dict)):
             raise ValidationError("roles must be a list of strings or null/undefined")
 
 

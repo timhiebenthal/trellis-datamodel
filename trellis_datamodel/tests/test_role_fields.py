@@ -197,6 +197,7 @@ class TestEntityRolesFieldYamlRoundTrip:
 
         model_path = os.path.join(temp_dir, "data_model.yml")
 
+        roles = [{"label": "Sales Agent", "role": "employee", "source": "proc_001"}]
         model_data = {
             "version": 0.1,
             "entities": [
@@ -204,10 +205,10 @@ class TestEntityRolesFieldYamlRoundTrip:
                     "id": "customer",
                     "label": "Customer",
                     "description": "Customer entity",
-                    "roles": ["dimension", "primary"]
+                    "roles": roles,
                 }
             ],
-            "relationships": []
+            "relationships": [],
         }
 
         # Save and reload
@@ -218,7 +219,7 @@ class TestEntityRolesFieldYamlRoundTrip:
 
         assert len(loaded_data["entities"]) == 1
         entity = loaded_data["entities"][0]
-        assert entity["roles"] == ["dimension", "primary"]
+        assert entity["roles"] == roles
 
     def test_entity_without_roles_loads_correctly(self, temp_dir):
         """Test backward compatibility - entities without roles field."""
@@ -233,10 +234,10 @@ class TestEntityRolesFieldYamlRoundTrip:
                 {
                     "id": "customer",
                     "label": "Customer",
-                    "description": "Customer entity"
+                    "description": "Customer entity",
                 }
             ],
-            "relationships": []
+            "relationships": [],
         }
 
         YamlHandler().save_file(model_path, old_format)
@@ -255,26 +256,28 @@ class TestEntityRolesFieldYamlRoundTrip:
 
         model_path = os.path.join(temp_dir, "data_model.yml")
 
+        role_a = {"label": "Sales Agent", "role": "employee", "source": "proc_001"}
+        role_b = {"label": "Manager", "role": "manager", "source": "proc_002"}
         model_data = {
             "version": 0.1,
             "entities": [
                 {
                     "id": "customer",
                     "label": "Customer",
-                    "roles": ["dimension"]
+                    "roles": [role_a],
                 },
                 {
                     "id": "order",
                     "label": "Order",
-                    "roles": ["fact", "transaction"]
+                    "roles": [role_a, role_b],
                 },
                 {
                     "id": "product",
-                    "label": "Product"
+                    "label": "Product",
                     # No roles field
-                }
+                },
             ],
-            "relationships": []
+            "relationships": [],
         }
 
         # First save
@@ -292,8 +295,8 @@ class TestEntityRolesFieldYamlRoundTrip:
             loaded_data_2 = yaml.safe_load(f)
 
         # Verify data integrity
-        assert loaded_data_2["entities"][0]["roles"] == ["dimension"]
-        assert loaded_data_2["entities"][1]["roles"] == ["fact", "transaction"]
+        assert loaded_data_2["entities"][0]["roles"] == [role_a]
+        assert loaded_data_2["entities"][1]["roles"] == [role_a, role_b]
         assert "roles" not in loaded_data_2["entities"][2]
 
 
@@ -301,16 +304,19 @@ class TestRolesFieldValidation:
     """Test validation of roles field in data model API."""
 
     def test_roles_must_be_list_or_none(self):
-        """Test that roles field must be a list of strings or None."""
+        """Test that roles field must be a list of strings/dicts or None."""
         from trellis_datamodel.routes.data_model import _validate_roles
 
-        # Valid cases
+        # Valid cases — None, empty list, strings, dicts, mixed str+dict
         _validate_roles(None)
         _validate_roles([])
         _validate_roles(["dimension"])
         _validate_roles(["dimension", "primary"])
+        _validate_roles([{"label": "Sales Agent", "role": "employee", "source": "proc_001"}])
+        _validate_roles([{"label": "Sales Agent"}])  # Partial dict also valid
+        _validate_roles(["dimension", {"label": "Sales Agent", "role": "employee", "source": "proc_001"}])
 
-        # Invalid cases
+        # Invalid: not a list at all
         with pytest.raises(Exception, match="must be a list") as exc_info:
             _validate_roles("dimension")  # String not list
         assert exc_info.type.__name__ == "ValidationError"
@@ -319,12 +325,13 @@ class TestRolesFieldValidation:
             _validate_roles(123)  # Number not list
         assert exc_info.type.__name__ == "ValidationError"
 
-        with pytest.raises(Exception, match="must be a list of strings") as exc_info:
-            _validate_roles([123])  # List with non-string
+        # Invalid: list containing a non-string, non-dict item
+        with pytest.raises(Exception, match="must be a list") as exc_info:
+            _validate_roles([123])  # List with integer
         assert exc_info.type.__name__ == "ValidationError"
 
-        with pytest.raises(Exception, match="must be a list of strings") as exc_info:
-            _validate_roles(["dimension", 123])  # Mixed types
+        with pytest.raises(Exception, match="must be a list") as exc_info:
+            _validate_roles(["dimension", 123])  # Mixed with integer
         assert exc_info.type.__name__ == "ValidationError"
 
 
@@ -391,3 +398,40 @@ relationships: []
         assert len(data["entities"]) == 1
         # Field is optional, so it won't be present
         assert "roles" not in data["entities"][0]
+
+    def test_flat_string_roles_do_not_crash_validator(self):
+        """Test that old flat-string roles list is accepted by _validate_roles (backward compat)."""
+        from trellis_datamodel.routes.data_model import _validate_roles
+
+        # Old format: list of plain strings — validator must not raise
+        _validate_roles(["employee"])
+        _validate_roles(["employee", "manager"])
+        _validate_roles([])
+
+    def test_flat_string_roles_load_from_yaml(self, temp_dir):
+        """Test that loading an entity with old flat roles: ['employee'] does not crash."""
+        model_path = os.path.join(temp_dir, "data_model.yml")
+
+        old_yaml = """
+version: 0.1
+entities:
+  - id: dim__employee
+    label: Employee
+    description: Employee dimension
+    roles:
+      - employee
+relationships: []
+"""
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        with open(model_path, "w") as f:
+            f.write(old_yaml)
+
+        with open(model_path, "r") as f:
+            data = yaml.safe_load(f)
+
+        entity = data["entities"][0]
+        assert entity["roles"] == ["employee"]
+
+        # Validator must accept it without raising
+        from trellis_datamodel.routes.data_model import _validate_roles
+        _validate_roles(entity["roles"])  # Should not raise
