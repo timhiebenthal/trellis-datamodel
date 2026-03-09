@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1b2] - 2026-03-09
+
+### Fixed
+- **Generate Entities dialog**: entity names no longer revert to defaults after save when edited before "Create All". Labels now sync correctly when the name is still auto-generated (`shouldAutoSyncGeneratedEntityLabel`).
+- **Entity ID preservation**: use `generateEntityId()` to preserve `dim__`/`fact__` prefixes instead of collapsing them; prevents role-playing dimension linkage from being lost.
+- **Role-playing persistence**: roles from preview are now passed into node data and persisted to `data_model.yml`; existing nodes are updated with preview roles on reopen.
+- **Duplicate entity creation**: deduplicate before create by removing event-level derived entities, process-derived entities, and legacy aliases (e.g. `dim_employee`, `dim_employee_1`) when canonical ID is `dim__employee`.
+- **Reopen prefilling**: on dialog reopen, prefer saved IDs and labels from canvas over generator defaults.
+- Removed debug instrumentation from frontend, routes, and services.
+
 ## [0.10.1b1] - 2026-03-09
 
 ### Fixed
