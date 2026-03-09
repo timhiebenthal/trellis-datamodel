@@ -3,6 +3,7 @@
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
     import { onMount } from "svelte";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
+    import { dimensionPrefixes } from "$lib/stores";
 
     type Props = {
         event: BusinessEvent;
@@ -556,8 +557,9 @@
             // Fetch current data model
             const dataModel = await getDataModel();
 
-            // Generate dimension ID from label
-            const dimensionId = `dim_${dimensionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+            // Generate dimension ID from label, using the configured prefix (first entry) or 'dim_' as fallback
+            const prefix = $dimensionPrefixes[0] ?? 'dim_';
+            const dimensionId = `${prefix}${dimensionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
 
             // Check if dimension already exists
             if (dataModel.entities.find(e => e.id === dimensionId)) {
