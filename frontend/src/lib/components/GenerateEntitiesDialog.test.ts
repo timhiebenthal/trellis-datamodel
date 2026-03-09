@@ -1,6 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { generateSlug } from '$lib/utils';
+import { generateEntityId } from '$lib/utils';
 import type { Node } from '@xyflow/svelte';
+
+function escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isLegacyGeneratedAlias(candidateId: string, canonicalId: string): boolean {
+    const collapsedId = canonicalId.replace(/_+/g, '_');
+    if (collapsedId === canonicalId) {
+        return false;
+    }
+
+    if (candidateId === collapsedId) {
+        return true;
+    }
+
+    return new RegExp(`^${escapeRegex(collapsedId)}_\\d+$`).test(candidateId);
+}
 
 /**
  * Replicates the entity-creation loop from GenerateEntitiesDialog.svelte
@@ -18,18 +35,19 @@ function runEntityCreationLoop(
     for (let i = 0; i < editedEntities.length; i++) {
         const edited = editedEntities[i];
         const trimmedId = edited.id.trim();
+        const normalizedEditedId = generateEntityId(trimmedId, []);
 
         // Recompute on each iteration — the fix under test.
         const currentEntityIds = new Set(
             nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
         );
 
-        if (currentEntityIds.has(trimmedId)) {
+        if (currentEntityIds.has(normalizedEditedId)) {
             // Entity already present; skip.
             continue;
         }
 
-        const id = generateSlug(trimmedId, [...nodesToUse.map((n) => n.id)]);
+        const id = generateEntityId(trimmedId, [...nodesToUse.map((n) => n.id)]);
 
         const newNode: Node = {
             id,
@@ -45,6 +63,22 @@ function runEntityCreationLoop(
     }
 
     return nodesToUse;
+}
+
+function removeLegacyAliasNodes(
+    editedEntities: Array<{ id: string; label: string; entity_type: string }>,
+    initialNodes: Node[]
+): Node[] {
+    const canonicalEntityIds = new Set(
+        editedEntities.map((entity) => generateEntityId(entity.id.trim(), [])).filter(Boolean)
+    );
+
+    return initialNodes.filter((node) => {
+        if (node.type !== 'entity') return true;
+        return ![...canonicalEntityIds].some((canonicalId) =>
+            isLegacyGeneratedAlias(node.id, canonicalId)
+        );
+    });
 }
 
 describe('GenerateEntitiesDialog – entity creation loop deduplication', () => {
@@ -110,4 +144,72 @@ describe('GenerateEntitiesDialog – entity creation loop deduplication', () => 
             expect.arrayContaining(['product', 'sales_fact'])
         );
     });
+
+    it('preserves configured double-underscore prefixes for generated entity IDs', () => {
+        const editedEntities = [
+            { id: 'dim__employee', label: 'Employee', entity_type: 'dimension' },
+            { id: 'fact__lead_gen_funnel', label: 'Lead Gen Funnel', entity_type: 'fact' },
+        ];
+
+        const resultNodes = runEntityCreationLoop(editedEntities);
+
+        const entityNodes = resultNodes.filter((n) => n.type === 'entity');
+        expect(entityNodes.map((n) => n.id)).toEqual(
+            expect.arrayContaining(['dim__employee', 'fact__lead_gen_funnel'])
+        );
+    });
+
+    it('removes stale legacy aliases before creating canonical IDs', () => {
+        const editedEntities = [
+            { id: 'dim__employee', label: 'Employee', entity_type: 'dimension' },
+            { id: 'fact__lead_gen_funnel', label: 'Lead Gen Funnel', entity_type: 'fact' },
+        ];
+        const existingNodes: Node[] = [
+            {
+                id: 'dim_employee',
+                type: 'entity',
+                position: { x: 0, y: 0 },
+                data: { label: 'Employee' },
+            },
+            {
+                id: 'dim_employee_1',
+                type: 'entity',
+                position: { x: 0, y: 0 },
+                data: { label: 'Employee copy' },
+            },
+            {
+                id: 'fact_lead_gen_funnel',
+                type: 'entity',
+                position: { x: 0, y: 0 },
+                data: { label: 'Lead Funnel' },
+            },
+            {
+                id: 'fact_lead_gen_funnel_1',
+                type: 'entity',
+                position: { x: 0, y: 0 },
+                data: { label: 'Lead Funnel copy' },
+            },
+            {
+                id: 'dim__employee',
+                type: 'entity',
+                position: { x: 0, y: 0 },
+                data: { label: 'Canonical employee' },
+            },
+        ];
+
+        const filteredNodes = removeLegacyAliasNodes(editedEntities, existingNodes);
+
+        expect(filteredNodes.map((node) => node.id)).toEqual(
+            expect.arrayContaining(['dim__employee'])
+        );
+        expect(filteredNodes.map((node) => node.id)).not.toEqual(
+            expect.arrayContaining([
+                'dim_employee',
+                'dim_employee_1',
+                'fact_lead_gen_funnel',
+                'fact_lead_gen_funnel_1',
+            ])
+        );
+    });
+
 });

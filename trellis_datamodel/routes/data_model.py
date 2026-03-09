@@ -1,5 +1,4 @@
 """Routes for data model CRUD operations."""
-
 from fastapi import APIRouter, HTTPException
 import yaml
 import os

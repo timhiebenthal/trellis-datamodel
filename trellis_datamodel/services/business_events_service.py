@@ -12,7 +12,6 @@ This service:
 - Manages annotation entries within events (Who, What, When, Where, How, How Many, Why)
 - Validates event data
 """
-
 import logging
 import os
 from datetime import datetime

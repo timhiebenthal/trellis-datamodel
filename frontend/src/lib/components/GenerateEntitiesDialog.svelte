@@ -1,8 +1,8 @@
 <script lang="ts">
     import { generateEntitiesFromEvent, generateEntitiesFromProcess, updateBusinessEvent, updateBusinessEventProcess, saveDataModel, getBusinessEvents } from '$lib/api';
     import type { BusinessEvent, BusinessEventProcess, GeneratedEntitiesResult } from '$lib/types';
-    import { nodes, edges, modelingStyle, sourceColors } from '$lib/stores';
-    import { generateSlug, mergeRelationshipIntoEdges, normalizeTags } from '$lib/utils';
+    import { nodes, edges, modelingStyle, sourceColors, dimensionPrefixes, factPrefixes } from '$lib/stores';
+    import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
@@ -60,13 +60,32 @@
             } else {
                 return;
             }
-            // Initialize edited entities with preview data (including tags)
-            editedEntities = previewData.entities.map((e) => ({
-                id: e.id,
-                label: e.label,
-                entity_type: e.entity_type,
-                tags: e.tags || [],
-            }));
+            const existingDerivedIds =
+                mode === 'event'
+                    ? (event?.derived_entities ?? [])
+                          .map((derived) =>
+                              typeof derived === 'string' ? derived : derived.entity_id
+                          )
+                          .filter(Boolean)
+                    : (process?.derived_entities ?? [])
+                          .map((derived) => derived.entity_id)
+                          .filter(Boolean);
+
+            // Initialize edited entities with preview data, but prefer any already-saved
+            // derived entity names so reopening the dialog preserves prior custom renames.
+            editedEntities = previewData.entities.map((e, index) => {
+                const derivedEntityId = existingDerivedIds[index];
+                const existingNode =
+                    derivedEntityId
+                        ? $nodes.find((node) => node.type === 'entity' && node.id === derivedEntityId)
+                        : undefined;
+                return {
+                    id: existingNode?.id || e.id,
+                    label: String((existingNode?.data as any)?.label || e.label),
+                    entity_type: String((existingNode?.data as any)?.entity_type || e.entity_type),
+                    tags: e.tags || [],
+                };
+            });
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to generate preview';
             console.error('Error generating preview:', error);
@@ -76,13 +95,47 @@
     }
 
     function updateEntityName(index: number, name: string) {
-        editedEntities[index] = { ...editedEntities[index], id: name };
+        const currentEntity = editedEntities[index];
+        const originalLabel = previewData?.entities[index]?.label || '';
+        const entityPrefixes = [...get(dimensionPrefixes), ...get(factPrefixes)];
+        const nextLabel = shouldAutoSyncGeneratedEntityLabel(
+            currentEntity?.id || '',
+            currentEntity?.label || '',
+            originalLabel,
+            entityPrefixes
+        )
+            ? formatModelNameForLabel(name.trim(), entityPrefixes)
+            : currentEntity?.label;
+
+        editedEntities[index] = {
+            ...currentEntity,
+            id: name,
+            label: nextLabel,
+        };
         validateEntities();
     }
 
     function updateEntityLabel(index: number, label: string) {
         editedEntities[index] = { ...editedEntities[index], label };
         validateEntities();
+    }
+
+    function escapeRegex(value: string): string {
+        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function isLegacyGeneratedAlias(candidateId: string, canonicalId: string): boolean {
+        const collapsedId = canonicalId.replace(/_+/g, '_');
+        if (collapsedId === canonicalId) {
+            return false;
+        }
+
+        if (candidateId === collapsedId) {
+            return true;
+        }
+
+        const collapsedAliasPattern = new RegExp(`^${escapeRegex(collapsedId)}_\\d+$`);
+        return collapsedAliasPattern.test(candidateId);
     }
 
     function validateEntities(): void {
@@ -154,16 +207,38 @@
             // Remove event-level entities from nodes/edges before creating new ones
             let nodesToUse = $nodes;
             let edgesToUse = $edges;
-            if (mode === 'process' && eventLevelEntityIds.size > 0) {
+            if (mode === 'process' && process) {
+                const processDerivedEntityIds = new Set(
+                    (process.derived_entities ?? [])
+                        .map((derived) => derived.entity_id)
+                        .filter(Boolean)
+                );
+                const canonicalEntityIds = new Set(
+                    editedEntities
+                        .map((entity) => generateEntityId(entity.id.trim(), []))
+                        .filter(Boolean)
+                );
+
+                const removableEntityIds = new Set<string>([
+                    ...eventLevelEntityIds,
+                    ...processDerivedEntityIds,
+                ]);
+
+                for (const node of $nodes) {
+                    if (node.type !== 'entity') continue;
+                    if ([...canonicalEntityIds].some((canonicalId) => isLegacyGeneratedAlias(node.id, canonicalId))) {
+                        removableEntityIds.add(node.id);
+                    }
+                }
+
                 nodesToUse = $nodes.filter(n => {
                     if (n.type !== 'entity') return true;
-                    return !eventLevelEntityIds.has(n.id);
+                    return !removableEntityIds.has(n.id);
                 });
                 edgesToUse = $edges.filter(e => {
-                    return !eventLevelEntityIds.has(e.source) && !eventLevelEntityIds.has(e.target);
+                    return !removableEntityIds.has(e.source) && !removableEntityIds.has(e.target);
                 });
             }
-
             // Create entities on canvas (skip ones that already exist)
             const createdEntityIds: string[] = [];
             const entityIdByIndex: string[] = [];
@@ -178,6 +253,7 @@
                 const trimmedId = edited.id.trim();
                 const inheritedDomain =
                     mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
+                const normalizedEditedId = generateEntityId(trimmedId, []);
 
                 // Check against current nodesToUse (updated in-loop) to avoid duplicates
                 // when the same generation is run more than once
@@ -185,13 +261,14 @@
                     nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
                 );
 
-                if (currentEntityIds.has(trimmedId)) {
+                if (currentEntityIds.has(normalizedEditedId)) {
                     const previewAnnotation =
                         (original as any)?.annotation_type ||
                         (original as any)?.metadata?.annotation_type;
+                    const previewRoles = (original as any)?.roles;
                     if (previewAnnotation) {
                         nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === trimmedId) {
+                            if (n.id === normalizedEditedId) {
                                 return {
                                     ...n,
                                     data: {
@@ -203,9 +280,23 @@
                             return n;
                         });
                     }
+                    if (Array.isArray(previewRoles) && previewRoles.length > 0) {
+                        nodesToUse = nodesToUse.map((n) => {
+                            if (n.id === normalizedEditedId) {
+                                return {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        roles: previewRoles,
+                                    },
+                                };
+                            }
+                            return n;
+                        });
+                    }
                     if (inheritedDomain) {
                         nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === trimmedId) {
+                            if (n.id === normalizedEditedId) {
                                 const existingDomains = Array.isArray((n.data as any)?.domains)
                                     ? ((n.data as any)?.domains as string[])
                                     : (n.data as any)?.domain
@@ -234,7 +325,7 @@
                     // Entity already exists - update its drafted_fields if this is a fact
                     if (edited.entity_type === 'fact' && (original as any).drafted_fields) {
                         nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === trimmedId) {
+                            if (n.id === normalizedEditedId) {
                                 return {
                                     ...n,
                                     data: {
@@ -246,12 +337,12 @@
                             return n;
                         });
                     }
-                    entityIdByIndex.push(trimmedId);
+                    entityIdByIndex.push(normalizedEditedId);
                     continue;
                 }
 
-                // Generate unique ID
-                const id = generateSlug(trimmedId, [
+                // Generate unique ID while preserving configured prefixes like dim__/fact__
+                const id = generateEntityId(trimmedId, [
                     ...nodesToUse.map((n) => n.id),
                     ...createdEntityIds,
                 ]);
@@ -285,6 +376,7 @@
                             undefined,
                         tags: original.tags || [],
                         drafted_fields: (original as any).drafted_fields || undefined,
+                        roles: (original as any).roles || undefined,
                         domain: inheritedDomain || undefined,
                         domains: inheritedDomain ? [inheritedDomain] : undefined,
                         width: 280,
@@ -298,7 +390,6 @@
                 createdEntityIds.push(id);
                 entityIdByIndex.push(id);
             }
-
             // Update nodes store with filtered + new nodes
             $nodes = nodesToUse;
 

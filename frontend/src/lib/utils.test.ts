@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getParallelOffset, generateSlug, getModelFolder, detectFieldSemantics, stripEntityPrefixes, formatModelNameForLabel } from './utils';
+import { getParallelOffset, generateSlug, getModelFolder, detectFieldSemantics, stripEntityPrefixes, formatModelNameForLabel, shouldAutoSyncGeneratedEntityLabel } from './utils';
 import type { DbtModel, ModelSchema } from './types';
 
 describe('getParallelOffset', () => {
@@ -364,5 +364,48 @@ describe('formatModelNameForLabel with dimensional prefixes', () => {
     it('strips fact prefixes before formatting', () => {
         expect(formatModelNameForLabel('fct_sales', prefixes)).toBe('Sales');
         expect(formatModelNameForLabel('fact_transactions', prefixes)).toBe('Transactions');
+    });
+});
+
+describe('shouldAutoSyncGeneratedEntityLabel', () => {
+    const prefixes = ['dim__', 'fact__', 'dim_', 'fact_'];
+
+    it('returns true when the current label is empty', () => {
+        expect(
+            shouldAutoSyncGeneratedEntityLabel('fact__lead_gen_funnel', '', 'Acquire Process', prefixes)
+        ).toBe(true);
+    });
+
+    it('returns true when the current label still matches the original generated label', () => {
+        expect(
+            shouldAutoSyncGeneratedEntityLabel(
+                'fact__acquire_lead_generation_qualification_for_is_fs',
+                'Acquire (lead Generation & Qualification For Is & Fs)',
+                'Acquire (lead Generation & Qualification For Is & Fs)',
+                prefixes
+            )
+        ).toBe(true);
+    });
+
+    it('returns true when the current label matches the auto-derived label for the current id', () => {
+        expect(
+            shouldAutoSyncGeneratedEntityLabel(
+                'fact__lead_gen_funnel',
+                'Lead Gen Funnel',
+                'Acquire (lead Generation & Qualification For Is & Fs)',
+                prefixes
+            )
+        ).toBe(true);
+    });
+
+    it('returns false when the label was manually customized', () => {
+        expect(
+            shouldAutoSyncGeneratedEntityLabel(
+                'fact__lead_gen_funnel',
+                'Custom KPI Fact',
+                'Acquire (lead Generation & Qualification For Is & Fs)',
+                prefixes
+            )
+        ).toBe(false);
     });
 });
