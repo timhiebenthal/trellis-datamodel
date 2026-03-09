@@ -1,6 +1,6 @@
 framework: dbt-core
 modeling_style: dimensional_model
-dbt_project_path: ./dbt_company_dummy_kimball
+dbt_project_path: ./dbt_demo
 dbt_manifest_path: target/manifest.json
 dbt_catalog_path: target/catalog.json
 data_model_file: data_model.yml
@@ -25,5 +25,5 @@ business_events:
   file: ''
 dimensional_modeling:
   inference_patterns:
-    dimension_prefix: dim_
-    fact_prefix: fact_
+    dimension_prefix: dim__
+    fact_prefix: fact__
