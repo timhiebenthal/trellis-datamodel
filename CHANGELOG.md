@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1b3] - 2026-03-09
+
+### Fixed
+- **WHO annotation cross-process pollution**: applying a suggestion from another process no longer pre-populates the "Generalize to" dimension dropdown with that process's linked dimension. Text suggestions (autocomplete) still pool from all processes; dimension linkage options now only reflect the current event/process's own annotations.
+- **SevenWsForm shared-reference mutation**: local annotation edits no longer mutate the source `event.annotations` / `process.annotations_superset` object directly. The form now deep-copies annotations on open, so canceling after edits (including entry deletion) leaves the source data intact.
+- **Generate Entities dialog — second stale fact table**: entity rows in the preview table were matched to previously-saved `derived_entities` by positional index. When `annotations_superset` changed (e.g. a new WHO entry was added), index mismatches caused a stale canvas node (old fact table) to hijack a dimension row's ID and entity type, producing a phantom second fact. Matching is now by entity ID identity, and entity type always comes from the backend preview.
+
 ## [0.10.1b2] - 2026-03-09
 
 ### Fixed

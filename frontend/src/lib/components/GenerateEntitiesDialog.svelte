@@ -73,16 +73,18 @@
 
             // Initialize edited entities with preview data, but prefer any already-saved
             // derived entity names so reopening the dialog preserves prior custom renames.
-            editedEntities = previewData.entities.map((e, index) => {
-                const derivedEntityId = existingDerivedIds[index];
+            // Match by entity ID (not index) to avoid stale derived_entities corrupting types
+            // when annotations_superset changes between generation runs.
+            const existingDerivedIdSet = new Set(existingDerivedIds);
+            editedEntities = previewData.entities.map((e) => {
                 const existingNode =
-                    derivedEntityId
-                        ? $nodes.find((node) => node.type === 'entity' && node.id === derivedEntityId)
+                    existingDerivedIdSet.has(e.id)
+                        ? $nodes.find((node) => node.type === 'entity' && node.id === e.id)
                         : undefined;
                 return {
                     id: existingNode?.id || e.id,
                     label: String((existingNode?.data as any)?.label || e.label),
-                    entity_type: String((existingNode?.data as any)?.entity_type || e.entity_type),
+                    entity_type: String(e.entity_type),
                     tags: e.tags || [],
                 };
             });

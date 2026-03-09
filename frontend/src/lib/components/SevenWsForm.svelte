@@ -187,7 +187,17 @@
             how_many: [],
             why: []
         };
-        annotations = sourceAnnotations;
+        // Deep-copy to prevent local edits from mutating the source event/process object
+        const annotationsCopy: BusinessEventAnnotations = {
+            who: sourceAnnotations.who?.map(e => ({ ...e })) ?? [],
+            what: sourceAnnotations.what?.map(e => ({ ...e })) ?? [],
+            when: sourceAnnotations.when?.map(e => ({ ...e })) ?? [],
+            where: sourceAnnotations.where?.map(e => ({ ...e })) ?? [],
+            how: sourceAnnotations.how?.map(e => ({ ...e })) ?? [],
+            how_many: sourceAnnotations.how_many?.map(e => ({ ...e })) ?? [],
+            why: sourceAnnotations.why?.map(e => ({ ...e })) ?? [],
+        };
+        annotations = annotationsCopy;
 
         // Initialize role state from existing annotations
         const newShowGeneralize = new Set<string>();
@@ -277,18 +287,29 @@
                     how_many: new Set(),
                     why: new Set(),
                 };
-                const addAnnotationsToAllowed = (annotations?: BusinessEventAnnotations | null) => {
-                    if (!annotations) return;
+                // Collect text suggestions from ALL events and processes (cross-process autocomplete)
+                const collectTextSuggestions = (ann?: BusinessEventAnnotations | null) => {
+                    if (!ann) return;
+                    for (const annotationType of Object.keys(textSuggestions) as AnnotationType[]) {
+                        for (const entry of ann[annotationType] || []) {
+                            if (entry.text) textSuggestions[annotationType].add(entry.text.trim());
+                            if (entry.role) textSuggestions[annotationType].add(entry.role.trim());
+                        }
+                    }
+                };
+                for (const businessEvent of events) {
+                    collectTextSuggestions(businessEvent.annotations);
+                }
+                for (const process of processes) {
+                    collectTextSuggestions(process.annotations_superset);
+                }
+
+                // Build allowedDimensionIdsByType only from the current event/process's own annotations
+                // to prevent other processes' dimension links from pre-populating the "Generalize to" dropdown
+                const addOwnAnnotationsToAllowed = (ann?: BusinessEventAnnotations | null) => {
+                    if (!ann) return;
                     for (const annotationType of Object.keys(allowedMap) as AnnotationType[]) {
-                        for (const entry of annotations[annotationType] || []) {
-                            if (entry.text) {
-                                // Collect text suggestions for autocomplete regardless of dimension linkage
-                                textSuggestions[annotationType].add(entry.text.trim());
-                            }
-                            if (entry.role) {
-                                // Also suggest explicit role names for role-playing dimensions
-                                textSuggestions[annotationType].add(entry.role.trim());
-                            }
+                        for (const entry of ann[annotationType] || []) {
                             if (entry.dimension_id && dimensionLookup.has(entry.dimension_id)) {
                                 allowedMap[annotationType].add(entry.dimension_id);
                                 continue;
@@ -302,12 +323,7 @@
                         }
                     }
                 };
-                for (const businessEvent of events) {
-                    addAnnotationsToAllowed(businessEvent.annotations);
-                }
-                for (const process of processes) {
-                    addAnnotationsToAllowed(process.annotations_superset);
-                }
+                addOwnAnnotationsToAllowed(event.annotations);
                 annotationTextSuggestions = textSuggestions;
                 allowedDimensionIdsByType = allowedMap;
                 hasError = false;
