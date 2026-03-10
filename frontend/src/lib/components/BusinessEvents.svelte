@@ -242,7 +242,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             processActionError = null;
             await updateBusinessEventProcess(processUnderAnnotation.id, {
                 annotations_superset: updatedEvent.annotations,
-                description: updatedEvent.description ?? null,
+                description: updatedEvent.description ?? undefined,
             });
             showProcessSevenWsForm = false;
             processUnderAnnotation = null;
@@ -725,7 +725,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             error = null;
             await updateBusinessEvent(updatedEvent.id, {
                 annotations: updatedEvent.annotations,
-                description: updatedEvent.description ?? null
+                description: updatedEvent.description ?? undefined
             });
             showSevenWsForm = false;
             sevenWsEvent = null;
