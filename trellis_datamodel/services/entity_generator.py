@@ -273,6 +273,7 @@ def _create_fact_from_annotation_entries(
     domain_tag: Optional[str] = None,
     domain: Optional[str] = None,
     event_text: Optional[str] = None,
+    event_description: Optional[str] = None,
 ) -> dict:
     """
     Create a fact entity dictionary from how_many entries.
@@ -286,6 +287,7 @@ def _create_fact_from_annotation_entries(
         domain_tag: Optional domain tag to add to entity (slugified domain)
         domain: Optional explicit domain value (not slugified)
         event_text: Optional event text for default fact name
+        event_description: Optional description for the fact entity
 
     Returns:
         Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
@@ -312,7 +314,7 @@ def _create_fact_from_annotation_entries(
         "id": entity_id,
         "label": label,
         "entity_type": "fact",
-        "description": f"Fact: {label}",
+        "description": event_description or f"Fact: {label}",
     }
 
     # Add event type as metadata
@@ -478,6 +480,7 @@ def _generate_from_annotations(
         domain_tag=domain_tag,
         domain=domain,
         event_text=event.text,
+        event_description=event.description,
     )
     fact_id = fact_entity["id"]
 
@@ -632,6 +635,7 @@ def generate_entities_from_process(
             process_events=process_events,
             domain_tag=domain_tag,
             domain=domain,
+            process_description=process.description,
         )
     elif process.type.value == "evolving":
         fact_entity = _create_fact_from_process_evolving(
@@ -641,6 +645,7 @@ def generate_entities_from_process(
             process_events=process_events,
             domain_tag=domain_tag,
             domain=domain,
+            process_description=process.description,
         )
     else:
         errors.append(f"Unknown process type: {process.type.value}")
@@ -679,6 +684,7 @@ def _create_fact_from_process_discrete(
     process_events: List[BusinessEvent],
     domain_tag: Optional[str] = None,
     domain: Optional[str] = None,
+    process_description: Optional[str] = None,
 ) -> dict:
     """
     Create a fact entity dictionary for a discrete process.
@@ -693,6 +699,7 @@ def _create_fact_from_process_discrete(
         process_events: List of BusinessEvent objects in the process
         domain_tag: Optional domain tag to add to entity (slugified domain)
         domain: Optional explicit domain value (not slugified)
+        process_description: Optional description for the fact entity
 
     Returns:
         Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
@@ -713,7 +720,7 @@ def _create_fact_from_process_discrete(
         "id": entity_id,
         "label": label,
         "entity_type": "fact",
-        "description": f"Fact: {label} (discrete process)",
+        "description": process_description or f"Fact: {label} (discrete process)",
     }
 
     # Add process and event metadata
@@ -774,6 +781,7 @@ def _create_fact_from_process_evolving(
     process_events: List[BusinessEvent],
     domain_tag: Optional[str] = None,
     domain: Optional[str] = None,
+    process_description: Optional[str] = None,
 ) -> dict:
     """
     Create a fact entity dictionary for an evolving process.
@@ -788,6 +796,7 @@ def _create_fact_from_process_evolving(
         process_events: List of BusinessEvent objects in the process
         domain_tag: Optional domain tag to add to entity (slugified domain)
         domain: Optional explicit domain value (not slugified)
+        process_description: Optional description for the fact entity
 
     Returns:
         Entity dictionary with id, label, entity_type, metadata, drafted_fields, tags, etc.
@@ -808,7 +817,7 @@ def _create_fact_from_process_evolving(
         "id": entity_id,
         "label": label,
         "entity_type": "fact",
-        "description": f"Fact: {label} (evolving process)",
+        "description": process_description or f"Fact: {label} (evolving process)",
     }
 
     # Add process and event metadata

@@ -220,7 +220,6 @@
                         .map((entity) => generateEntityId(entity.id.trim(), []))
                         .filter(Boolean)
                 );
-
                 const removableEntityIds = new Set<string>([
                     ...eventLevelEntityIds,
                     ...processDerivedEntityIds,
@@ -324,15 +323,16 @@
                             return n;
                         });
                     }
-                    // Entity already exists - update its drafted_fields if this is a fact
-                    if (edited.entity_type === 'fact' && (original as any).drafted_fields) {
+                    // Entity already exists - update its drafted_fields and description if provided
+                    if (edited.entity_type === 'fact' && ((original as any).drafted_fields || original.description)) {
                         nodesToUse = nodesToUse.map((n) => {
                             if (n.id === normalizedEditedId) {
                                 return {
                                     ...n,
                                     data: {
                                         ...n.data,
-                                        drafted_fields: (original as any).drafted_fields,
+                                        ...((original as any).drafted_fields ? { drafted_fields: (original as any).drafted_fields } : {}),
+                                        ...(original.description ? { description: original.description } : {}),
                                     },
                                 };
                             }
@@ -455,7 +455,6 @@
                     entity_id: id,
                     created_at: new Date().toISOString(),
                 }));
-
                 await updateBusinessEventProcess(process.id, {
                     derived_entities: derivedEntities,
                 });
