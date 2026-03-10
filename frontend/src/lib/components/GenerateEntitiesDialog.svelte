@@ -1,8 +1,8 @@
 <script lang="ts">
     import { generateEntitiesFromEvent, generateEntitiesFromProcess, updateBusinessEvent, updateBusinessEventProcess, saveDataModel, getBusinessEvents } from '$lib/api';
     import type { BusinessEvent, BusinessEventProcess, GeneratedEntitiesResult } from '$lib/types';
-    import { nodes, edges, modelingStyle, sourceColors } from '$lib/stores';
-    import { generateSlug, mergeRelationshipIntoEdges, normalizeTags } from '$lib/utils';
+    import { nodes, edges, modelingStyle, sourceColors, dimensionPrefixes, factPrefixes } from '$lib/stores';
+    import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
@@ -60,13 +60,56 @@
             } else {
                 return;
             }
-            // Initialize edited entities with preview data (including tags)
-            editedEntities = previewData.entities.map((e) => ({
-                id: e.id,
-                label: e.label,
-                entity_type: e.entity_type,
-                tags: e.tags || [],
-            }));
+            const existingDerivedIds =
+                mode === 'event'
+                    ? (event?.derived_entities ?? [])
+                          .map((derived) =>
+                              typeof derived === 'string' ? derived : derived.entity_id
+                          )
+                          .filter(Boolean)
+                    : (process?.derived_entities ?? [])
+                          .map((derived) => derived.entity_id)
+                          .filter(Boolean);
+
+            // Initialize edited entities with preview data, but prefer any already-saved
+            // derived entity names so reopening the dialog preserves prior custom renames.
+            // Match by entity ID (not index) to avoid stale derived_entities corrupting types
+            // when annotations_superset changes between generation runs.
+            const existingDerivedIdSet = new Set(existingDerivedIds);
+            // Pre-build the list of derived nodes for fallback matching by entity_type.
+            const derivedNodes = $nodes.filter(
+                (node) => node.type === 'entity' && existingDerivedIdSet.has(node.id)
+            );
+            // Track which derived nodes have already been matched to avoid double-assignment.
+            const matchedDerivedNodeIds = new Set<string>();
+            editedEntities = previewData.entities.map((e) => {
+                // Try exact ID match first (entity was not renamed).
+                let existingNode =
+                    existingDerivedIdSet.has(e.id)
+                        ? $nodes.find((node) => node.type === 'entity' && node.id === e.id)
+                        : undefined;
+
+                // Fallback: entity was renamed — find a derived node with matching entity_type.
+                // This preserves custom renames across dialog re-opens.
+                if (!existingNode) {
+                    existingNode = derivedNodes.find(
+                        (node) =>
+                            (node.data as any)?.entity_type === e.entity_type &&
+                            !matchedDerivedNodeIds.has(node.id)
+                    );
+                }
+
+                if (existingNode) {
+                    matchedDerivedNodeIds.add(existingNode.id);
+                }
+
+                return {
+                    id: existingNode?.id || e.id,
+                    label: String((existingNode?.data as any)?.label || e.label),
+                    entity_type: String(e.entity_type),
+                    tags: e.tags || [],
+                };
+            });
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to generate preview';
             console.error('Error generating preview:', error);
@@ -76,13 +119,47 @@
     }
 
     function updateEntityName(index: number, name: string) {
-        editedEntities[index] = { ...editedEntities[index], id: name };
+        const currentEntity = editedEntities[index];
+        const originalLabel = previewData?.entities[index]?.label || '';
+        const entityPrefixes = [...get(dimensionPrefixes), ...get(factPrefixes)];
+        const nextLabel = shouldAutoSyncGeneratedEntityLabel(
+            currentEntity?.id || '',
+            currentEntity?.label || '',
+            originalLabel,
+            entityPrefixes
+        )
+            ? formatModelNameForLabel(name.trim(), entityPrefixes)
+            : currentEntity?.label;
+
+        editedEntities[index] = {
+            ...currentEntity,
+            id: name,
+            label: nextLabel,
+        };
         validateEntities();
     }
 
     function updateEntityLabel(index: number, label: string) {
         editedEntities[index] = { ...editedEntities[index], label };
         validateEntities();
+    }
+
+    function escapeRegex(value: string): string {
+        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function isLegacyGeneratedAlias(candidateId: string, canonicalId: string): boolean {
+        const collapsedId = canonicalId.replace(/_+/g, '_');
+        if (collapsedId === canonicalId) {
+            return false;
+        }
+
+        if (candidateId === collapsedId) {
+            return true;
+        }
+
+        const collapsedAliasPattern = new RegExp(`^${escapeRegex(collapsedId)}_\\d+$`);
+        return collapsedAliasPattern.test(candidateId);
     }
 
     function validateEntities(): void {
@@ -154,16 +231,37 @@
             // Remove event-level entities from nodes/edges before creating new ones
             let nodesToUse = $nodes;
             let edgesToUse = $edges;
-            if (mode === 'process' && eventLevelEntityIds.size > 0) {
+            if (mode === 'process' && process) {
+                const processDerivedEntityIds = new Set(
+                    (process.derived_entities ?? [])
+                        .map((derived) => derived.entity_id)
+                        .filter(Boolean)
+                );
+                const canonicalEntityIds = new Set(
+                    editedEntities
+                        .map((entity) => generateEntityId(entity.id.trim(), []))
+                        .filter(Boolean)
+                );
+                const removableEntityIds = new Set<string>([
+                    ...eventLevelEntityIds,
+                    ...processDerivedEntityIds,
+                ]);
+
+                for (const node of $nodes) {
+                    if (node.type !== 'entity') continue;
+                    if ([...canonicalEntityIds].some((canonicalId) => isLegacyGeneratedAlias(node.id, canonicalId))) {
+                        removableEntityIds.add(node.id);
+                    }
+                }
+
                 nodesToUse = $nodes.filter(n => {
                     if (n.type !== 'entity') return true;
-                    return !eventLevelEntityIds.has(n.id);
+                    return !removableEntityIds.has(n.id);
                 });
                 edgesToUse = $edges.filter(e => {
-                    return !eventLevelEntityIds.has(e.source) && !eventLevelEntityIds.has(e.target);
+                    return !removableEntityIds.has(e.source) && !removableEntityIds.has(e.target);
                 });
             }
-
             // Create entities on canvas (skip ones that already exist)
             const createdEntityIds: string[] = [];
             const entityIdByIndex: string[] = [];
@@ -178,6 +276,7 @@
                 const trimmedId = edited.id.trim();
                 const inheritedDomain =
                     mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
+                const normalizedEditedId = generateEntityId(trimmedId, []);
 
                 // Check against current nodesToUse (updated in-loop) to avoid duplicates
                 // when the same generation is run more than once
@@ -185,13 +284,14 @@
                     nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
                 );
 
-                if (currentEntityIds.has(trimmedId)) {
+                if (currentEntityIds.has(normalizedEditedId)) {
                     const previewAnnotation =
                         (original as any)?.annotation_type ||
                         (original as any)?.metadata?.annotation_type;
+                    const previewRoles = (original as any)?.roles;
                     if (previewAnnotation) {
                         nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === trimmedId) {
+                            if (n.id === normalizedEditedId) {
                                 return {
                                     ...n,
                                     data: {
@@ -203,9 +303,23 @@
                             return n;
                         });
                     }
+                    if (Array.isArray(previewRoles) && previewRoles.length > 0) {
+                        nodesToUse = nodesToUse.map((n) => {
+                            if (n.id === normalizedEditedId) {
+                                return {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        roles: previewRoles,
+                                    },
+                                };
+                            }
+                            return n;
+                        });
+                    }
                     if (inheritedDomain) {
                         nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === trimmedId) {
+                            if (n.id === normalizedEditedId) {
                                 const existingDomains = Array.isArray((n.data as any)?.domains)
                                     ? ((n.data as any)?.domains as string[])
                                     : (n.data as any)?.domain
@@ -231,27 +345,28 @@
                             return n;
                         });
                     }
-                    // Entity already exists - update its drafted_fields if this is a fact
-                    if (edited.entity_type === 'fact' && (original as any).drafted_fields) {
+                    // Entity already exists - update its drafted_fields and description if provided
+                    if (edited.entity_type === 'fact' && ((original as any).drafted_fields || original.description)) {
                         nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === trimmedId) {
+                            if (n.id === normalizedEditedId) {
                                 return {
                                     ...n,
                                     data: {
                                         ...n.data,
-                                        drafted_fields: (original as any).drafted_fields,
+                                        ...((original as any).drafted_fields ? { drafted_fields: (original as any).drafted_fields } : {}),
+                                        ...(original.description ? { description: original.description } : {}),
                                     },
                                 };
                             }
                             return n;
                         });
                     }
-                    entityIdByIndex.push(trimmedId);
+                    entityIdByIndex.push(normalizedEditedId);
                     continue;
                 }
 
-                // Generate unique ID
-                const id = generateSlug(trimmedId, [
+                // Generate unique ID while preserving configured prefixes like dim__/fact__
+                const id = generateEntityId(trimmedId, [
                     ...nodesToUse.map((n) => n.id),
                     ...createdEntityIds,
                 ]);
@@ -285,6 +400,7 @@
                             undefined,
                         tags: original.tags || [],
                         drafted_fields: (original as any).drafted_fields || undefined,
+                        roles: (original as any).roles || undefined,
                         domain: inheritedDomain || undefined,
                         domains: inheritedDomain ? [inheritedDomain] : undefined,
                         width: 280,
@@ -298,7 +414,6 @@
                 createdEntityIds.push(id);
                 entityIdByIndex.push(id);
             }
-
             // Update nodes store with filtered + new nodes
             $nodes = nodesToUse;
 
@@ -362,7 +477,6 @@
                     entity_id: id,
                     created_at: new Date().toISOString(),
                 }));
-
                 await updateBusinessEventProcess(process.id, {
                     derived_entities: derivedEntities,
                 });

@@ -691,3 +691,160 @@ class TestDomainFieldGeneration:
         for entity in result.entities:
             assert "domain" not in entity
             assert "tags" not in entity  # No tags either since no domain
+
+
+class TestDimensionIdRolePlaying:
+    """Test role-playing dimension behaviour when dimension_id is provided."""
+
+    def _make_config(self):
+        mock_config = Mock()
+        mock_config.dimension_prefix = ["dim__"]
+        mock_config.fact_prefix = ["fct_"]
+        return mock_config
+
+    def _make_event(self, who_entries, event_id="evt_20260101_001"):
+        from datetime import datetime
+        now = datetime.now()
+        return BusinessEvent(
+            domain=None,
+            id=event_id,
+            text="employee does something",
+            type=BusinessEventType.DISCRETE,
+            created_at=now,
+            updated_at=now,
+            annotations=BusinessEventAnnotations(
+                who=who_entries,
+                how_many=[AnnotationEntry(id="hm1", text="count", description=None, attributes={})],
+            ),
+            derived_entities=[],
+        )
+
+    def test_a_dimension_id_fallthrough_creates_entity_from_id_not_text(self, monkeypatch):
+        """When dimension_id exists but entity NOT in data_model, id comes from dimension_id not text."""
+        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: {})
+
+        entry = AnnotationEntry(
+            id="w1",
+            text="Sales Agent",
+            dimension_id="dim__employee",
+            description=None,
+            attributes={},
+            role="employee",
+        )
+        event = self._make_event([entry])
+        result = entity_generator.generate_entities_from_event(event, self._make_config())
+
+        assert result.errors == []
+        dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
+        assert len(dim_entities) == 1
+
+        dim = dim_entities[0]
+        # id must be the dimension_id, NOT derived from text "Sales Agent"
+        assert dim["id"] == "dim__employee"
+        assert dim["id"] != "dim__sales_agent"
+        # label derived from the id remainder ("employee" → "Employee")
+        assert dim["label"] == "Employee"
+
+    def test_b_dimension_id_found_reuses_entity_and_attaches_role(self, monkeypatch):
+        """When dimension_id exists in data_model, entity is reused and role entry is attached."""
+        existing = {
+            "dim__employee": {
+                "id": "dim__employee",
+                "label": "Employee",
+                "entity_type": "dimension",
+                "description": "Employee dimension",
+            }
+        }
+        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: existing)
+
+        entry = AnnotationEntry(
+            id="w1",
+            text="Sales Agent",
+            dimension_id="dim__employee",
+            description=None,
+            attributes={},
+            role="employee",
+        )
+        event = self._make_event([entry], event_id="evt_20260101_001")
+        result = entity_generator.generate_entities_from_event(event, self._make_config())
+
+        assert result.errors == []
+        dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
+        assert len(dim_entities) == 1
+
+        dim = dim_entities[0]
+        assert dim["id"] == "dim__employee"
+        assert "roles" in dim
+        assert len(dim["roles"]) == 1
+        role_entry = dim["roles"][0]
+        assert role_entry["label"] == "Sales Agent"
+        assert role_entry["role"] == "employee"
+        assert role_entry["source"] == "evt_20260101_001"
+
+    def test_c_no_dimension_id_no_roles_key(self, monkeypatch):
+        """When annotation has no dimension_id, the generated entity has no roles key."""
+        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: {})
+
+        entry = AnnotationEntry(
+            id="w1",
+            text="customer",
+            dimension_id=None,
+            description=None,
+            attributes={},
+        )
+        event = self._make_event([entry])
+        result = entity_generator.generate_entities_from_event(event, self._make_config())
+
+        assert result.errors == []
+        dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
+        assert len(dim_entities) == 1
+        assert "roles" not in dim_entities[0]
+
+    def test_d_same_dimension_id_twice_roles_merged_not_duplicated(self, monkeypatch):
+        """Two annotations referencing the same dimension_id produce one entity with merged roles."""
+        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: {})
+
+        entry1 = AnnotationEntry(
+            id="w1",
+            text="Sales Agent",
+            dimension_id="dim__employee",
+            description=None,
+            attributes={},
+            role="sales",
+        )
+        entry2 = AnnotationEntry(
+            id="w2",
+            text="Support Agent",
+            dimension_id="dim__employee",
+            description=None,
+            attributes={},
+            role="support",
+        )
+        event = self._make_event([entry1, entry2], event_id="evt_20260101_001")
+        result = entity_generator.generate_entities_from_event(event, self._make_config())
+
+        assert result.errors == []
+        dim_entities = [e for e in result.entities if e["entity_type"] == "dimension"]
+        # Only one entity for dim__employee
+        assert len(dim_entities) == 1
+        dim = dim_entities[0]
+        assert dim["id"] == "dim__employee"
+
+        roles = dim["roles"]
+        assert len(roles) == 2
+        labels = {r["label"] for r in roles}
+        assert labels == {"Sales Agent", "Support Agent"}
+
+    def test_e_merge_role_entries_deduplicates(self):
+        """_merge_role_entries deduplicates by (label, source)."""
+        existing = [{"label": "A", "source": "p1"}]
+        incoming = [{"label": "A", "source": "p1"}, {"label": "B", "source": "p2"}]
+
+        result = entity_generator._merge_role_entries(existing, incoming)
+
+        assert len(result) == 2
+        labels = {r["label"] for r in result}
+        assert labels == {"A", "B"}
+        # No duplicate A/p1
+        a_entries = [r for r in result if r["label"] == "A"]
+        assert len(a_entries) == 1

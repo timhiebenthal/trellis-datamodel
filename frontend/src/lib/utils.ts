@@ -43,6 +43,31 @@ export function generateSlug(label: string, existingIds: string[], currentId?: s
 }
 
 /**
+ * Generate an entity ID while preserving existing underscores.
+ *
+ * This is used for dimensional model entity IDs where configured prefixes like
+ * `dim__` and `fact__` must survive round-tripping through the UI.
+ */
+export function generateEntityId(label: string, existingIds: string[], currentId?: string): string {
+    let entityId = label
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+    if (!entityId) entityId = 'entity';
+
+    let finalEntityId = entityId;
+    let counter = 1;
+    while (existingIds.some((id) => id === finalEntityId && id !== currentId)) {
+        finalEntityId = `${entityId}_${counter}`;
+        counter++;
+    }
+
+    return finalEntityId;
+}
+
+/**
  * Convert a string to title case (capitalize first letter of each word).
  * 
  * @param text - The text to convert
@@ -189,6 +214,33 @@ export function formatModelNameForLabel(modelName: string, prefixes: string[] = 
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ');
+}
+
+/**
+ * Decide whether a generated entity label should keep following the entity ID.
+ *
+ * We keep the label in sync while it still matches the original generated label
+ * or the auto-derived label for the current entity ID. Once a user edits the
+ * label independently, name changes should no longer overwrite it.
+ */
+export function shouldAutoSyncGeneratedEntityLabel(
+    currentEntityId: string,
+    currentLabel: string,
+    originalLabel: string,
+    prefixes: string[] = []
+): boolean {
+    const normalizedCurrentLabel = (currentLabel || '').trim();
+    const normalizedOriginalLabel = (originalLabel || '').trim();
+
+    if (!normalizedCurrentLabel) {
+        return true;
+    }
+
+    if (normalizedCurrentLabel === normalizedOriginalLabel) {
+        return true;
+    }
+
+    return normalizedCurrentLabel === formatModelNameForLabel(currentEntityId, prefixes).trim();
 }
 
 /**

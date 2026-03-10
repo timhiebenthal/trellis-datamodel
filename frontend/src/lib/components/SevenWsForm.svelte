@@ -1,8 +1,9 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension } from "$lib/types";
-    import { onMount } from "svelte";
+    import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
+    import { onMount, untrack } from "svelte";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
+    import { dimensionPrefixes } from "$lib/stores";
 
     type Props = {
         event: BusinessEvent;
@@ -24,6 +25,7 @@
     ];
 
     // Form state
+    let description = $state<string>(event.description || '');
     let annotations = $state<BusinessEventAnnotations>(event.annotations || {
         who: [],
         what: [],
@@ -83,8 +85,8 @@
 
     // Dimension roles cache: maps dimension_id -> roles array for quick lookup
     // Caches dimension role definitions to avoid repeated API calls during role selection
-    // Structure: { "dim_calendar": ["order_date", "ship_date", "delivery_date"], ... }
-    let dimensionRolesCache = $state<Record<string, string[]>>({});
+    // Structure: { "dim_calendar": [{ role: "order_date" }, { role: "ship_date" }, { role: "delivery_date" }], ... }
+    let dimensionRolesCache = $state<Record<string, EntityRole[]>>({});
 
     // Role success feedback
     let roleSuccessMessage = $state<string | null>(null);
@@ -175,42 +177,61 @@
 
     let isValid = $derived(validationErrors.length === 0 && !hasError);
 
-    // Initialize on mount
+    // Initialize on mount / when event changes (keyed by event.id)
+    // untrack() wraps all initialization so that local annotation/description edits
+    // don't re-trigger this effect and reset user-typed values mid-session.
     $effect(() => {
-        const sourceAnnotations = event.annotations || {
-            who: [],
-            what: [],
-            when: [],
-            where: [],
-            how: [],
-            how_many: [],
-            why: []
-        };
-        annotations = sourceAnnotations;
+        // Track only event.id — re-init when a different event is opened
+        const eventId = event.id;
 
-        // Initialize role state from existing annotations
-        const newShowGeneralize = new Set<string>();
-        const nextSelectedRoles: Record<string, string | undefined> = {};
-        for (const annotationType of ANNOTATION_TYPES) {
-            for (const entry of sourceAnnotations[annotationType.type]) {
-                if (entry.role) {
-                    nextSelectedRoles[entry.id] = entry.role;
-                }
-                // Prefetch roles for dimensions that already have dimension_id
-                if (entry.dimension_id) {
-                    fetchDimensionRoles(entry.dimension_id);
-                    // Auto-expand generalize section for entries with dimension already linked
-                    newShowGeneralize.add(entry.id);
+        untrack(() => {
+            const sourceEvent = event;
+            const sourceAnnotations = sourceEvent.annotations || {
+                who: [],
+                what: [],
+                when: [],
+                where: [],
+                how: [],
+                how_many: [],
+                why: []
+            };
+            // Deep-copy to prevent local edits from mutating the source event/process object
+            const annotationsCopy: BusinessEventAnnotations = {
+                who: sourceAnnotations.who?.map(e => ({ ...e })) ?? [],
+                what: sourceAnnotations.what?.map(e => ({ ...e })) ?? [],
+                when: sourceAnnotations.when?.map(e => ({ ...e })) ?? [],
+                where: sourceAnnotations.where?.map(e => ({ ...e })) ?? [],
+                how: sourceAnnotations.how?.map(e => ({ ...e })) ?? [],
+                how_many: sourceAnnotations.how_many?.map(e => ({ ...e })) ?? [],
+                why: sourceAnnotations.why?.map(e => ({ ...e })) ?? [],
+            };
+            annotations = annotationsCopy;
+            description = sourceEvent.description || '';
+
+            // Initialize role state from existing annotations
+            const newShowGeneralize = new Set<string>();
+            const nextSelectedRoles: Record<string, string | undefined> = {};
+            for (const annotationType of ANNOTATION_TYPES) {
+                for (const entry of sourceAnnotations[annotationType.type]) {
+                    if (entry.role) {
+                        nextSelectedRoles[entry.id] = entry.role;
+                    }
+                    // Prefetch roles for dimensions that already have dimension_id
+                    if (entry.dimension_id) {
+                        fetchDimensionRoles(entry.dimension_id);
+                        // Auto-expand generalize section for entries with dimension already linked
+                        newShowGeneralize.add(entry.id);
+                    }
                 }
             }
-        }
-        selectedRoles = nextSelectedRoles;
-        showGeneralizeForEntry = newShowGeneralize;
+            selectedRoles = nextSelectedRoles;
+            showGeneralizeForEntry = newShowGeneralize;
 
-        // Reset error state when event changes
-        hasError = false;
-        errorMessage = null;
-        error = null;
+            // Reset error state when event changes
+            hasError = false;
+            errorMessage = null;
+            error = null;
+        });
     });
 
     // Error boundary wrapper
@@ -276,18 +297,29 @@
                     how_many: new Set(),
                     why: new Set(),
                 };
-                const addAnnotationsToAllowed = (annotations?: BusinessEventAnnotations | null) => {
-                    if (!annotations) return;
+                // Collect text suggestions from ALL events and processes (cross-process autocomplete)
+                const collectTextSuggestions = (ann?: BusinessEventAnnotations | null) => {
+                    if (!ann) return;
+                    for (const annotationType of Object.keys(textSuggestions) as AnnotationType[]) {
+                        for (const entry of ann[annotationType] || []) {
+                            if (entry.text) textSuggestions[annotationType].add(entry.text.trim());
+                            if (entry.role) textSuggestions[annotationType].add(entry.role.trim());
+                        }
+                    }
+                };
+                for (const businessEvent of events) {
+                    collectTextSuggestions(businessEvent.annotations);
+                }
+                for (const process of processes) {
+                    collectTextSuggestions(process.annotations_superset);
+                }
+
+                // Build allowedDimensionIdsByType only from the current event/process's own annotations
+                // to prevent other processes' dimension links from pre-populating the "Generalize to" dropdown
+                const addOwnAnnotationsToAllowed = (ann?: BusinessEventAnnotations | null) => {
+                    if (!ann) return;
                     for (const annotationType of Object.keys(allowedMap) as AnnotationType[]) {
-                        for (const entry of annotations[annotationType] || []) {
-                            if (entry.text) {
-                                // Collect text suggestions for autocomplete regardless of dimension linkage
-                                textSuggestions[annotationType].add(entry.text.trim());
-                            }
-                            if (entry.role) {
-                                // Also suggest explicit role names for role-playing dimensions
-                                textSuggestions[annotationType].add(entry.role.trim());
-                            }
+                        for (const entry of ann[annotationType] || []) {
                             if (entry.dimension_id && dimensionLookup.has(entry.dimension_id)) {
                                 allowedMap[annotationType].add(entry.dimension_id);
                                 continue;
@@ -301,12 +333,7 @@
                         }
                     }
                 };
-                for (const businessEvent of events) {
-                    addAnnotationsToAllowed(businessEvent.annotations);
-                }
-                for (const process of processes) {
-                    addAnnotationsToAllowed(process.annotations_superset);
-                }
+                addOwnAnnotationsToAllowed(event.annotations);
                 annotationTextSuggestions = textSuggestions;
                 allowedDimensionIdsByType = allowedMap;
                 hasError = false;
@@ -556,8 +583,9 @@
             // Fetch current data model
             const dataModel = await getDataModel();
 
-            // Generate dimension ID from label
-            const dimensionId = `dim_${dimensionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+            // Generate dimension ID from label, using the configured prefix (first entry) or 'dim_' as fallback
+            const prefix = $dimensionPrefixes[0] ?? 'dim_';
+            const dimensionId = `${prefix}${dimensionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
 
             // Check if dimension already exists
             if (dataModel.entities.find(e => e.id === dimensionId)) {
@@ -692,6 +720,7 @@
             // Create updated event
             const updatedEvent: BusinessEvent = {
                 ...event,
+                description: description.trim() || undefined,
                 annotations: annotations,
                 updated_at: new Date().toISOString()
             };
@@ -752,8 +781,8 @@
             tabindex="-1"
         >
             <!-- Header -->
-            <div class="flex items-center justify-between p-6 border-b border-gray-200">
-                <div class="flex items-center gap-3">
+            <div class="p-6 border-b border-gray-200 space-y-3">
+                <div class="flex items-center justify-between">
                     <div>
                         <h2 id="seven-ws-modal-title" class="text-xl font-semibold text-gray-900">
                             Annotations - Business Event
@@ -762,22 +791,38 @@
                             {event.text}
                         </p>
                     </div>
-                </div>
-                <div class="flex items-center gap-3">
-                    <!-- Progress Badge -->
-                    <div
-                        class="px-3 py-1 rounded-full text-sm font-medium {isValid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}"
-                    >
-                        {filledAnnotationsCount}/7 completed
+                    <div class="flex items-center gap-3 ml-4 flex-shrink-0">
+                        <!-- Progress Badge -->
+                        <div
+                            class="px-3 py-1 rounded-full text-sm font-medium {isValid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}"
+                        >
+                            {filledAnnotationsCount}/7 completed
+                        </div>
+                        <button
+                            class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                            onclick={handleCancel}
+                            aria-label="Close"
+                            disabled={loading}
+                        >
+                            <Icon icon="lucide:x" class="w-5 h-5" />
+                        </button>
                     </div>
-                    <button
-                        class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
-                        onclick={handleCancel}
-                        aria-label="Close"
+                </div>
+                <!-- Business event / process description -->
+                <div>
+                    <label for="event-description" class="block text-xs font-medium text-gray-600 mb-1">
+                        Description
+                        <span class="text-gray-400 font-normal">(optional — will be used as fact table description)</span>
+                    </label>
+                    <textarea
+                        id="event-description"
+                        bind:value={description}
+                        placeholder="Describe what this business event or process represents..."
+                        rows={2}
+                        maxlength={1000}
                         disabled={loading}
-                    >
-                        <Icon icon="lucide:x" class="w-5 h-5" />
-                    </button>
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                    ></textarea>
                 </div>
             </div>
 

@@ -220,6 +220,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         return {
             id: process.id,
             text: process.name,
+            description: process.description ?? undefined,
             type: process.type,
             domain: process.domain ?? undefined,
             created_at: process.created_at,
@@ -241,6 +242,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             processActionError = null;
             await updateBusinessEventProcess(processUnderAnnotation.id, {
                 annotations_superset: updatedEvent.annotations,
+                description: updatedEvent.description ?? undefined,
             });
             showProcessSevenWsForm = false;
             processUnderAnnotation = null;
@@ -721,9 +723,9 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     async function handleSevenWsSave(updatedEvent: BusinessEvent) {
         try {
             error = null;
-            // Call updateBusinessEvent with annotations data
             await updateBusinessEvent(updatedEvent.id, {
-                annotations: updatedEvent.annotations
+                annotations: updatedEvent.annotations,
+                description: updatedEvent.description ?? undefined
             });
             showSevenWsForm = false;
             sevenWsEvent = null;

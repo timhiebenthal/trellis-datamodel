@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-03-10
+
+Stable release incorporating role-playing dimension fixes and description propagation from 0.10.1b1–b4.
+
+### Fixed
+- **Role-playing dimension entity generator**: when an annotation has `dimension_id: dim__employee` but `dim__employee` does not yet exist in `data_model.yml`, the entity generator now creates an entity with `id: dim__employee` (derived from the `dimension_id` value) instead of `id: dim__sales_agent` (derived from the annotation text). The linkage is no longer silently lost on first generation.
+- Role context is now stored on the base entity as structured objects `{label, role, source}` in `data_model.yml` rather than being discarded. Roles accumulate across generation runs without duplicating (deduped by `(label, source)`).
+- **WHO annotation cross-process pollution**: applying a suggestion from another process no longer pre-populates the "Generalize to" dimension dropdown with that process's linked dimension. Text suggestions (autocomplete) still pool from all processes; dimension linkage options now only reflect the current event/process's own annotations.
+- **SevenWsForm shared-reference mutation**: local annotation edits no longer mutate the source `event.annotations` / `process.annotations_superset` object directly. The form now deep-copies annotations on open, so canceling after edits (including entry deletion) leaves the source data intact.
+- **Generate Entities dialog — second stale fact table**: entity rows in the preview table were matched to previously-saved `derived_entities` by positional index. When `annotations_superset` changed (e.g. a new WHO entry was added), index mismatches caused a stale canvas node (old fact table) to hijack a dimension row's ID and entity type, producing a phantom second fact. Matching is now by entity ID identity with fallback to entity-type matching, and entity type always comes from the backend preview.
+- **Generate Entities dialog — entity name revert**: entity names no longer revert to defaults after save when edited before "Create All". Labels now sync correctly when the name is still auto-generated (`shouldAutoSyncGeneratedEntityLabel`).
+- **Entity ID preservation**: use `generateEntityId()` to preserve `dim__`/`fact__` prefixes instead of collapsing them; prevents role-playing dimension linkage from being lost.
+- **Role-playing persistence**: roles from preview are now passed into node data and persisted to `data_model.yml`; existing nodes are updated with preview roles on reopen.
+- **Duplicate entity creation**: deduplicate before create by removing event-level derived entities, process-derived entities, and legacy aliases (e.g. `dim_employee`, `dim_employee_1`) when canonical ID is `dim__employee`.
+- **Reopen prefilling**: on dialog reopen, prefer saved IDs and labels from canvas over generator defaults.
+- **Event description propagation**: event descriptions are now included when updating business events and when generating fact entities from the backend, ensuring descriptions are preserved across generation and dialog reopens.
+- Fixed description handling in `BusinessEvents` component to use `undefined` instead of `null` for optional description fields, improving consistency across the data structure.
+- Removed debug instrumentation from frontend, routes, and services.
+- Used configured dimension prefix when creating generalising dimensions.
+
+### Added
+- Read-only **Role aliases** section in `EntityDetailModal` for dimension entities: auto-derived roles (those with a `source` field) are displayed as `Sales Agent (employee) · proc_001`, separate from the user-editable Roles list.
+- Updated `roles` field schema from flat `list[str]` to `list[{label, role, source}]` in both Python and TypeScript; old flat-string values are accepted without crashing for backward compatibility.
+
 ## [0.10.0] - 2026-03-05
 
 ### Added
@@ -26,23 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed duplicate entity persistence in `POST /api/data-model`: entities are now deduplicated by ID before writing to `data_model.yml`, preventing duplicate entries regardless of how duplicates entered the payload.
 
 ## [0.9.0] - 2026-02-18
-
-### Added
-- **Role-Playing Dimensions:** Added support for role-playing dimensions, allowing dimensions to represent multiple contextual uses in business processes. Users can define roles for dimension entities (e.g., Calendar with roles: order_date, ship_date, delivery_date) and assign specific roles when annotating business events.
-- Added role management UI in EntityDetailModal: users can define, edit, and delete roles for dimension entities with simple inline interface.
-- Added role selection dropdown in SevenWsForm: when annotating business events, users can optionally assign a role to dimension references for richer semantic representation.
-- Added role display in event cards and process rows: annotations display as "Dimension (Role)" when roles are assigned, e.g., "Calendar (Order Date)".
-- Added comprehensive role-playing dimensions user guide with step-by-step instructions, common examples (Calendar dates, Employee job roles, Location place types), and best practices.
-- Added enhanced JSDoc documentation for role-related fields in TypeScript type definitions with practical examples and use cases.
-- Added `roles?: string[]` field to Entity type for storing available roles at the dimension level.
-- Added `role?: string` field to AnnotationEntry type for storing role assignments in business event annotations.
-- Full backward compatibility: existing projects without roles continue to work unchanged; roles are entirely optional and can be adopted incrementally.
-
-### Changed
-- Enhanced EntityDetailModal to display Roles section for dimension entities with add/edit/remove functionality.
-- Enhanced SevenWsForm with role selection state management and dimension role caching for improved performance.
-- Enhanced EventCard and ProcessRow components to display role information alongside dimension names for better semantic clarity.
-- Enhanced DimensionAutocomplete to load and display available roles when a dimension is selected in annotation forms.
 
 ### Fixed
 - Fixed 7W annotation suggestion UX: existing values now appear on input focus (without requiring initial typing), and suggestion matching/filtering is more robust during entry editing.
