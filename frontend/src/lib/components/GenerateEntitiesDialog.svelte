@@ -76,11 +76,33 @@
             // Match by entity ID (not index) to avoid stale derived_entities corrupting types
             // when annotations_superset changes between generation runs.
             const existingDerivedIdSet = new Set(existingDerivedIds);
+            // Pre-build the list of derived nodes for fallback matching by entity_type.
+            const derivedNodes = $nodes.filter(
+                (node) => node.type === 'entity' && existingDerivedIdSet.has(node.id)
+            );
+            // Track which derived nodes have already been matched to avoid double-assignment.
+            const matchedDerivedNodeIds = new Set<string>();
             editedEntities = previewData.entities.map((e) => {
-                const existingNode =
+                // Try exact ID match first (entity was not renamed).
+                let existingNode =
                     existingDerivedIdSet.has(e.id)
                         ? $nodes.find((node) => node.type === 'entity' && node.id === e.id)
                         : undefined;
+
+                // Fallback: entity was renamed — find a derived node with matching entity_type.
+                // This preserves custom renames across dialog re-opens.
+                if (!existingNode) {
+                    existingNode = derivedNodes.find(
+                        (node) =>
+                            (node.data as any)?.entity_type === e.entity_type &&
+                            !matchedDerivedNodeIds.has(node.id)
+                    );
+                }
+
+                if (existingNode) {
+                    matchedDerivedNodeIds.add(existingNode.id);
+                }
+
                 return {
                     id: existingNode?.id || e.id,
                     label: String((existingNode?.data as any)?.label || e.label),
