@@ -9,6 +9,7 @@
 	import { exportEntityToExcel } from '$lib/utils/excel-export';
 	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
 	import { goto } from '$app/navigation';
+	import DropIndicator from './DropIndicator.svelte';
 
 	// Get autoSaveService from parent context (set in +layout.svelte)
 	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
@@ -157,6 +158,49 @@
 
 	function deleteDraftedField(index: number) {
 		editableDraftedFields = editableDraftedFields.filter((_, i) => i !== index);
+	}
+
+	// Drag-to-reorder state for drafted fields
+	let dragIndex = $state<number | null>(null);
+	let dropIndex = $state<number | null>(null);
+	let dropPosition = $state<'before' | 'after' | null>(null);
+
+	function onAttributeDragStart(index: number, e: DragEvent) {
+		e.dataTransfer!.effectAllowed = 'move';
+		// Defer state update so browser captures drag image before DOM changes
+		setTimeout(() => {
+			dragIndex = index;
+			dropIndex = null;
+			dropPosition = null;
+		}, 0);
+	}
+
+	function onAttributeDragOver(index: number, e: DragEvent) {
+		if (dragIndex === null || dragIndex === index) return;
+		e.preventDefault();
+		e.dataTransfer!.dropEffect = 'move';
+		dropIndex = index;
+		dropPosition = dragIndex < index ? 'after' : 'before';
+	}
+
+	function onAttributeDrop(index: number, e: DragEvent) {
+		e.preventDefault();
+		if (dragIndex !== null && dragIndex !== index) {
+			const fields = [...editableDraftedFields];
+			const [moved] = fields.splice(dragIndex, 1);
+			fields.splice(index, 0, moved);
+			editableDraftedFields = fields;
+			isDirty = true;
+		}
+		dragIndex = null;
+		dropIndex = null;
+		dropPosition = null;
+	}
+
+	function onAttributeDragEnd() {
+		dragIndex = null;
+		dropIndex = null;
+		dropPosition = null;
 	}
 
 	// Bound dbt models
@@ -1212,17 +1256,39 @@
 								{#if editableDraftedFields.length > 0}
 									<!-- Header row -->
 									<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
+										<div class="col-span-1"></div>
 										<div class="col-span-3">Name</div>
 										<div class="col-span-2">Type</div>
-										<div class="col-span-6">Description</div>
+										<div class="col-span-5">Description</div>
 										<div class="col-span-1"></div>
 									</div>
 									<!-- Attribute rows -->
 									<div class="divide-y divide-gray-200">
 										{#each editableDraftedFields as field, index}
-											<div class="px-3 py-2 hover:bg-gray-50 group">
-												<div class="grid grid-cols-12 gap-2 items-center">
-													<!-- Name (narrower) -->
+											<div class="relative">
+												{#if dropIndex === index && dropPosition === 'before'}
+													<DropIndicator position="before" />
+												{/if}
+												<div
+													class="px-3 py-2 hover:bg-gray-50 group transition-colors"
+													class:opacity-40={dragIndex === index}
+													ondragover={(e) => onAttributeDragOver(index, e)}
+													ondrop={(e) => onAttributeDrop(index, e)}
+												>
+													<div class="grid grid-cols-12 gap-2 items-center">
+													<!-- Drag handle -->
+													<div class="col-span-1 flex justify-center">
+														<span
+															draggable="true"
+															ondragstart={(e) => onAttributeDragStart(index, e)}
+															ondragend={onAttributeDragEnd}
+															class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing hover:text-gray-500"
+															title="Drag to reorder"
+														>
+															<Icon icon="lucide:grip-vertical" class="w-4 h-4" />
+														</span>
+													</div>
+													<!-- Name -->
 													<div class="col-span-3">
 														<input
 															type="text"
@@ -1254,8 +1320,8 @@
 															<option value="timestamp">timestamp</option>
 														</select>
 													</div>
-													<!-- Description (wider) -->
-													<div class="col-span-6">
+													<!-- Description -->
+													<div class="col-span-5">
 														<input
 															type="text"
 															value={field.description || ''}
@@ -1279,6 +1345,10 @@
 														</button>
 													</div>
 												</div>
+												</div>
+											{#if dropIndex === index && dropPosition === 'after'}
+												<DropIndicator position="after" />
+											{/if}
 											</div>
 										{/each}
 									</div>
