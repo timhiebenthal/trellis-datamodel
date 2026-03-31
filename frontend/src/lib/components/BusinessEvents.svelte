@@ -26,6 +26,7 @@ import { toTitleCase } from '$lib/utils';
     import SevenWsForm from './SevenWsForm.svelte';
     import GenerateEntitiesDialog from './GenerateEntitiesDialog.svelte';
     import ProcessGroupModal from './ProcessGroupModal.svelte';
+    import DropIndicator from './DropIndicator.svelte';
 
     let events = $state<BusinessEvent[]>([]);
     let processes = $state<BusinessEventProcess[]>([]);
@@ -1101,10 +1102,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                     {#each processGroup.events as event (event.id)}
                                                         <div class="relative">
                                                             {#if dragOverEventId === event.id && dropIndicatorPosition === 'before'}
-                                                                <div class="absolute -top-1 left-0 right-0 h-0.5 bg-primary-500 z-10">
-                                                                    <div class="absolute -left-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
-                                                                    <div class="absolute -right-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
-                                                                </div>
+                                                                <DropIndicator position="before" />
                                                             {/if}
                                                             <EventCard
                                                                 {event}
@@ -1135,10 +1133,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                                                 onDragEnd={handleEventDragEnd}
                                                             />
                                                             {#if dragOverEventId === event.id && dropIndicatorPosition === 'after'}
-                                                                <div class="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary-500 z-10">
-                                                                    <div class="absolute -left-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
-                                                                    <div class="absolute -right-1 -top-1 w-2 h-2 bg-primary-500 rounded-full"></div>
-                                                                </div>
+                                                                <DropIndicator position="after" />
                                                             {/if}
                                                         </div>
                                                     {/each}
