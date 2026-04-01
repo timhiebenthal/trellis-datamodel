@@ -1126,11 +1126,31 @@ class DbtCoreAdapter:
             if not source_field or not target_field:
                 continue
 
-            fk_on_target = rel_type == "one_to_many"
-            fk_entity = target_id if fk_on_target else source_id
-            fk_field = target_field if fk_on_target else source_field
-            ref_entity = source_id if fk_on_target else target_id
-            ref_field = source_field if fk_on_target else target_field
+            if rel_type in (
+                "one_to_many",
+                "one_to_zero_or_many",
+                "zero_or_one_to_many",
+                "zero_or_many_to_many",
+            ):
+                fk_entity = target_id
+                fk_field = target_field
+                ref_entity = source_id
+                ref_field = source_field
+            elif rel_type in ("many_to_one", "many_to_many", "zero_or_many_to_one"):
+                fk_entity = source_id
+                fk_field = source_field
+                ref_entity = target_id
+                ref_field = target_field
+            elif rel_type == "one_to_one":
+                fk_entity = source_id
+                fk_field = source_field
+                ref_entity = target_id
+                ref_field = target_field
+            else:
+                fk_entity = target_id
+                fk_field = target_field
+                ref_entity = source_id
+                ref_field = source_field
 
             if fk_entity == entity_id:
                 field_to_relationship[fk_field] = {
@@ -1138,35 +1158,15 @@ class DbtCoreAdapter:
                     "target_field": ref_field,
                 }
 
-        # Generate YAML content with relationship tests
-        columns = []
-        for field in fields:
-            column_dict: dict[str, Any] = {
+        # Build plain column schema (without tests — tests are applied via yaml_handler below)
+        columns = [
+            {
                 "name": field["name"],
                 "data_type": field["datatype"],
+                **({"description": field["description"]} if field.get("description") else {}),
             }
-
-            if field.get("description"):
-                column_dict["description"] = field["description"]
-
-            field_name = field["name"]
-            if field_name in field_to_relationship:
-                rel_info = field_to_relationship[field_name]
-                ref_model = entity_model_name.get(
-                    rel_info["target_entity"], rel_info["target_entity"]
-                )
-                column_dict["data_tests"] = [
-                    {
-                        "relationships": {
-                            "arguments": {
-                                "to": f"ref('{ref_model}')",
-                                "field": rel_info["target_field"],
-                            }
-                        }
-                    }
-                ]
-
-            columns.append(column_dict)
+            for field in fields
+        ]
 
         target_version = self._resolve_model_version(
             model_name=model_name, entity_id=entity_id, data_model=data_model
@@ -1204,6 +1204,8 @@ class DbtCoreAdapter:
                 )
             if tags is not None:
                 self.yaml_handler.update_version_tags(version_entry, tags)
+
+            schema_entry = version_entry
         else:
             # Non-versioned model: update columns and metadata directly
             if entity_description:
@@ -1215,6 +1217,20 @@ class DbtCoreAdapter:
 
             if tags is not None:
                 self.yaml_handler.update_model_tags(model_entry, tags)
+
+            schema_entry = model_entry
+
+        # Apply relationship tests after columns are written
+        for field in fields:
+            field_name = field["name"]
+            if field_name not in field_to_relationship:
+                continue
+            rel_info = field_to_relationship[field_name]
+            ref_model = entity_model_name.get(
+                rel_info["target_entity"], rel_info["target_entity"]
+            )
+            col = self.yaml_handler.ensure_column(schema_entry, field_name)
+            self.yaml_handler.add_relationship_test(col, ref_model, rel_info["target_field"])
 
         self.yaml_handler.save_file(yml_path, data)
         return Path(yml_path)

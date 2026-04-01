@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.3b1] - 2026-04-01
+
+### Fixed
+- **dbt relationship tests for non-`one_to_many` relationships**: `save_dbt_schema` (POST `/api/dbt-schema`) now resolves which entity holds the foreign key for `many_to_one`, `one_to_one`, and other relationship types the same way as the full schema sync path. Relationship tests are written on the correct FK column instead of being skipped when the link was not modeled as `one_to_many`.
+
 ## [0.11.2b2] - 2026-04-01
 
 ### Fixed

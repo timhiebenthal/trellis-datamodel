@@ -151,6 +151,103 @@ class TestSaveDbtSchema:
         assert versions[2].get("config", {}).get("tags") == ["core"]
 
 
+    def test_writes_relationship_test_for_many_to_one(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        Regression: save_dbt_schema must write a relationship test when the entity
+        holds the FK in a many_to_one relationship.
+        """
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "orders", "label": "Orders", "position": {"x": 100, "y": 0}},
+                {"id": "customers", "label": "Customers", "position": {"x": 0, "y": 0}},
+            ],
+            "relationships": [
+                {
+                    "source": "orders",
+                    "target": "customers",
+                    "type": "many_to_one",
+                    "source_field": "customer_id",
+                    "target_field": "id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post(
+            "/api/dbt-schema",
+            json={
+                "entity_id": "orders",
+                "model_name": "orders",
+                "fields": [{"name": "customer_id", "datatype": "int"}],
+            },
+        )
+        assert response.status_code == 200
+
+        with open(response.json()["file_path"]) as f:
+            schema = yaml.safe_load(f)
+
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert rel_tests == [
+            {
+                "relationships": {
+                    "arguments": {"to": "ref('customers')", "field": "id"},
+                }
+            }
+        ]
+
+    def test_writes_relationship_test_for_one_to_one(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        save_dbt_schema must write a relationship test when the entity holds
+        the FK in a one_to_one relationship.
+        """
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "passports", "label": "Passports", "position": {"x": 0, "y": 0}},
+                {"id": "persons", "label": "Persons", "position": {"x": 100, "y": 0}},
+            ],
+            "relationships": [
+                {
+                    "source": "passports",
+                    "target": "persons",
+                    "type": "one_to_one",
+                    "source_field": "person_id",
+                    "target_field": "id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post(
+            "/api/dbt-schema",
+            json={
+                "entity_id": "passports",
+                "model_name": "passports",
+                "fields": [{"name": "person_id", "datatype": "int"}],
+            },
+        )
+        assert response.status_code == 200
+
+        with open(response.json()["file_path"]) as f:
+            schema = yaml.safe_load(f)
+
+        rel_tests = schema["models"][0]["columns"][0]["data_tests"]
+        assert rel_tests == [
+            {
+                "relationships": {
+                    "arguments": {"to": "ref('persons')", "field": "id"},
+                }
+            }
+        ]
+
+
 class TestSyncDbtTests:
     """Tests for POST /api/sync-dbt-tests endpoint."""
 
