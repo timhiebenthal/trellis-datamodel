@@ -231,6 +231,9 @@
             // Remove event-level entities from nodes/edges before creating new ones
             let nodesToUse = $nodes;
             let edgesToUse = $edges;
+            // Map of entityId → drafted_fields for entities that are about to be removed (process mode).
+            // Used below to re-apply manually drafted fields onto freshly created nodes.
+            const previousDraftedFieldsMap = new Map<string, any[]>();
             if (mode === 'process' && process) {
                 const processDerivedEntityIds = new Set(
                     (process.derived_entities ?? [])
@@ -251,6 +254,15 @@
                     if (node.type !== 'entity') continue;
                     if ([...canonicalEntityIds].some((canonicalId) => isLegacyGeneratedAlias(node.id, canonicalId))) {
                         removableEntityIds.add(node.id);
+                    }
+                }
+
+                // Capture drafted_fields from entities about to be removed so they can be
+                // re-merged onto the freshly created nodes (see creation loop below).
+                for (const node of $nodes) {
+                    if (node.type !== 'entity') continue;
+                    if (removableEntityIds.has(node.id) && Array.isArray((node.data as any)?.drafted_fields)) {
+                        previousDraftedFieldsMap.set(node.id, (node.data as any).drafted_fields);
                     }
                 }
 
@@ -401,6 +413,19 @@
                     };
                 }
 
+                // Merge drafted_fields: start with any manually drafted fields that were on
+                // the previous node with this ID (captured before the removal step), then
+                // append generated fields that don't already exist by name.
+                const _prevFields: any[] = previousDraftedFieldsMap.get(normalizedEditedId) ?? [];
+                const _genFields: any[] = Array.isArray((original as any).drafted_fields)
+                    ? (original as any).drafted_fields
+                    : [];
+                const _prevNames = new Set(_prevFields.map((f: any) => f.name));
+                const _mergedDraftedFields = [
+                    ..._prevFields,
+                    ..._genFields.filter((f: any) => !_prevNames.has(f.name)),
+                ];
+
                 // Create node (include tags, domain, annotation_type, and drafted_fields from preview data)
                 const newNode: Node = {
                     id,
@@ -415,7 +440,7 @@
                             (original as any)?.metadata?.annotation_type ||
                             undefined,
                         tags: original.tags || [],
-                        drafted_fields: (original as any).drafted_fields || undefined,
+                        drafted_fields: _mergedDraftedFields.length > 0 ? _mergedDraftedFields : undefined,
                         roles: (original as any).roles || undefined,
                         domain: inheritedDomain || undefined,
                         domains: inheritedDomain ? [inheritedDomain] : undefined,
@@ -509,11 +534,6 @@
 
             // Save the data model to persist entities to data_model.yml
             const dataModel = buildDataModelFromState($nodes, $edges);
-
-            // Debug: Log what we're saving
-            const factEntity = dataModel.entities.find((e: any) => e.entity_type === 'fact');
-            console.log('Saving data model - fact entity:', factEntity);
-            console.log('Fact has drafted_fields:', factEntity?.drafted_fields);
             await saveDataModel(dataModel);
 
             success = true;
