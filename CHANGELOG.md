@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2b1] - 2026-04-01
+
+### Fixed
+- **Preserve manually drafted fields on entity re-generation**: when re-applying entities from the Generate Entities dialog for a fact that already exists on the canvas, manually added `drafted_fields` are no longer overwritten. Generated fields are merged in (by field name), so only net-new fields from the generator are appended while user-defined columns are retained.
+
 ## [0.11.1] - 2026-04-01
 
 ### Fixed
