@@ -5,16 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.1] - 2026-04-01
 
 ### Fixed
 - **dbt package conflicts**: removed `dbt-core`, `dbt-duckdb`, and `dbt-colibri` from hard dependencies. Trellis only reads dbt artifacts (manifest.json, catalog.json, schema YAMLs) and never imports dbt as a Python package, so requiring a specific dbt version conflicted with users who have their own dbt adapter installed (e.g. dbt-postgres, dbt-snowflake, or the new dbt CLI). Users manage their own dbt installation; `dbt-colibri` is now an optional extra (`pip install trellis-datamodel[colibri]`) and `dbt-duckdb` remains available via the `[dbt-example]` extra for the bundled sample project.
-
-## [0.11.0b1] - 2026-03-26
-
-### Added
-- **Attribute reordering in Entity Detail Modal**: drafted attributes on unbound entities can now be reordered via drag-and-drop. A grab handle (`⠿`) appears on hover for each attribute row; dragging shows a live drop-position indicator (primary-colored line with end-caps) consistent with the Business Events reordering UX. The new order is persisted automatically through the existing auto-save flow.
-- Extracted shared `DropIndicator` component used by both the Entity Detail Modal and Business Events attribute reordering, ensuring a consistent visual language across all drag-and-drop lists.
 
 ## [0.10.1] - 2026-03-10
 
