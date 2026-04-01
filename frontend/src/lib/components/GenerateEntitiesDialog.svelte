@@ -345,15 +345,31 @@
                             return n;
                         });
                     }
-                    // Entity already exists - update its drafted_fields and description if provided
+                    // Entity already exists - merge drafted_fields (preserve manually added fields)
+                    // and update description if provided
                     if (edited.entity_type === 'fact' && ((original as any).drafted_fields || original.description)) {
                         nodesToUse = nodesToUse.map((n) => {
                             if (n.id === normalizedEditedId) {
+                                const existingDraftedFields: any[] = Array.isArray((n.data as any)?.drafted_fields)
+                                    ? (n.data as any).drafted_fields
+                                    : [];
+                                const generatedFields: any[] = Array.isArray((original as any).drafted_fields)
+                                    ? (original as any).drafted_fields
+                                    : [];
+                                // Keep all existing (manually drafted) fields; add generated fields
+                                // only if no field with the same name already exists
+                                const existingNames = new Set(existingDraftedFields.map((f: any) => f.name));
+                                const mergedFields = [
+                                    ...existingDraftedFields,
+                                    ...generatedFields.filter((f: any) => !existingNames.has(f.name)),
+                                ];
                                 return {
                                     ...n,
                                     data: {
                                         ...n.data,
-                                        ...((original as any).drafted_fields ? { drafted_fields: (original as any).drafted_fields } : {}),
+                                        ...(generatedFields.length > 0 || existingDraftedFields.length > 0
+                                            ? { drafted_fields: mergedFields }
+                                            : {}),
                                         ...(original.description ? { description: original.description } : {}),
                                     },
                                 };
