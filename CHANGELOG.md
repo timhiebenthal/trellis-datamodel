@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **dbt package conflicts**: removed `dbt-core`, `dbt-duckdb`, and `dbt-colibri` from hard dependencies. Trellis only reads dbt artifacts (manifest.json, catalog.json, schema YAMLs) and never imports dbt as a Python package, so requiring a specific dbt version conflicted with users who have their own dbt adapter installed (e.g. dbt-postgres, dbt-snowflake, or the new dbt CLI). Users manage their own dbt installation; `dbt-colibri` is now an optional extra (`pip install trellis-datamodel[colibri]`) and `dbt-duckdb` remains available via the `[dbt-example]` extra for the bundled sample project.
+
 ## [0.11.0b1] - 2026-03-26
 
 ### Added
