@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trellis-datamodel"
-version = "0.11.0b1"
+version = "0.11.1"
 description = "Visual data model editor for dbt projects"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,9 +22,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "dbt-core>=1.10.5,<2.0",
-    "dbt-colibri>=0.1.0",
-    "dbt-duckdb>=1.10.0",
     "fastapi>=0.121.3",
     "pydantic>=2.0.0",
     "python-dotenv>=1.2.1",
@@ -47,6 +44,9 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "httpx>=0.27.0",
+]
+colibri = [
+    "dbt-colibri>=0.1.0",
 ]
 dbt-example = [
     "dbt-duckdb==1.10",
