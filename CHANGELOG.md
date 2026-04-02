@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-04-02
+
+### Fixed
+- **Entity detail modal — duplicate role rows**: dimensions with multiple `roles` entries sharing the same `role` name (e.g. one per `source` process) now render a single row in the Roles list. Process expansion and counts no longer repeat identical blocks. Edit and delete apply to all entries for that role name so persisted YAML stays consistent.
+
+### Changed
+- **Entity detail modal**: dialog title is now `{entity label} Details` instead of a static "Entity Details".
+- **Entity detail modal — roles empty state**: replaced the large dashed empty card with a short, low-contrast line of helper text; refined tooltip and add-role placeholder copy for role-playing dimensions.
+
 ## [0.12.0] - 2026-04-02
 
 ### Added
