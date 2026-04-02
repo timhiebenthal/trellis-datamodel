@@ -11,6 +11,7 @@ import {
   generateOverviewSheet,
   generateAttributesSheet,
   generateRelationshipsSheet,
+  generateDataModelOverviewSheet,
   exportDataModelToExcel
 } from './excel-export';
 import type { EntityData } from '$lib/types';
@@ -246,7 +247,7 @@ describe('Sheet Generators', () => {
 });
 
 describe('exportDataModelToExcel', () => {
-  it('calls book_append_sheet once per entity node and ignores non-entity nodes', () => {
+  it('calls book_append_sheet once per entity node plus one overview sheet, ignores non-entity nodes', () => {
     const nodes = [
       {
         type: 'entity',
@@ -263,7 +264,8 @@ describe('exportDataModelToExcel', () => {
 
     exportDataModelToExcel(nodes, []);
 
-    expect(XLSX.utils.book_append_sheet).toHaveBeenCalledTimes(2);
+    // 1 overview + 2 entity sheets = 3
+    expect(XLSX.utils.book_append_sheet).toHaveBeenCalledTimes(3);
   });
 
   it('writes DataModel_export_YYYYMMDD.xlsx', () => {
@@ -294,9 +296,58 @@ describe('exportDataModelToExcel', () => {
 
     exportDataModelToExcel(nodes, []);
 
-    const sheetArg = vi.mocked(XLSX.utils.book_append_sheet).mock.calls[0][1] as {
+    // calls[0] = overview sheet, calls[1] = first entity sheet
+    const sheetArg = vi.mocked(XLSX.utils.book_append_sheet).mock.calls[1][1] as {
       data: string[][];
     };
     expect(sheetArg.data[1]).toEqual(['No attributes defined', '', '']);
+  });
+});
+
+describe('generateDataModelOverviewSheet', () => {
+  it('first row contains "About this Data Model Export"', () => {
+    const nodes = [
+      { type: 'entity', id: 'e1', data: { label: 'Sales', entity_type: 'fact' } }
+    ] as unknown as Node[];
+    const sheet = generateDataModelOverviewSheet(nodes, []);
+    expect(sheet.data[0][0]).toBe('About this Data Model Export');
+  });
+
+  it('entity directory section lists all entity names', () => {
+    const nodes = [
+      { type: 'entity', id: 'e1', data: { label: 'Customer', entity_type: 'dimension', description: 'A customer' } },
+      { type: 'entity', id: 'e2', data: { label: 'Order', entity_type: 'fact', description: 'An order' } }
+    ] as unknown as Node[];
+    const sheet = generateDataModelOverviewSheet(nodes, []);
+    const allRows: string[][] = sheet.data;
+    const labels = allRows.map((r) => r[0]);
+    expect(labels).toContain('Customer');
+    expect(labels).toContain('Order');
+  });
+
+  it('shows "No relationships defined" when edges is empty', () => {
+    const nodes = [
+      { type: 'entity', id: 'e1', data: { label: 'Foo', entity_type: 'fact' } }
+    ] as unknown as Node[];
+    const sheet = generateDataModelOverviewSheet(nodes, []);
+    const allRows: string[][] = sheet.data;
+    const hasNoRel = allRows.some((r) => r[0] === 'No relationships defined');
+    expect(hasNoRel).toBe(true);
+  });
+
+  it('lists relationships using entity labels', () => {
+    const nodes = [
+      { type: 'entity', id: 'e1', data: { label: 'Order', entity_type: 'fact' } },
+      { type: 'entity', id: 'e2', data: { label: 'Customer', entity_type: 'dimension' } }
+    ] as unknown as Node[];
+    const edges = [
+      { source: 'e1', target: 'e2', label: 'placed by', data: { type: 'many_to_one' } }
+    ];
+    const sheet = generateDataModelOverviewSheet(nodes, edges);
+    const allRows: string[][] = sheet.data;
+    const relRow = allRows.find((r) => r[0] === 'Order' && r[1] === 'Customer');
+    expect(relRow).toBeDefined();
+    expect(relRow![2]).toBe('placed by');
+    expect(relRow![3]).toBe('N:1');
   });
 });

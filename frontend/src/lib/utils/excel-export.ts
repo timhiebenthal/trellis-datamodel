@@ -301,6 +301,81 @@ export function exportEntityToExcel(
 	}
 }
 
+/**
+ * Generates a "Data Model Overview" sheet with:
+ *  1. A short explanation of the model structure (entity/relationship counts, export date).
+ *  2. An entity directory table: Name | Type | Description | Domains | Tags.
+ *  3. A relationships table: From | To | Label | Type.
+ */
+export function generateDataModelOverviewSheet(
+	entityNodes: Node[],
+	edges: any[]
+): XLSX.WorkSheet {
+	const entityCount = entityNodes.length;
+	const factCount = entityNodes.filter(
+		(n) => (n.data as unknown as EntityData).entity_type === 'fact'
+	).length;
+	const dimensionCount = entityNodes.filter(
+		(n) => (n.data as unknown as EntityData).entity_type === 'dimension'
+	).length;
+	const relCount = edges.length;
+
+	const rows: (string | number | undefined)[][] = [];
+
+	// --- Section 1: About this export ---
+	rows.push(['About this Data Model Export']);
+	rows.push(['Exported on', getDateString()]);
+	rows.push(['Total entities', entityCount]);
+	rows.push(['  Facts', factCount]);
+	rows.push(['  Dimensions', dimensionCount]);
+	rows.push(['  Unclassified', entityCount - factCount - dimensionCount]);
+	rows.push(['Total relationships', relCount]);
+	rows.push([]);
+	rows.push([
+		'Structure: each following tab contains the attributes (Name / Type / Description) of one entity.'
+	]);
+	rows.push([]);
+
+	// --- Section 2: Entity directory ---
+	rows.push(['Entity Directory']);
+	rows.push(['Name', 'Type', 'Description', 'Domains', 'Tags']);
+	for (const node of entityNodes) {
+		const d = node.data as unknown as EntityData;
+		const domains = Array.isArray(d.domains) && d.domains.length > 0
+			? d.domains.join(', ')
+			: d.domain ?? '';
+		rows.push([
+			d.label ?? '',
+			formatEntityType(d.entity_type),
+			d.description ?? '',
+			domains,
+			d.tags?.join(', ') ?? ''
+		]);
+	}
+	rows.push([]);
+
+	// --- Section 3: Relationships ---
+	rows.push(['Relationships']);
+	rows.push(['From', 'To', 'Label', 'Type']);
+	if (edges.length === 0) {
+		rows.push(['No relationships defined', '', '', '']);
+	} else {
+		const nodeById = new Map(entityNodes.map((n) => [n.id, (n.data as unknown as EntityData).label ?? n.id]));
+		for (const edge of edges) {
+			rows.push([
+				nodeById.get(edge.source) ?? edge.source,
+				nodeById.get(edge.target) ?? edge.target,
+				edge.label ?? '',
+				formatRelationshipType(edge.data?.type ?? 'unknown')
+			]);
+		}
+	}
+
+	const ws = XLSX.utils.aoa_to_sheet(rows);
+	ws['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 55 }, { wch: 28 }, { wch: 30 }];
+	return ws;
+}
+
 function draftedFieldsToAttributes(
 	entity: EntityData
 ): Array<{ name: string; type: string; description?: string }> {
@@ -313,19 +388,24 @@ function draftedFieldsToAttributes(
 }
 
 /**
- * Exports all entities to a single workbook: one tab per entity (attributes only).
- * @param _edges Reserved for future use (e.g. per-entity relationship sheets).
+ * Exports all entities to a single workbook.
+ * Sheet 1 ("Overview"): model summary, entity directory, and relationship list.
+ * Remaining sheets: one tab per entity showing its attributes (Name / Type / Description).
+ * @param edges SvelteFlow edge objects — used for the overview relationships table.
  */
-export function exportDataModelToExcel(nodes: Node[], _edges: any[]): void {
-	void _edges;
+export function exportDataModelToExcel(nodes: Node[], edges: any[]): void {
 	try {
 		const entityNodes = nodes.filter((n) => n.type === 'entity');
 		const wb = XLSX.utils.book_new();
 		const usedSheetNames = new Set<string>();
 
+		// Always include the overview sheet first
+		const overviewSheet = generateDataModelOverviewSheet(entityNodes, edges);
+		XLSX.utils.book_append_sheet(wb, overviewSheet, sanitizeSheetName('Overview', usedSheetNames));
+
 		if (entityNodes.length === 0) {
 			const ws = XLSX.utils.aoa_to_sheet([['No entities in this data model.']]);
-			XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName('Export', usedSheetNames));
+			XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName('Entities', usedSheetNames));
 		} else {
 			for (const node of entityNodes) {
 				const data = node.data as unknown as EntityData;
