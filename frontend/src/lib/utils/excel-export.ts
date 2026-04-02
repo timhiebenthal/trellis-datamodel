@@ -25,6 +25,34 @@ export function sanitizeFilename(name: string): string {
 	return sanitized;
 }
 
+/** Excel worksheet tab names cannot contain these characters (see spec / Excel limits). */
+const SHEET_NAME_FORBIDDEN = /[\[\]:*?/\\]/g;
+const MAX_SHEET_NAME_LEN = 31;
+
+/**
+ * Produces a unique Excel sheet name from an entity label (≤31 chars, no forbidden characters).
+ * Mutates `usedNames` to record the returned name.
+ */
+export function sanitizeSheetName(label: string, usedNames: Set<string>): string {
+	let base = label.replace(SHEET_NAME_FORBIDDEN, '').trim();
+	if (base.length === 0) {
+		base = 'Entity';
+	}
+
+	let counter = 1;
+	while (true) {
+		const suffix = counter === 1 ? '' : `_${counter}`;
+		const maxBaseLen = MAX_SHEET_NAME_LEN - suffix.length;
+		const truncatedBase = base.slice(0, Math.max(1, maxBaseLen));
+		const candidate = (truncatedBase + suffix).slice(0, MAX_SHEET_NAME_LEN);
+		if (!usedNames.has(candidate)) {
+			usedNames.add(candidate);
+			return candidate;
+		}
+		counter += 1;
+	}
+}
+
 /**
  * Returns the current date in YYYYMMDD format.
  *
@@ -269,6 +297,51 @@ export function exportEntityToExcel(
 		console.error('Excel export failed:', error);
 		throw new Error(
 			`Failed to export entity to Excel: ${error instanceof Error ? error.message : 'Unknown error'}`
+		);
+	}
+}
+
+function draftedFieldsToAttributes(
+	entity: EntityData
+): Array<{ name: string; type: string; description?: string }> {
+	const fields = entity.drafted_fields ?? [];
+	return fields.map((f) => ({
+		name: f.name,
+		type: f.datatype,
+		description: f.description
+	}));
+}
+
+/**
+ * Exports all entities to a single workbook: one tab per entity (attributes only).
+ * @param _edges Reserved for future use (e.g. per-entity relationship sheets).
+ */
+export function exportDataModelToExcel(nodes: Node[], _edges: any[]): void {
+	void _edges;
+	try {
+		const entityNodes = nodes.filter((n) => n.type === 'entity');
+		const wb = XLSX.utils.book_new();
+		const usedSheetNames = new Set<string>();
+
+		if (entityNodes.length === 0) {
+			const ws = XLSX.utils.aoa_to_sheet([['No entities in this data model.']]);
+			XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName('Export', usedSheetNames));
+		} else {
+			for (const node of entityNodes) {
+				const data = node.data as unknown as EntityData;
+				const sheetName = sanitizeSheetName(data.label || 'Entity', usedSheetNames);
+				const attributes = draftedFieldsToAttributes(data);
+				const sheet = generateAttributesSheet(attributes);
+				XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+			}
+		}
+
+		const filename = `DataModel_export_${getDateString()}.xlsx`;
+		XLSX.writeFile(wb, filename);
+	} catch (error) {
+		console.error('Data model Excel export failed:', error);
+		throw new Error(
+			`Failed to export data model to Excel: ${error instanceof Error ? error.message : 'Unknown error'}`
 		);
 	}
 }

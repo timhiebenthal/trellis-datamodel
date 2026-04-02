@@ -1,13 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Node } from '@xyflow/svelte';
+import * as XLSX from 'xlsx';
 import {
   sanitizeFilename,
+  sanitizeSheetName,
   getDateString,
   formatEntityType,
   formatAnnotationType,
   formatRelationshipType,
   generateOverviewSheet,
   generateAttributesSheet,
-  generateRelationshipsSheet
+  generateRelationshipsSheet,
+  exportDataModelToExcel
 } from './excel-export';
 import type { EntityData } from '$lib/types';
 
@@ -32,10 +36,16 @@ vi.mock('xlsx', () => ({
       return `${col}${r + 1}`;
     }),
     book_new: vi.fn(() => ({})),
-    book_append_sheet: vi.fn(),
-    writeFile: vi.fn()
-  }
+    book_append_sheet: vi.fn()
+  },
+  writeFile: vi.fn()
 }));
+
+beforeEach(() => {
+  vi.mocked(XLSX.utils.book_append_sheet).mockClear();
+  vi.mocked(XLSX.writeFile).mockClear();
+  vi.mocked(XLSX.utils.book_new).mockClear();
+});
 
 describe('excel-export utilities', () => {
   describe('sanitizeFilename', () => {
@@ -52,6 +62,41 @@ describe('excel-export utilities', () => {
     it('should truncate long names', () => {
       const longName = 'a'.repeat(250);
       expect(sanitizeFilename(longName).length).toBeLessThanOrEqual(200);
+    });
+  });
+
+  describe('sanitizeSheetName', () => {
+    it('removes forbidden Excel characters from sheet names', () => {
+      const used = new Set<string>();
+      expect(sanitizeSheetName('A/B:C[D]*?\\', used)).toBe('ABCD');
+    });
+
+    it('truncates labels longer than 31 characters', () => {
+      const used = new Set<string>();
+      const result = sanitizeSheetName('X'.repeat(40), used);
+      expect(result.length).toBe(31);
+      expect(result).toBe('X'.repeat(31));
+    });
+
+    it('uses Entity for blank label after sanitization', () => {
+      const used = new Set<string>();
+      expect(sanitizeSheetName('   ', used)).toBe('Entity');
+      expect(sanitizeSheetName('[]:*?/\\', used)).toBe('Entity_2');
+    });
+
+    it('appends _2 and _3 on collision and stays at most 31 chars', () => {
+      const used = new Set<string>();
+      expect(sanitizeSheetName('Same', used)).toBe('Same');
+      expect(sanitizeSheetName('Same', used)).toBe('Same_2');
+      expect(sanitizeSheetName('Same', used)).toBe('Same_3');
+      expect(used.size).toBe(3);
+      const long = 'A'.repeat(50);
+      const used2 = new Set<string>();
+      const a = sanitizeSheetName(long, used2);
+      const b = sanitizeSheetName(long, used2);
+      expect(a.length).toBeLessThanOrEqual(31);
+      expect(b.length).toBeLessThanOrEqual(31);
+      expect(a).not.toBe(b);
     });
   });
 
@@ -197,5 +242,61 @@ describe('Sheet Generators', () => {
       expect(sheet).toBeDefined();
       expect(sheet.data[1]).toEqual(['No relationships defined', '', '', '']);
     });
+  });
+});
+
+describe('exportDataModelToExcel', () => {
+  it('calls book_append_sheet once per entity node and ignores non-entity nodes', () => {
+    const nodes = [
+      {
+        type: 'entity',
+        id: 'e1',
+        data: { label: 'Alpha', drafted_fields: [{ name: 'id', datatype: 'int' }] }
+      },
+      { type: 'annotation', id: 'a1', data: {} },
+      {
+        type: 'entity',
+        id: 'e2',
+        data: { label: 'Beta', drafted_fields: [] }
+      }
+    ] as unknown as Node[];
+
+    exportDataModelToExcel(nodes, []);
+
+    expect(XLSX.utils.book_append_sheet).toHaveBeenCalledTimes(2);
+  });
+
+  it('writes DataModel_export_YYYYMMDD.xlsx', () => {
+    const nodes = [
+      {
+        type: 'entity',
+        id: 'e1',
+        data: { label: 'Only', drafted_fields: [] }
+      }
+    ] as unknown as Node[];
+
+    exportDataModelToExcel(nodes, []);
+
+    expect(vi.mocked(XLSX.writeFile)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringMatching(/^DataModel_export_\d{8}\.xlsx$/)
+    );
+  });
+
+  it('uses generateAttributesSheet empty state when drafted_fields is missing or empty', () => {
+    const nodes = [
+      {
+        type: 'entity',
+        id: 'e1',
+        data: { label: 'EmptyFields' }
+      }
+    ] as unknown as Node[];
+
+    exportDataModelToExcel(nodes, []);
+
+    const sheetArg = vi.mocked(XLSX.utils.book_append_sheet).mock.calls[0][1] as {
+      data: string[][];
+    };
+    expect(sheetArg.data[1]).toEqual(['No attributes defined', '', '']);
   });
 });
