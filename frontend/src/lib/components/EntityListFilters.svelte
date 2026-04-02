@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { entityListFilters, nodes } from '$lib/stores';
+	import { entityListFilters, nodes, edges } from '$lib/stores';
 	import type { EntityData } from '$lib/types';
+	import { exportDataModelToExcel } from '$lib/utils/excel-export';
 	import Icon from '@iconify/svelte';
 
 	interface Props {
@@ -116,6 +117,10 @@
 		}));
 	}
 
+	function handleExportDataModel() {
+		exportDataModelToExcel($nodes, $edges);
+	}
+
 	// Clear all filters
 	function clearAllFilters() {
 		searchTermLocal = '';
@@ -152,25 +157,38 @@
 			/>
 		</div>
 
-		<!-- Result Count Badge -->
-		<div class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
-			<span class="font-medium text-gray-900">{filteredCount}</span>
-			<span class="text-gray-500">/</span>
-			<span class="text-gray-600">{totalCount}</span>
-			<span class="text-gray-500">entities</span>
-		</div>
+		<div class="flex flex-wrap items-center gap-2 shrink-0">
+			<!-- Result Count Badge -->
+			<div class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+				<span class="font-medium text-gray-900">{filteredCount}</span>
+				<span class="text-gray-500">/</span>
+				<span class="text-gray-600">{totalCount}</span>
+				<span class="text-gray-500">entities</span>
+			</div>
 
-		<!-- Clear Filters Button -->
-		{#if $entityListFilters.searchTerm || $entityListFilters.selectedDomains.length > 0 || $entityListFilters.selectedTags.length > 0}
 			<button
-				onclick={clearAllFilters}
+				type="button"
+				onclick={handleExportDataModel}
 				class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors"
-				title="Clear all filters"
+				title="Download all entities as one Excel file (one tab per entity)"
 			>
-				<Icon icon="lucide:x" class="w-4 h-4" />
-				<span>Clear</span>
+				<Icon icon="lucide:download" class="w-4 h-4" />
+				<span>Export Data Model</span>
 			</button>
-		{/if}
+
+			<!-- Clear Filters Button -->
+			{#if $entityListFilters.searchTerm || $entityListFilters.selectedDomains.length > 0 || $entityListFilters.selectedTags.length > 0}
+				<button
+					type="button"
+					onclick={clearAllFilters}
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors"
+					title="Clear all filters"
+				>
+					<Icon icon="lucide:x" class="w-4 h-4" />
+					<span>Clear</span>
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Filters Row -->
