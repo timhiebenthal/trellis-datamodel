@@ -1012,6 +1012,11 @@ class DbtCoreAdapter:
                 f_name = field.get("name")
                 f_type = field.get("datatype")
                 f_desc = field.get("description")
+                f_origin = field.get("origin")
+                if f_desc and f_origin:
+                    f_desc = f"{f_desc} | Origin: {f_origin}"
+                elif f_origin:
+                    f_desc = f"Origin: {f_origin}"
 
                 if not f_name:
                     continue
@@ -1159,14 +1164,20 @@ class DbtCoreAdapter:
                 }
 
         # Build plain column schema (without tests — tests are applied via yaml_handler below)
-        columns = [
-            {
-                "name": field["name"],
-                "data_type": field["datatype"],
-                **({"description": field["description"]} if field.get("description") else {}),
-            }
-            for field in fields
-        ]
+        columns = []
+        for field in fields:
+            desc = field.get("description")
+            origin = field.get("origin")
+            if desc and origin:
+                combined_desc = f"{desc} | Origin: {origin}"
+            elif origin:
+                combined_desc = f"Origin: {origin}"
+            else:
+                combined_desc = desc
+            col: dict = {"name": field["name"], "data_type": field["datatype"]}
+            if combined_desc:
+                col["description"] = combined_desc
+            columns.append(col)
 
         target_version = self._resolve_model_version(
             model_name=model_name, entity_id=entity_id, data_model=data_model
