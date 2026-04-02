@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-04-02
+
+### Added
+- **Attribute origin field**: drafted entity attributes now support an optional `origin` field for recording technical source lineage (e.g. `source_system.schema.table.column`) separately from the human-readable description.
+  - New `origin?: string` property on `DraftedField`; persisted to and loaded from `data_model.yml` transparently — no backend changes required.
+  - Editable `Origin` column added to the attribute table in `EntityDetailModal`; read-only `Origin` column shown for dbt-bound entities.
+  - `origin` included as a 4th column in both Excel exports (entity and full data model) and Markdown copy.
+  - `dbt_demo/data_model.yml` migrated: all inline `description | DH1: …` / `description | DAX: …` / `description | source: TBD` / `description | MS Dynamics …` patterns split into separate `description` and `origin` fields.
+- **Full data model Excel export**: new "Export Data Model" button in the Entity List toolbar downloads a single `.xlsx` workbook covering the entire data model.
+  - **Overview sheet** (first tab): export date, entity counts broken down by fact / dimension / unclassified, relationship count, a one-line structural explanation, an entity directory table (Name | Type | Description | Domains | Tags), and a full relationships table (From | To | Label | Type).
+  - **Per-entity attribute sheets**: one tab per entity showing its drafted fields (Name | Type | Description | Origin); falls back to "No attributes defined" for entities without fields.
+  - Sheet names are sanitised (Excel-forbidden characters removed, truncated to 31 chars) and deduplicated with `_2`, `_3` suffixes on collision.
+  - Filename pattern: `DataModel_export_YYYYMMDD.xlsx`.
+
 ## [0.11.3] - 2026-04-01
 
 Stable release incorporating dbt relationship test fixes and Generate Entities drafted-field preservation from 0.11.2b2 and 0.11.3b1.

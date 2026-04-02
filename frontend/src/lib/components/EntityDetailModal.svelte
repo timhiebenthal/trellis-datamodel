@@ -112,7 +112,8 @@
 				return model.columns.map((col) => ({
 					name: col.name,
 					type: col.type || 'unknown',
-					description: ''
+					description: '',
+					origin: undefined as string | undefined
 				}));
 			}
 		}
@@ -121,7 +122,8 @@
 		return draftedFields.map((field) => ({
 			name: field.name,
 			type: field.datatype || 'unknown',
-			description: field.description || ''
+			description: field.description || '',
+			origin: field.origin
 		}));
 	});
 
@@ -1220,21 +1222,17 @@
 											<tr>
 												<th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
 												<th class="px-4 py-2 text-left font-semibold text-gray-700">Type</th>
-												<th class="px-4 py-2 text-left font-semibold text-gray-700"
-													>Description</th
-												>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700">Description</th>
+												<th class="px-4 py-2 text-left font-semibold text-gray-700">Origin</th>
 											</tr>
 										</thead>
 										<tbody class="divide-y divide-gray-200">
 											{#each entityAttributes as attr}
 												<tr class="hover:bg-gray-50">
 													<td class="px-4 py-2 font-medium text-gray-900">{attr.name}</td>
-													<td class="px-4 py-2 text-gray-600 font-mono text-xs"
-														>{attr.type}</td
-													>
-													<td class="px-4 py-2 text-gray-600"
-														>{attr.description || '—'}</td
-													>
+													<td class="px-4 py-2 text-gray-600 font-mono text-xs">{attr.type}</td>
+													<td class="px-4 py-2 text-gray-600">{attr.description || '—'}</td>
+													<td class="px-4 py-2 text-gray-400 font-mono text-xs">{attr.origin || '—'}</td>
 												</tr>
 											{/each}
 										</tbody>
@@ -1257,9 +1255,10 @@
 									<!-- Header row -->
 									<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
 										<div class="col-span-1"></div>
-										<div class="col-span-3">Name</div>
-										<div class="col-span-2">Type</div>
-										<div class="col-span-5">Description</div>
+										<div class="col-span-2">Name</div>
+										<div class="col-span-1">Type</div>
+										<div class="col-span-4">Description</div>
+										<div class="col-span-3">Origin</div>
 										<div class="col-span-1"></div>
 									</div>
 									<!-- Attribute rows -->
@@ -1289,7 +1288,7 @@
 														</span>
 													</div>
 													<!-- Name -->
-													<div class="col-span-3">
+													<div class="col-span-2">
 														<input
 															type="text"
 															value={field.name}
@@ -1302,7 +1301,7 @@
 														/>
 													</div>
 													<!-- Type -->
-													<div class="col-span-2">
+													<div class="col-span-1">
 														<select
 															value={field.datatype}
 															onchange={(e) =>
@@ -1310,7 +1309,7 @@
 																	datatype: (e.target as HTMLSelectElement)
 																		.value as any
 																})}
-															class="w-full px-2 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
+															class="w-full px-1 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
 														>
 															<option value="text">text</option>
 															<option value="int">int</option>
@@ -1321,7 +1320,7 @@
 														</select>
 													</div>
 													<!-- Description -->
-													<div class="col-span-5">
+													<div class="col-span-4">
 														<input
 															type="text"
 															value={field.description || ''}
@@ -1331,6 +1330,19 @@
 																})}
 															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
 															placeholder="Description (optional)"
+														/>
+													</div>
+													<!-- Origin -->
+													<div class="col-span-3">
+														<input
+															type="text"
+         													value={field.origin || ''}
+															oninput={(e) =>
+																updateDraftedField(index, {
+																	origin: (e.target as HTMLInputElement).value || undefined
+																})}
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+															placeholder="e.g. source.schema.table.column"
 														/>
 													</div>
 													<!-- Delete button -->
