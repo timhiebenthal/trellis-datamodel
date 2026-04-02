@@ -223,21 +223,22 @@ export function generateRelationshipsSheet(
  * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
 export function generateAttributesSheet(
-	attributes: Array<{ name: string; type: string; description?: string }>
+	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>
 ): XLSX.WorkSheet {
-	// Create 3-column array: Name | Type | Description
+	// Create 4-column array: Name | Type | Description | Origin
 	const attributesData = [
-		['Name', 'Type', 'Description'],
+		['Name', 'Type', 'Description', 'Origin'],
 		...attributes.map(attr => [
 			attr.name,
 			attr.type,
-			attr.description || ''
+			attr.description || '',
+			attr.origin || ''
 		])
 	];
 
 	// If no attributes, show message
 	if (attributes.length === 0) {
-		attributesData.push(['No attributes defined', '', '']);
+		attributesData.push(['No attributes defined', '', '', '']);
 	}
 
 	const ws = XLSX.utils.aoa_to_sheet(attributesData);
@@ -253,7 +254,7 @@ export function generateAttributesSheet(
 	}
 
 	// Set column widths
-	ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 50 }];
+	ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 40 }, { wch: 35 }];
 
 	return ws;
 }
@@ -269,7 +270,7 @@ export function generateAttributesSheet(
  */
 export function exportEntityToExcel(
 	entity: EntityData,
-	attributes: Array<{ name: string; type: string; description?: string }>,
+	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>,
 	edges: any[],
 	allNodes: Node[],
 	entityId: string
@@ -378,12 +379,13 @@ export function generateDataModelOverviewSheet(
 
 function draftedFieldsToAttributes(
 	entity: EntityData
-): Array<{ name: string; type: string; description?: string }> {
+): Array<{ name: string; type: string; description?: string; origin?: string }> {
 	const fields = entity.drafted_fields ?? [];
 	return fields.map((f) => ({
 		name: f.name,
 		type: f.datatype,
-		description: f.description
+		description: f.description,
+		origin: f.origin
 	}));
 }
 

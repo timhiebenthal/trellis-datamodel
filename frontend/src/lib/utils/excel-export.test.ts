@@ -208,13 +208,29 @@ describe('Sheet Generators', () => {
 
       const sheet = generateAttributesSheet(attributes);
       expect(sheet).toBeDefined();
-      expect(sheet.data[0]).toEqual(['Name', 'Type', 'Description']);
+      expect(sheet.data[0]).toEqual(['Name', 'Type', 'Description', 'Origin']);
     });
 
     it('should handle empty attributes', () => {
       const sheet = generateAttributesSheet([]);
       expect(sheet).toBeDefined();
-      expect(sheet.data[1]).toEqual(['No attributes defined', '', '']);
+      expect(sheet.data[1]).toEqual(['No attributes defined', '', '', '']);
+    });
+
+    it('should include origin value when populated', () => {
+      const attributes = [
+        { name: 'campaign_id', type: 'text', description: 'Unique identifier', origin: 'DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID' }
+      ];
+      const sheet = generateAttributesSheet(attributes);
+      expect(sheet.data[1][3]).toBe('DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID');
+    });
+
+    it('should render empty string for undefined origin', () => {
+      const attributes = [
+        { name: 'name', type: 'text', description: 'Name field' }
+      ];
+      const sheet = generateAttributesSheet(attributes);
+      expect(sheet.data[1][3]).toBe('');
     });
   });
 
@@ -300,7 +316,7 @@ describe('exportDataModelToExcel', () => {
     const sheetArg = vi.mocked(XLSX.utils.book_append_sheet).mock.calls[1][1] as {
       data: string[][];
     };
-    expect(sheetArg.data[1]).toEqual(['No attributes defined', '', '']);
+    expect(sheetArg.data[1]).toEqual(['No attributes defined', '', '', '']);
   });
 });
 

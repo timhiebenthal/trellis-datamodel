@@ -40,6 +40,7 @@ export interface DraftedField {
     name: string;
     datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp' | 'unknown';
     description?: string;
+    origin?: string;
 }
 
 export interface EntityData {

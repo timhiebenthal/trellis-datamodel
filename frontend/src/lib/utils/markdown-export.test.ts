@@ -5,7 +5,7 @@ import type { Node } from '@xyflow/svelte';
 
 describe('markdown-export utilities', () => {
 	let mockEntity: EntityData;
-	let mockAttributes: Array<{ name: string; type: string; description?: string }>;
+	let mockAttributes: Array<{ name: string; type: string; description?: string; origin?: string }>;
 	let mockEdges: any[];
 	let mockNodes: Node[];
 
@@ -71,8 +71,8 @@ describe('markdown-export utilities', () => {
 
 			// Check attributes section
 			expect(result).toContain('## Attributes');
-			expect(result).toContain('| Name | Type | Description |');
-			expect(result).toContain('| customer_id | int | Primary key |');
+			expect(result).toContain('| Name | Type | Description | Origin |');
+			expect(result).toContain('| customer_id | int | Primary key |  |');
 			expect(result).toContain('| customer_name | varchar | Full name |');
 
 			// Check relationships section
@@ -85,7 +85,7 @@ describe('markdown-export utilities', () => {
 			const result = formatEntityAsMarkdown(mockEntity, mockAttributes, mockEdges, mockNodes, 'customer');
 
 			// Check for table separator
-			expect(result).toContain('|------|------|-------------|');
+			expect(result).toContain('|------|------|-------------|--------|');
 		});
 
 		it('should have proper line breaks between sections', () => {
@@ -142,7 +142,7 @@ describe('markdown-export utilities', () => {
 
 			expect(result).toContain('## Attributes');
 			expect(result).toContain('No attributes defined');
-			expect(result).not.toContain('| Name | Type | Description |');
+			expect(result).not.toContain('| Name | Type | Description | Origin |');
 		});
 
 		it('should handle empty relationships array', () => {
@@ -414,8 +414,8 @@ describe('markdown-export utilities', () => {
 			const headerIndex = attributesIndex + 2; // Account for blank line
 			const separatorIndex = headerIndex + 1;
 
-			expect(lines[headerIndex]).toBe('| Name | Type | Description |');
-			expect(lines[separatorIndex]).toBe('|------|------|-------------|');
+			expect(lines[headerIndex]).toBe('| Name | Type | Description | Origin |');
+			expect(lines[separatorIndex]).toBe('|------|------|-------------|--------|');
 
 			// All data rows should start and end with pipe
 			for (let i = separatorIndex + 1; i < lines.length; i++) {
@@ -426,15 +426,15 @@ describe('markdown-export utilities', () => {
 			}
 		});
 
-		it('should have exactly 3 pipes in attributes header', () => {
+		it('should have exactly 5 pipes in attributes header', () => {
 			const result = formatEntityAsMarkdown(mockEntity, mockAttributes, [], mockNodes, 'customer');
 
-			const headerLine = result.split('\n').find(l => l.includes('Name | Type | Description'));
+			const headerLine = result.split('\n').find(l => l.includes('Name | Type | Description | Origin'));
 			const pipeCount = (headerLine?.match(/\|/g) || []).length;
-			expect(pipeCount).toBe(4); // 4 pipes for 3 columns
+			expect(pipeCount).toBe(5); // 5 pipes for 4 columns
 		});
 
-		it('should have 4 pipes in each attribute data row', () => {
+		it('should have 5 pipes in each attribute data row', () => {
 			const attributes = [
 				{ name: 'id', type: 'int', description: 'Primary key' },
 				{ name: 'name', type: 'text', description: 'Name field' }
@@ -447,8 +447,24 @@ describe('markdown-export utilities', () => {
 
 			dataRows.forEach(row => {
 				const pipeCount = (row.match(/\|/g) || []).length;
-				expect(pipeCount).toBe(4);
+				expect(pipeCount).toBe(5);
 			});
+		});
+
+		it('should render origin value in 4th column', () => {
+			const attributes = [
+				{ name: 'campaign_id', type: 'text', description: 'Unique ID', origin: 'DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID' }
+			];
+			const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
+			expect(result).toContain('| campaign_id | text | Unique ID | DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID |');
+		});
+
+		it('should render empty string for undefined origin in 4th column', () => {
+			const attributes = [
+				{ name: 'field', type: 'text', description: 'A field' }
+			];
+			const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
+			expect(result).toContain('| field | text | A field |  |');
 		});
 	});
 

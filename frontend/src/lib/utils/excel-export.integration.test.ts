@@ -106,7 +106,7 @@ describe('excel-export integration tests', () => {
 
       expect(ws).toBeDefined();
       expect(ws['!cols']).toBeDefined();
-      expect(ws['!cols']).toHaveLength(3);
+      expect(ws['!cols']).toHaveLength(4);
 
       // Verify headers are bold
       expect(ws['A1']?.s?.font?.bold).toBe(true);
@@ -116,7 +116,8 @@ describe('excel-export integration tests', () => {
       // Verify column widths
       expect(ws['!cols'][0].wch).toBe(25);
       expect(ws['!cols'][1].wch).toBe(15);
-      expect(ws['!cols'][2].wch).toBe(50);
+      expect(ws['!cols'][2].wch).toBe(40);
+      expect(ws['!cols'][3].wch).toBe(35);
     });
 
     it('should handle empty attributes array', () => {

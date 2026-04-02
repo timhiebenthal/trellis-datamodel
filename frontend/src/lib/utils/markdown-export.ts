@@ -24,7 +24,7 @@ function escapePipes(text: string): string {
  */
 export function formatEntityAsMarkdown(
 	entity: EntityData,
-	attributes: Array<{ name: string; type: string; description?: string }>,
+	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>,
 	edges: any[],
 	allNodes: Node[],
 	entityId: string
@@ -53,14 +53,15 @@ export function formatEntityAsMarkdown(
 	if (attributes.length === 0) {
 		lines.push('No attributes defined');
 	} else {
-		lines.push('| Name | Type | Description |');
-		lines.push('|------|------|-------------|');
+		lines.push('| Name | Type | Description | Origin |');
+		lines.push('|------|------|-------------|--------|');
 
 		for (const attr of attributes) {
 			const name = escapePipes(attr.name);
 			const type = escapePipes(attr.type);
 			const description = escapePipes(attr.description || '');
-			lines.push(`| ${name} | ${type} | ${description} |`);
+			const origin = escapePipes(attr.origin || '');
+			lines.push(`| ${name} | ${type} | ${description} | ${origin} |`);
 		}
 	}
 
