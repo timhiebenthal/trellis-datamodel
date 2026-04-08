@@ -44,10 +44,20 @@
 	// Role management state
 	let entityRoles = $state<EntityRole[]>([]);
 	let roleInput = $state('');
-	let editingRoleIndex = $state<number | null>(null);
+	let editingRoleName = $state<string | null>(null);
 	let editingRoleValue = $state('');
-	let deletingRoleIndex = $state<number | null>(null);
+	let deletingRoleName = $state<string | null>(null);
 	let autoRoles = $derived(entityRoles.filter(r => r.source));
+	// Deduplicate roles by name for display (multiple entries can exist per role when sourced from different processes)
+	let uniqueEntityRoles = $derived.by(() => {
+		const seen = new Set<string>();
+		return entityRoles.filter(role => {
+			const key = role.role || '';
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
+	});
 	
 	// Process linking state
 	let processes = $state<BusinessEventProcess[]>([]);
@@ -239,9 +249,9 @@
 			domainInput = '';
 			sourceInput = '';
 			roleInput = '';
-			editingRoleIndex = null;
+			editingRoleName = null;
 			editingRoleValue = '';
-			deletingRoleIndex = null;
+			deletingRoleName = null;
 			sourceSuggestions = [];
 			showSourceSuggestions = false;
 			activeSourceSuggestionIndex = 0;
@@ -345,8 +355,8 @@
 				showExportDropdown = false;
 			} else if (showDeleteConfirm) {
 				showDeleteConfirm = false;
-			} else if (deletingRoleIndex !== null) {
-				deletingRoleIndex = null;
+			} else if (deletingRoleName !== null) {
+				deletingRoleName = null;
 			} else {
 				handleCancel();
 			}
@@ -496,13 +506,13 @@
 		}
 	}
 
-	function startEditingRole(index: number) {
-		editingRoleIndex = index;
-		editingRoleValue = entityRoles[index].role || '';
+	function startEditingRole(role: EntityRole) {
+		editingRoleName = role.role || '';
+		editingRoleValue = role.role || '';
 	}
 
 	function saveEditingRole() {
-		if (editingRoleIndex === null) return;
+		if (editingRoleName === null) return;
 
 		const trimmed = editingRoleValue.trim();
 		if (!trimmed) {
@@ -510,22 +520,22 @@
 			return;
 		}
 
-		// Check for duplicates (excluding the current role being edited)
-		const duplicate = entityRoles.find((role, idx) => idx !== editingRoleIndex && role.role === trimmed);
-		if (duplicate) {
+		// Check for duplicates (excluding the role being edited)
+		if (trimmed !== editingRoleName && entityRoles.some(r => r.role === trimmed)) {
 			alert(`Role "${trimmed}" already exists`);
 			return;
 		}
 
-		entityRoles = entityRoles.map((role, idx) =>
-			idx === editingRoleIndex ? { ...role, role: trimmed } : role
+		// Update all entries that share this role name (e.g. sourced from different processes)
+		entityRoles = entityRoles.map(r =>
+			r.role === editingRoleName ? { ...r, role: trimmed } : r
 		);
-		editingRoleIndex = null;
+		editingRoleName = null;
 		editingRoleValue = '';
 	}
 
 	function cancelEditingRole() {
-		editingRoleIndex = null;
+		editingRoleName = null;
 		editingRoleValue = '';
 	}
 
@@ -539,18 +549,19 @@
 		}
 	}
 
-	function confirmDeleteRole(index: number) {
-		deletingRoleIndex = index;
+	function confirmDeleteRole(roleName: string) {
+		deletingRoleName = roleName;
 	}
 
 	function deleteRole() {
-		if (deletingRoleIndex === null) return;
-		entityRoles = entityRoles.filter((_, idx) => idx !== deletingRoleIndex);
-		deletingRoleIndex = null;
+		if (deletingRoleName === null) return;
+		// Remove all entries sharing this role name
+		entityRoles = entityRoles.filter(r => r.role !== deletingRoleName);
+		deletingRoleName = null;
 	}
 
 	function cancelDeleteRole() {
-		deletingRoleIndex = null;
+		deletingRoleName = null;
 	}
 
 	function handleSave() {
@@ -746,7 +757,7 @@
 							class="text-2xl font-bold text-gray-900 mb-2"
 							style="letter-spacing: -0.02em;"
 						>
-							Entity Details
+							{entityName || 'Entity'} Details
 						</h2>
 						{#if $modelingStyle === 'dimensional_model'}
 							<p class="text-sm text-gray-600">
@@ -1071,31 +1082,27 @@
 					{#if entityType === 'dimension'}
 						<div>
 							<div class="flex items-center gap-2 mb-3">
-								<label class="block text-sm font-semibold text-gray-700">
-									Roles ({entityRoles.length})
-								</label>
+					<label class="block text-sm font-semibold text-gray-700">
+								Roles ({uniqueEntityRoles.length})
+							</label>
 								<button
 									type="button"
 									class="text-gray-400 hover:text-gray-600 transition-colors"
-									title="Role-playing dimensions: Track different contextual uses of the same dimension (e.g., 'order_date', 'ship_date', 'delivery_date' for a Date dimension)"
+									title="Role-playing dimensions: Track different contextual uses of the this dimension (e.g. 'date' can become 'order_date', 'ship_date', 'delivery_date')"
 								>
 									<Icon icon="lucide:info" class="w-4 h-4" />
 								</button>
 							</div>
 
-							{#if entityRoles.length === 0 && !roleInput}
+							{#if uniqueEntityRoles.length === 0 && !roleInput}
 								<!-- Empty state -->
-								<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
-									<Icon icon="lucide:users" class="w-8 h-8 text-gray-400 mx-auto mb-2" />
-									<p class="text-sm text-gray-600 mb-1">No roles defined for this dimension</p>
-									<p class="text-xs text-gray-500">Roles track different contextual uses (e.g., order_date, ship_date)</p>
-								</div>
+								<p class="text-xs text-gray-400 italic">No roles defined for this dimension. Use this functionality if this entity 'slips' into different roles and functions.</p>
 							{:else}
 								<!-- Role list -->
 								<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
-									{#if entityRoles.length > 0}
+									{#if uniqueEntityRoles.length > 0}
 										<div class="divide-y divide-gray-200">
-											{#each entityRoles as role, index}
+											{#each uniqueEntityRoles as role}
 												<div class="border-b border-gray-200 last:border-b-0">
 													<!-- Role header -->
 													<div class="px-4 py-3 hover:bg-gray-50 transition-colors group flex items-center justify-between">
@@ -1112,7 +1119,7 @@
 																/>
 															</button>
 
-															{#if editingRoleIndex === index}
+															{#if editingRoleName === role.role}
 																<!-- Edit mode -->
 																<input
 																	type="text"
@@ -1127,7 +1134,7 @@
 																<!-- View mode -->
 																<button
 																	type="button"
-																	onclick={() => startEditingRole(index)}
+																	onclick={() => startEditingRole(role)}
 																	class="flex-1 text-left px-2 py-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors rounded"
 																	title="Click to edit"
 																>
@@ -1142,7 +1149,7 @@
 														<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 															<button
 																type="button"
-																onclick={() => startEditingRole(index)}
+																onclick={() => startEditingRole(role)}
 																class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
 																title="Edit role"
 															>
@@ -1150,7 +1157,7 @@
 															</button>
 															<button
 																type="button"
-																onclick={() => confirmDeleteRole(index)}
+																onclick={() => confirmDeleteRole(role.role || '')}
 																class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
 																title="Delete role"
 															>
@@ -1197,7 +1204,7 @@
 									bind:value={roleInput}
 									onkeydown={handleRoleInputKeydown}
 									class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-									placeholder="e.g., Sales Agent, Manager, Team Lead"
+									placeholder="e.g. Employee = Sales Agent, Manager, Team Lead, ..."
 								/>
 								<button
 									type="button"
@@ -1514,18 +1521,18 @@
 			</div>
 
 			<!-- Delete Role Confirmation Modal -->
-			{#if deletingRoleIndex !== null}
-				<div class="absolute inset-0 bg-gray-900/50 flex items-center justify-center z-10 rounded-xl">
-					<div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4 border-2 border-red-200">
-						<div class="flex items-start gap-3 mb-4">
-							<Icon icon="lucide:alert-triangle" class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-							<div>
-								<h3 class="text-lg font-bold text-gray-900 mb-1">Remove Role?</h3>
-								<p class="text-sm text-gray-600">
-									Are you sure you want to remove the role <span class="font-semibold text-gray-900">"{entityRoles[deletingRoleIndex]}"</span>?
-								</p>
-							</div>
+		{#if deletingRoleName !== null}
+			<div class="absolute inset-0 bg-gray-900/50 flex items-center justify-center z-10 rounded-xl">
+				<div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4 border-2 border-red-200">
+					<div class="flex items-start gap-3 mb-4">
+						<Icon icon="lucide:alert-triangle" class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+						<div>
+							<h3 class="text-lg font-bold text-gray-900 mb-1">Remove Role?</h3>
+							<p class="text-sm text-gray-600">
+								Are you sure you want to remove the role <span class="font-semibold text-gray-900">"{deletingRoleName}"</span>?
+							</p>
 						</div>
+					</div>
 						<div class="flex gap-2 justify-end">
 							<button
 								onclick={cancelDeleteRole}
