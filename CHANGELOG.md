@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.1] - 2026-04-08
+## [0.13.1] - 2026-04-08
 
 ### Fixed
 - **Entity type badge hidden in entity-modeling mode**: the Fact / Dimension / Unclassified badge in `EntityList` rows is no longer shown when the modeling style is `entity_model`. The badge is only visible in `dimensional_model` mode, eliminating the "Unclassified" clutter that appeared next to every entity during entity modeling. Fixes [#72](https://github.com/timhiebenthal/trellis-datamodel/issues/72).
