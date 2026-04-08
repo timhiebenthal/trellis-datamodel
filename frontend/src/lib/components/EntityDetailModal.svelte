@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
-	import { nodes, edges, entityDetailModal, pushHistory, dbtModels } from '$lib/stores';
+	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole } from '$lib/types';
 	import type { Node } from '@xyflow/svelte';
@@ -759,9 +759,11 @@
 						>
 							{entityName || 'Entity'} Details
 						</h2>
-						<p class="text-sm text-gray-600">
-							{entityType === 'dimension' ? 'Dimension' : entityType === 'fact' ? 'Fact' : 'Unclassified'} entity
-						</p>
+						{#if $modelingStyle === 'dimensional_model'}
+							<p class="text-sm text-gray-600">
+								{entityType === 'dimension' ? 'Dimension' : entityType === 'fact' ? 'Fact' : 'Unclassified'} entity
+							</p>
+						{/if}
 					</div>
 					<button
 						class="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
@@ -850,120 +852,122 @@
 						></textarea>
 					</div>
 
-					<!-- Entity Type and 7Ws - Same Row -->
-					<div class="grid grid-cols-2 gap-4">
-						<!-- Entity Type - Compact Chips -->
-						<div>
-							<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Entity Type</label>
-							<div class="flex gap-2">
-								<button
-									type="button"
-									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'dimension'
-										? 'bg-green-50 border-green-500 text-green-700'
-										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
-									onclick={() => (entityType = 'dimension')}
-								>
-									<Icon icon="lucide:list" class="w-4 h-4 inline-block mr-1" />
-									Dimension
-								</button>
-								<button
-									type="button"
-									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'fact'
-										? 'bg-blue-50 border-blue-500 text-blue-700'
-										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
-									onclick={() => (entityType = 'fact')}
-								>
-									<Icon icon="lucide:bar-chart-3" class="w-4 h-4 inline-block mr-1" />
-									Fact
-								</button>
-								<button
-									type="button"
-									class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'unclassified'
-										? 'bg-gray-50 border-gray-500 text-gray-700'
-										: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
-									onclick={() => (entityType = 'unclassified')}
-								>
-									<Icon icon="lucide:circle-help" class="w-4 h-4 inline-block mr-1" />
-									Unclassified
-								</button>
-							</div>
-						</div>
-
-						<!-- Annotation Type (7Ws) - Chip/Badge style for dimensions only -->
-						{#if entityType === 'dimension'}
-							<div class="relative annotation-dropdown-container">
-								<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-									Annotation Type (7Ws)
-								</label>
-								<!-- Selected chip/badge or placeholder -->
-								<button
-									type="button"
-									class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
-										? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
-										: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200'}"
-									onclick={() => (show7WsDropdown = !show7WsDropdown)}
-								>
-									{#if annotationType}
-										<span>
-											{annotationTypes.find((a) => a.value === annotationType)?.label}
-										</span>
-									{:else}
-										<span>Select 7W...</span>
-									{/if}
-									<Icon
-										icon="lucide:chevron-down"
-										class="w-3 h-3 transition-transform {show7WsDropdown ? 'rotate-180' : ''}"
-									/>
-								</button>
-
-								<!-- Dropdown menu -->
-								{#if show7WsDropdown}
-									<div
-										class="absolute z-10 mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]"
+					<!-- Entity Type and 7Ws (dimensional modeling only) -->
+					{#if $modelingStyle === 'dimensional_model'}
+						<div class="grid grid-cols-2 gap-4">
+							<!-- Entity Type - Compact Chips -->
+							<div>
+								<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Entity Type</label>
+								<div class="flex gap-2">
+									<button
+										type="button"
+										class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'dimension'
+											? 'bg-green-50 border-green-500 text-green-700'
+											: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+										onclick={() => (entityType = 'dimension')}
 									>
-										<div class="max-h-60 overflow-y-auto">
-											{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
+										<Icon icon="lucide:list" class="w-4 h-4 inline-block mr-1" />
+										Dimension
+									</button>
+									<button
+										type="button"
+										class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'fact'
+											? 'bg-blue-50 border-blue-500 text-blue-700'
+											: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
+										onclick={() => (entityType = 'fact')}
+									>
+										<Icon icon="lucide:bar-chart-3" class="w-4 h-4 inline-block mr-1" />
+										Fact
+									</button>
+									<button
+										type="button"
+										class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'unclassified'
+											? 'bg-gray-50 border-gray-500 text-gray-700'
+											: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
+										onclick={() => (entityType = 'unclassified')}
+									>
+										<Icon icon="lucide:circle-help" class="w-4 h-4 inline-block mr-1" />
+										Unclassified
+									</button>
+								</div>
+							</div>
+
+							<!-- Annotation Type (7Ws) - Chip/Badge style for dimensions only -->
+							{#if entityType === 'dimension'}
+								<div class="relative annotation-dropdown-container">
+									<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+										Annotation Type (7Ws)
+									</label>
+									<!-- Selected chip/badge or placeholder -->
+									<button
+										type="button"
+										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
+											? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
+											: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200'}"
+										onclick={() => (show7WsDropdown = !show7WsDropdown)}
+									>
+										{#if annotationType}
+											<span>
+												{annotationTypes.find((a) => a.value === annotationType)?.label}
+											</span>
+										{:else}
+											<span>Select 7W...</span>
+										{/if}
+										<Icon
+											icon="lucide:chevron-down"
+											class="w-3 h-3 transition-transform {show7WsDropdown ? 'rotate-180' : ''}"
+										/>
+									</button>
+
+									<!-- Dropdown menu -->
+									{#if show7WsDropdown}
+										<div
+											class="absolute z-10 mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]"
+										>
+											<div class="max-h-60 overflow-y-auto">
+												{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
+													<button
+														type="button"
+														class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
+															? option.color
+															: 'text-gray-700'}"
+														onclick={() => {
+															annotationType = option.value;
+															show7WsDropdown = false;
+														}}
+													>
+														{#if annotationType === option.value}
+															<Icon icon="lucide:check" class="w-4 h-4" />
+														{:else}
+															<span class="w-4"></span>
+														{/if}
+														{option.label}
+													</button>
+												{/each}
 												<button
 													type="button"
-													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
-														? option.color
-														: 'text-gray-700'}"
+													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
+														? 'bg-gray-50 text-gray-700'
+														: 'text-gray-500'}"
 													onclick={() => {
-														annotationType = option.value;
+														annotationType = undefined;
 														show7WsDropdown = false;
 													}}
 												>
-													{#if annotationType === option.value}
+													{#if annotationType === undefined}
 														<Icon icon="lucide:check" class="w-4 h-4" />
 													{:else}
 														<span class="w-4"></span>
 													{/if}
-													{option.label}
+													None
 												</button>
-											{/each}
-											<button
-												type="button"
-												class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
-													? 'bg-gray-50 text-gray-700'
-													: 'text-gray-500'}"
-												onclick={() => {
-													annotationType = undefined;
-													show7WsDropdown = false;
-												}}
-											>
-												{#if annotationType === undefined}
-													<Icon icon="lucide:check" class="w-4 h-4" />
-												{:else}
-													<span class="w-4"></span>
-												{/if}
-												None
-											</button>
+											</div>
 										</div>
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</div>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					{/if}
 
 					<!-- Tags and Source Systems - Side by Side -->
 					<div class="grid grid-cols-2 gap-4">

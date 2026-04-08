@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "@iconify/svelte";
 	import type { Entity } from "$lib/types";
-	import { entityDetailModal, entitySelection } from "$lib/stores";
+	import { entityDetailModal, entitySelection, modelingStyle } from "$lib/stores";
 	import DomainBadge from "./DomainBadge.svelte";
 
 	type Props = {
@@ -158,16 +158,18 @@
 			{entity.label}
 		</span>
 
-		<!-- Type badge -->
-		<span
-			class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {typeBadgeColor()}"
-			title={`Entity Type: ${typeLabel()}`}
-		>
-			{typeLabel()}
-		</span>
+		<!-- Type badge (only visible in dimensional modeling) -->
+		{#if $modelingStyle === 'dimensional_model'}
+			<span
+				class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {typeBadgeColor()}"
+				title={`Entity Type: ${typeLabel()}`}
+			>
+				{typeLabel()}
+			</span>
+		{/if}
 
-		<!-- 7Ws annotation badge (for dimensions) -->
-		{#if annotationTypeLabel()}
+		<!-- 7Ws annotation badge (dimensional modeling only) -->
+		{#if $modelingStyle === 'dimensional_model' && annotationTypeLabel()}
 			<span
 				class="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {annotationTypeColor()}"
 				title="Annotation Type: {annotationTypeLabel()}"
