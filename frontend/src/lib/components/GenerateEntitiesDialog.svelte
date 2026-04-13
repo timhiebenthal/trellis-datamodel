@@ -574,12 +574,12 @@
                             ? displayTags
                             : undefined;
 
-                    const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const domain = ((n.data as any)?.domain) as string | undefined;
                     const domains = ((n.data as any)?.domains) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
                     const roles = ((n.data as any)?.roles) as string[] | undefined;
+                    const isDimensional = $modelingStyle === 'dimensional_model';
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -592,8 +592,11 @@
                         panel_height: n.data?.panelHeight as number | undefined,
                         collapsed: (n.data?.collapsed as boolean) ?? false,
                         tags: tagsToPersist,
-                        entity_type: entity_type,
                     };
+                    // Only include entity_type for dimensional modeling
+                    if (isDimensional) {
+                        entity.entity_type = ((n.data as any)?.entity_type) || 'unclassified';
+                    }
 
                     if (domain && domain.trim()) {
                         entity.domain = domain.trim();
