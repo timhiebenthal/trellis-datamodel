@@ -1947,7 +1947,7 @@
     }
 
     :global(.connection-handle) {
-        color: rgb(209 213 219); /* gray-300 — icon default */
+        color: transparent;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
