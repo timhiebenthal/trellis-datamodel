@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **`trellis generate-company-data` works when installed from PyPI**: the `generate_data.py` script is now bundled in the package, so users don't need the `dbt_company_dummy` project locally. The script is found automatically from the installed package location. Also improved error messages when the script can't be found.
-- **Output directory isolation**: running `dbt run` from the generated project now uses `--profiles-dir .` to avoid interfering with the user's dbt configuration.
+- **Output directory isolation**: running `dbt run` from the generated project now uses `--profiles-dir .` to avoid interfering with the user's dbt configuration. Also added `require-dbt-version: "1.10.0"` to the scaffolded project to warn on version mismatches.
+- **CLI dependency documentation**: added `Requires:` note in `--help` output and error message for missing dbt dependency, pointing users to `pip install trellis-datamodel[dbt-example]`.
 
 ## [0.13.4] - 2026-04-13
 
