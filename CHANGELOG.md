@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.5] - 2026-04-13
+
+### Fixed
+- **`trellis generate-company-data` works when installed from PyPI**: the `generate_data.py` script is now bundled in the package, so users don't need the `dbt_company_dummy` project locally. The script is found automatically from the installed package location. Also improved `--help` output with clear usage instructions and better error messages when the script can't be found.
+
 ## [0.13.4] - 2026-04-13
 
 ### Fixed
