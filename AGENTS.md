@@ -26,3 +26,9 @@
 - Short sentence summaries (see `git log`). Prefix `(fix:`, `(feat:`, `(style:`, ...).
 - Branch from `main`, keep PRs focused, include context + linked issues. Run pytest + `npm run test:smoke` (`make test-all` for larger changes) before opening PR.
 - Docs and changelog accompany behavior changes. Sign CLA (`CLA.md`) once. DCO sign-off (`git commit -s`) if org prefers.
+
+## Execution Guidelines
+- **Think before coding**: State assumptions. If uncertain, ask. If multiple interpretations exist, present them. Push back on simpler approach.
+- **Simplicity first**: No speculative features. No abstractions for single-use. If 200 lines solve what 50 could, rewrite.
+- **Surgical changes**: Touch only what needed. Don't "improve" adjacent code. Match existing style. Remove imports/variables your changes make unused.
+- **Goal-driven**: Define success criteria. "Fix bug" → write test reproducing it, then make pass. Multi-step: state plan, verify each.
