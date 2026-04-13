@@ -1955,8 +1955,8 @@
     }
 
     :global(.connection-handle:hover) {
-        color: rgb(59 130 246) !important; /* blue-500 */
-        background-color: rgb(239 246 255) !important; /* blue-50 */
+        color: rgb(38 166 154) !important; /* teal #26A69A */
+        background-color: rgb(224 242 241) !important; /* teal-50 */
     }
 
     .height-resize-handle {
