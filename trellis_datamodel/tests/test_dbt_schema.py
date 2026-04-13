@@ -150,7 +150,6 @@ class TestSaveDbtSchema:
         assert v2_columns[0]["name"] == "player_uuid"
         assert versions[2].get("config", {}).get("tags") == ["core"]
 
-
     def test_writes_relationship_test_for_many_to_one(
         self, test_client, temp_dir, temp_data_model_path
     ):
@@ -286,6 +285,78 @@ class TestSyncDbtTests:
         assert result["status"] == "success"
         assert len(result["files"]) == 2  # One for each entity
 
+    def test_syncs_relationship_tests_with_entity_type(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """
+        Regression test: relationship type should be determined by entity_type when
+        relationship has no explicit type set (or defaults incorrectly).
+
+        When source is fact and target is dimension (e.g., orders -> customers),
+        the FK is typically on the fact side (source), making it many_to_one.
+        When source is dimension and target is fact (e.g., customers -> orders),
+        the FK is typically on the fact side (target), making it one_to_many.
+
+        This test ensures the backend correctly writes relationship tests based on
+        the relationship type, not based on entity_type inference.
+        """
+        # Test case 1: fact -> dimension should result in FK on source (many_to_one)
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim_customers",
+                    "label": "Customers",
+                    "entity_type": "dimension",
+                    "position": {"x": 0, "y": 0},
+                },
+                {
+                    "id": "fct_orders",
+                    "label": "Orders",
+                    "entity_type": "fact",
+                    "position": {"x": 100, "y": 0},
+                    "drafted_fields": [{"name": "customer_id", "datatype": "int"}],
+                },
+            ],
+            # Relationship from dimension (source) to fact (target)
+            # With one_to_many, FK should be on target (fact/fct_orders)
+            "relationships": [
+                {
+                    "source": "dim_customers",
+                    "target": "fct_orders",
+                    "type": "one_to_many",
+                    "source_field": "id",
+                    "target_field": "customer_id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # fct_orders.yml should have the relationship test (FK on target)
+        orders_yml = os.path.join(temp_dir, "models", "3_core", "fct_orders.yml")
+        assert os.path.exists(orders_yml)
+        with open(orders_yml, "r") as f:
+            schema = yaml.safe_load(f)
+
+        # Find customer_id column
+        customer_id_col = None
+        for col in schema["models"][0]["columns"]:
+            if col["name"] == "customer_id":
+                customer_id_col = col
+                break
+
+        assert customer_id_col is not None, "customer_id column not found"
+        assert "data_tests" in customer_id_col, "FK test not written"
+        # Should reference dim_customers
+        assert any(
+            "dim_customers" in str(test.get("relationships", {}).get("arguments", {}))
+            for test in customer_id_col["data_tests"]
+        ), "Relationship test should reference dim_customers"
+
     def test_syncs_using_dbt_model_names(
         self, test_client, temp_dir, temp_data_model_path
     ):
@@ -341,7 +412,9 @@ class TestSyncDbtTests:
             }
         ]
 
-    def test_syncs_many_to_one_relationship(self, test_client, temp_dir, temp_data_model_path):
+    def test_syncs_many_to_one_relationship(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
         """
         Ensure many_to_one relationships write FK test to source entity (the "many" side).
         """
@@ -410,7 +483,9 @@ class TestSyncDbtTests:
                             for test in tests:
                                 if "relationships" in test:
                                     rel = test["relationships"]
-                                    ref = rel.get("arguments", {}).get("to", "") or rel.get("to", "")
+                                    ref = rel.get("arguments", {}).get(
+                                        "to", ""
+                                    ) or rel.get("to", "")
                                     assert "ref('orders')" not in ref
 
     def test_removes_stale_relationship_tests_when_type_changes(
@@ -460,7 +535,7 @@ class TestSyncDbtTests:
         assert os.path.exists(orders_yml)
         with open(orders_yml, "r") as f:
             schema = yaml.safe_load(f)
-        
+
         # Verify FK test is on orders.customer_id
         rel_tests = schema["models"][0]["columns"][0]["data_tests"]
         assert len(rel_tests) == 1
@@ -486,7 +561,7 @@ class TestSyncDbtTests:
         # Verify orders.yml still has the test (FK is still on orders, just different semantics)
         with open(orders_yml, "r") as f:
             schema = yaml.safe_load(f)
-        
+
         rel_tests = schema["models"][0]["columns"][0]["data_tests"]
         assert len(rel_tests) == 1
         assert "relationships" in rel_tests[0]
@@ -506,7 +581,9 @@ class TestSyncDbtTests:
                             for test in tests:
                                 if "relationships" in test:
                                     rel = test["relationships"]
-                                    ref = rel.get("arguments", {}).get("to", "") or rel.get("to", "")
+                                    ref = rel.get("arguments", {}).get(
+                                        "to", ""
+                                    ) or rel.get("to", "")
                                     assert "ref('orders')" not in ref
 
     def test_removes_stale_tests_when_swapping_one_to_many_to_many_to_one(
@@ -554,7 +631,7 @@ class TestSyncDbtTests:
         assert os.path.exists(cool_stuff_yml)
         with open(cool_stuff_yml, "r") as f:
             schema = yaml.safe_load(f)
-        
+
         # Verify FK test exists on cool_stuff.department_id
         rel_tests = schema["models"][0]["columns"][0]["data_tests"]
         assert len(rel_tests) == 1
@@ -573,7 +650,7 @@ class TestSyncDbtTests:
         # Verify cool_stuff.yml no longer has the relationship test
         with open(cool_stuff_yml, "r") as f:
             schema = yaml.safe_load(f)
-        
+
         # cool_stuff.department_id should NOT have relationship test anymore
         if "columns" in schema["models"][0]:
             for col in schema["models"][0]["columns"]:
@@ -588,7 +665,7 @@ class TestSyncDbtTests:
         assert os.path.exists(department_yml)
         with open(department_yml, "r") as f:
             dept_schema = yaml.safe_load(f)
-        
+
         # department.department_id should have relationship test pointing to cool_stuff
         rel_tests = dept_schema["models"][0]["columns"][0]["data_tests"]
         assert len(rel_tests) == 1
@@ -1313,7 +1390,11 @@ class TestEntityPrefixApplication:
         monkeypatch.setattr(
             cfg,
             "ENTITY_MODELING_CONFIG",
-            type("obj", (object,), {"enabled": True, "entity_prefix": ["tbl_", "entity_", "t_"]})(),
+            type(
+                "obj",
+                (object,),
+                {"enabled": True, "entity_prefix": ["tbl_", "entity_", "t_"]},
+            )(),
         )
         monkeypatch.setattr(cfg, "MODELING_STYLE", "entity_model")
 

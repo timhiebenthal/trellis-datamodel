@@ -951,6 +951,8 @@
         let finalSourceField = $draggingField.fieldName;
         let finalTargetField = targetFieldName;
         let relationshipType: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many' = 'one_to_many';
+        const sourceEntityType = (sourceNodeData?.entity_type as string | undefined) || 'unclassified';
+        const targetEntityType = (targetNodeData?.entity_type as string | undefined) || 'unclassified';
         
         if (sourceActiveModel && targetActiveModel) {
             try {
@@ -1013,6 +1015,16 @@
             }
         }
         // If models aren't bound (greenfield), use drag direction - user can manually swap if needed
+        if (!sourceActiveModel || !targetActiveModel) {
+            // Prefer dimensional typing when available:
+            // - fact -> dimension typically means FK is on source (many_to_one)
+            // - dimension -> fact typically means FK is on target (one_to_many)
+            if (sourceEntityType === 'fact' && targetEntityType === 'dimension') {
+                relationshipType = 'many_to_one';
+            } else if (sourceEntityType === 'dimension' && targetEntityType === 'fact') {
+                relationshipType = 'one_to_many';
+            }
+        }
         
         // Create relationship object
         const relationship = {
