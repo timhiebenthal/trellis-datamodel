@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.0] - 2026-04-13
+## [0.13.4] - 2026-04-13
 
 ### Fixed
 - **Relationship tests not written to dbt schema.yml for unbound entities**: when creating a relationship by dragging one entity's field onto another where at least one entity was not bound to a dbt model, the relationship type always defaulted to `one_to_many`. This caused the backend to write the relationship test to the wrong entity (target instead of source) when the relationship should have been `many_to_one`. The frontend now infers the relationship type from the entity's `entity_type` (fact/dimension) when either entity is unbound — fact → dimension becomes `many_to_one` (FK on source), dimension → fact becomes `one_to_many` (FK on target), matching the dimensional modeling convention.
