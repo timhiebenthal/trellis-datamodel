@@ -1,28 +1,28 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-- `trellis_datamodel/`: Python backend (Typer CLI + FastAPI), organized into `adapters/`, `routes/`, `services/`, `models/`, and static assets served from `trellis_datamodel/static/`; backend tests live in `trellis_datamodel/tests/`.
-- `frontend/`: SvelteKit + TypeScript UI with Tailwind; tests under `frontend/tests/` (Vitest unit, Playwright smoke/E2E).
-- `resources/` (branding assets), `scripts/` (utility scripts like version checks), `dbt_built/` and `dbt_company_dummy/` (example dbt artifacts), `dist/` (built wheels), and `trellis.yml` as the default runtime config.
+## Project Structure
+- `trellis_datamodel/`: Python backend (Typer CLI + FastAPI) — adapters/, routes/, services/, models/, static/; tests in `trellis_datamodel/tests/`.
+- `frontend/`: SvelteKit + TypeScript + Tailwind; tests in `frontend/tests/` (Vitest unit, Playwright smoke/E2E).
+- `resources/`, `scripts/`, `dbt_built/`, `dbt_company_dummy/`, `dist/`, `trellis.yml` (default config).
 
-## Build, Test, and Development Commands
-- Install deps: `make setup` (runs `uv sync` + `npm install`), or run each command manually if you prefer.
-- Run locally: `make backend` (FastAPI on :8089) and `make frontend` (Vite on :5173); `make dev` prints both commands for two terminals. `trellis run -p 8089` starts the bundled app with the packaged static build.
-- Package: `make build-package` builds the frontend, copies artifacts to `trellis_datamodel/static/`, and produces wheels in `dist/`.
-- Tests: backend `uv run pytest`; frontend `cd frontend && npm run test:smoke|check|test:unit|test:e2e` or `npm run test` for all. Makefile equivalents: `make test-smoke`, `make test-unit`, `make test-e2e`, `make test-all`.
+## Build & Test Commands
+- `make setup` — `uv sync` + `npm install`.
+- `make backend` — FastAPI :8089. `make frontend` — Vite :5173. `make dev` prints both. `trellis run -p 8089` bundled app.
+- `make build-package` — frontend build → `trellis_datamodel/static/` → wheels in `dist/`.
+- Backend: `uv run pytest`. Frontend: `cd frontend && npm run test:smoke|check|test:unit|test:e2e|`npm run test` for all. Make equivalents: `make test-smoke|test-unit|test-e2e|test-all`.
 
-## Coding Style & Naming Conventions
-- Python: target 3.11+, 4-space indents, type hints, and small focused functions; keep module and test names `snake_case`. Follow existing FastAPI/Typer patterns for routers and CLI commands.
-- Frontend: Svelte components in PascalCase (`Component.svelte`), colocate helpers in the same folder, prefer TypeScript types over `any`, and use Tailwind utility classes consistently. Run `npm run check` before committing to catch TS/Svelte issues.
-- Config: `trellis.yml` uses snake_case keys (`dbt_project_path`, `dbt_manifest_path`, etc.); keep secrets and environment-specific paths out of version control.
-- **Dimension & Fact Styling**: Consistently use green for dimensions (`bg-green-200`, `text-green-900`, icon `lucide:list`) and blue for facts (`bg-blue-200`, `text-blue-900`, icon `lucide:bar-chart-3`) across all UI components (canvas, annotations, badges, etc.).
+## Coding Style
+- Python: 3.11+, 4-space indents, type hints, small focused functions. Names `snake_case`. Follow FastAPI/Typer router/CLI patterns.
+- Frontend: Svelte components PascalCase (`Component.svelte`), colocate helpers, prefer TS types over `any`, Tailwind consistent. Run `npm run check` before commit.
+- Config: `trellis.yml` snake_case keys (`dbt_project_path`, `dbt_manifest_path`, etc.). Keep secrets out of version control.
+- **Dimension & Fact**: Green for dimensions (`bg-green-200`, `text-green-900`, `lucide:list`), blue for facts (`bg-blue-200`, `text-blue-900`, `lucide:bar-chart-3`) — canvas, annotations, badges, etc.
 
-## Testing Guidelines
-- Add or update pytest cases in `trellis_datamodel/tests/test_*.py` alongside the feature you touch; mirror fixtures in `conftest.py` when possible.
-- Frontend smoke tests (`npm run test:smoke`) catch crashes; `npm run test:e2e` spins up the backend with isolated test data (`frontend/tests/test_data_model.yml`). Prefer adding Vitest unit coverage for logic and Playwright specs for flows.
-- Aim to keep test data deterministic; avoid reusing production `trellis.yml` or dbt artifacts in tests.
+## Testing
+- pytest cases in `trellis_datamodel/tests/test_*.py` alongside feature; mirror fixtures in `conftest.py` when possible.
+- Frontend smoke (`npm run test:smoke`) catches crashes. `npm run test:e2E` spins backend with isolated test data (`frontend/tests/test_data_model.yml`). Prefer Vitest unit + Playwright specs.
+- Keep test data deterministic. Avoid production `trellis.yml` or dbt artifacts in tests.
 
-## Commit & Pull Request Guidelines
-- Commit messages follow short, sentence-style summaries (see `git log`); add commit prefixes like (fix:, feat:, style:, ...).
-- Create branches from `main`, keep PRs focused, and include context plus linked issues. Run backend pytest and at least `npm run test:smoke` (or `make test-all` for larger changes) before opening a PR.
-- Documentation and changelog updates should accompany behavior changes. Signing the CLA (`CLA.md`) is required once; add a DCO sign-off (`git commit -s`) if your organization prefers.
+## Commit & PR
+- Short sentence summaries (see `git log`). Prefix `(fix:`, `(feat:`, `(style:`, ...).
+- Branch from `main`, keep PRs focused, include context + linked issues. Run pytest + `npm run test:smoke` (`make test-all` for larger changes) before opening PR.
+- Docs and changelog accompany behavior changes. Sign CLA (`CLA.md`) once. DCO sign-off (`git commit -s`) if org prefers.
