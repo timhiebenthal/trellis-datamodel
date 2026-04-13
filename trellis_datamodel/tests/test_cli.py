@@ -419,6 +419,11 @@ class TestCLIInstalledPackage:
             check=True,
             capture_output=True,
         )
+        subprocess.run(
+            [str(pip), "install", "pandas", "faker"],
+            check=True,
+            capture_output=True,
+        )
 
     def _get_venv_trellis_command(self, venv_dir: Path) -> Path:
         """Get path to trellis command in venv."""
