@@ -510,7 +510,8 @@ data_model_file: "data_model.yml"
                     capture_output=True,
                     text=True,
                     cwd=str(user_project_dir),
-                    env=test_env,  # Use clean environment without test vars
+                    env=test_env,
+                    input=f"{user_project_dir}\ny\n",  # Provide output path and confirm
                 )
 
                 assert result.returncode == 0, (
