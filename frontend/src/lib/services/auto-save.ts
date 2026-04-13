@@ -3,7 +3,7 @@ import type { DataModel, EntityRole } from '$lib/types';
 import { getApiBase, saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
 import { get } from 'svelte/store';
-import { sourceColors as sourceColorsStore } from '$lib/stores';
+import { sourceColors as sourceColorsStore, modelingStyle as modelingStyleStore } from '$lib/stores';
 
 /**
  * AutoSave service - Manages debounced saves for node/edge state changes.
@@ -256,12 +256,12 @@ export class AutoSaveService {
                             ? displayTags
                             : undefined;
 
-                    const entity_type = ((n.data as any)?.entity_type) || 'unclassified';
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
                     const roles = ((n.data as any)?.roles) as EntityRole[] | undefined;
                     const domain = ((n.data as any)?.domain) as string | undefined;
                     const domains = ((n.data as any)?.domains) as string[] | undefined;
+                    const isDimensional = get(modelingStyleStore) === 'dimensional_model';
                     const entity: any = {
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
@@ -275,9 +275,11 @@ export class AutoSaveService {
                         collapsed: (n.data?.collapsed as boolean) ?? false,
                         // Persist display tags only; schema writes rely on _schemaTags.
                         tags: tagsToPersist,
-                        // Include entity_type with default "unclassified" if not set
-                        entity_type: entity_type,
                     };
+                    // Only include entity_type for dimensional modeling
+                    if (isDimensional) {
+                        entity.entity_type = ((n.data as any)?.entity_type) || 'unclassified';
+                    }
 
                     // Include domain if present
                     if (domain && domain.trim()) {

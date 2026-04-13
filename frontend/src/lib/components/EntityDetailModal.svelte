@@ -663,7 +663,8 @@
 				entityAttributes,
 				$edges,
 				$nodes,
-				entityId
+				entityId,
+				$modelingStyle === 'dimensional_model'
 			);
 
 			// Success - file downloads automatically
@@ -685,7 +686,8 @@
 				entityAttributes,
 				$edges,
 				$nodes,
-				entityId
+				entityId,
+				$modelingStyle === 'dimensional_model'
 			);
 			await navigator.clipboard.writeText(markdown);
 			

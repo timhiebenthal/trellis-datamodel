@@ -27,7 +27,8 @@ export function formatEntityAsMarkdown(
 	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>,
 	edges: any[],
 	allNodes: Node[],
-	entityId: string
+	entityId: string,
+	isDimensional: boolean = true
 ): string {
 	const lines: string[] = [];
 
@@ -36,7 +37,9 @@ export function formatEntityAsMarkdown(
 	lines.push('');
 
 	// Metadata section
-	lines.push(`**Type:** ${formatEntityType(entity.entity_type)}`);
+	if (isDimensional) {
+		lines.push(`**Type:** ${formatEntityType(entity.entity_type)}`);
+	}
 	lines.push(`**7W Annotation:** ${formatAnnotationType(entity.annotation_type)}`);
 	lines.push(`**Domain(s):** ${entity.domains?.join(', ') || entity.domain || '-'}`);
 	lines.push(`**Tags:** ${entity.tags?.join(', ') || '-'}`);

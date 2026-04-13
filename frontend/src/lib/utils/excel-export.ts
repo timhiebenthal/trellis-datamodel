@@ -125,12 +125,12 @@ export function formatRelationshipType(type: string): string {
  * @returns Configured XLSX worksheet with bold headers and column widths
  * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
-export function generateOverviewSheet(entity: EntityData): XLSX.WorkSheet {
+export function generateOverviewSheet(entity: EntityData, isDimensional: boolean = true): XLSX.WorkSheet {
 	// Create 2-column array: Field | Value
-	const overviewData = [
+	const overviewData: (string | undefined)[][] = [
 		['Field', 'Value'],
 		['Entity Name', entity.label],
-		['Entity Type', formatEntityType(entity.entity_type)],
+		...(isDimensional ? [['Entity Type', formatEntityType(entity.entity_type)]] : []),
 		['Annotation (7W)', formatAnnotationType(entity.annotation_type)],
 		['Domain(s)', entity.domains?.join(', ') || entity.domain || '-'],
 		['Tags', entity.tags?.join(', ') || '-'],
@@ -273,11 +273,12 @@ export function exportEntityToExcel(
 	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>,
 	edges: any[],
 	allNodes: Node[],
-	entityId: string
+	entityId: string,
+	isDimensional: boolean = true
 ): void {
 	try {
 		// Generate three sheets using generators
-		const overviewSheet = generateOverviewSheet(entity);
+		const overviewSheet = generateOverviewSheet(entity, isDimensional);
 		const attributesSheet = generateAttributesSheet(attributes);
 		const relationshipsSheet = generateRelationshipsSheet(edges, entityId, allNodes);
 
@@ -310,15 +311,10 @@ export function exportEntityToExcel(
  */
 export function generateDataModelOverviewSheet(
 	entityNodes: Node[],
-	edges: any[]
+	edges: any[],
+	isDimensional: boolean = true
 ): XLSX.WorkSheet {
 	const entityCount = entityNodes.length;
-	const factCount = entityNodes.filter(
-		(n) => (n.data as unknown as EntityData).entity_type === 'fact'
-	).length;
-	const dimensionCount = entityNodes.filter(
-		(n) => (n.data as unknown as EntityData).entity_type === 'dimension'
-	).length;
 	const relCount = edges.length;
 
 	const rows: (string | number | undefined)[][] = [];
@@ -327,9 +323,17 @@ export function generateDataModelOverviewSheet(
 	rows.push(['About this Data Model Export']);
 	rows.push(['Exported on', getDateString()]);
 	rows.push(['Total entities', entityCount]);
-	rows.push(['  Facts', factCount]);
-	rows.push(['  Dimensions', dimensionCount]);
-	rows.push(['  Unclassified', entityCount - factCount - dimensionCount]);
+	if (isDimensional) {
+		const factCount = entityNodes.filter(
+			(n) => (n.data as unknown as EntityData).entity_type === 'fact'
+		).length;
+		const dimensionCount = entityNodes.filter(
+			(n) => (n.data as unknown as EntityData).entity_type === 'dimension'
+		).length;
+		rows.push(['  Facts', factCount]);
+		rows.push(['  Dimensions', dimensionCount]);
+		rows.push(['  Unclassified', entityCount - factCount - dimensionCount]);
+	}
 	rows.push(['Total relationships', relCount]);
 	rows.push([]);
 	rows.push([
@@ -339,19 +343,32 @@ export function generateDataModelOverviewSheet(
 
 	// --- Section 2: Entity directory ---
 	rows.push(['Entity Directory']);
-	rows.push(['Name', 'Type', 'Description', 'Domains', 'Tags']);
+	if (isDimensional) {
+		rows.push(['Name', 'Type', 'Description', 'Domains', 'Tags']);
+	} else {
+		rows.push(['Name', 'Description', 'Domains', 'Tags']);
+	}
 	for (const node of entityNodes) {
 		const d = node.data as unknown as EntityData;
 		const domains = Array.isArray(d.domains) && d.domains.length > 0
 			? d.domains.join(', ')
 			: d.domain ?? '';
-		rows.push([
-			d.label ?? '',
-			formatEntityType(d.entity_type),
-			d.description ?? '',
-			domains,
-			d.tags?.join(', ') ?? ''
-		]);
+		if (isDimensional) {
+			rows.push([
+				d.label ?? '',
+				formatEntityType(d.entity_type),
+				d.description ?? '',
+				domains,
+				d.tags?.join(', ') ?? ''
+			]);
+		} else {
+			rows.push([
+				d.label ?? '',
+				d.description ?? '',
+				domains,
+				d.tags?.join(', ') ?? ''
+			]);
+		}
 	}
 	rows.push([]);
 
@@ -395,14 +412,14 @@ function draftedFieldsToAttributes(
  * Remaining sheets: one tab per entity showing its attributes (Name / Type / Description).
  * @param edges SvelteFlow edge objects — used for the overview relationships table.
  */
-export function exportDataModelToExcel(nodes: Node[], edges: any[]): void {
+export function exportDataModelToExcel(nodes: Node[], edges: any[], isDimensional: boolean = true): void {
 	try {
 		const entityNodes = nodes.filter((n) => n.type === 'entity');
 		const wb = XLSX.utils.book_new();
 		const usedSheetNames = new Set<string>();
 
 		// Always include the overview sheet first
-		const overviewSheet = generateDataModelOverviewSheet(entityNodes, edges);
+		const overviewSheet = generateDataModelOverviewSheet(entityNodes, edges, isDimensional);
 		XLSX.utils.book_append_sheet(wb, overviewSheet, sanitizeSheetName('Overview', usedSheetNames));
 
 		if (entityNodes.length === 0) {

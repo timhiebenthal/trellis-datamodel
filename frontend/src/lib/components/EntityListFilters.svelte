@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { entityListFilters, nodes, edges } from '$lib/stores';
+	import { entityListFilters, nodes, edges, modelingStyle } from '$lib/stores';
 	import type { EntityData } from '$lib/types';
 	import { exportDataModelToExcel } from '$lib/utils/excel-export';
 	import Icon from '@iconify/svelte';
@@ -118,7 +118,7 @@
 	}
 
 	function handleExportDataModel() {
-		exportDataModelToExcel($nodes, $edges);
+		exportDataModelToExcel($nodes, $edges, $modelingStyle === 'dimensional_model');
 	}
 
 	// Clear all filters
