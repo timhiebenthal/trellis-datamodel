@@ -1054,20 +1054,20 @@
 >
     <!-- Handles on all 4 sides for flexible edge routing -->
     <!-- Top -->
-    <Handle type="target" position={Position.Top} id="top-target" class="!bg-gray-400 !w-2 !h-2" />
-    <Handle type="source" position={Position.Top} id="top-source" class="!bg-gray-400 !w-2 !h-2" />
-    
-    <!-- Left -->
-    <Handle type="target" position={Position.Left} id="left-target" class="!bg-gray-400 !w-2 !h-2" />
-    <Handle type="source" position={Position.Left} id="left-source" class="!bg-gray-400 !w-2 !h-2" />
-    
-    <!-- Right -->
-    <Handle type="target" position={Position.Right} id="right-target" class="!bg-gray-400 !w-2 !h-2" />
-    <Handle type="source" position={Position.Right} id="right-source" class="!bg-gray-400 !w-2 !h-2" />
-    
+    <Handle type="target" position={Position.Top} id="top-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
+        <Icon icon="mdi:arrow-up" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+    <Handle type="source" position={Position.Top} id="top-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
+        <Icon icon="mdi:arrow-up" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+
     <!-- Bottom -->
-    <Handle type="target" position={Position.Bottom} id="bottom-target" class="!bg-gray-400 !w-2 !h-2" />
-    <Handle type="source" position={Position.Bottom} id="bottom-source" class="!bg-gray-400 !w-2 !h-2" />
+    <Handle type="target" position={Position.Bottom} id="bottom-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+    <Handle type="source" position={Position.Bottom} id="bottom-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
 
     <!-- Header -->
     <div
@@ -1944,6 +1944,19 @@
     .width-resize-handle:hover,
     .height-resize-handle:hover {
         background: rgba(38, 166, 154, 0.2);
+    }
+
+    :global(.connection-handle) {
+        color: transparent;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: color 0.15s, background-color 0.15s;
+    }
+
+    :global(.connection-handle:hover) {
+        color: rgb(38 166 154) !important; /* teal #26A69A */
+        background-color: rgb(224 242 241) !important; /* teal-50 */
     }
 
     .height-resize-handle {
