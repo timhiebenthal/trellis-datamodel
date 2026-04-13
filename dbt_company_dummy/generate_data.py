@@ -3,10 +3,17 @@ Generate mock commercial company data for modeling exercises.
 
 This script generates static CSV files with realistic commercial company data
 including departments, employees, leads, customers, products, orders, and order items.
+
+Usage:
+    python generate_data.py [output_dir]
+
+If output_dir is provided, CSV files are written to output_dir/data/.
+Otherwise, files are written to ./data/ relative to this script.
 """
 
 import os
 import random
+import sys
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import List, Dict
@@ -16,8 +23,7 @@ try:
     from faker import Faker
 except ImportError as e:
     raise ImportError(
-        f"Missing required dependency: {e.name}. "
-        "Install with: pip install pandas faker"
+        f"Missing required dependency: {e.name}. Install with: pip install pandas faker"
     ) from e
 
 # Initialize Faker with seed for reproducible data
@@ -46,6 +52,13 @@ def date_between_days_ago(start_days_ago: int, end_days_ago: int) -> date:
 PROJECT_ROOT = Path(__file__).parent
 DATA_DIR = PROJECT_ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
+
+# Override output directory if positional arg provided
+if len(sys.argv) > 1:
+    output_arg = Path(sys.argv[1])
+    PROJECT_ROOT = output_arg
+    DATA_DIR = PROJECT_ROOT / "data"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def generate_departments(count: int = 8) -> pd.DataFrame:
@@ -703,6 +716,8 @@ def scaffold_dbt_project():
         dbt_project_content = """name: 'company_dummy'
 version: '1.0.0'
 config-version: 2
+
+require-dbt-version: "1.10.0"
 
 profile: 'company_dummy'
 
@@ -1567,7 +1582,9 @@ def main():
     print("Scaffolding dbt project...")
     scaffold_dbt_project()
     print()
-    print("✓ dbt project ready! Run 'dbt build' to compile and run models.")
+    print(
+        f"✓ dbt project ready! Run 'cd {PROJECT_ROOT} && dbt run --profiles-dir .' to generate dbt artifacts needed for trellis."
+    )
 
 
 if __name__ == "__main__":

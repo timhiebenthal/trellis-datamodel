@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.5] - 2026-04-13
+
+### Added
+- **`trellis generate-company-data` prompts for output directory**: when no `dbt_company_dummy_path` is set in trellis.yml, the command now prompts for an output directory. If configured, it confirms the path with the user before generating data. Generated CSV files and the dbt project are created in the specified directory.
+- **Output directory override**: `generate_data.py` now accepts a positional argument to specify where data goes: `python generate_data.py /path/to/output`. CSV files are written to `<output>/data/`.
+
+### Fixed
+- **`trellis generate-company-data` works when installed from PyPI**: the `generate_data.py` script is now bundled in the package, so users don't need the `dbt_company_dummy` project locally. The script is found automatically from the installed package location. Also improved error messages when the script can't be found.
+- **Output directory isolation**: running `dbt run` from the generated project now uses `--profiles-dir .` to avoid interfering with the user's dbt configuration. Also added `require-dbt-version: "1.10.0"` to the scaffolded project to warn on version mismatches.
+- **CLI dependency documentation**: added `Requires:` note in `--help` output and error message for missing dbt dependency, pointing users to `pip install trellis-datamodel[dbt-example]`.
+
 ## [0.13.4] - 2026-04-13
 
 ### Fixed
