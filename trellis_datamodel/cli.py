@@ -196,10 +196,13 @@ def generate_company_data(
     Generate mock commercial company data for modeling exercises.
 
     Creates CSV files in <output_path>/data/ with departments, employees,
-    leads, customers, products, orders, and order items.
+    leads, customers, products, orders, and order items. Then scaffolds a
+    dbt project that can be run with 'dbt run --profiles-dir .'.
 
     If dbt_company_dummy_path is set in trellis.yml, confirms the output path.
     Otherwise, prompts for an output directory.
+
+    Requires: pip install trellis-datamodel[dbt-example] (for dbt-duckdb)
     """
     import subprocess
     import sys
@@ -274,6 +277,17 @@ def generate_company_data(
             )
         )
         raise typer.Exit(1)
+    except Exception as e:
+        if "dbt" in str(e).lower() or "duckdb" in str(e).lower():
+            typer.echo(
+                typer.style(
+                    "Missing dbt dependency. Install with:",
+                    fg=typer.colors.RED,
+                )
+            )
+            typer.echo("  pip install trellis-datamodel[dbt-example]")
+            raise typer.Exit(1)
+        raise
 
 
 if __name__ == "__main__":
