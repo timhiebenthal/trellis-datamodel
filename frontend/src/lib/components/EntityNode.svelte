@@ -1054,18 +1054,18 @@
 >
     <!-- Handles on all 4 sides for flexible edge routing -->
     <!-- Top -->
-    <Handle type="target" position={Position.Top} id="top-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
-        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    <Handle type="target" position={Position.Top} id="top-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
+        <Icon icon="mdi:arrow-up" class="w-3 h-3 pointer-events-none" />
     </Handle>
-    <Handle type="source" position={Position.Top} id="top-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
-        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    <Handle type="source" position={Position.Top} id="top-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
+        <Icon icon="mdi:arrow-up" class="w-3 h-3 pointer-events-none" />
     </Handle>
 
     <!-- Bottom -->
-    <Handle type="target" position={Position.Bottom} id="bottom-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+    <Handle type="target" position={Position.Bottom} id="bottom-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
         <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
     </Handle>
-    <Handle type="source" position={Position.Bottom} id="bottom-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+    <Handle type="source" position={Position.Bottom} id="bottom-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to other entity to create relationship">
         <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
     </Handle>
 
