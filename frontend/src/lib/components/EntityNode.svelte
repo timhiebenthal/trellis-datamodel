@@ -1054,20 +1054,36 @@
 >
     <!-- Handles on all 4 sides for flexible edge routing -->
     <!-- Top -->
-    <Handle type="target" position={Position.Top} id="top-target" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
-    <Handle type="source" position={Position.Top} id="top-source" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
+    <Handle type="target" position={Position.Top} id="top-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+    <Handle type="source" position={Position.Top} id="top-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
 
     <!-- Left -->
-    <Handle type="target" position={Position.Left} id="left-target" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
-    <Handle type="source" position={Position.Left} id="left-source" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
+    <Handle type="target" position={Position.Left} id="left-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+    <Handle type="source" position={Position.Left} id="left-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
 
     <!-- Right -->
-    <Handle type="target" position={Position.Right} id="right-target" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
-    <Handle type="source" position={Position.Right} id="right-source" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
+    <Handle type="target" position={Position.Right} id="right-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+    <Handle type="source" position={Position.Right} id="right-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
 
     <!-- Bottom -->
-    <Handle type="target" position={Position.Bottom} id="bottom-target" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
-    <Handle type="source" position={Position.Bottom} id="bottom-source" class="connection-handle !w-2.5 !h-2.5 !rounded-full !bg-gray-300 !border-0" title="Drag to create relationship" />
+    <Handle type="target" position={Position.Bottom} id="bottom-target" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
+    <Handle type="source" position={Position.Bottom} id="bottom-source" class="connection-handle !w-5 !h-5 !rounded-full !bg-transparent !border-0" title="Drag to create relationship">
+        <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
+    </Handle>
 
     <!-- Header -->
     <div
@@ -1946,10 +1962,18 @@
         background: rgba(38, 166, 154, 0.2);
     }
 
+    :global(.connection-handle) {
+        color: rgb(209 213 219); /* gray-300 — icon default */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: color 0.15s, background-color 0.15s, transform 0.15s;
+    }
+
     :global(.connection-handle:hover) {
-        background-color: rgb(59 130 246) !important; /* blue-500 */
-        transform: scale(1.3);
-        transition: background-color 0.15s, transform 0.15s;
+        color: rgb(59 130 246) !important; /* blue-500 */
+        background-color: rgb(239 246 255) !important; /* blue-50 */
+        transform: scale(1.2);
     }
 
     .height-resize-handle {
