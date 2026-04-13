@@ -56,7 +56,8 @@ DATA_DIR.mkdir(exist_ok=True)
 # Override output directory if positional arg provided
 if len(sys.argv) > 1:
     output_arg = Path(sys.argv[1])
-    DATA_DIR = output_arg / "data"
+    PROJECT_ROOT = output_arg
+    DATA_DIR = PROJECT_ROOT / "data"
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
