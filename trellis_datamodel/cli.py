@@ -195,20 +195,14 @@ def generate_company_data(
     """
     Generate mock commercial company data for modeling exercises.
 
-    Creates CSV files in dbt_company_dummy/data/ with departments, employees,
+    Creates CSV files in <output_path>/data/ with departments, employees,
     leads, customers, products, orders, and order items.
 
-    Usage:
-      1. pip install trellis-datamodel
-      2. Ensure dbt_company_dummy project exists (from repo at dbt_company_dummy/
-         or configure dbt_company_dummy_path in trellis.yml)
-      3. trellis generate-company-data
-
-    The project path defaults to ./dbt_company_dummy or can be set via
-    dbt_company_dummy_path in trellis.yml.
+    If dbt_company_dummy_path is set in trellis.yml, confirms the output path.
+    Otherwise, prompts for an output directory.
     """
+    import subprocess
     import sys
-    import importlib.util
 
     # Load config to get dbt_company_dummy_path
     config_path = config
@@ -220,65 +214,50 @@ def generate_company_data(
     if config_path:
         load_config(config_path)
 
-    # Use configured path or fallback to default relative to current working directory
+    # Determine output path
+    if cfg.DBT_COMPANY_DUMMY_PATH:
+        default_path = cfg.DBT_COMPANY_DUMMY_PATH
+        typer.echo(f"Output directory: {default_path}")
+        confirm = typer.prompt(
+            "Generate CSV files to this directory? [y/n]",
+            default="y",
+        )
+        if confirm.lower() not in ("y", "yes"):
+            default_path = typer.prompt("Enter output directory")
+    else:
+        default_path = typer.prompt("Enter output directory")
+
+    output_path = Path(default_path).resolve()
+
+    # Find generator script (fallback logic)
     import os
 
-    if cfg.DBT_COMPANY_DUMMY_PATH:
-        generator_path = Path(cfg.DBT_COMPANY_DUMMY_PATH) / "generate_data.py"
+    package_root = Path(__file__).parent
+    package_dummy_path = package_root / "dbt_company_dummy" / "generate_data.py"
+    if package_dummy_path.exists():
+        generator_path = package_dummy_path
     else:
-        # Fallback: check current working directory first (for installed packages)
-        # This is the most common case when running from repo root
-        cwd_dummy_path = Path(os.getcwd()) / "dbt_company_dummy" / "generate_data.py"
-        if cwd_dummy_path.exists():
-            generator_path = cwd_dummy_path
+        project_root = package_root.parent
+        repo_dummy_path = project_root / "dbt_company_dummy" / "generate_data.py"
+        if repo_dummy_path.exists():
+            generator_path = repo_dummy_path
         else:
-            # Try package data path (for pip-installed package)
-            package_root = Path(__file__).parent
-            package_dummy_path = package_root / "dbt_company_dummy" / "generate_data.py"
-            if package_dummy_path.exists():
-                generator_path = package_dummy_path
-            else:
-                # Try repo root (for development when running from source)
-                project_root = package_root.parent
-                repo_dummy_path = (
-                    project_root / "dbt_company_dummy" / "generate_data.py"
+            typer.echo(
+                typer.style(
+                    "Error: Generator script not found in package",
+                    fg=typer.colors.RED,
                 )
-                if repo_dummy_path.exists():
-                    generator_path = repo_dummy_path
-                else:
-                    # Last resort: use current working directory even if it doesn't exist yet
-                    # (will show helpful error message)
-                    generator_path = cwd_dummy_path
-
-    if not generator_path.exists():
-        import os
-
-        typer.echo(
-            typer.style(
-                f"Error: Generator script not found at {generator_path}",
-                fg=typer.colors.RED,
             )
-        )
-        typer.echo()
-        typer.echo("To generate company data, you need the dbt_company_dummy project.")
-        typer.echo()
-        typer.echo("Options:")
-        typer.echo("  1. Run from the repository that contains dbt_company_dummy/")
-        typer.echo("  2. Configure 'dbt_company_dummy_path' in your trellis.yml")
-        typer.echo(
-            "  3. Install from source: pip install -e . (includes dbt_company_dummy)"
-        )
-        raise typer.Exit(1)
+            raise typer.Exit(1)
 
-    # Load and run the generator module
+    # Run the generator
     try:
-        spec = importlib.util.spec_from_file_location("generate_data", generator_path)
-        generator_module = importlib.util.module_from_spec(spec)
-        sys.modules["generate_data"] = generator_module
-        spec.loader.exec_module(generator_module)
-
-        # Call the main function
-        generator_module.main()
+        result = subprocess.run(
+            [sys.executable, str(generator_path), str(output_path)],
+            capture_output=False,
+        )
+        if result.returncode != 0:
+            raise typer.Exit(result.returncode)
 
         typer.echo()
         typer.echo(
@@ -287,22 +266,10 @@ def generate_company_data(
                 fg=typer.colors.GREEN,
             )
         )
-    except ImportError as e:
+    except FileNotFoundError as e:
         typer.echo(
             typer.style(
-                f"Error: Missing dependency - {e}",
-                fg=typer.colors.RED,
-            )
-        )
-        typer.echo(
-            "  Install required dependencies with: pip install trellis-datamodel[dbt-example]"
-        )
-        typer.echo("  Or install directly: pip install pandas faker")
-        raise typer.Exit(1)
-    except Exception as e:
-        typer.echo(
-            typer.style(
-                f"Error generating data: {e}",
+                f"Error: {e}",
                 fg=typer.colors.RED,
             )
         )
