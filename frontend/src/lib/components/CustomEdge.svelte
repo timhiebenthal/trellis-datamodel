@@ -549,7 +549,7 @@
           value={label}
           oninput={onLabelChange}
           onchange={onLabelChange}
-          class="text-xs font-medium focus:outline-none bg-white flex-1 border border-slate-200 rounded px-1.5 py-0.5 focus:border-[#26A69A] min-w-[100px]"
+          class="text-xs font-medium text-gray-900 focus:outline-none bg-white flex-1 border border-slate-200 rounded px-1.5 py-0.5 focus:border-[#26A69A] min-w-[100px]"
           placeholder="relationship..."
         />
         <button 
