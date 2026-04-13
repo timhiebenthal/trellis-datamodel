@@ -6,4 +6,12 @@
 The `init` command creates a `trellis.yml` configuration file in your working directory.
 Here you can define things like the data modeling style you're using or which dbt-subdirectory to load metadata from.
 
+## test 2
+
+This is an MP4 video file. You can embed it in markdown like:
+<video src="https://github.com/user-attachments/assets/88a523e1-5eb2-4c3f-b177-e89244f98a43" controls></video>
+Or use it as a direct link:
+[Watch Video](https://github.com/user-attachments/assets/88a523e1-5eb2-4c3f-b177-e89244f98a43)
+
+
 ## tbd
