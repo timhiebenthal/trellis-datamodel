@@ -195,12 +195,17 @@ def generate_company_data(
     """
     Generate mock commercial company data for modeling exercises.
 
-    Creates CSV files in dbt_company_dummy/data/ directory with realistic
-    commercial company data including departments, employees, leads, customers,
-    products, orders, and order items.
+    Creates CSV files in dbt_company_dummy/data/ with departments, employees,
+    leads, customers, products, orders, and order items.
 
-    The path to the dbt company dummy project can be configured in trellis.yml
-    via the 'dbt_company_dummy_path' option (defaults to './dbt_company_dummy').
+    Usage:
+      1. pip install trellis-datamodel
+      2. Ensure dbt_company_dummy project exists (from repo at dbt_company_dummy/
+         or configure dbt_company_dummy_path in trellis.yml)
+      3. trellis generate-company-data
+
+    The project path defaults to ./dbt_company_dummy or can be set via
+    dbt_company_dummy_path in trellis.yml.
     """
     import sys
     import importlib.util
@@ -227,15 +232,23 @@ def generate_company_data(
         if cwd_dummy_path.exists():
             generator_path = cwd_dummy_path
         else:
-            # Try repo root (for development when running from source)
-            project_root = Path(__file__).parent.parent
-            repo_dummy_path = project_root / "dbt_company_dummy" / "generate_data.py"
-            if repo_dummy_path.exists():
-                generator_path = repo_dummy_path
+            # Try package data path (for pip-installed package)
+            package_root = Path(__file__).parent
+            package_dummy_path = package_root / "dbt_company_dummy" / "generate_data.py"
+            if package_dummy_path.exists():
+                generator_path = package_dummy_path
             else:
-                # Last resort: use current working directory even if it doesn't exist yet
-                # (will show helpful error message)
-                generator_path = cwd_dummy_path
+                # Try repo root (for development when running from source)
+                project_root = package_root.parent
+                repo_dummy_path = (
+                    project_root / "dbt_company_dummy" / "generate_data.py"
+                )
+                if repo_dummy_path.exists():
+                    generator_path = repo_dummy_path
+                else:
+                    # Last resort: use current working directory even if it doesn't exist yet
+                    # (will show helpful error message)
+                    generator_path = cwd_dummy_path
 
     if not generator_path.exists():
         import os
@@ -247,20 +260,14 @@ def generate_company_data(
             )
         )
         typer.echo()
-        typer.echo("The generator script should be located at:")
-        if cfg.DBT_COMPANY_DUMMY_PATH:
-            typer.echo(f"  {cfg.DBT_COMPANY_DUMMY_PATH}/generate_data.py")
-            typer.echo()
-            typer.echo("This path is configured in your trellis.yml file.")
-        else:
-            typer.echo(f"  {os.getcwd()}/dbt_company_dummy/generate_data.py")
-            typer.echo()
-            typer.echo(
-                "Make sure you're running this command from the repository root,"
-            )
-            typer.echo(
-                "or configure 'dbt_company_dummy_path' in your trellis.yml file."
-            )
+        typer.echo("To generate company data, you need the dbt_company_dummy project.")
+        typer.echo()
+        typer.echo("Options:")
+        typer.echo("  1. Run from the repository that contains dbt_company_dummy/")
+        typer.echo("  2. Configure 'dbt_company_dummy_path' in your trellis.yml")
+        typer.echo(
+            "  3. Install from source: pip install -e . (includes dbt_company_dummy)"
+        )
         raise typer.Exit(1)
 
     # Load and run the generator module

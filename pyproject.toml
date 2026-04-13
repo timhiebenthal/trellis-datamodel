@@ -60,10 +60,11 @@ dbt-example = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["trellis_datamodel*"]
+include = ["trellis_datamodel*", "dbt_company_dummy*"]
+exclude = ["dbt_company_dummy*tests*", "dbt_company_dummy*target*"]
 
 [tool.setuptools.package-data]
-trellis_datamodel = ["static/**/*"]
+trellis_datamodel = ["static/**/*", "dbt_company_dummy/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["trellis_datamodel/tests"]
