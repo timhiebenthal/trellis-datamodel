@@ -1951,13 +1951,12 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transition: color 0.15s, background-color 0.15s, transform 0.15s;
+        transition: color 0.15s, background-color 0.15s;
     }
 
     :global(.connection-handle:hover) {
         color: rgb(59 130 246) !important; /* blue-500 */
         background-color: rgb(239 246 255) !important; /* blue-50 */
-        transform: scale(1.2);
     }
 
     .height-resize-handle {
