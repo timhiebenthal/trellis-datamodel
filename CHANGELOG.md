@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.3] - 2026-04-13
+
+### Fixed
+- **Relationship label text visible again**: the label name input in the edge editor was inheriting `color: transparent` from the canvas pane, making typed text invisible (white-on-white). An explicit `text-gray-900` now ensures the text is always readable.
+- **Connection handles vs. resize handles disambiguated**: connection handles (top/bottom of entity) now show a teal `mdi:arrow-up` / `mdi:arrow-down` icon on hover with a matching teal background, clearly distinguishing them from the resize handles (right/bottom edge) which keep their existing teal glow. Arrows are invisible at rest and only appear on hover. Left/right connection handles removed — connections are created from the top and bottom edges only. Tooltip updated to "Drag to other entity to create relationship".
+
 ## [0.13.2] - 2026-04-13
 
 ### Fixed
