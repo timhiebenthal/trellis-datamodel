@@ -1,29 +1,28 @@
 # Specification Creation Process
 
-You are creating a specification document for a new feature or change. This spec will serve as the foundation for task planning and implementation.
+Create spec document for new feature. Spec = foundation for task planning + implementation.
 
-## Process Overview
+## Process
 
-1. **Gather Requirements**
-2. **Create Spec Structure**
-3. **Document Requirements, Scope, and Approach**
-4. **Save Specification**
+1. Gather Requirements
+2. Create Spec Structure  
+3. Document Specification
+4. Save Specification
 
 ## Step 1: Gather Requirements
 
-If you have results from `/spar-idea`, use those as the foundation. Otherwise:
-
-- Ask the user to describe the idea or feature
-- Review any existing documentation or related code
-- Check for similar features that might inform this spec
+Input sources:
+- `/spar-idea` output (if exists)
+- User describes feature
+- Review related code/docs
+- Check similar features
 
 ## Step 2: Create Spec Structure
 
-Create a new spec directory following this pattern:
-- **Path**: `specs/[YYYY-MM-DD]-[descriptive-name]/`
-- **Example**: `specs/2025-01-15-user-authentication/`
+Directory pattern: `specs/[YYYY-MM-DD]-[name]/`
+Example: `specs/2025-01-15-user-authentication/`
 
-Create the directory structure:
+Structure:
 ```
 specs/[YYYY-MM-DD]-[name]/
   spec.md
@@ -31,82 +30,90 @@ specs/[YYYY-MM-DD]-[name]/
 
 ## Step 3: Document Specification
 
-Create `spec.md` with the following structure:
+`spec.md` structure:
 
 ```markdown
 # [Feature Name] - Specification
 
 ## Overview
-Brief description of what this feature does and why it's needed.
+What feature does, why needed.
 
 ## Requirements
 
 ### Functional Requirements
-- [Requirement 1]
-- [Requirement 2]
-- [Requirement 3]
+- [requirement]
 
-### Non-Functional Requirements
-- Performance considerations
-- Security considerations
-- Usability considerations
+### Non-Functional Requirements  
+- Performance
+- Security
+- Usability
 
 ## Scope
 
 ### In Scope
-- What will be included
+- Included items
 
 ### Out of Scope
-- What will be explicitly excluded (helps prevent scope creep)
+- Explicitly excluded (prevents scope creep)
 
 ## Approach
 
 ### Technical Approach
-- High-level technical strategy
+- High-level strategy
 - Key design decisions
-- Integration points with existing code
+- Integration points
 
 ### User Experience
-- How users will interact with this feature
-- UI/UX considerations (if applicable)
+- How users interact
+- UI/UX notes
 
 ## Dependencies
-- What needs to be in place first
+- Prerequisites
 - External dependencies
-- Related features or systems
+- Related systems
 
 ## Success Criteria
-- How we'll know this is complete and successful
+- How we know it's done
 - Acceptance criteria
 
 ## Notes
-- Any additional context, constraints, or considerations
+- Context, constraints, considerations
 ```
 
-Fill in each section based on:
-- The validated idea from `/spar-idea` (if available)
-- User input and clarification
-- Project context from `.cursor/project.md`
-- Existing codebase patterns
+Fill using:
+- `/spar-idea` output
+- User input
+- `.cursor/project.md` (tech stack)
+- Codebase patterns
 
 ## Step 4: Save Specification
 
-Save the completed `spec.md` file to `specs/[YYYY-MM-DD]-[name]/spec.md`.
+Save to `specs/[YYYY-MM-DD]-[name]/spec.md`.
 
-Inform the user:
+## Spec Self-Review (Required)
+
+Before notifying user, scan and fix:
+
+1. **Placeholder scan**: "TBD", "TODO", vague requirements?
+2. **Internal consistency**: Sections contradict?
+3. **Scope check**: Focused enough for one plan?
+4. **Ambiguity check**: Multiple valid interpretations?
+
+Fix inline. Then proceed.
+
+Output:
 ```
 Specification created!
 
-✅ Spec document: `specs/[YYYY-MM-DD]-[name]/spec.md`
+✅ Spec: `specs/[YYYY-MM-DD]-[name]/spec.md`
 
-NEXT STEP 👉 Run `/plan-tasks` to create an implementation plan.
+NEXT STEP → Run `/plan-tasks`.
 ```
 
 ## Guidelines
 
-- Be specific but not overly prescriptive
-- Reference `.cursor/project.md` for tech stack and mission alignment
-- Consider existing patterns in the codebase
-- Keep it focused - avoid scope creep
-- Make requirements testable and measurable
-
+- Be specific, not prescriptive
+- Reference `.cursor/project.md`
+- Follow codebase patterns
+- Keep focused — avoid scope creep
+- Make requirements testable
