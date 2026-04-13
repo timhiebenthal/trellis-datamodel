@@ -524,8 +524,8 @@ data_model_file: "data_model.yml"
                     f"STDOUT: {result.stdout}\n"
                     f"STDERR: {result.stderr}"
                 )
-                assert "Mock data generation complete" in result.stdout, (
-                    f"Expected 'Mock data generation complete' in output\n"
+                assert "generation completed successfully" in result.stdout, (
+                    f"Expected success message in output\n"
                     f"STDOUT: {result.stdout}\n"
                     f"STDERR: {result.stderr}"
                 )
