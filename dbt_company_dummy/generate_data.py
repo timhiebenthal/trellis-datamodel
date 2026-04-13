@@ -1580,7 +1580,9 @@ def main():
     print("Scaffolding dbt project...")
     scaffold_dbt_project()
     print()
-    print("✓ dbt project ready! Run 'dbt build' to compile and run models.")
+    print(
+        f"✓ dbt project ready! Run 'cd {PROJECT_ROOT} && dbt build' to compile and run models."
+    )
 
 
 if __name__ == "__main__":
