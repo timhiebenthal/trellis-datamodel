@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.5] - 2026-04-13
 
+### Added
+- **`trellis generate-company-data` prompts for output directory**: when no `dbt_company_dummy_path` is set in trellis.yml, the command now prompts for an output directory. If configured, it confirms the path with the user before generating data. Generated CSV files and the dbt project are created in the specified directory.
+- **Output directory override**: `generate_data.py` now accepts a positional argument to specify where data goes: `python generate_data.py /path/to/output`. CSV files are written to `<output>/data/`.
+
 ### Fixed
-- **`trellis generate-company-data` works when installed from PyPI**: the `generate_data.py` script is now bundled in the package, so users don't need the `dbt_company_dummy` project locally. The script is found automatically from the installed package location. Also improved `--help` output with clear usage instructions and better error messages when the script can't be found.
+- **`trellis generate-company-data` works when installed from PyPI**: the `generate_data.py` script is now bundled in the package, so users don't need the `dbt_company_dummy` project locally. The script is found automatically from the installed package location. Also improved error messages when the script can't be found.
+- **Output directory isolation**: running `dbt run` from the generated project now uses `--profiles-dir .` to avoid interfering with the user's dbt configuration.
 
 ## [0.13.4] - 2026-04-13
 
