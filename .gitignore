@@ -56,3 +56,4 @@ dbt_company_dummy_entity/logs/
 dbt_company_dummy_entity/target/
 **/.omc/
 *.bak
+.opencode/*
