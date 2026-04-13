@@ -8,6 +8,13 @@ vi.mock('$lib/api', () => ({
     getApiBase: vi.fn().mockReturnValue('http://localhost:8089/api'),
 }));
 
+// Mock stores
+const mockModelingStyle = { value: 'entity_model' as 'dimensional_model' | 'entity_model' };
+vi.mock('$lib/stores', () => ({
+    sourceColors: { subscribe: (fn: (v: any) => void) => { fn({}); return () => {}; } },
+    modelingStyle: { subscribe: (fn: (v: string) => void) => { fn(mockModelingStyle.value); return () => {}; } },
+}));
+
 import { saveDataModel as apiSaveDataModel } from '$lib/api';
 
 describe('AutoSaveService', () => {
@@ -122,7 +129,8 @@ describe('AutoSaveService', () => {
             expect(apiSaveDataModel).toHaveBeenCalled();
         });
 
-        it('should build correct data model payload', async () => {
+        it('should include entity_type in payload for dimensional modeling', async () => {
+            mockModelingStyle.value = 'dimensional_model';
             const nodes: Node[] = [
                 {
                     id: 'entity1',
@@ -157,6 +165,32 @@ describe('AutoSaveService', () => {
                     ]),
                 })
             );
+        });
+
+        it('should omit entity_type from payload for entity modeling', async () => {
+            mockModelingStyle.value = 'entity_model';
+            const nodes: Node[] = [
+                {
+                    id: 'entity1',
+                    type: 'entity',
+                    position: { x: 100, y: 100 },
+                    data: {
+                        label: 'Test Entity',
+                        description: 'Test description',
+                        entity_type: 'fact',
+                        width: 280,
+                        panelHeight: 200,
+                        collapsed: false,
+                    },
+                },
+            ];
+            const edges: Edge[] = [];
+
+            service.save(nodes, edges);
+            vi.advanceTimersByTime(400);
+
+            const call = (apiSaveDataModel as ReturnType<typeof vi.fn>).mock.calls[0][0];
+            expect(call.entities[0]).not.toHaveProperty('entity_type');
         });
     });
 
