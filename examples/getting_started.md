@@ -1,17 +1,45 @@
+# Getting Started with Trellis
 
-## Initialize a trellis project
+Video tutorials demonstrating core Trellis workflows.
 
-[Trellis Init](https://private-user-images.githubusercontent.com/57394222/577061092-88a523e1-5eb2-4c3f-b177-e89244f98a43.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzYwNjM1NzQsIm5iZiI6MTc3NjA2MzI3NCwicGF0aCI6Ii81NzM5NDIyMi81NzcwNjEwOTItODhhNTIzZTEtNWViMi00YzNmLWIxNzctZTg5MjQ0Zjk4YTQzLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjA0MTMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwNDEzVDA2NTQzNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTY4M2I2Y2Q2OWUxNjJkMjFmZjFmNmI0NTBlYWY0ODgyY2YzZjhiNGU4NTkwNzYwZTZmZTAxNGVjNTMwN2ZlYzImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JnJlc3BvbnNlLWNvbnRlbnQtdHlwZT12aWRlbyUyRm1wNCJ9.ikJS80_RSJPklgGPM-O0aeu9Tfo-qCIOjeGtP_B4QkY)
+## Initialize Project
 
-The `init` command creates a `trellis.yml` configuration file in your working directory.
-Here you can define things like the data modeling style you're using or which dbt-subdirectory to load metadata from.
+Initialize a new trellis project with `trellis init` and configure your dbt project path.
 
-## test 2
-
-This is an MP4 video file. You can embed it in markdown like:
 <video src="https://github.com/user-attachments/assets/88a523e1-5eb2-4c3f-b177-e89244f98a43" controls></video>
-Or use it as a direct link:
-[Watch Video](https://github.com/user-attachments/assets/88a523e1-5eb2-4c3f-b177-e89244f98a43)
 
+## Create Entities
 
-## tbd
+Add new entities to your canvas by clicking "Add Entity" and defining their attributes.
+
+<video src="https://github.com/user-attachments/assets/b5690e96-3ed0-4988-a576-5471e48096f2" controls></video>
+
+## Define Relationships
+
+Connect entities by dragging from one entity's field to another to create relationships.
+
+<video src="https://github.com/user-attachments/assets/a27de46c-a909-4e90-af4e-7e68e6f52d98" controls></video>
+
+## Edit Entity Details
+
+Click an entity to open its detail panel and edit fields, descriptions, and roles.
+
+<video src="https://github.com/user-attachments/assets/e24322c0-8631-458c-8359-67e0d4d5e624" controls></video>
+
+## Save & Export
+
+Save your data model locally with Ctrl+S or export to Excel/YAML for dbt integration.
+
+<video src="https://github.com/user-attachments/assets/d30406c2-13e0-46aa-9288-a0414c6688cf" controls></video>
+
+## Generate Entities
+
+Auto-generate entities from your dbt models with the Generate Entities dialog.
+
+<video src="https://github.com/user-attachments/assets/518c497a-564e-488d-8b94-ddca51d0e3c6" controls></video>
+
+## Sync dbt Schema
+
+Sync your drafted entities back to dbt with the dbt Schema sync button.
+
+<video src="https://github.com/user-attachments/assets/d4187b27-18f5-44f6-bbef-d13dfb619085" controls></video>
