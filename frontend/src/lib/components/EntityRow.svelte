@@ -12,13 +12,16 @@
 
 	// Determine entity type icon
 	const typeIcon = $derived(() => {
-		if (entity.entity_type === "dimension") {
-			return "lucide:list";
-		} else if (entity.entity_type === "fact") {
-			return "lucide:bar-chart-3";
-		} else {
-			return "lucide:help-circle";
+		if ($modelingStyle === 'dimensional_model') {
+			if (entity.entity_type === "dimension") {
+				return "lucide:list";
+			} else if (entity.entity_type === "fact") {
+				return "lucide:bar-chart-3";
+			} else {
+				return "lucide:help-circle";
+			}
 		}
+		return "lucide:box";
 	});
 
 	// Type label
@@ -144,9 +147,10 @@
 	<!-- Entity Icon -->
 	<div
 		class="flex-shrink-0"
-		class:text-green-600={entity.entity_type === "dimension"}
-		class:text-blue-600={entity.entity_type === "fact"}
-		class:text-gray-600={entity.entity_type !== "dimension" && entity.entity_type !== "fact"}
+		class:text-green-600={$modelingStyle === 'dimensional_model' && entity.entity_type === "dimension"}
+		class:text-blue-600={$modelingStyle === 'dimensional_model' && entity.entity_type === "fact"}
+		class:text-gray-600={$modelingStyle === 'dimensional_model' && entity.entity_type !== "dimension" && entity.entity_type !== "fact"}
+		class:text-slate-500={$modelingStyle !== 'dimensional_model'}
 	>
 		<Icon icon={typeIcon()} class="w-5 h-5" />
 	</div>
