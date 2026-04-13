@@ -1581,7 +1581,7 @@ def main():
     scaffold_dbt_project()
     print()
     print(
-        f"✓ dbt project ready! Run 'cd {PROJECT_ROOT} && dbt build --profiles-dir .' to compile and run models."
+        f"✓ dbt project ready! Run 'cd {PROJECT_ROOT} && dbt run --profiles-dir .' to generate dbt artifacts needed for trellis."
     )
 
 
