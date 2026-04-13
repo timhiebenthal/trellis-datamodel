@@ -93,6 +93,17 @@ Fill in each section based on:
 
 Save the completed `spec.md` file to `specs/[YYYY-MM-DD]-[name]/spec.md`.
 
+## Spec Self-Review (Required)
+
+Before notifying user, scan and fix:
+
+1. **Placeholder scan**: Any "TBD", "TODO", vague requirements, or placeholder sections?
+2. **Internal consistency**: Any sections contradict each other?
+3. **Scope check**: Focused enough for one implementation plan, or need decomposition?
+4. **Ambiguity check**: Any requirement interpretable multiple ways?
+
+Fix issues inline. Then proceed.
+
 Inform the user:
 ```
 Specification created!

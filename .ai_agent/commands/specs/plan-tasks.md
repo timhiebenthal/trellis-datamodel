@@ -23,6 +23,46 @@ Each task should be:
 - Testable/verifiable
 - Include brief implementation detail when useful (e.g., file, function, API)
 - **NEVER use placeholder implementations** - all components must be fully functional when marked complete
+- **TDD: Test FIRST, code SECOND** - every task includes failing test before implementation
+
+### TDD Enforcement
+
+Each task follows this sequence:
+
+1. **Write failing test** - Show actual test code that fails
+2. **Run verify failure** - Expected output shows failure
+3. **Write minimal implementation** - Code to make test pass
+4. **Run verify pass** - Test passes
+5. **Commit** - Atomic change with meaningful message
+
+```markdown
+- [ ] **Write failing test**
+
+```python
+def test_specific_behavior():
+    result = function(input)
+    assert result == expected  # This will fail
+```
+
+- [ ] **Run test to verify failure**
+
+Run: `pytest tests/path/test.py::test_name -v`
+Expected: FAIL
+
+- [ ] **Write minimal implementation**
+
+```python
+def function(input):
+    return expected
+```
+
+- [ ] **Run test to verify pass**
+
+Run: `pytest tests/path/test.py::test_name -v`
+Expected: PASS
+
+- [ ] **Commit**
+```
 
 Task types:
 - Setup: Environment, dependencies
@@ -160,6 +200,21 @@ Implementation notes, edge cases, standards
 - Include testing tasks
 - Order by: dependencies → logical flow → risk
 - **Verify no placeholders**: Before marking tasks complete, ensure all components are fully implemented and integrated
+- **TDD enforced**: Every task has failing test before code
+
+### Pre-Save Placeholder Scan (Required)
+
+Before saving tasks.md, scan for anti-patterns:
+
+| Anti-Pattern | Example | Fix |
+|--------------|---------|-----|
+| Placeholder text | "TBD", "TODO", "implement later" | Write actual content |
+| Test without code | "Write tests" (no test code) | Show actual test |
+| Code step without block | "Implement the function" | Show actual code |
+| Vague instruction | "Add appropriate validation" | Specific validation rules |
+| Reference to undefined | "Call function from Task 3" | Define function in task |
+
+If ANY found: Fix inline before saving.
 
 ### SPRINT Guidelines
 - Clear milestones
