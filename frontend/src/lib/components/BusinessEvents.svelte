@@ -14,6 +14,7 @@ import type {
     BusinessEventAnnotations,
 } from '$lib/types';
 import { toTitleCase } from '$lib/utils';
+import { modelingStyle } from '$lib/stores';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
@@ -852,11 +853,15 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                     <div>
                         <h2 class="text-xl font-bold text-gray-800">Business Events</h2>
                         <p class="text-sm text-gray-600 mt-1">
-                            Document business events during the conception phase of dimensional data modeling.
-                            <br />
-                            Identify granular events by asking "What happens?" (e.g. "Customer buys Product") and annotate them with analytical context answering "Who, What, When, Where, How, Why, and How Many".
-                            <br />
-                            Optionally group related events into a holistic process to consolidate multiple events into the same fact table.
+                            {#if $modelingStyle === 'entity_model'}
+                                Document business scenarios during the conception phase of entity modeling. Identify core business interactions by writing 'Subject Verb Object' sentences (e.g. 'Customer places Order') and annotate them to discover entities and relationships.
+                            {:else}
+                                Document business events during the conception phase of dimensional data modeling.
+                                <br />
+                                Identify granular events by asking "What happens?" (e.g. "Customer buys Product") and annotate them with analytical context answering "Who, What, When, Where, How, Why, and How Many".
+                                <br />
+                                Optionally group related events into a holistic process to consolidate multiple events into the same fact table.
+                            {/if}
                         </p>
                     </div>
                     <button
@@ -873,6 +878,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div class="flex items-center gap-4 flex-wrap">
+                        {#if $modelingStyle !== 'entity_model'}
                         <div class="flex items-center gap-2">
                             <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
                             <span class="text-sm font-medium text-gray-700">Filter by type:</span>
@@ -886,6 +892,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                             <option value="evolving">Evolving</option>
                             <option value="recurring">Recurring</option>
                         </select>
+                        {/if}
 
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-medium text-gray-700">Filter by domain:</span>

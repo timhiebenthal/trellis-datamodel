@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-04-14
+
+### Added
+- **Business Events for entity model users**: the `/business-events` route is no longer restricted to `dimensional_model`. Any project with `business_events.enabled: true` can now access the page regardless of modeling style.
+- **Entity model generation from business events**: generating entities from an annotated event or process in `entity_model` mode produces a central entity of `entity_type: "entity"`, `drafted_fields` for unlinked annotations, and relationship stubs for annotations linked to an existing entity.
+- **Modeling-style-aware UI in Business Events**: entity model users see SVO-focused copy ("Subject Verb Object" framing), no event type selector, no "How Many" section, a `/6` progress badge, and "Link to entity" instead of "Generalize to dimension".
+- **`entity` accepted as valid entity type**: saving an entity with `entity_type: "entity"` to `data_model.yml` via the API no longer returns a 400 validation error.
+- **Optional event type on create**: `CreateEventRequest.type` is now optional; omitting it defaults to `"discrete"` so existing clients are unaffected.
+
+### Fixed
+- **`modelingStyle` store default corrected to `dimensional_model`**: the store was accidentally defaulting to `entity_model`, causing unit tests for `CreateEventModal` and `SevenWsForm` to fail in dimensional mode.
+
 ## [0.13.5] - 2026-04-13
 
 ### Added

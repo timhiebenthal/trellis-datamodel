@@ -528,13 +528,13 @@ export async function getBusinessEventDomains(): Promise<string[]> {
  */
 export async function createBusinessEvent(
     text: string,
-    type: BusinessEventType,
+    type?: BusinessEventType,
     domain?: string,
     annotations?: BusinessEventAnnotations,
     description?: string
 ): Promise<BusinessEvent> {
     try {
-        const body: any = { text, type, domain: domain || null };
+        const body: any = { text, ...(type !== undefined ? { type } : {}), domain: domain || null };
         if (description) {
             body.description = description;
         }

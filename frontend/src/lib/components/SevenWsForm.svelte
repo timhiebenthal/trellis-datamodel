@@ -3,7 +3,7 @@
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
     import { onMount, untrack } from "svelte";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
-    import { dimensionPrefixes } from "$lib/stores";
+    import { dimensionPrefixes, modelingStyle } from "$lib/stores";
 
     type Props = {
         event: BusinessEvent;
@@ -23,6 +23,22 @@
         { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
         { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
     ];
+
+    // Filtered annotation types: entity_model hides how_many from UI (data is preserved)
+    let annotationTypesForUi = $derived(
+        ANNOTATION_TYPES.filter(a => $modelingStyle !== 'entity_model' || a.type !== 'how_many')
+    );
+
+    function sectionDescription(at: typeof ANNOTATION_TYPES[number]): string {
+        if ($modelingStyle !== 'entity_model') return at.description;
+        switch (at.type) {
+            case 'when': return 'Time attributes or temporal entities';
+            case 'how':  return 'Process attributes or status';
+            case 'why':  return 'Causal context attributes or entities';
+            case 'how_many': return 'Quantitative attributes on the central entity';
+            default: return at.description;
+        }
+    }
 
     // Form state
     let description = $state<string>(event.description || '');
@@ -99,9 +115,9 @@
     let newDimensionName = $state<string>('');
     let activeSuggestionEntryId = $state<string | null>(null);
 
-    // Calculate filled annotations count
+    // Calculate filled annotations count (only over visible annotation types)
     let filledAnnotationsCount = $derived(
-        ANNOTATION_TYPES.filter(a => annotations[a.type].length > 0).length
+        annotationTypesForUi.filter(a => annotations[a.type].length > 0).length
     );
 
     // Check for dimension_id conflicts with existing dimensions
@@ -144,7 +160,7 @@
             errors.push("At least one dimension entry (Who, What, When, Where, How, or Why) is required for entity generation");
         }
 
-        if (howManyEntries === 0) {
+        if (howManyEntries === 0 && $modelingStyle !== 'entity_model') {
             errors.push("At least one 'How Many' entry is required for entity generation (becomes fact table)");
         }
 
@@ -704,8 +720,8 @@
         loading = true;
 
         try {
-            // Validate no empty text entries
-            for (const a of ANNOTATION_TYPES) {
+            // Validate no empty text entries (only for visible annotation types)
+            for (const a of annotationTypesForUi) {
                 for (const entryItem of annotations[a.type]) {
                     if (!entryItem.text.trim()) {
                         throw new Error(`All entries must have text. Please check the ${a.label} section.`);
@@ -796,7 +812,7 @@
                         <div
                             class="px-3 py-1 rounded-full text-sm font-medium {isValid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}"
                         >
-                            {filledAnnotationsCount}/7 completed
+                            {filledAnnotationsCount}/{annotationTypesForUi.length} completed
                         </div>
                         <button
                             class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
@@ -812,7 +828,7 @@
                 <div>
                     <label for="event-description" class="block text-xs font-medium text-gray-600 mb-1">
                         Description
-                        <span class="text-gray-400 font-normal">(optional — will be used as fact table description)</span>
+                        <span class="text-gray-400 font-normal">(optional — {$modelingStyle === 'entity_model' ? 'used as the central entity description' : 'will be used as fact table description'})</span>
                     </label>
                     <textarea
                         id="event-description"
@@ -829,7 +845,7 @@
             <!-- Form -->
             <div class="p-6 space-y-4">
                 <!-- Annotation Sections -->
-                {#each ANNOTATION_TYPES as annotationType}
+                {#each annotationTypesForUi as annotationType}
                     <div class="border border-gray-200 rounded-lg overflow-visible">
                         <!-- Section Header -->
                         <button
@@ -853,7 +869,7 @@
                                             </span>
                                         {/if}
                                     </div>
-                                    <p class="text-xs text-gray-500">{annotationType.description}</p>
+                                    <p class="text-xs text-gray-500">{sectionDescription(annotationType)}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -977,7 +993,7 @@
                                                                 <!-- Create new dimension inline -->
                                                                 <div class="space-y-2">
                                                                     <label class="text-xs font-medium text-gray-600">
-                                                                        Create new dimension
+                                                                        {$modelingStyle === 'entity_model' ? 'Create new entity' : 'Create new dimension'}
                                                                     </label>
                                                                     <div class="flex items-center gap-2">
                                                                         <input
@@ -1022,7 +1038,7 @@
                                                                         for={`dimension-select-${entry.id}`}
                                                                         class="text-xs font-medium text-gray-600 whitespace-nowrap"
                                                                     >
-                                                                        Generalize to
+                                                                        {$modelingStyle === 'entity_model' ? 'Link to entity' : 'Generalize to'}
                                                                     </label>
                                                                     <select
                                                                         id={`dimension-select-${entry.id}`}
@@ -1042,7 +1058,7 @@
                                                                         {#each getAllowedDimensionsForType(annotationType.type) as dimension}
                                                                             <option value={dimension.id}>{dimension.label}</option>
                                                                         {/each}
-                                                                        <option value="__create_new__" class="text-blue-600 font-medium">+ Create new dimension...</option>
+                                                                        <option value="__create_new__" class="text-blue-600 font-medium">{$modelingStyle === 'entity_model' ? '+ Create new entity…' : '+ Create new dimension...'}</option>
                                                                     </select>
                                                                 </div>
                                                                 {#if entry.dimension_id}
@@ -1074,13 +1090,13 @@
                                                             type="button"
                                                             class="p-2 rounded-md transition-colors {entry.dimension_id ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}"
                                                             onclick={() => toggleGeneralizeSection(entry.id)}
-                                                            aria-label="Generalize to a dimension"
+                                                            aria-label={$modelingStyle === 'entity_model' ? 'Link to entity' : 'Generalize to a dimension'}
                                                             disabled={loading}
                                                         >
                                                             <Icon icon="material-symbols:groups" class="w-4 h-4" />
                                                         </button>
                                                         <div class="absolute right-0 bottom-full mb-2 w-[300px] p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
-                                                            Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date).
+                                                            {$modelingStyle === 'entity_model' ? 'Link to an existing entity to create a relationship. Leave unlinked to keep as attribute.' : "Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date)."}
                                                             <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                                                         </div>
                                                     </div>

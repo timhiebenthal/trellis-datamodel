@@ -165,15 +165,20 @@
     function validateEntities(): void {
         validationErrors = [];
 
-        // Check for at least 1 dimension and 1 fact
-        const dimensions = editedEntities.filter((e) => e.entity_type === 'dimension');
-        const facts = editedEntities.filter((e) => e.entity_type === 'fact');
-        
-        if (dimensions.length === 0) {
-            validationErrors.push('At least one dimension is required');
-        }
-        if (facts.length === 0) {
-            validationErrors.push('At least one fact is required');
+        if ($modelingStyle === 'entity_model') {
+            if (editedEntities.length === 0) {
+                validationErrors.push('At least one entity is required');
+            }
+        } else {
+            const dimensions = editedEntities.filter((e) => e.entity_type === 'dimension');
+            const facts = editedEntities.filter((e) => e.entity_type === 'fact');
+
+            if (dimensions.length === 0) {
+                validationErrors.push('At least one dimension is required');
+            }
+            if (facts.length === 0) {
+                validationErrors.push('At least one fact is required');
+            }
         }
 
         // Check for empty names
@@ -725,7 +730,11 @@
                     id="generate-entities-dialog-title"
                     class="text-xl font-semibold text-gray-900"
                 >
-                    {mode === 'process' ? 'Generate Entities from Process' : 'Generate Entities from Event'}
+                    {#if $modelingStyle === 'entity_model'}
+                        {mode === 'process' ? 'Generate Entities and Relationships from Process' : 'Generate Entities and Relationships from Event'}
+                    {:else}
+                        {mode === 'process' ? 'Generate Entities from Process' : 'Generate Entities from Event'}
+                    {/if}
                 </h2>
                 <button
                     onclick={onCancel}
@@ -762,7 +771,11 @@
                 <div class="bg-green-50 border border-green-200 rounded p-4 mb-4">
                     <div class="flex items-center gap-2">
                         <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
-                        <p class="text-sm text-green-800">Entities created successfully!</p>
+                        <p class="text-sm text-green-800">
+                            {$modelingStyle === 'entity_model'
+                                ? 'Entities and relationships created successfully!'
+                                : 'Entities created successfully!'}
+                        </p>
                     </div>
                 </div>
             {:else if previewData && editedEntities.length > 0}
@@ -824,13 +837,17 @@
                                                     ? 'bg-green-100 text-green-700'
                                                     : entity.entity_type === 'fact'
                                                       ? 'bg-blue-100 text-blue-700'
-                                                      : 'bg-gray-100 text-gray-800'}"
+                                                      : entity.entity_type === 'entity'
+                                                        ? 'bg-purple-100 text-purple-700'
+                                                        : 'bg-gray-100 text-gray-800'}"
                                             >
                                                 {entity.entity_type === 'dimension'
                                                     ? 'Dimension'
                                                     : entity.entity_type === 'fact'
                                                       ? 'Fact'
-                                                      : 'Unclassified'}
+                                                      : entity.entity_type === 'entity'
+                                                        ? 'Entity'
+                                                        : 'Unclassified'}
                                             </span>
                                         </td>
                                         <td class="px-4 py-3">
