@@ -2,6 +2,7 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventProcess } from "$lib/types";
     import { deleteBusinessEvent } from "$lib/api";
+    import { modelingStyle } from "$lib/stores";
     type Props = {
         event: BusinessEvent;
         process?: BusinessEventProcess;
@@ -76,7 +77,9 @@
         annotations.how.length > 0 || 
         annotations.why.length > 0
     );
-    const canGenerateEntities = $derived(hasDimensionEntries && hasHowManyEntries);
+    const canGenerateEntities = $derived(
+        $modelingStyle === 'entity_model' ? hasDimensionEntries : hasDimensionEntries && hasHowManyEntries
+    );
     const hasDerivedEntities = $derived(event.derived_entities.length > 0);
 
     // Type badge colors
@@ -256,10 +259,14 @@
                 class:cursor-pointer={canGenerateEntities}
                 title={
                     canGenerateEntities
-                        ? "Generate dimensional entities from annotations"
-                        : !hasHowManyEntries
-                            ? "Add 'How Many' entries to generate fact table"
-                            : "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
+                        ? $modelingStyle === 'entity_model'
+                            ? "Generate entities and relationships from annotations"
+                            : "Generate dimensional entities from annotations"
+                        : $modelingStyle === 'entity_model'
+                            ? "Add entries (Who, What, When, Where, How, or Why) to generate entities"
+                            : !hasHowManyEntries
+                                ? "Add 'How Many' entries to generate fact table"
+                                : "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
                 }
             >
                 <Icon icon="lucide:sparkles" class="w-4 h-4" />
