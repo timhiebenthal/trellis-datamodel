@@ -923,12 +923,12 @@
                                 </div>
                             </div>
 
-                            <!-- Business Events Container (Dimensional Modeling only) -->
-                            {#if modelingStyle === 'dimensional_model'}
+                            <!-- Business Events Container -->
+                            {#if true}
                             <div class="bg-white border border-amber-200 rounded-lg p-4">
                                 <div class="flex items-center gap-2 mb-4">
                                     <h3 class="text-base font-semibold text-amber-900">Business Events</h3>
-                                    <Tooltip text="Model business events using BEAM* methodology. Annotate events with dimensions and facts to generate dimensional models. Only available for dimensional modeling style.">
+                                    <Tooltip text="Model business events by annotating natural language sentences with the 7 W's to generate entities and relationships. Works for both dimensional and entity modeling styles.">
                                         <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
                                     </Tooltip>
                                 </div>
@@ -946,7 +946,7 @@
                                             {#if getFieldMetadata('business_events.enabled')?.description}
                                                 <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('business_events.enabled')?.description}</p>
                                             {:else}
-                                                <p class="text-xs text-gray-500 mt-1">Enable business events modeling with BEAM* methodology</p>
+                                                <p class="text-xs text-gray-500 mt-1">Enable business events modeling to annotate natural language sentences and generate entities</p>
                                             {/if}
                                         </div>
                                         <label class="relative inline-flex items-center cursor-pointer">
