@@ -1,6 +1,6 @@
 # Task Planning Process
 
-Break down specification into actionable tasks. Organize into SPRINTS and STREAMS.
+Break spec into actionable tasks. Organize into SPRINTS and STREAMS.
 
 ## Process
 
@@ -27,42 +27,21 @@ Task requirements:
 
 ### TDD Enforcement
 
-Each task sequence:
+Each task follows this sequence — never skip:
 
 1. **Write failing test** — actual test code that fails
-2. **Run verify failure** — expected output shows failure
-3. **Write minimal implementation** — code to make test pass
-4. **Run verify pass** — test passes
+2. **Run to verify failure** — expected output shows failure; wrong failure = fix test first
+3. **Write minimal implementation** — code to make test pass, nothing more
+4. **Run to verify pass** — all tests pass, no new warnings
 5. **Commit** — atomic change with meaningful message
 
-```markdown
-- [ ] **Write failing test**
+tasks.md: include exact test command + expected outcome:
 
-```python
-def test_specific_behavior():
-    result = function(input)
-    assert result == expected  # This will fail
-```
-
-- [ ] **Run test to verify failure**
-
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: FAIL
-
-- [ ] **Write minimal implementation**
-
-```python
-def function(input):
-    return expected
-```
-
-- [ ] **Run test to verify pass**
-
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: PASS
-
+- [ ] **Write failing test** for `test_specific_behavior` in `tests/path/test_module.py`
+- [ ] **Run to verify failure**: `uv run pytest tests/path/test_module.py::test_specific_behavior -v` → expect FAIL
+- [ ] **Write minimal implementation** in `module.py`
+- [ ] **Run to verify pass**: `uv run pytest tests/path/test_module.py::test_specific_behavior -v` → expect PASS; then `uv run pytest` → all pass
 - [ ] **Commit**
-```
 
 Task types:
 - Setup: Environment, dependencies
@@ -76,7 +55,7 @@ Task types:
 
 **NEVER create stubs that say "will be implemented later"**
 
-Reason: placeholders create confusion, break UX, require double work. Tasks marked `[x]` = fully functional, not stub.
+Placeholders: confusion, broken UX, double work. `[x]` = fully functional, not stub.
 
 ## Step 3: Organize into SPRINTS and STREAMS
 
@@ -84,7 +63,7 @@ Reason: placeholders create confusion, break UX, require double work. Tasks mark
 
 - Inventory upstream work before finalizing stream
 - Mark hard dependencies: `⚠️ Depends on: SPRINT 1 - Stream A - Task X`
-- Don't plan stream requiring unfinished functionality elsewhere
+- Don't plan stream needing unfinished functionality elsewhere
 
 ### SPRINTS (sequential)
 - SPRINT 1: Foundation/infrastructure

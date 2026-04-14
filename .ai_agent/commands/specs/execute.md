@@ -7,8 +7,9 @@ Execute tasks from plan. Stop after specified work. Do NOT continue on own.
 1. Accept Parameters
 2. Read Task Plan
 3. Filter Tasks
-4. Implement Sequentially
-5. Update Progress
+4. Implement with TDD
+5. Verify Before Claiming Complete
+6. Update Progress
 
 ## Step 1: Accept Parameters
 
@@ -41,32 +42,176 @@ Based on parameters:
 
 After filtering: do NOT continue automatically. Stop after filtered tasks.
 
-## Step 4: Implement Sequentially
+## Step 3b: Parallelization via Subagents
 
-Work through filtered tasks:
+Before executing, check current sprint for parallel streams.
 
-1. Start with first task
-2. Read carefully — understand requirement
-3. Check dependencies — warn if outside filtered list
-4. Implement:
-   - Follow project patterns
-   - Reference `agent-os/standards/`
-   - Match spec requirements
-5. Verify — complete and working
-6. Move to next task
-7. **Stop** after completing filtered tasks
+**When to dispatch subagents:**
+- Sprint has 2+ independent streams (no cross-stream dependencies in this sprint)
+- Streams touch different files (KEY RULE from plan-tasks: 1 file = 1 stream)
+
+**When NOT to dispatch subagents:**
+- Only 1 stream in sprint
+- Stream has `⚠️ Depends on:` marker pointing to incomplete work in same sprint
+- User specified exact task IDs (not streams) — execute sequentially in main agent
+
+**How to dispatch:**
+
+Dispatch one subagent per independent stream. Each subagent receives:
+
+1. Full stream task list (exact checkboxes from tasks.md)
+2. Relevant spec section(s) for that stream's scope
+3. Tech stack from `.cursor/project.md`
+4. TDD iron law: NO production code without failing test first. RED → verify fail → GREEN → verify pass → REFACTOR.
+5. Verification iron law: NO completion claims without running command and showing output.
+6. Instruction to update tasks.md checkboxes for its stream when done
+
+After all subagents complete:
+- Collect results
+- Check for conflicts (unexpected file overlaps)
+- Run full test suite in main agent — show output
+- Proceed to between-sprint review before next sprint
+
+## Step 4: Implement with TDD
+
+### The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Written code before test? Delete it. Start over from test.
+
+No exceptions:
+- Don't keep as "reference"
+- Don't "adapt" existing code while writing tests
+- Delete means delete
+
+### RED-GREEN-REFACTOR Cycle (Mandatory per task)
+
+**RED — Write Failing Test**
+
+Write one minimal test for behavior this task implements.
+
+Requirements:
+- One specific behavior per test
+- Clear descriptive name
+- Test real code behavior, not mocks (unless unavoidable)
+
+**Verify RED — Run Test, Confirm Failure**
+
+MANDATORY. Never skip.
+
+```bash
+uv run pytest path/to/test_file.py::test_name -v
+# OR
+cd frontend && npm test -- path/to/test.ts
+```
+
+Confirm ALL of:
+- Test **fails** (not errors due to typos)
+- Failure message is what you expect
+- Fails because feature is missing, not bug in test
+
+Test passes immediately? Testing existing behavior. Fix test.
+Test errors? Fix, re-run until fails correctly.
+
+**GREEN — Write Minimal Implementation**
+
+Write simplest code that makes test pass. Nothing more.
+
+Do NOT:
+- Add features not yet tested
+- Refactor adjacent code
+- "Improve" beyond what test requires
+
+**Verify GREEN — Run Test, Confirm Pass**
+
+MANDATORY.
+
+```bash
+uv run pytest path/to/test_file.py::test_name -v
+# AND full suite
+uv run pytest
+```
+
+Confirm ALL of:
+- Target test passes
+- All other tests still pass
+- No new warnings or errors in output
+
+Test fails? Fix code, not test.
+Other tests fail? Fix now before proceeding.
+
+**REFACTOR — Clean Up (stay green)**
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green throughout. Do not add behavior.
+
+**Repeat** for next behavior in task.
 
 ### Implementation Guidelines
 
-- Follow existing patterns
+- Follow existing patterns in codebase
 - Reference coding standards
-- Write tests for new functionality
 - Handle errors properly
-- Document code where helpful
+- Document non-obvious intent only
 
-## Step 5: Update Progress
+## Step 5: Verify Before Claiming Complete
 
-After completing task:
+### The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+If command not run in this message, cannot claim it passes.
+
+### Verification Gate (Required before marking any task done)
+
+1. **Identify** command(s) that prove task is complete
+2. **Run** full command fresh — no relying on earlier runs
+3. **Read** full output: exit code, pass count, failure count
+4. **Check requirements**: re-read task + spec section, confirm each met
+5. **Only then** mark complete and report status
+
+### Required Checks
+
+| Claim | Must Run | Evidence Required |
+|-------|----------|-------------------|
+| Tests pass | `uv run pytest` or `npm test` | "X passed, 0 failed" |
+| Frontend clean | `cd frontend && npm run check` | 0 type errors |
+| Build works | `make build-package` | exit 0 |
+| Bug fixed | Test reproducing bug | RED then GREEN cycle |
+| Task complete | All above relevant checks | Shown output |
+
+### Red Flags — STOP
+
+Catch yourself doing any? Stop + verify first:
+
+- Using "should", "probably", "seems to", "looks like"
+- Expressing satisfaction before verification ("Done!", "Great!", "Fixed!")
+- About to mark `[x]` without having just run test command
+- Trusting previous run from earlier in session
+- Skipping checks because "it's a small change"
+
+### Common Rationalizations — All Wrong
+
+| Excuse | Reality |
+|--------|---------|
+| "Should work now" | Run verification |
+| "I'm confident" | Confidence ≠ evidence |
+| "Just this once" | No exceptions |
+| "Tests passed earlier" | Run again now |
+| "It's a small change" | Small changes break things |
+
+## Step 6: Update Progress
+
+After task verified complete:
 
 1. Mark complete in tasks.md: `- [ ]` → `- [x]`
 2. Update subtasks if applicable
@@ -80,14 +225,25 @@ Example:
 - [ ] Task 3 - Next up
 ```
 
+## Between Tasks: Code Review Checkpoint
+
+After task (or batch of 2-3 related), pause + review:
+
+1. **Re-read spec section** for what was just implemented
+2. **Check git diff**: `git diff HEAD~N` — does it match plan?
+3. **Verify no unintended side effects**: changed files outside task scope?
+4. **Confirm no placeholders**: no stubs, TODOs, or "will implement later"
+
+If issues found: fix before marking complete and moving on.
+
 ## Completion
 
 When all filtered tasks complete:
 
-1. Verify fully implemented
-2. Run tests — ensure pass
-3. Check lint/type errors
-4. Inform user complete
+1. Run full test suite — show output
+2. Run `cd frontend && npm run check` if frontend touched
+3. Re-read spec success criteria — confirm each met
+4. Report status with evidence
 5. **Stop** — do NOT continue unless asked
 
 ## Guidelines
@@ -97,15 +253,14 @@ When all filtered tasks complete:
 - One task at a time
 - Update progress in tasks.md
 - Ask if stuck
-- Test as you go
-- Follow standards
+- Follow TDD strictly — no exceptions
 - Check dependencies
-- Report status clearly
+- Report status with evidence, not claims
 
 ## If You Need to Deviate
 
 Plan needs changes:
-- **Explain why**: What discovered?
+- **Explain why**: What did you discover?
 - **Propose update**: Suggest fix
 - **Get approval**: Ask before changing
 - **Update plan**: Modify tasks.md if approved
