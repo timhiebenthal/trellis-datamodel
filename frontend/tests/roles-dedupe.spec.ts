@@ -137,11 +137,12 @@ test.describe('Role Deduplication', () => {
         await page.waitForLoadState('networkidle');
         await page.waitForTimeout(3000);
 
-        // Verify role badges are deduplicated
-        const roleBadges = page.locator('.bg-green-100.text-green-800');
-        const badgeCount = await roleBadges.count();
+        // Verify role badges are deduplicated - look specifically for "region" role
+        // (there might be other badges from other entities in the test data)
+        const regionRoleBadges = page.locator('.bg-green-100.text-green-800').filter({ hasText: /region/i });
+        const regionBadgeCount = await regionRoleBadges.count();
         
-        // Should be at most 1 badge (deduplicated from 2 entries with different cases)
-        expect(badgeCount).toBeLessThanOrEqual(1);
+        // Should be exactly 1 badge for "Region" role (deduplicated from 2 entries with different cases)
+        expect(regionBadgeCount).toBe(1);
     });
 });
