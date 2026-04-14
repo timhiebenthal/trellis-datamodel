@@ -244,7 +244,51 @@ When all filtered tasks complete:
 2. Run `cd frontend && npm run check` if frontend touched
 3. Re-read spec success criteria — confirm each met
 4. Report status with evidence
-5. **Stop** — do NOT continue unless asked
+5. Update version + changelog (see below)
+6. **Stop** — do NOT continue unless asked
+
+## Versioning + Changelog (Required after feature/fix)
+
+### Determine bump type
+
+| Change type | Bump |
+|-------------|------|
+| Breaking API/behavior change | `major` (X.0.0) |
+| New feature, backward-compatible | `minor` (0.X.0) |
+| Bug fix | `patch` (0.0.X) |
+
+For bug fixes: after verification passes, ask user:
+
+> "Fix verified. Patch bump to `0.X.Y` directly, or stage as beta (`0.X.Y-beta.1`) for extra verification before release?"
+
+Wait for answer before bumping.
+
+### Update `pyproject.toml`
+
+Bump `version = "X.Y.Z"` under `[project]`.
+
+### Update `CHANGELOG.md`
+
+Prepend new entry above current latest, using Keep a Changelog format:
+
+```markdown
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+- **Feature name**: what it does and why.
+
+### Fixed
+- **Bug name**: what broke and how fixed.
+
+### Changed
+- **Thing changed**: old behavior → new behavior.
+```
+
+Rules:
+- Use today's date
+- Only include sections with actual changes (`Added` / `Fixed` / `Changed` / `Removed`)
+- Bold the subject, plain prose description — match existing entry style
+- One entry per logical change, not per file touched
 
 ## Guidelines
 
