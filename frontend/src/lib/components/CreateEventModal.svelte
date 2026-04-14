@@ -3,6 +3,7 @@
     import { createBusinessEvent, updateBusinessEvent, getBusinessEventDomains } from "$lib/api";
     import type { BusinessEvent, BusinessEventType } from "$lib/types";
     import { toTitleCase } from "$lib/utils";
+    import { modelingStyle } from "$lib/stores";
 
     type Props = {
         open: boolean;
@@ -31,7 +32,7 @@
     let isValid = $derived.by(() => {
         if (eventText.trim().length === 0) return false;
         if (eventText.length > MAX_TEXT_LENGTH) return false;
-        if (!eventType) return false;
+        if ($modelingStyle !== 'entity_model' && !eventType) return false;
         if (loading) return false;
         return true;
     });
@@ -102,14 +103,14 @@
                 await updateBusinessEvent(event.id, {
                     text: eventText.trim(),
                     description: eventDescription.trim() || undefined,
-                    type: eventType,
+                    ...($modelingStyle !== 'entity_model' ? { type: eventType } : {}),
                     domain: eventDomain ?? undefined
                 });
             } else {
                 // Create new event
                 await createBusinessEvent(
                     eventText.trim(),
-                    eventType,
+                    $modelingStyle !== 'entity_model' ? eventType : undefined,
                     eventDomain ?? undefined,
                     undefined,
                     eventDescription.trim() || undefined
@@ -188,7 +189,7 @@
                         maxlength={MAX_TEXT_LENGTH}
                         rows="4"
                         class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="e.g., customer buys product"
+                        placeholder={$modelingStyle === 'entity_model' ? "e.g. customer places order" : "e.g., customer buys product"}
                         disabled={loading}
                     ></textarea>
                     <div class="flex items-center justify-between mt-1">
@@ -223,6 +224,7 @@
                 </div>
 
                 <!-- Event Type -->
+                {#if $modelingStyle !== 'entity_model'}
                 <div>
                     <div class="flex items-center gap-2 mb-2">
                         <label for="event-type" class="block text-sm font-medium text-gray-700">
@@ -266,6 +268,7 @@
                         <option value="recurring">Recurring</option>
                     </select>
                 </div>
+                {/if}
 
                 <!-- Business Domain -->
                 <div>

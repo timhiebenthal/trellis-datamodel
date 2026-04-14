@@ -503,7 +503,7 @@ def _validate_entity_type(entity_type: str) -> None:
     """
     from trellis_datamodel.exceptions import ValidationError
 
-    valid_types = {"fact", "dimension", "unclassified"}
+    valid_types = {"fact", "dimension", "unclassified", "entity"}
     if entity_type and entity_type not in valid_types:
         raise ValidationError(
             f"Invalid entity_type '{entity_type}'. Must be one of: {', '.join(sorted(valid_types))}"

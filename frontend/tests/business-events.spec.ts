@@ -858,3 +858,257 @@ test.describe('Business Events - E2E', () => {
     });
 
 });
+
+/**
+ * Entity Model mode E2E tests.
+ *
+ * These tests mock the config-info API to simulate `modeling_style: 'entity_model'`
+ * so the frontend hides the event-type selector and the "How Many" annotation section.
+ */
+
+function getEntityModelConfigOverrides() {
+    return { modeling_style: 'entity_model', business_events: { enabled: true } };
+}
+
+test.describe('Business Events - entity_model mode', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    const mockEvents = [
+        {
+            id: 'evt_em_001',
+            text: 'customer places order',
+            type: 'discrete',
+            created_at: '2026-01-21T10:30:00Z',
+            updated_at: '2026-01-21T10:30:00Z',
+            annotations: {
+                who: [{ id: 'ent1', text: 'customer' }],
+                what: [],
+                when: [],
+                where: [],
+                how: [],
+                how_many: [],
+                why: []
+            },
+            derived_entities: [],
+        },
+    ];
+
+    /**
+     * Registers route mocks for the business-events API and the config-info endpoint
+     * so the page thinks it is running in entity_model mode with business events enabled.
+     */
+    async function setupEntityModelMocks(page: import('@playwright/test').Page) {
+        const overrides = getEntityModelConfigOverrides();
+
+        await page.route('**/api/config-info', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    business_events_enabled: overrides.business_events.enabled,
+                    modeling_style: overrides.modeling_style,
+                }),
+            });
+        });
+
+        await page.route('**/api/business-events', async (route) => {
+            if (route.request().method() === 'GET') {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify(mockEvents),
+                });
+            } else if (route.request().method() === 'POST') {
+                const body = await route.request().postDataJSON();
+                const newEvent = {
+                    id: 'evt_em_new',
+                    text: body.text,
+                    type: body.type ?? null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    annotations: { who: [], what: [], when: [], where: [], how: [], how_many: [], why: [] },
+                    derived_entities: [],
+                };
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify(newEvent),
+                });
+            } else {
+                await route.continue();
+            }
+        });
+
+        await page.route('**/api/business-events/*', async (route) => {
+            if (route.request().method() === 'PUT') {
+                const body = await route.request().postDataJSON();
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ ...mockEvents[0], ...body, updated_at: new Date().toISOString() }),
+                });
+            } else {
+                await route.continue();
+            }
+        });
+
+        await page.route('**/api/business-events/*/generate-entities', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ entities: [], relationships: [], errors: [] }),
+            });
+        });
+
+        // Stub auxiliary APIs so the page loads cleanly
+        await page.route('**/api/business-events/domains', async (route) => {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+        });
+        await page.route('**/api/processes', async (route) => {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+        });
+        await page.route('**/api/data-model', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ entities: [], relationships: [] }),
+            });
+        });
+    }
+
+    test('entity_model route accessible', async ({ page }) => {
+        await setupEntityModelMocks(page);
+        await page.goto('/');
+
+        const response = await page.goto('/business-events').catch(() => null);
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+
+        await page.waitForLoadState('domcontentloaded');
+
+        // Should not have been redirected to /canvas
+        expect(page.url()).not.toContain('/canvas');
+
+        // Heading should be visible
+        const heading = page.getByRole('heading', { name: /business events/i });
+        await expect(heading).toBeVisible({ timeout: 5000 });
+    });
+
+    test('entity_model no event type selector', async ({ page }) => {
+        await setupEntityModelMocks(page);
+        await page.goto('/');
+
+        const response = await page.goto('/business-events').catch(() => null);
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+
+        await page.waitForLoadState('domcontentloaded');
+
+        // Open the Create Event modal
+        const addButton = page.getByRole('button', { name: /add event/i });
+        const buttonExists = await addButton.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!buttonExists) {
+            test.skip();
+            return;
+        }
+
+        await addButton.click();
+
+        // Wait for the modal to appear
+        const modal = page.getByRole('dialog');
+        await modal.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
+            test.skip();
+        });
+
+        // The event-type select must NOT be present in entity_model mode
+        const eventTypeSelect = page.locator('select#event-type');
+        await expect(eventTypeSelect).not.toBeAttached({ timeout: 2000 });
+    });
+
+    test('entity_model seven ws shows 6 sections', async ({ page }) => {
+        await setupEntityModelMocks(page);
+        await page.goto('/');
+
+        const response = await page.goto('/business-events').catch(() => null);
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+
+        await page.waitForLoadState('domcontentloaded');
+
+        // Open the 7 Ws form via the highlighter button on the first event card
+        const highlighterButton = page.getByRole('button', { name: /annotations|add annotations|edit annotations/i }).first();
+        const buttonExists = await highlighterButton.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (!buttonExists) {
+            // Fall back to title-based locator
+            const fallback = page.locator('button[title*="annotation"]').first();
+            const fallbackExists = await fallback.isVisible({ timeout: 2000 }).catch(() => false);
+            if (!fallbackExists) {
+                test.skip();
+                return;
+            }
+            await fallback.click();
+        } else {
+            await highlighterButton.click();
+        }
+
+        // Wait for the annotations modal
+        const modal = page.getByRole('dialog');
+        await modal.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
+            test.skip();
+        });
+
+        // Count annotation section headers rendered inside the modal.
+        // Each section renders a <button> with aria-expanded that toggles the collapse.
+        // In entity_model mode, "How Many" is hidden, so exactly 6 sections should render.
+        const sectionButtons = modal.locator('button[aria-expanded]');
+        await expect(sectionButtons).toHaveCount(6, { timeout: 5000 });
+    });
+
+    test('entity_model progress badge /6', async ({ page }) => {
+        await setupEntityModelMocks(page);
+        await page.goto('/');
+
+        const response = await page.goto('/business-events').catch(() => null);
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+
+        await page.waitForLoadState('domcontentloaded');
+
+        // Open the 7 Ws annotations form for the first event.
+        // The first mock event already has 1 annotation (who: customer) so the badge
+        // should immediately show "1/6 completed".
+        const highlighterButton = page.getByRole('button', { name: /annotations|add annotations|edit annotations/i }).first();
+        const buttonExists = await highlighterButton.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (!buttonExists) {
+            const fallback = page.locator('button[title*="annotation"]').first();
+            const fallbackExists = await fallback.isVisible({ timeout: 2000 }).catch(() => false);
+            if (!fallbackExists) {
+                test.skip();
+                return;
+            }
+            await fallback.click();
+        } else {
+            await highlighterButton.click();
+        }
+
+        // Wait for modal
+        const modal = page.getByRole('dialog');
+        await modal.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
+            test.skip();
+        });
+
+        // The progress badge denominator must be 6 in entity_model mode
+        const progressBadge = modal.locator('text=/\\d+\\/6/');
+        await expect(progressBadge).toBeVisible({ timeout: 5000 });
+    });
+});

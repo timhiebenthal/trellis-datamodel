@@ -20,8 +20,7 @@
                 $modelingStyle = info.modeling_style;
             }
             
-            // Check if business events is enabled and modeling style is dimensional_model
-            if (businessEventsEnabled && $modelingStyle === 'dimensional_model') {
+            if (businessEventsEnabled) {
                 $viewMode = 'business_events';
             } else {
                 // Redirect to canvas if business events not available
@@ -57,7 +56,7 @@
             <p class="text-sm mt-1">{error}</p>
         </div>
     </div>
-{:else if businessEventsEnabled && $modelingStyle === 'dimensional_model'}
+{:else if businessEventsEnabled}
     <BusinessEvents />
 {:else}
     <div class="flex items-center justify-center h-full text-gray-500">

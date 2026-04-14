@@ -46,7 +46,7 @@ class CreateEventRequest(BaseModel):
     """Request model for creating a business event."""
 
     text: str
-    type: str
+    type: str | None = None
     description: str | None = None
     domain: str | None = None
     annotations: BusinessEventAnnotations | None = None
@@ -201,12 +201,13 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
 
     try:
         # Validate event type
+        raw_type = request.type if request.type is not None else "discrete"
         try:
-            event_type = BusinessEventType(request.type)
+            event_type = BusinessEventType(raw_type)
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid event type: {request.type}. Must be one of: discrete, evolving, recurring",
+                detail=f"Invalid event type: {raw_type}. Must be one of: discrete, evolving, recurring",
             )
 
         event = create_event(request.text, event_type, domain=request.domain, description=request.description)
