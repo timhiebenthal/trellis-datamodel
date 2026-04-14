@@ -198,7 +198,7 @@
 
         <!-- Status badges -->
         <div class="flex items-center gap-2 flex-shrink-0">
-            {#if annotationsFilledCount > 0}
+            {#if annotationsFilledCount > 0 && $modelingStyle === 'dimensional_model'}
                 <span
                     class="px-2 py-1 rounded text-xs font-medium border {annotationsBadgeColor()} flex items-center gap-1"
                     title="Annotations completion status"
