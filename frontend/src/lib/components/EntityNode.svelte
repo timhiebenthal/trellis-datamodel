@@ -22,7 +22,7 @@
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
     } from "$lib/stores";
-    import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
+    import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData, EntityRole } from "$lib/types";
     import {
         inferRelationships,
         getLineage,
@@ -710,7 +710,8 @@
     let entityTags = $derived(normalizeTags(data.tags));
     
     // Roles display (for dimensions)
-    let entityRoles = $derived(((data as any).roles || []) as string[]);
+    // EntityRole is an object with { role, label, source } — extract the role string
+    let entityRoles = $derived((((data as any).roles || []) as EntityRole[]).map((r) => r.role || r.label || '').filter(Boolean));
 
     function handleTagsUpdate(newTags: string[]) {
         const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
