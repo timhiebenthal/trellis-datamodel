@@ -711,7 +711,18 @@
     
     // Roles display (for dimensions)
     // EntityRole is an object with { role, label, source } — extract the role string
-    let entityRoles = $derived((((data as any).roles || []) as EntityRole[]).map((r) => r.role || r.label || '').filter(Boolean));
+    // Deduplicate case-insensitively (e.g., "Creation Date" and "creation date" should be one)
+    let entityRoles = $derived.by(() => {
+        const roles = (((data as any).roles || []) as EntityRole[]).map((r) => r.role || r.label || '');
+        const seen = new Set<string>();
+        return roles.filter((role) => {
+            if (!role) return false;
+            const key = role.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    });
 
     function handleTagsUpdate(newTags: string[]) {
         const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
