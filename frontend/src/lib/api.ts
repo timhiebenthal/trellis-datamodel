@@ -617,7 +617,7 @@ export async function updateBusinessEventAnnotations(
  * @param filterByType - Optional annotation type filter (annotation_type)
  * @returns Promise containing array of Dimension objects
  */
-export async function getDimensions(filterByType?: AnnotationType): Promise<Dimension[]> {
+export async function getDimensions(filterByType?: AnnotationType, includeAllEntities = false): Promise<Dimension[]> {
     try {
         let url = `${API_BASE}/data-model`;
         const params = new URLSearchParams();
@@ -637,13 +637,12 @@ export async function getDimensions(filterByType?: AnnotationType): Promise<Dime
         }
 
         const data = await res.json();
-        // Filter entities to return only dimensions
         const entities = data.entities || [];
         return entities
-            .filter((e: Dimension) => e.entity_type === 'dimension')
+            .filter((e: Dimension) => includeAllEntities || e.entity_type === 'dimension')
             .filter((e: Dimension) => {
-                // If annotation_type filter specified, only return matching dimensions
-                if (filterByType) {
+                // annotation_type filter only applies for dimensional mode
+                if (!includeAllEntities && filterByType) {
                     return e.annotation_type === filterByType;
                 }
                 return true;

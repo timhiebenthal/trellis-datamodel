@@ -364,7 +364,7 @@
                     }
                     // Entity already exists - merge drafted_fields (preserve manually added fields)
                     // and update description if provided
-                    if (edited.entity_type === 'fact' && ((original as any).drafted_fields || original.description)) {
+                    if ((edited.entity_type === 'fact' || edited.entity_type === 'entity') && ((original as any).drafted_fields || original.description)) {
                         nodesToUse = nodesToUse.map((n) => {
                             if (n.id === normalizedEditedId) {
                                 const existingDraftedFields: any[] = Array.isArray((n.data as any)?.drafted_fields)
@@ -810,6 +810,11 @@
                     {/if}
 
                     <!-- Entities Table -->
+                    {#if $modelingStyle === 'entity_model'}
+                        <p class="text-xs text-gray-500">
+                            Rename the central entity to the core concept (e.g. the verb or transaction, not the full sentence).
+                        </p>
+                    {/if}
                     <div class="border border-gray-200 rounded-lg overflow-hidden">
                         <table class="w-full">
                             <thead class="bg-gray-50 border-b border-gray-200">
@@ -897,6 +902,32 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Drafted Fields (entity_model only) -->
+                    {#if $modelingStyle === 'entity_model'}
+                        {@const allDraftedFields = previewData.entities.flatMap((e) => (e as any).drafted_fields || [])}
+                        {#if allDraftedFields.length > 0}
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <div class="flex items-start gap-2 mb-2">
+                                    <Icon icon="lucide:list" class="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                                    <div>
+                                        <h3 class="text-sm font-medium text-amber-800">Attributes (drafted fields)</h3>
+                                        <p class="text-xs text-amber-700 mt-0.5">
+                                            Unlinked annotations become attributes on the central entity.
+                                            To make one a separate entity instead, link it via "Link to entity" in the annotations form.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5 mt-2">
+                                    {#each allDraftedFields as field}
+                                        <span class="px-2 py-0.5 bg-white border border-amber-300 rounded text-xs font-mono text-amber-900">
+                                            {field.name}
+                                        </span>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
+                    {/if}
 
                     <!-- Relationships Section -->
                     {#if previewData.relationships && previewData.relationships.length > 0}

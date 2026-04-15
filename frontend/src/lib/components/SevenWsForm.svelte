@@ -2,6 +2,7 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
     import { onMount, untrack } from "svelte";
+    import { get } from "svelte/store";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
     import { dimensionPrefixes, modelingStyle } from "$lib/stores";
 
@@ -273,7 +274,8 @@
         async function loadDimensionsWithRetry() {
             try {
                 dimensionsLoading = true;
-                dimensions = await getDimensions();
+                const isEntityModel = get(modelingStyle) === 'entity_model';
+                dimensions = await getDimensions(undefined, isEntityModel);
                 businessEventsLoading = true;
                 processesLoading = true;
                 const [events, processes] = await Promise.all([
@@ -486,7 +488,6 @@
     }
 
     async function updateEntryDimensionId(annotationType: AnnotationType, entryId: string, dimension_id: string) {
-        console.log('updateEntryDimensionId called:', { annotationType, entryId, dimension_id });
         editingEntries[entryId] = { ...editingEntries[entryId], dimension_id };
 
         // When linking to a dimension, the current text becomes the role
@@ -627,7 +628,7 @@
             await saveDataModel(dataModel);
 
             // Reload dimensions to get the new one
-            dimensions = await getDimensions();
+            dimensions = await getDimensions(undefined, get(modelingStyle) === 'entity_model');
 
             // Link the annotation to the new dimension
             await updateEntryDimensionId(annotationType, entryId, dimensionId);
@@ -656,6 +657,10 @@
     }
 
     function getAllowedDimensionsForType(annotationType: AnnotationType): Dimension[] {
+        // In entity_model mode all entities are available for any annotation type
+        if ($modelingStyle === 'entity_model') {
+            return dimensions;
+        }
         const allowedSet = allowedDimensionIdsByType?.[annotationType];
         return dimensions.filter((dimension) => {
             // Show dimension if:
@@ -700,6 +705,28 @@
     function applySuggestion(annotationType: AnnotationType, entryId: string, suggestion: string) {
         updateEntryText(annotationType, entryId, suggestion, false);
         activeSuggestionEntryId = null;
+    }
+
+    function applyEntitySuggestion(annotationType: AnnotationType, entryId: string, entity: Dimension) {
+        // Set the text to the entity label and auto-link the dimension_id
+        updateEntryText(annotationType, entryId, entity.label, false);
+        updateEntryDimensionId(annotationType, entryId, entity.id);
+        activeSuggestionEntryId = null;
+    }
+
+    function getEntitySuggestionsForType(annotationType: AnnotationType, currentText: string): Dimension[] {
+        if ($modelingStyle !== 'entity_model') return [];
+        const query = currentText.trim().toLowerCase();
+        return dimensions
+            .filter(d => !query || d.label.toLowerCase().includes(query) || d.id.toLowerCase().includes(query))
+            .slice(0, 8);
+    }
+
+    function unlinkEntry(annotationType: AnnotationType, entryId: string) {
+        annotations[annotationType] = annotations[annotationType].map(e =>
+            e.id === entryId ? { ...e, dimension_id: undefined, role: undefined } : e
+        );
+        selectedRoles[entryId] = undefined;
     }
 
     function cancelCreateDimension() {
@@ -967,27 +994,68 @@
                                                         disabled={loading}
                                                     />
                                                     {#if activeSuggestionEntryId === entry.id}
-                                                        {@const visibleSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
-                                                        {#if visibleSuggestions.length > 0}
+                                                        {@const entitySuggestions = getEntitySuggestionsForType(annotationType.type, entry.text)}
+                                                        {@const textSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
+                                                        {#if entitySuggestions.length > 0 || textSuggestions.length > 0}
                                                             <div class="mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-44 overflow-y-auto">
-                                                                {#each visibleSuggestions as suggestion}
-                                                                    <button
-                                                                        type="button"
-                                                                        class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-blue-50"
-                                                                        onmousedown={(e) => {
-                                                                            e.preventDefault();
-                                                                            applySuggestion(annotationType.type, entry.id, suggestion);
-                                                                        }}
-                                                                    >
-                                                                        {suggestion}
-                                                                    </button>
-                                                                {/each}
+                                                                {#if entitySuggestions.length > 0}
+                                                                    {#if textSuggestions.length > 0}
+                                                                        <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100">Entities</div>
+                                                                    {/if}
+                                                                    {#each entitySuggestions as entity}
+                                                                        <button
+                                                                            type="button"
+                                                                            class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-green-50 flex items-center gap-2"
+                                                                            onmousedown={(e) => {
+                                                                                e.preventDefault();
+                                                                                applyEntitySuggestion(annotationType.type, entry.id, entity);
+                                                                            }}
+                                                                        >
+                                                                            <span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium flex-shrink-0">entity</span>
+                                                                            {entity.label}
+                                                                        </button>
+                                                                    {/each}
+                                                                {/if}
+                                                                {#if textSuggestions.length > 0}
+                                                                    {#if entitySuggestions.length > 0}
+                                                                        <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100 border-t">Previous entries</div>
+                                                                    {/if}
+                                                                    {#each textSuggestions as suggestion}
+                                                                        <button
+                                                                            type="button"
+                                                                            class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-blue-50"
+                                                                            onmousedown={(e) => {
+                                                                                e.preventDefault();
+                                                                                applySuggestion(annotationType.type, entry.id, suggestion);
+                                                                            }}
+                                                                        >
+                                                                            {suggestion}
+                                                                        </button>
+                                                                    {/each}
+                                                                {/if}
                                                             </div>
                                                         {/if}
                                                     {/if}
 
-                                                    <!-- Collapsible Dimension Link (generalization) -->
-                                                    {#if showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
+                                                    <!-- Inline linked entity badge (entity_model) -->
+                                                    {#if $modelingStyle === 'entity_model' && entry.dimension_id}
+                                                        {@const linkedEntity = dimensions.find(d => d.id === entry.dimension_id)}
+                                                        <div class="flex items-center gap-1.5 mt-1">
+                                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 border border-green-300 rounded-full text-xs font-medium">
+                                                                <Icon icon="lucide:link" class="w-3 h-3" />
+                                                                {linkedEntity?.label || entry.dimension_id}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onclick={() => unlinkEntry(annotationType.type, entry.id)}
+                                                                class="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                                                title="Remove entity link (keep as free text)"
+                                                            >unlink</button>
+                                                        </div>
+                                                    {/if}
+
+                                                    <!-- Collapsible Dimension Link (generalization) — dimensional_model only -->
+                                                    {#if $modelingStyle !== 'entity_model' && showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
                                                         <div class="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
                                                             {#if creatingDimensionForEntry === entry.id}
                                                                 <!-- Create new dimension inline -->
@@ -1083,20 +1151,20 @@
                                                 />
                                             </div>
                                             <div class="flex flex-col gap-1">
-                                                {#if annotationType.type !== 'how_many'}
-                                                    <!-- Generalize to dimension button -->
+                                                {#if annotationType.type !== 'how_many' && $modelingStyle !== 'entity_model'}
+                                                    <!-- Generalize to dimension button (dimensional_model only) -->
                                                     <div class="group relative">
                                                         <button
                                                             type="button"
                                                             class="p-2 rounded-md transition-colors {entry.dimension_id ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}"
                                                             onclick={() => toggleGeneralizeSection(entry.id)}
-                                                            aria-label={$modelingStyle === 'entity_model' ? 'Link to entity' : 'Generalize to a dimension'}
+                                                            aria-label="Generalize to a dimension"
                                                             disabled={loading}
                                                         >
                                                             <Icon icon="material-symbols:groups" class="w-4 h-4" />
                                                         </button>
                                                         <div class="absolute right-0 bottom-full mb-2 w-[300px] p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
-                                                            {$modelingStyle === 'entity_model' ? 'Link to an existing entity to create a relationship. Leave unlinked to keep as attribute.' : "Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date)."}
+                                                            Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date).
                                                             <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                                                         </div>
                                                     </div>
