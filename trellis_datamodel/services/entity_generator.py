@@ -476,17 +476,6 @@ def _generate_from_annotations_entity_model(
     if drafted_fields:
         central_entity["drafted_fields"] = drafted_fields
 
-    # #region agent log
-    try:
-        import json as _json, pathlib as _pl, time as _time
-        _log = {"sessionId":"1340c5","runId":"post-fix-3","hypothesisId":"A","location":"entity_generator.py:post-loop","message":"final state with first_what fix","data":{"entity_id":entity_id,"first_what":first_what.text if first_what else None,"first_unlinked_what":first_unlinked_what.text if first_unlinked_what else None,"drafted_fields":[f["name"] for f in drafted_fields],"relationships":[r["target"] for r in relationships]},"timestamp":_time.time()}
-        _logpath = _pl.Path("/home/thiebenthal_ubuntu/git_repos/trellis-datamodel/.cursor/debug-1340c5.log")
-        _logpath.parent.mkdir(parents=True, exist_ok=True)
-        _logpath.open("a").write(_json.dumps(_log)+"\n")
-    except Exception:
-        pass
-    # #endregion
-
     logger.info(
         f"Generated entity_model entity from event {event.id}: "
         f"1 entity, {len(relationships)} relationships, {len(drafted_fields)} drafted fields"
