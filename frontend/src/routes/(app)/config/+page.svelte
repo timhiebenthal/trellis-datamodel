@@ -588,9 +588,9 @@
                                     <label for="entity-guidance-enabled" class="block text-sm font-medium text-gray-700 mb-1.5">
                                         Enable Entity Wizard
                                     </label>
-                                    {#if getFieldMetadata('entity_creation_guidance.enabled')?.description}
-                                        <p class="text-xs text-gray-500">{getFieldMetadata('entity_creation_guidance.enabled')?.description}</p>
-                                    {/if}
+                                    <p class="text-xs text-gray-500">
+                                        Turn on entity creation with guided questions for consistent model definitions.
+                                    </p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input
@@ -609,9 +609,9 @@
                                     <label for="entity-guidance-push-warning" class="block text-sm font-medium text-gray-700 mb-1.5">
                                         Push Warning Enabled
                                     </label>
-                                    {#if getFieldMetadata('entity_creation_guidance.push_warning_enabled')?.description}
-                                        <p class="text-xs text-gray-500">{getFieldMetadata('entity_creation_guidance.push_warning_enabled')?.description}</p>
-                                    {/if}
+                                    <p class="text-xs text-gray-500">
+                                        Show a warning for undescribed entities/attributes when you push to dbt.
+                                    </p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input
