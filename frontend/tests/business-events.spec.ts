@@ -1111,4 +1111,94 @@ test.describe('Business Events - entity_model mode', () => {
         const progressBadge = modal.locator('text=/\\d+\\/6/');
         await expect(progressBadge).toBeVisible({ timeout: 5000 });
     });
+
+    test('topology source dropdown', async ({ page }) => {
+        await setupEntityModelMocks(page);
+        await page.route('**/api/business-events/*/generate-entities', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    entities: [{ id: 'booking', label: 'Booking', entity_type: 'entity' }],
+                    relationships: [
+                        {
+                            source: 'booking',
+                            target: 'employee',
+                            label: 'Employee',
+                            type: 'many_to_one',
+                        },
+                    ],
+                    errors: [],
+                }),
+            });
+        });
+
+        await page.goto('/');
+        const response = await page.goto('/business-events').catch(() => null);
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+        await page.waitForLoadState('domcontentloaded');
+
+        const generateBtn = page.getByTitle('Generate entities and relationships from annotations');
+        await expect(generateBtn).toBeVisible({ timeout: 5000 });
+        await generateBtn.click();
+
+        const dialog = page.getByRole('dialog').filter({
+            hasText: /generate entities and relationships from event/i,
+        });
+        await expect(dialog).toBeVisible({ timeout: 5000 });
+
+        await expect(dialog.getByRole('heading', { name: 'Relationships:' })).toBeVisible();
+        const sourceSelect = dialog.locator('select').first();
+        await expect(sourceSelect).toBeVisible();
+        await expect(sourceSelect.locator('option[value="booking"]')).toBeAttached();
+    });
+
+    test('topology field target dropdown', async ({ page }) => {
+        await setupEntityModelMocks(page);
+        await page.route('**/api/business-events/*/generate-entities', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    entities: [
+                        {
+                            id: 'booking',
+                            label: 'Booking',
+                            entity_type: 'entity',
+                            drafted_fields: [{ name: 'hire_date', datatype: 'date' }],
+                        },
+                    ],
+                    relationships: [],
+                    errors: [],
+                }),
+            });
+        });
+
+        await page.goto('/');
+        const response = await page.goto('/business-events').catch(() => null);
+        if (!response || !response.ok()) {
+            test.skip();
+            return;
+        }
+        await page.waitForLoadState('domcontentloaded');
+
+        const generateBtn = page.getByTitle('Generate entities and relationships from annotations');
+        await expect(generateBtn).toBeVisible({ timeout: 5000 });
+        await generateBtn.click();
+
+        const dialog = page.getByRole('dialog').filter({
+            hasText: /generate entities and relationships from event/i,
+        });
+        await expect(dialog).toBeVisible({ timeout: 5000 });
+
+        await expect(
+            dialog.getByRole('heading', { name: /attributes \(drafted fields\)/i })
+        ).toBeVisible({ timeout: 5000 });
+
+        const attributesBlock = dialog.locator('.bg-amber-50').filter({ hasText: 'hire_date' });
+        await expect(attributesBlock.locator('select')).toBeVisible();
+    });
 });

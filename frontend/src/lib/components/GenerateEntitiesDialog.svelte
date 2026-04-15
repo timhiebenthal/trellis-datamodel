@@ -25,11 +25,39 @@
     let error = $state<string | null>(null);
     let previewData = $state<GeneratedEntitiesResult | null>(null);
     let editedEntities = $state<Array<{ id: string; label: string; entity_type: string; tags?: string[] }>>([]);
+    type EditedRelationship = { source: string; target: string; label: string; type: string };
+    type EditedDraftedField = { name: string; datatype: string; targetEntityId: string };
+
+    let editedRelationships = $state<EditedRelationship[]>([]);
+    let editedDraftedFields = $state<EditedDraftedField[]>([]);
     let validationErrors = $state<string[]>([]);
     let creating = $state(false);
     let success = $state(false);
 
     const positioner = new DimensionalModelPositioner();
+
+    const allEntityOptions = $derived(
+        $modelingStyle === 'entity_model'
+            ? [
+                  ...(previewData?.entities || []).map((e, i) => ({
+                      id: e.id,
+                      label: editedEntities[i]?.label || e.label,
+                      isNew: true,
+                  })),
+                  ...$nodes
+                      .filter(
+                          (n) =>
+                              n.type === 'entity' &&
+                              !(previewData?.entities || []).some((pe) => pe.id === n.id)
+                      )
+                      .map((n) => ({
+                          id: n.id,
+                          label: String((n.data as any)?.label || n.id),
+                          isNew: false,
+                      })),
+              ]
+            : []
+    );
 
     // Load preview data when dialog opens
     $effect(() => {
@@ -40,6 +68,8 @@
             untrack(() => {
                 previewData = null;
                 editedEntities = [];
+                editedRelationships = [];
+                editedDraftedFields = [];
                 validationErrors = [];
                 error = null;
                 success = false;
@@ -110,6 +140,26 @@
                     tags: e.tags || [],
                 };
             });
+
+            if (get(modelingStyle) === 'entity_model' && previewData) {
+                editedRelationships = (previewData.relationships || []).map((rel) => ({
+                    source: rel.source,
+                    target: rel.target,
+                    label: rel.label || '',
+                    type: rel.type || 'many_to_one',
+                }));
+
+                editedDraftedFields = previewData.entities.flatMap((e) =>
+                    ((e as any).drafted_fields || []).map((f: any) => ({
+                        name: f.name,
+                        datatype: f.datatype || 'unknown',
+                        targetEntityId: e.id,
+                    }))
+                );
+            } else {
+                editedRelationships = [];
+                editedDraftedFields = [];
+            }
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to generate preview';
             console.error('Error generating preview:', error);
@@ -287,6 +337,22 @@
                 10
             );
 
+            let fieldsByEntity = new Map<string, any[]>();
+            if ($modelingStyle === 'entity_model') {
+                const preliminaryIdMap = new Map(
+                    previewData.entities.map((e, i) => [
+                        e.id,
+                        generateEntityId(editedEntities[i].id.trim(), []),
+                    ])
+                );
+                fieldsByEntity = new Map();
+                for (const f of editedDraftedFields) {
+                    const actualId = preliminaryIdMap.get(f.targetEntityId) ?? f.targetEntityId;
+                    if (!fieldsByEntity.has(actualId)) fieldsByEntity.set(actualId, []);
+                    fieldsByEntity.get(actualId)!.push({ name: f.name, datatype: f.datatype });
+                }
+            }
+
             for (let i = 0; i < editedEntities.length; i++) {
                 const edited = editedEntities[i];
                 const original = previewData.entities[i];
@@ -294,6 +360,13 @@
                 const inheritedDomain =
                     mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
                 const normalizedEditedId = generateEntityId(trimmedId, []);
+
+                const generatedFieldsForMerge: any[] =
+                    $modelingStyle === 'entity_model'
+                        ? (fieldsByEntity.get(normalizedEditedId) ?? [])
+                        : Array.isArray((original as any).drafted_fields)
+                          ? (original as any).drafted_fields
+                          : [];
 
                 // Check against current nodesToUse (updated in-loop) to avoid duplicates
                 // when the same generation is run more than once
@@ -364,27 +437,27 @@
                     }
                     // Entity already exists - merge drafted_fields (preserve manually added fields)
                     // and update description if provided
-                    if ((edited.entity_type === 'fact' || edited.entity_type === 'entity') && ((original as any).drafted_fields || original.description)) {
+                    if (
+                        (edited.entity_type === 'fact' || edited.entity_type === 'entity') &&
+                        (generatedFieldsForMerge.length > 0 || original.description)
+                    ) {
                         nodesToUse = nodesToUse.map((n) => {
                             if (n.id === normalizedEditedId) {
                                 const existingDraftedFields: any[] = Array.isArray((n.data as any)?.drafted_fields)
                                     ? (n.data as any).drafted_fields
-                                    : [];
-                                const generatedFields: any[] = Array.isArray((original as any).drafted_fields)
-                                    ? (original as any).drafted_fields
                                     : [];
                                 // Keep all existing (manually drafted) fields; add generated fields
                                 // only if no field with the same name already exists
                                 const existingNames = new Set(existingDraftedFields.map((f: any) => f.name));
                                 const mergedFields = [
                                     ...existingDraftedFields,
-                                    ...generatedFields.filter((f: any) => !existingNames.has(f.name)),
+                                    ...generatedFieldsForMerge.filter((f: any) => !existingNames.has(f.name)),
                                 ];
                                 return {
                                     ...n,
                                     data: {
                                         ...n.data,
-                                        ...(generatedFields.length > 0 || existingDraftedFields.length > 0
+                                        ...(generatedFieldsForMerge.length > 0 || existingDraftedFields.length > 0
                                             ? { drafted_fields: mergedFields }
                                             : {}),
                                         ...(original.description ? { description: original.description } : {}),
@@ -422,13 +495,10 @@
                 // the previous node with this ID (captured before the removal step), then
                 // append generated fields that don't already exist by name.
                 const _prevFields: any[] = previousDraftedFieldsMap.get(normalizedEditedId) ?? [];
-                const _genFields: any[] = Array.isArray((original as any).drafted_fields)
-                    ? (original as any).drafted_fields
-                    : [];
                 const _prevNames = new Set(_prevFields.map((f: any) => f.name));
                 const _mergedDraftedFields = [
                     ..._prevFields,
-                    ..._genFields.filter((f: any) => !_prevNames.has(f.name)),
+                    ...generatedFieldsForMerge.filter((f: any) => !_prevNames.has(f.name)),
                 ];
 
                 // Create node (include tags, domain, annotation_type, and drafted_fields from preview data)
@@ -460,11 +530,40 @@
                 createdEntityIds.push(id);
                 entityIdByIndex.push(id);
             }
+
+            if ($modelingStyle === 'entity_model') {
+                for (const [entityId, fields] of fieldsByEntity) {
+                    if (entityIdByIndex.includes(entityId) || createdEntityIds.includes(entityId)) continue;
+                    nodesToUse = nodesToUse.map((n) => {
+                        if (n.id !== entityId || n.type !== 'entity') return n;
+                        const existing: any[] = Array.isArray((n.data as any)?.drafted_fields)
+                            ? (n.data as any).drafted_fields
+                            : [];
+                        const existingNames = new Set(existing.map((f: any) => f.name));
+                        const merged = [
+                            ...existing,
+                            ...fields.filter((f) => !existingNames.has(f.name)),
+                        ];
+                        return {
+                            ...n,
+                            data: {
+                                ...n.data,
+                                drafted_fields: merged.length > 0 ? merged : undefined,
+                            },
+                        };
+                    });
+                }
+            }
+
             // Update nodes store with filtered + new nodes
             $nodes = nodesToUse;
 
             // Create relationships
-            if (previewData.relationships && previewData.relationships.length > 0) {
+            const relsToCreate =
+                $modelingStyle === 'entity_model'
+                    ? editedRelationships
+                    : (previewData.relationships || []);
+            if (relsToCreate.length > 0) {
                 // Map original entity IDs to created entity IDs
                 const idMapping = new Map<string, string>();
                 for (let i = 0; i < previewData.entities.length; i++) {
@@ -478,7 +577,7 @@
 
                 // Create edges for relationships
                 let updatedEdges = edgesToUse;
-                for (const rel of previewData.relationships) {
+                for (const rel of relsToCreate) {
                     const sourceId = idMapping.get(rel.source) || rel.source;
                     const targetId = idMapping.get(rel.target) || rel.target;
 
@@ -491,7 +590,7 @@
                             source: sourceId,
                             target: targetId,
                             label: rel.label || '',
-                            type: rel.type || 'one_to_many',
+                            type: (rel.type || 'one_to_many') as 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many',
                         };
                         updatedEdges = mergeRelationshipIntoEdges(updatedEdges, relationship);
                     }
@@ -904,47 +1003,110 @@
                     </div>
 
                     <!-- Drafted Fields (entity_model only) -->
-                    {#if $modelingStyle === 'entity_model'}
-                        {@const allDraftedFields = previewData.entities.flatMap((e) => (e as any).drafted_fields || [])}
-                        {#if allDraftedFields.length > 0}
-                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                <div class="flex items-start gap-2 mb-2">
-                                    <Icon icon="lucide:list" class="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <h3 class="text-sm font-medium text-amber-800">Attributes (drafted fields)</h3>
-                                        <p class="text-xs text-amber-700 mt-0.5">
-                                            Unlinked annotations become attributes on the central entity.
-                                            To make one a separate entity instead, link it via "Link to entity" in the annotations form.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex flex-wrap gap-1.5 mt-2">
-                                    {#each allDraftedFields as field}
-                                        <span class="px-2 py-0.5 bg-white border border-amber-300 rounded text-xs font-mono text-amber-900">
-                                            {field.name}
-                                        </span>
-                                    {/each}
+                    {#if $modelingStyle === 'entity_model' && editedDraftedFields.length > 0}
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <div class="flex items-start gap-2 mb-3">
+                                <Icon icon="lucide:list" class="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <h3 class="text-sm font-medium text-amber-800">Attributes (drafted fields)</h3>
+                                    <p class="text-xs text-amber-700 mt-0.5">
+                                        Choose which entity each attribute belongs to.
+                                    </p>
                                 </div>
                             </div>
-                        {/if}
+                            <div class="space-y-1.5">
+                                {#each editedDraftedFields as field, i}
+                                    <div class="flex items-center gap-2">
+                                        <span
+                                            class="px-2 py-0.5 bg-white border border-amber-300 rounded text-xs font-mono text-amber-900 min-w-0 shrink-0"
+                                        >
+                                            {field.name}
+                                        </span>
+                                        <span class="text-xs text-gray-400 shrink-0">on</span>
+                                        <select
+                                            value={field.targetEntityId}
+                                            onchange={(e) => {
+                                                editedDraftedFields[i] = {
+                                                    ...field,
+                                                    targetEntityId: e.currentTarget.value,
+                                                };
+                                            }}
+                                            class="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        >
+                                            {#if allEntityOptions.length > 0}
+                                                <optgroup label="In this dialog">
+                                                    {#each allEntityOptions.filter((o) => o.isNew) as opt}
+                                                        <option value={opt.id}>{opt.label}</option>
+                                                    {/each}
+                                                </optgroup>
+                                                {#if allEntityOptions.some((o) => !o.isNew)}
+                                                    <optgroup label="Existing entities">
+                                                        {#each allEntityOptions.filter((o) => !o.isNew) as opt}
+                                                            <option value={opt.id}>{opt.label}</option>
+                                                        {/each}
+                                                    </optgroup>
+                                                {/if}
+                                            {/if}
+                                        </select>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
                     {/if}
 
                     <!-- Relationships Section -->
                     {#if previewData.relationships && previewData.relationships.length > 0}
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <h3 class="text-sm font-medium text-gray-700 mb-2">Relationships:</h3>
-                            <div class="space-y-1">
-                                {#each previewData.relationships as rel}
-                                    <p class="text-sm text-gray-600">
-                                        <span class="font-mono">{getPreviewDisplayId(rel.source)}</span>
-                                        <span class="mx-2">→</span>
-                                        <span class="font-mono">{getPreviewDisplayId(rel.target)}</span>
-                                        {#if rel.label}
-                                            <span class="text-gray-500 ml-2">({rel.label})</span>
-                                        {/if}
-                                    </p>
-                                {/each}
-                            </div>
+                            {#if $modelingStyle === 'entity_model'}
+                                <div class="space-y-1.5">
+                                    {#each editedRelationships as rel, i}
+                                        <div class="flex items-center gap-2 text-sm">
+                                            <select
+                                                value={rel.source}
+                                                onchange={(e) => {
+                                                    editedRelationships[i] = {
+                                                        ...rel,
+                                                        source: e.currentTarget.value,
+                                                    };
+                                                }}
+                                                class="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            >
+                                                {#if allEntityOptions.length > 0}
+                                                    <optgroup label="In this dialog">
+                                                        {#each allEntityOptions.filter((o) => o.isNew) as opt}
+                                                            <option value={opt.id}>{opt.label}</option>
+                                                        {/each}
+                                                    </optgroup>
+                                                    {#if allEntityOptions.some((o) => !o.isNew)}
+                                                        <optgroup label="Existing entities">
+                                                            {#each allEntityOptions.filter((o) => !o.isNew) as opt}
+                                                                <option value={opt.id}>{opt.label}</option>
+                                                            {/each}
+                                                        </optgroup>
+                                                    {/if}
+                                                {/if}
+                                            </select>
+                                            <span class="text-gray-400">→</span>
+                                            <span class="font-mono text-gray-700">{getPreviewDisplayId(rel.target)}</span>
+                                            {#if rel.label}
+                                                <span class="text-gray-400 text-xs">({rel.label})</span>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <div class="space-y-1">
+                                    {#each previewData.relationships as rel}
+                                        <p class="text-sm text-gray-600">
+                                            <span class="font-mono">{getPreviewDisplayId(rel.source)}</span>
+                                            <span class="mx-2">→</span>
+                                            <span class="font-mono">{getPreviewDisplayId(rel.target)}</span>
+                                            {#if rel.label}<span class="text-gray-500 ml-2">({rel.label})</span>{/if}
+                                        </p>
+                                    {/each}
+                                </div>
+                            {/if}
                         </div>
                     {/if}
 
