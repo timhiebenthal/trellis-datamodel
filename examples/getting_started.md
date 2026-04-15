@@ -18,7 +18,7 @@ You can also disable the Entity Creation Wizard.
 
 ## Add Entity Attributes
 
-Use the **Conceptual View** for a high-level business overview. Switch to the **Logical View** to add entity attributes and metadata such as descriptions and data types.
+Use the **Conceptual View** for a high-level business overview. Switch to the **Logical View** to add entity attributes and metadata such as descriptions and data types or the data source.
 
 <video src="https://github.com/user-attachments/assets/e24322c0-8631-458c-8359-67e0d4d5e624" controls></video>
 
@@ -32,7 +32,7 @@ Trellis writes per-entity `schema.yml` files with descriptions and, for field-le
 ## Entity Details & Export
 
 The **Entity List** page gives you an overview of all entities, which is especially useful in larger projects. The **Entity Detail** page lets you refine metadata, including retrieval context for individual fields.  
-You can export a single Entity Specification as Markdown or `.xlsx`, and export the full data model as `.xlsx` as well.
+You can export a single Entity Specification as Markdown (perfect for e.g. JIRA tickets) or `.xlsx`, and export the full data model as `.xlsx` as well.
 
 <video src="https://github.com/user-attachments/assets/518c497a-564e-488d-8b94-ddca51d0e3c6" controls></video>
 
