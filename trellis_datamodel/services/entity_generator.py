@@ -397,15 +397,26 @@ def _generate_from_annotations_entity_model(
 
     prefixes = _entity_prefixes(config)
 
-    # Build central entity id/label from event text
-    base_name = _text_to_snake_case(event.text)
+    # Build central entity id/label — prefer first What annotation as the core concept
+    # name (e.g. "Employee makes Booking" → "booking"), fall back to full event text
+    # when no What entries exist at all.
+    first_what = next((e for e in (event.annotations.what or [])), None)
+    # Keep track of the first unlinked What so we can skip it from drafted_fields below
+    first_unlinked_what = next(
+        (e for e in (event.annotations.what or []) if not e.dimension_id), None
+    )
+    if first_what:
+        base_name = _text_to_snake_case(first_what.text)
+        label = _text_to_title_case(first_what.text)
+    else:
+        base_name = _text_to_snake_case(event.text)
+        label = _text_to_title_case(event.text)
+
     entity_id = base_name
     if prefixes:
         has_prefix = any(base_name.lower().startswith(p.lower()) for p in prefixes)
         if not has_prefix:
             entity_id = f"{prefixes[0]}{base_name}"
-
-    label = _text_to_title_case(event.text)
 
     # Build domain/tags
     domain = event.domain or None
@@ -432,7 +443,14 @@ def _generate_from_annotations_entity_model(
     seen_rel_pairs: set = set()
 
     for annotation_type, entry in non_how_many_entries:
+        # Skip the first unlinked What entry — it was promoted to the central entity name
+        if first_unlinked_what and entry.id == first_unlinked_what.id:
+            continue
         if entry.dimension_id:
+            # Skip self-referential relationships (linked What whose id matches
+            # the central entity we derived from its text)
+            if entry.dimension_id == entity_id:
+                continue
             pair = (entity_id, entry.dimension_id)
             if pair not in seen_rel_pairs:
                 relationships.append(
@@ -457,6 +475,17 @@ def _generate_from_annotations_entity_model(
 
     if drafted_fields:
         central_entity["drafted_fields"] = drafted_fields
+
+    # #region agent log
+    try:
+        import json as _json, pathlib as _pl, time as _time
+        _log = {"sessionId":"1340c5","runId":"post-fix-3","hypothesisId":"A","location":"entity_generator.py:post-loop","message":"final state with first_what fix","data":{"entity_id":entity_id,"first_what":first_what.text if first_what else None,"first_unlinked_what":first_unlinked_what.text if first_unlinked_what else None,"drafted_fields":[f["name"] for f in drafted_fields],"relationships":[r["target"] for r in relationships]},"timestamp":_time.time()}
+        _logpath = _pl.Path("/home/thiebenthal_ubuntu/git_repos/trellis-datamodel/.cursor/debug-1340c5.log")
+        _logpath.parent.mkdir(parents=True, exist_ok=True)
+        _logpath.open("a").write(_json.dumps(_log)+"\n")
+    except Exception:
+        pass
+    # #endregion
 
     logger.info(
         f"Generated entity_model entity from event {event.id}: "

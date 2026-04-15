@@ -600,25 +600,27 @@
             // Fetch current data model
             const dataModel = await getDataModel();
 
-            // Generate dimension ID from label, using the configured prefix (first entry) or 'dim_' as fallback
-            const prefix = $dimensionPrefixes[0] ?? 'dim_';
+            const isEntityModel = get(modelingStyle) === 'entity_model';
+            // In entity_model mode: no prefix, plain snake_case id
+            // In dimensional_model mode: use configured dim prefix or 'dim_' fallback
+            const prefix = isEntityModel ? '' : ($dimensionPrefixes[0] ?? 'dim_');
             const dimensionId = `${prefix}${dimensionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
 
-            // Check if dimension already exists
+            // Check if entity already exists
             if (dataModel.entities.find(e => e.id === dimensionId)) {
-                error = `Dimension "${dimensionId}" already exists`;
+                error = `${isEntityModel ? 'Entity' : 'Dimension'} "${dimensionId}" already exists`;
                 return;
             }
 
-            // Create new dimension entity
+            // Create new entity
             const newDimension = {
                 id: dimensionId,
                 label: dimensionLabel,
-                description: `${dimensionLabel} dimension`,
-                entity_type: 'dimension' as const,
-                annotation_type: annotationType,
-                position: { x: 100, y: 100 }, // Default position
-                roles: [] // Empty roles array
+                description: '',
+                entity_type: (isEntityModel ? 'entity' : 'dimension') as 'entity' | 'dimension',
+                ...(isEntityModel ? {} : { annotation_type: annotationType }),
+                position: { x: 100, y: 100 },
+                roles: []
             };
 
             // Add to data model
@@ -996,26 +998,37 @@
                                                     {#if activeSuggestionEntryId === entry.id}
                                                         {@const entitySuggestions = getEntitySuggestionsForType(annotationType.type, entry.text)}
                                                         {@const textSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
-                                                        {#if entitySuggestions.length > 0 || textSuggestions.length > 0}
+                                                        {@const showNewEntityOption = $modelingStyle === 'entity_model' && entry.text.trim() && !entitySuggestions.some(e => e.label.toLowerCase() === entry.text.trim().toLowerCase())}
+                                                        {#if entitySuggestions.length > 0 || textSuggestions.length > 0 || showNewEntityOption}
                                                             <div class="mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-44 overflow-y-auto">
-                                                                {#if entitySuggestions.length > 0}
-                                                                    {#if textSuggestions.length > 0}
-                                                                        <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100">Entities</div>
-                                                                    {/if}
-                                                                    {#each entitySuggestions as entity}
-                                                                        <button
-                                                                            type="button"
-                                                                            class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-green-50 flex items-center gap-2"
-                                                                            onmousedown={(e) => {
-                                                                                e.preventDefault();
-                                                                                applyEntitySuggestion(annotationType.type, entry.id, entity);
-                                                                            }}
-                                                                        >
-                                                                            <span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium flex-shrink-0">entity</span>
+                                                                {#if showNewEntityOption}
+                                                                    <button
+                                                                        type="button"
+                                                                        class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 font-medium border-b border-gray-100"
+                                                                        onmousedown={(e) => {
+                                                                            e.preventDefault();
+                                                                            activeSuggestionEntryId = null;
+                                                                            newDimensionName = entry.text;
+                                                                            creatingDimensionForEntry = entry.id;
+                                                                        }}
+                                                                    >+ New entity "{entry.text}"</button>
+                                                                {/if}
+                                                                {#if entitySuggestions.length > 0 && textSuggestions.length > 0}
+                                                                    <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100">Entities</div>
+                                                                {/if}
+                                                                {#each entitySuggestions as entity}
+                                                                    <button
+                                                                        type="button"
+                                                                        class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-green-50 flex items-center gap-2"
+                                                                        onmousedown={(e) => {
+                                                                            e.preventDefault();
+                                                                            applyEntitySuggestion(annotationType.type, entry.id, entity);
+                                                                        }}
+                                                                    >
+                                                                        <span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium flex-shrink-0">entity</span>
                                                                             {entity.label}
                                                                         </button>
                                                                     {/each}
-                                                                {/if}
                                                                 {#if textSuggestions.length > 0}
                                                                     {#if entitySuggestions.length > 0}
                                                                         <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100 border-t">Previous entries</div>
@@ -1051,6 +1064,28 @@
                                                                 class="text-xs text-gray-400 hover:text-red-500 transition-colors"
                                                                 title="Remove entity link (keep as free text)"
                                                             >unlink</button>
+                                                        </div>
+                                                    {/if}
+
+                                                    <!-- Inline create entity form (entity_model only) -->
+                                                    {#if $modelingStyle === 'entity_model' && creatingDimensionForEntry === entry.id}
+                                                        <div class="mt-2 space-y-1 border-l-2 border-blue-200 pl-3">
+                                                            <label class="text-xs font-medium text-gray-600">Create new entity</label>
+                                                            <div class="flex items-center gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    bind:value={newDimensionName}
+                                                                    placeholder="e.g., Employee, Project"
+                                                                    class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                                    disabled={loading}
+                                                                    onkeydown={(e) => {
+                                                                        if (e.key === 'Enter') submitCreateDimension(annotationType.type, entry.id);
+                                                                        else if (e.key === 'Escape') cancelCreateDimension();
+                                                                    }}
+                                                                />
+                                                                <button type="button" onclick={() => submitCreateDimension(annotationType.type, entry.id)} disabled={!newDimensionName.trim() || loading} class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Create</button>
+                                                                <button type="button" onclick={cancelCreateDimension} class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" disabled={loading}>Cancel</button>
+                                                            </div>
                                                         </div>
                                                     {/if}
 
