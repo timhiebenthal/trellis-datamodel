@@ -1,5 +1,7 @@
 # Documenting Business Processes with Trellis
 
+**Disclaimer** This feature is still experimental, therefore it needs to be activated explicitly through the `trellis.yml` or in the UI as shown in the 1. clip. 
+
 ## Create Events and annotate them
 
 Capture business events in trellis and derive their dimensions using the 7W's of the BEAM* Modeling Approach.
