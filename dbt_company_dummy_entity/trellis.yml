@@ -1,4 +1,4 @@
-# Trellis configuration for data model UI
+# trellis configuration for data model UI
 # Select data modeling style (entity_model or dimensional_model)
 modeling_style: entity_model
 

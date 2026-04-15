@@ -1,17 +1,17 @@
-# Getting Started with Trellis
+# Getting Started with trellis
 
-Video tutorials demonstrating core Trellis workflows.
+Video tutorials demonstrating core trellis workflows.
 
 ## Initialize Project
 
-Start Trellis in a file-based setup with `trellis init` and create the initial config with the optional wizard.  
+Start trellis in a file-based setup with `trellis init` and create the initial config with the optional wizard.  
 Launch the UI with `trellis run`; modeled entities are stored in `data_model.yml`, which works well for version control and machine-readable workflows.
 
 <video src="https://github.com/user-attachments/assets/b5690e96-3ed0-4988-a576-5471e48096f2" controls></video>
 
 ## Configure in UI
 
-Edit Trellis settings directly in the UI instead of managing everything by hand in YAML.  
+Edit trellis settings directly in the UI instead of managing everything by hand in YAML.  
 You can also disable the Entity Creation Wizard.
 
 <video src="https://github.com/user-attachments/assets/a27de46c-a909-4e90-af4e-7e68e6f52d98" controls></video>
@@ -25,7 +25,7 @@ Use the **Conceptual View** for a high-level business overview. Switch to the **
 ## Create Relationships & Push to dbt
 
 Connect entities visually at the entity or field level and push the resulting artifacts to dbt.  
-Trellis writes per-entity `schema.yml` files with descriptions and, for field-level links, relationship tests.
+trellis writes per-entity `schema.yml` files with descriptions and, for field-level links, relationship tests.
 
 <video src="https://github.com/user-attachments/assets/d30406c2-13e0-46aa-9288-a0414c6688cf" controls></video>
 
