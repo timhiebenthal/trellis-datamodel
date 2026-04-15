@@ -13,5 +13,6 @@ Leverage Role-Playing Dimensions to have a single table covering several process
 ## Documenting Entity Lineage
 
 Combine multiple events into a process, consolidating the dimensions and facts into a single star-schema.
+You then also can view a filtered canvas for this particular process or event, ideal for larger, clutterered projects
 
 <video src="https://github.com/user-attachments/assets/574c6a3f-0a4d-4518-9868-547680bd1fab" controls></video>
