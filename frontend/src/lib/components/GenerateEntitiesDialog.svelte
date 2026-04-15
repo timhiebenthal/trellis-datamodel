@@ -1,6 +1,11 @@
 <script lang="ts">
     import { generateEntitiesFromEvent, generateEntitiesFromProcess, updateBusinessEvent, updateBusinessEventProcess, saveDataModel, getBusinessEvents } from '$lib/api';
-    import type { BusinessEvent, BusinessEventProcess, GeneratedEntitiesResult } from '$lib/types';
+    import type {
+        BusinessEvent,
+        BusinessEventAnnotations,
+        BusinessEventProcess,
+        GeneratedEntitiesResult,
+    } from '$lib/types';
     import { nodes, edges, modelingStyle, sourceColors, dimensionPrefixes, factPrefixes } from '$lib/stores';
     import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
@@ -33,31 +38,98 @@
     let validationErrors = $state<string[]>([]);
     let creating = $state(false);
     let success = $state(false);
+    /** When false, "existing canvas" options are limited to entities referenced by this event/process. */
+    let topologyShowAllCanvasEntities = $state(false);
 
     const positioner = new DimensionalModelPositioner();
 
-    const allEntityOptions = $derived(
+    /** IDs referenced by preview, annotations (dimension links), relationships, and derived entities. */
+    function collectScopedCanvasEntityIds(
+        pd: GeneratedEntitiesResult,
+        evt: BusinessEvent | null,
+        proc: BusinessEventProcess | null,
+        rels: EditedRelationship[]
+    ): Set<string> {
+        const ids = new Set<string>();
+        for (const e of pd.entities) {
+            ids.add(e.id);
+        }
+        const relList = rels.length > 0 ? rels : (pd.relationships || []);
+        for (const rel of relList) {
+            ids.add(rel.source);
+            ids.add(rel.target);
+        }
+        const scanAnnotations = (ann: BusinessEventAnnotations | undefined) => {
+            if (!ann) return;
+            const buckets = [
+                ann.who,
+                ann.what,
+                ann.when,
+                ann.where,
+                ann.how,
+                ann.why,
+                ann.how_many,
+            ];
+            for (const bucket of buckets) {
+                for (const entry of bucket || []) {
+                    if (entry.dimension_id) ids.add(entry.dimension_id);
+                }
+            }
+        };
+        scanAnnotations(evt?.annotations);
+        scanAnnotations(proc?.annotations_superset);
+        for (const d of evt?.derived_entities ?? []) {
+            const id = typeof d === 'string' ? d : d.entity_id;
+            if (id) ids.add(id);
+        }
+        for (const d of proc?.derived_entities ?? []) {
+            if (d.entity_id) ids.add(d.entity_id);
+        }
+        return ids;
+    }
+
+    const previewEntityIdSet = $derived(new Set((previewData?.entities || []).map((e) => e.id)));
+
+    const scopedCanvasEntityIds = $derived(
+        $modelingStyle === 'entity_model' && previewData
+            ? collectScopedCanvasEntityIds(previewData, event, process, editedRelationships)
+            : new Set<string>()
+    );
+
+    const dialogEntityOptions = $derived(
         $modelingStyle === 'entity_model'
-            ? [
-                  ...(previewData?.entities || []).map((e, i) => ({
-                      id: e.id,
-                      label: editedEntities[i]?.label || e.label,
-                      isNew: true,
-                  })),
-                  ...$nodes
-                      .filter(
-                          (n) =>
-                              n.type === 'entity' &&
-                              !(previewData?.entities || []).some((pe) => pe.id === n.id)
-                      )
-                      .map((n) => ({
-                          id: n.id,
-                          label: String((n.data as any)?.label || n.id),
-                          isNew: false,
-                      })),
-              ]
+            ? (previewData?.entities || []).map((e, i) => ({
+                  id: e.id,
+                  label: editedEntities[i]?.label || e.label,
+                  isNew: true as const,
+              }))
             : []
     );
+
+    const fullExistingCanvasEntityOptions = $derived(
+        $modelingStyle === 'entity_model' && previewData
+            ? $nodes
+                  .filter(
+                      (n) =>
+                          n.type === 'entity' &&
+                          !previewEntityIdSet.has(n.id)
+                  )
+                  .map((n) => ({
+                      id: n.id,
+                      label: String((n.data as any)?.label || n.id),
+                      isNew: false as const,
+                  }))
+            : []
+    );
+
+    const existingCanvasEntityOptions = $derived(
+        topologyShowAllCanvasEntities
+            ? fullExistingCanvasEntityOptions
+            : fullExistingCanvasEntityOptions.filter((o) => scopedCanvasEntityIds.has(o.id))
+    );
+
+    const topologySelectClass =
+        'w-full min-w-[11rem] rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-10 text-sm font-medium text-gray-800 shadow-sm transition-colors placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 hover:border-gray-300 appearance-none cursor-pointer';
 
     // Load preview data when dialog opens
     $effect(() => {
@@ -70,6 +142,7 @@
                 editedEntities = [];
                 editedRelationships = [];
                 editedDraftedFields = [];
+                topologyShowAllCanvasEntities = false;
                 validationErrors = [];
                 error = null;
                 success = false;
@@ -1002,52 +1075,85 @@
                         </table>
                     </div>
 
+                    {#if $modelingStyle === 'entity_model' && fullExistingCanvasEntityOptions.length > 0}
+                        <label
+                            class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200/90 bg-gradient-to-r from-gray-50/90 to-white px-4 py-3 text-sm text-gray-600 shadow-sm"
+                        >
+                            <input
+                                type="checkbox"
+                                class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                bind:checked={topologyShowAllCanvasEntities}
+                            />
+                            <span>
+                                <span class="font-medium text-gray-800">Show all entities on the canvas</span>
+                                <span class="mt-0.5 block text-xs text-gray-500">
+                                    Off by default: only entities linked in this {mode === 'process' ? 'process' : 'event'}
+                                    (annotations, relationships, derived) appear in the lists below.
+                                </span>
+                            </span>
+                        </label>
+                    {/if}
+
                     <!-- Drafted Fields (entity_model only) -->
                     {#if $modelingStyle === 'entity_model' && editedDraftedFields.length > 0}
-                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <div class="flex items-start gap-2 mb-3">
-                                <Icon icon="lucide:list" class="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                        <div
+                            class="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/95 to-white p-4 shadow-sm"
+                        >
+                            <div class="mb-3 flex items-start gap-2.5">
+                                <Icon icon="lucide:list" class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
                                 <div>
-                                    <h3 class="text-sm font-medium text-amber-800">Attributes (drafted fields)</h3>
-                                    <p class="text-xs text-amber-700 mt-0.5">
+                                    <h3 class="text-sm font-semibold text-amber-900">Attributes (drafted fields)</h3>
+                                    <p class="mt-0.5 text-xs text-amber-800/80">
                                         Choose which entity each attribute belongs to.
                                     </p>
                                 </div>
                             </div>
-                            <div class="space-y-1.5">
+                            <div class="space-y-2.5">
                                 {#each editedDraftedFields as field, i}
-                                    <div class="flex items-center gap-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-100/90 bg-white/90 px-3 py-2.5 shadow-sm"
+                                    >
                                         <span
-                                            class="px-2 py-0.5 bg-white border border-amber-300 rounded text-xs font-mono text-amber-900 min-w-0 shrink-0"
+                                            class="min-w-0 shrink-0 rounded-md border border-amber-200 bg-amber-50/80 px-2 py-1 font-mono text-xs font-medium text-amber-950"
                                         >
                                             {field.name}
                                         </span>
-                                        <span class="text-xs text-gray-400 shrink-0">on</span>
-                                        <select
-                                            value={field.targetEntityId}
-                                            onchange={(e) => {
-                                                editedDraftedFields[i] = {
-                                                    ...field,
-                                                    targetEntityId: e.currentTarget.value,
-                                                };
-                                            }}
-                                            class="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        >
-                                            {#if allEntityOptions.length > 0}
-                                                <optgroup label="In this dialog">
-                                                    {#each allEntityOptions.filter((o) => o.isNew) as opt}
-                                                        <option value={opt.id}>{opt.label}</option>
-                                                    {/each}
-                                                </optgroup>
-                                                {#if allEntityOptions.some((o) => !o.isNew)}
-                                                    <optgroup label="Existing entities">
-                                                        {#each allEntityOptions.filter((o) => !o.isNew) as opt}
+                                        <span class="shrink-0 text-xs font-medium text-gray-400">on</span>
+                                        <div class="relative min-w-[12rem] max-w-full flex-1">
+                                            <select
+                                                value={field.targetEntityId}
+                                                onchange={(e) => {
+                                                    editedDraftedFields[i] = {
+                                                        ...field,
+                                                        targetEntityId: e.currentTarget.value,
+                                                    };
+                                                }}
+                                                class={topologySelectClass}
+                                            >
+                                                {#if dialogEntityOptions.length > 0}
+                                                    <optgroup label="From this generation">
+                                                        {#each dialogEntityOptions as opt}
                                                             <option value={opt.id}>{opt.label}</option>
                                                         {/each}
                                                     </optgroup>
                                                 {/if}
-                                            {/if}
-                                        </select>
+                                                {#if existingCanvasEntityOptions.length > 0}
+                                                    <optgroup
+                                                        label={topologyShowAllCanvasEntities
+                                                            ? 'Other entities on canvas'
+                                                            : 'This event — on canvas'}
+                                                    >
+                                                        {#each existingCanvasEntityOptions as opt}
+                                                            <option value={opt.id}>{opt.label}</option>
+                                                        {/each}
+                                                    </optgroup>
+                                                {/if}
+                                            </select>
+                                            <Icon
+                                                icon="lucide:chevron-down"
+                                                class="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+                                            />
+                                        </div>
                                     </div>
                                 {/each}
                             </div>
@@ -1056,41 +1162,55 @@
 
                     <!-- Relationships Section -->
                     {#if previewData.relationships && previewData.relationships.length > 0}
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <h3 class="text-sm font-medium text-gray-700 mb-2">Relationships:</h3>
+                        <div
+                            class="rounded-xl border border-gray-200/90 bg-gradient-to-b from-white to-gray-50/90 p-4 shadow-sm"
+                        >
+                            <h3 class="mb-3 text-sm font-semibold text-gray-800">Relationships</h3>
                             {#if $modelingStyle === 'entity_model'}
-                                <div class="space-y-1.5">
+                                <div class="space-y-2.5">
                                     {#each editedRelationships as rel, i}
-                                        <div class="flex items-center gap-2 text-sm">
-                                            <select
-                                                value={rel.source}
-                                                onchange={(e) => {
-                                                    editedRelationships[i] = {
-                                                        ...rel,
-                                                        source: e.currentTarget.value,
-                                                    };
-                                                }}
-                                                class="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            >
-                                                {#if allEntityOptions.length > 0}
-                                                    <optgroup label="In this dialog">
-                                                        {#each allEntityOptions.filter((o) => o.isNew) as opt}
-                                                            <option value={opt.id}>{opt.label}</option>
-                                                        {/each}
-                                                    </optgroup>
-                                                    {#if allEntityOptions.some((o) => !o.isNew)}
-                                                        <optgroup label="Existing entities">
-                                                            {#each allEntityOptions.filter((o) => !o.isNew) as opt}
+                                        <div
+                                            class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 bg-white/95 px-3 py-2.5 text-sm shadow-sm"
+                                        >
+                                            <div class="relative min-w-[12rem] max-w-full flex-1 sm:max-w-[18rem]">
+                                                <select
+                                                    value={rel.source}
+                                                    onchange={(e) => {
+                                                        editedRelationships[i] = {
+                                                            ...rel,
+                                                            source: e.currentTarget.value,
+                                                        };
+                                                    }}
+                                                    class={topologySelectClass}
+                                                >
+                                                    {#if dialogEntityOptions.length > 0}
+                                                        <optgroup label="From this generation">
+                                                            {#each dialogEntityOptions as opt}
                                                                 <option value={opt.id}>{opt.label}</option>
                                                             {/each}
                                                         </optgroup>
                                                     {/if}
-                                                {/if}
-                                            </select>
-                                            <span class="text-gray-400">→</span>
-                                            <span class="font-mono text-gray-700">{getPreviewDisplayId(rel.target)}</span>
+                                                    {#if existingCanvasEntityOptions.length > 0}
+                                                        <optgroup
+                                                            label={topologyShowAllCanvasEntities
+                                                                ? 'Other entities on canvas'
+                                                                : 'This event — on canvas'}
+                                                        >
+                                                            {#each existingCanvasEntityOptions as opt}
+                                                                <option value={opt.id}>{opt.label}</option>
+                                                            {/each}
+                                                        </optgroup>
+                                                    {/if}
+                                                </select>
+                                                <Icon
+                                                    icon="lucide:chevron-down"
+                                                    class="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+                                                />
+                                            </div>
+                                            <span class="text-gray-300">→</span>
+                                            <span class="font-mono text-sm text-gray-800">{getPreviewDisplayId(rel.target)}</span>
                                             {#if rel.label}
-                                                <span class="text-gray-400 text-xs">({rel.label})</span>
+                                                <span class="text-xs text-gray-500">({rel.label})</span>
                                             {/if}
                                         </div>
                                     {/each}

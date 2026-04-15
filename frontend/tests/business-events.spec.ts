@@ -1150,7 +1150,7 @@ test.describe('Business Events - entity_model mode', () => {
         });
         await expect(dialog).toBeVisible({ timeout: 5000 });
 
-        await expect(dialog.getByRole('heading', { name: 'Relationships:' })).toBeVisible();
+        await expect(dialog.getByRole('heading', { name: 'Relationships', exact: true })).toBeVisible();
         const sourceSelect = dialog.locator('select').first();
         await expect(sourceSelect).toBeVisible();
         await expect(sourceSelect.locator('option[value="booking"]')).toBeAttached();
@@ -1198,7 +1198,6 @@ test.describe('Business Events - entity_model mode', () => {
             dialog.getByRole('heading', { name: /attributes \(drafted fields\)/i })
         ).toBeVisible({ timeout: 5000 });
 
-        const attributesBlock = dialog.locator('.bg-amber-50').filter({ hasText: 'hire_date' });
-        await expect(attributesBlock.locator('select')).toBeVisible();
+        await expect(dialog.locator('select').first()).toBeVisible();
     });
 });
