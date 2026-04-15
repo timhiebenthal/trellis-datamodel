@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] - 2026-04-15
+
+### Added
+- **Create new domain from business events modal**: users can now create new business domains directly from the Create Event modal. Includes a "+" button next to the domain dropdown that reveals an input field for quick add/cancel. Domains are normalized to lowercase on creation.
+
+### Fixed
+- **Entity node displays "[object Object]" under Roles**: role-playing dimensions were showing `[object Object]` instead of the actual role name on the canvas. This happened because `Entity.roles` is an array of `EntityRole` objects (`{ role, label, source }`), but the code was treating them as strings.
+- **Case-insensitive role deduplication**: duplicate roles with different casing (e.g., "Creation Date", "creation date") are now consolidated into a single role entry, fixing the display of duplicate role badges.
+
 ## [0.14.0] - 2026-04-14
 
 ### Added

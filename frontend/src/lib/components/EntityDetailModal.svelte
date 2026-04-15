@@ -49,10 +49,12 @@
 	let deletingRoleName = $state<string | null>(null);
 	let autoRoles = $derived(entityRoles.filter(r => r.source));
 	// Deduplicate roles by name for display (multiple entries can exist per role when sourced from different processes)
+	// Case-insensitive: "Creation Date" and "creation date" should be treated as the same role
+	// Use role.role or role.label (some entries only have label, no role field)
 	let uniqueEntityRoles = $derived.by(() => {
 		const seen = new Set<string>();
 		return entityRoles.filter(role => {
-			const key = role.role || '';
+			const key = (role.role || role.label || '').toLowerCase();
 			if (seen.has(key)) return false;
 			seen.add(key);
 			return true;

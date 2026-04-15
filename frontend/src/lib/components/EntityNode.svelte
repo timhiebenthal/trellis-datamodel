@@ -22,7 +22,7 @@
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
     } from "$lib/stores";
-    import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData } from "$lib/types";
+    import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData, EntityRole } from "$lib/types";
     import {
         inferRelationships,
         getLineage,
@@ -710,7 +710,19 @@
     let entityTags = $derived(normalizeTags(data.tags));
     
     // Roles display (for dimensions)
-    let entityRoles = $derived(((data as any).roles || []) as string[]);
+    // EntityRole is an object with { role, label, source } — extract the role string
+    // Deduplicate case-insensitively (e.g., "Creation Date" and "creation date" should be one)
+    let entityRoles = $derived.by(() => {
+        const roles = (((data as any).roles || []) as EntityRole[]).map((r) => r.role || r.label || '');
+        const seen = new Set<string>();
+        return roles.filter((role) => {
+            if (!role) return false;
+            const key = role.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    });
 
     function handleTagsUpdate(newTags: string[]) {
         const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];

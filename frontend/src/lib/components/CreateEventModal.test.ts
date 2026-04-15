@@ -47,7 +47,8 @@ describe('CreateEventModal', () => {
         });
 
         // The button text is "Create" for new events, not "Save"
-        const createButton = screen.getByRole('button', { name: /create/i });
+        // Note: There's also a "+" icon button for creating domains, so we need to be specific
+        const createButton = screen.getByRole('button', { name: /^create$/i });
         expect(createButton).toBeInTheDocument();
         
         // Just verify structure - text input should exist
