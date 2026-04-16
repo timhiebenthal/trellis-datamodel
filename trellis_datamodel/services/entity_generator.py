@@ -401,10 +401,6 @@ def _generate_from_annotations_entity_model(
     # name (e.g. "Employee makes Booking" → "booking"), fall back to full event text
     # when no What entries exist at all.
     first_what = next((e for e in (event.annotations.what or [])), None)
-    # Keep track of the first unlinked What so we can skip it from drafted_fields below
-    first_unlinked_what = next(
-        (e for e in (event.annotations.what or []) if not e.dimension_id), None
-    )
     if first_what:
         base_name = _text_to_snake_case(first_what.text)
         label = _text_to_title_case(first_what.text)
@@ -443,9 +439,6 @@ def _generate_from_annotations_entity_model(
     seen_rel_pairs: set = set()
 
     for annotation_type, entry in non_how_many_entries:
-        # Skip the first unlinked What entry — it was promoted to the central entity name
-        if first_unlinked_what and entry.id == first_unlinked_what.id:
-            continue
         if entry.dimension_id:
             # Skip self-referential relationships (linked What whose id matches
             # the central entity we derived from its text)

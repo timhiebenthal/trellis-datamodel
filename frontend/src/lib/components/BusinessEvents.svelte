@@ -14,6 +14,7 @@ import type {
     BusinessEventAnnotations,
 } from '$lib/types';
 import { toTitleCase } from '$lib/utils';
+import { getCanvasFilterEntityIdsForProcessGroup } from '$lib/businessEventCanvasFilter';
 import { modelingStyle } from '$lib/stores';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
@@ -810,21 +811,6 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         showProcessGroupModal = false;
     }
 
-    function getDerivedEntityIds(events: BusinessEvent[]): string[] {
-        const ids = events
-            .flatMap((event) => event.derived_entities ?? [])
-            .map((entry) => (typeof entry === "string" ? entry : entry.entity_id))
-            .filter((id): id is string => Boolean(id));
-        return Array.from(new Set(ids));
-    }
-
-    function getProcessDerivedEntityIds(process: BusinessEventProcess): string[] {
-        const ids = (process.derived_entities ?? [])
-            .map((entry) => (typeof entry === "string" ? entry : entry.entity_id))
-            .filter((id): id is string => Boolean(id));
-        return Array.from(new Set(ids));
-    }
-
 </script>
 
 <div class="h-full w-full overflow-auto bg-gray-50">
@@ -1065,7 +1051,10 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
                                         </div>
                                     {/if}
                                     {#each domainGroup.processes as processGroup (processGroup.process.id)}
-                                        {@const derivedIds = getProcessDerivedEntityIds(processGroup.process).length > 0 ? getProcessDerivedEntityIds(processGroup.process) : getDerivedEntityIds(processGroup.events)}
+                                        {@const derivedIds = getCanvasFilterEntityIdsForProcessGroup(
+                                            processGroup.process,
+                                            processGroup.events
+                                        )}
                                         <div
                                             class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 shadow-sm"
                                             class:border-primary-300={dragOverProcessId === processGroup.process.id}

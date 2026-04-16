@@ -1151,9 +1151,17 @@ test.describe('Business Events - entity_model mode', () => {
         await expect(dialog).toBeVisible({ timeout: 5000 });
 
         await expect(dialog.getByRole('heading', { name: 'Relationships', exact: true })).toBeVisible();
-        const sourceSelect = dialog.locator('select').first();
+        const sourceSelect = dialog.locator('button[aria-haspopup="listbox"]').first();
         await expect(sourceSelect).toBeVisible();
-        await expect(sourceSelect.locator('option[value="booking"]')).toBeAttached();
+        
+        // Click to open dropdown
+        await sourceSelect.click();
+        const listbox = page.getByRole('listbox');
+        await expect(listbox).toBeVisible();
+        
+        // Check for option
+        const bookingOption = listbox.getByRole('option', { name: 'Booking' });
+        await expect(bookingOption).toBeVisible();
     });
 
     test('topology field target dropdown', async ({ page }) => {
@@ -1198,6 +1206,6 @@ test.describe('Business Events - entity_model mode', () => {
             dialog.getByRole('heading', { name: /attributes \(drafted fields\)/i })
         ).toBeVisible({ timeout: 5000 });
 
-        await expect(dialog.locator('select').first()).toBeVisible();
+        await expect(dialog.locator('button[aria-haspopup="listbox"]').first()).toBeVisible();
     });
 });
