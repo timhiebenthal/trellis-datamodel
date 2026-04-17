@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { cleanupTestEntities, resetDataModel, completeEntityWizard } from './helpers';
+import {
+    applyConfigOverrides,
+    cleanupTestEntities,
+    completeEntityWizard,
+    getCompanyDummyConfigOverrides,
+    resetDataModel,
+    restoreConfig,
+} from './helpers';
 
 test.describe('Canvas Interactions', () => {
     test.beforeEach(async ({ page, request }) => {
@@ -61,6 +68,31 @@ test.describe('Canvas Interactions', () => {
 
         // Verify gone
         await expect(entity).not.toBeVisible();
+    });
+
+    test('creates entity directly when wizard guidance is disabled', async ({ page, request }) => {
+        const originalConfig = await applyConfigOverrides(request, {
+            ...getCompanyDummyConfigOverrides(),
+            entity_creation_guidance: { enabled: false },
+        });
+
+        try {
+            await resetDataModel(request);
+            await page.reload();
+            await page.waitForLoadState('networkidle');
+
+            const addEntityBtn = page.getByRole('button', { name: 'Add Entity' });
+            await expect(addEntityBtn).toBeVisible({ timeout: 10000 });
+            await addEntityBtn.click();
+
+            const wizardModal = page.getByRole('dialog', { name: /create new entity/i });
+            await expect(wizardModal).not.toBeVisible({ timeout: 2000 });
+
+            const entityNameInput = page.getByPlaceholder('Entity Name').first();
+            await expect(entityNameInput).toBeVisible({ timeout: 10000 });
+        } finally {
+            await restoreConfig(request, originalConfig);
+        }
     });
 
     test('expand/collapse all entities toggle', async ({ page }) => {
