@@ -48,7 +48,7 @@ dev = [
 colibri = [
     "dbt-colibri>=0.1.0",
 ]
-company-dummy = [
+dbt-example = [
     "duckdb>=1.4.2",
     "faker>=24.0.0",
     "pandas>=2.3.3",

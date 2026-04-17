@@ -10,12 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **dbt decoupling**: Removed `dbt-duckdb` (and thus `dbt-core`) from optional extras so no Trellis install path pulls in dbt Python packages, avoiding version conflicts with project adapters and `dbt` binary clashes with the dbt Cloud CLI.
-- **Optional extra rename**: `[dbt-example]` is now `[company-dummy]` and only includes generator dependencies: `duckdb`, `faker`, `pandas`, `tqdm`.
+- **`[dbt-example]` extra pruned**: The extra name is unchanged, but it no longer pulls in dbt packages; it only includes generator dependencies: `duckdb`, `faker`, `pandas`, `tqdm`.
 - **Legacy cleanup**: Dropped unused `marimo` and `nba-api` from that extra.
 
 ### Fixed
 
-- **`generate-company-data`**: Removed a misleading error path that suggested installing dbt via the old extra; missing pandas/faker now points at `[company-dummy]`. On success, the CLI prints a hint to build the scaffold with `uvx --from dbt-duckdb dbt build` (or a separate venv/pipx).
+- **`generate-company-data`**: Removed a misleading error path that suggested installing dbt via the old extra; missing pandas/faker now points at `[dbt-example]`. The generator prints an isolated `uvx`/`dbt-duckdb` build hint (or use a separate venv/pipx).
 
 ## [0.14.3] - 2026-04-17
 

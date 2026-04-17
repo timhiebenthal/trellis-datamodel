@@ -202,7 +202,7 @@ def generate_company_data(
     If dbt_company_dummy_path is set in trellis.yml, confirms the output path.
     Otherwise, prompts for an output directory.
 
-    Requires: pip install trellis-datamodel[company-dummy] (pandas, faker,
+    Requires: pip install trellis-datamodel[dbt-example] (pandas, faker,
     duckdb, tqdm for CSV generation). dbt is not bundled; use uvx/pipx or a
     separate venv to run dbt against the scaffold.
     """
@@ -278,7 +278,7 @@ def generate_company_data(
                         fg=typer.colors.RED,
                     )
                 )
-                typer.echo("  pip install trellis-datamodel[company-dummy]")
+                typer.echo("  pip install trellis-datamodel[dbt-example]")
             raise typer.Exit(result.returncode)
 
         typer.echo()

@@ -8,7 +8,7 @@ This directory contains two parallel dbt projects that implement different data 
 uvx --from dbt-duckdb dbt build --project-dir /path/to/output --profiles-dir /path/to/output
 ```
 
-The `trellis generate-company-data` command only needs `pip install trellis-datamodel[company-dummy]` for CSV generation (pandas, faker, duckdb, tqdm).
+The `trellis generate-company-data` command only needs `pip install trellis-datamodel[dbt-example]` for CSV generation (pandas, faker, duckdb, tqdm).
 
 ## Overview
 

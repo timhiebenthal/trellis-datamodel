@@ -346,14 +346,14 @@ class TestCLIHelp:
         assert "--port" in out
         assert "--config" in out
 
-    def test_generate_company_data_help_mentions_company_dummy_extra(self):
-        """generate-company-data --help documents the company-dummy optional extra."""
+    def test_generate_company_data_help_mentions_dbt_example_extra(self):
+        """generate-company-data --help documents the dbt-example optional extra."""
         from trellis_datamodel.cli import app
 
         result = runner.invoke(app, ["generate-company-data", "--help"], color=False)
         assert result.exit_code == 0
         out = _strip_ansi(result.output)
-        assert "company-dummy" in out
+        assert "dbt-example" in out
 
 
 class TestCLIInstalledPackage:

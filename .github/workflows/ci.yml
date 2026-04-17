@@ -28,7 +28,7 @@ jobs:
         run: pip install uv
 
       - name: Install Python dependencies
-        run: uv sync --dev --extra company-dummy
+        run: uv sync --dev --extra dbt-example
 
       - name: Install frontend dependencies
         run: cd frontend && npm ci
