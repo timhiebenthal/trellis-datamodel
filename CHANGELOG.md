@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Generate preview dialog**: in-flight preview requests are aborted when the dialog closes; a server timeout avoids an endless spinner; the preview-loading effect no longer retriggered in a tight loop (which could freeze the browser); `loading` resets when the dialog closes.
 - **Relationship edge labels**: filler labels that only repeat the target entity’s name or id (as emitted by the generator) are cleared on the canvas; regenerating overwrites stale filler text on existing edges.
+## [0.14.2] - 2026-04-15
+
+### Added
+- **Create new domain from business events modal**: users can now create new business domains directly from the Create Event modal. Includes a "+" button next to the domain dropdown that reveals an input field for quick add/cancel. Domains are normalized to lowercase on creation.
+
+### Fixed
+- **Entity node displays "[object Object]" under Roles**: role-playing dimensions were showing `[object Object]` instead of the actual role name on the canvas. This happened because `Entity.roles` is an array of `EntityRole` objects (`{ role, label, source }`), but the code was treating them as strings.
+- **Case-insensitive role deduplication**: duplicate roles with different casing (e.g., "Creation Date", "creation date") are now consolidated into a single role entry, fixing the display of duplicate role badges.
 
 ## [0.14.0] - 2026-04-14
 

@@ -22,6 +22,8 @@
     let loading = $state(false);
     let error = $state<string | null>(null);
     let domains = $state<string[]>([]);
+    let showNewDomainInput = $state(false);
+    let newDomainName = $state("");
 
     // Character limit
     const MAX_TEXT_LENGTH = 500;
@@ -141,6 +143,16 @@
         error = null;
         loading = false;
         onCancel();
+    }
+
+    function addNewDomain() {
+        if (newDomainName.trim() && !domains.includes(newDomainName.trim().toLowerCase())) {
+            const normalized = newDomainName.trim().toLowerCase();
+            domains = [...domains, normalized];
+            eventDomain = normalized;
+            newDomainName = "";
+            showNewDomainInput = false;
+        }
     }
 </script>
 
@@ -295,17 +307,50 @@
                             </div>
                         </div>
                     </div>
-                    <select
-                        id="event-domain"
-                        bind:value={eventDomain}
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        disabled={loading}
-                    >
-                        <option value={null}>No Domain</option>
-                        {#each domains as domain}
-                            <option value={domain}>{toTitleCase(domain)}</option>
-                        {/each}
-                    </select>
+                    {#if showNewDomainInput}
+                        <div class="flex gap-2">
+                            <input
+                                type="text"
+                                bind:value={newDomainName}
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Enter new domain name"
+                                onkeydown={(e) => e.key === 'Enter' && addNewDomain()}
+                            />
+                            <button
+                                onclick={addNewDomain}
+                                class="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                            >
+                                <Icon icon="lucide:check" class="w-5 h-5" />
+                            </button>
+                            <button
+                                onclick={() => { showNewDomainInput = false; newDomainName = ""; }}
+                                class="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                            >
+                                <Icon icon="lucide:x" class="w-5 h-5" />
+                            </button>
+                        </div>
+                    {:else}
+                        <div class="flex gap-2">
+                            <select
+                                id="event-domain"
+                                bind:value={eventDomain}
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                disabled={loading}
+                            >
+                                <option value={null}>No Domain</option>
+                                {#each domains as domain}
+                                    <option value={domain}>{toTitleCase(domain)}</option>
+                                {/each}
+                            </select>
+                            <button
+                                onclick={() => showNewDomainInput = true}
+                                class="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                title="Create new domain"
+                            >
+                                <Icon icon="lucide:plus" class="w-5 h-5" />
+                            </button>
+                        </div>
+                    {/if}
                 </div>
 
                 <!-- Error Message -->

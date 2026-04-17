@@ -717,7 +717,7 @@ def scaffold_dbt_project():
 version: '1.0.0'
 config-version: 2
 
-require-dbt-version: "1.10.0"
+require-dbt-version: ">=1.10.0"
 
 profile: 'company_dummy'
 
