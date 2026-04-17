@@ -860,7 +860,7 @@ import {
 
         <!-- View Switcher -->
         <div class="flex bg-gray-100 rounded-lg p-1 border border-gray-200/60 gap-1">
-            {#if businessEventsEnabled && $modelingStyle === 'dimensional_model'}
+            {#if businessEventsEnabled}
                 <a
                     href="/business-events"
                     class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"

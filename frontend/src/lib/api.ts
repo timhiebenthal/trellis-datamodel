@@ -617,7 +617,7 @@ export async function updateBusinessEventAnnotations(
  * @param filterByType - Optional annotation type filter (annotation_type)
  * @returns Promise containing array of Dimension objects
  */
-export async function getDimensions(filterByType?: AnnotationType): Promise<Dimension[]> {
+export async function getDimensions(filterByType?: AnnotationType, includeAllEntities = false): Promise<Dimension[]> {
     try {
         let url = `${API_BASE}/data-model`;
         const params = new URLSearchParams();
@@ -637,13 +637,12 @@ export async function getDimensions(filterByType?: AnnotationType): Promise<Dime
         }
 
         const data = await res.json();
-        // Filter entities to return only dimensions
         const entities = data.entities || [];
         return entities
-            .filter((e: Dimension) => e.entity_type === 'dimension')
+            .filter((e: Dimension) => includeAllEntities || e.entity_type === 'dimension')
             .filter((e: Dimension) => {
-                // If annotation_type filter specified, only return matching dimensions
-                if (filterByType) {
+                // annotation_type filter only applies for dimensional mode
+                if (!includeAllEntities && filterByType) {
                     return e.annotation_type === filterByType;
                 }
                 return true;
@@ -834,6 +833,28 @@ export async function removeAnnotation(
     }
 }
 
+/** Abort fetch if the server never responds (avoids an endless “Generating preview…” spinner). */
+function previewGenerateTimeoutSignal(ms: number): AbortSignal {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(ms);
+    }
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
+}
+
+function combinePreviewSignals(user: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+    const t = previewGenerateTimeoutSignal(timeoutMs);
+    if (!user) {
+        return t;
+    }
+    const anyFn = (AbortSignal as unknown as { any?: (signals: AbortSignal[]) => AbortSignal }).any;
+    if (typeof anyFn === 'function') {
+        return anyFn([user, t]);
+    }
+    return t;
+}
+
 /**
  * Generate entities from a business event.
  * Supports both annotation-based and 7 Ws-based entity generation.
@@ -841,11 +862,14 @@ export async function removeAnnotation(
  * @returns Promise containing GeneratedEntitiesResult
  */
 export async function generateEntitiesFromEvent(
-    eventId: string
+    eventId: string,
+    options?: { signal?: AbortSignal }
 ): Promise<GeneratedEntitiesResult> {
+    const signal = combinePreviewSignals(options?.signal, 120_000);
     try {
         const res = await fetch(`${API_BASE}/business-events/${eventId}/generate-entities`, {
             method: 'POST',
+            signal,
         });
         if (!res.ok) {
             const error = await res.json();
@@ -855,6 +879,12 @@ export async function generateEntitiesFromEvent(
         // Handle both direct response and wrapped response formats
         return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
     } catch (e) {
+        const name = e instanceof Error ? e.name : '';
+        if (name === 'AbortError' || name === 'TimeoutError') {
+            throw new Error(
+                'Error generating entities: request timed out or was cancelled (check that the API is running).'
+            );
+        }
         const message = e instanceof Error ? e.message : String(e);
         throw new Error(`Error generating entities: ${message}`);
     }
@@ -867,11 +897,14 @@ export async function generateEntitiesFromEvent(
  * @returns Promise containing GeneratedEntitiesResult
  */
 export async function generateEntitiesFromProcess(
-    processId: string
+    processId: string,
+    options?: { signal?: AbortSignal }
 ): Promise<GeneratedEntitiesResult> {
+    const signal = combinePreviewSignals(options?.signal, 120_000);
     try {
         const res = await fetch(`${API_BASE}/processes/${processId}/generate-entities`, {
             method: 'POST',
+            signal,
         });
         if (!res.ok) {
             const error = await res.json();
@@ -881,6 +914,12 @@ export async function generateEntitiesFromProcess(
         // Handle both direct response and wrapped response formats
         return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
     } catch (e) {
+        const name = e instanceof Error ? e.name : '';
+        if (name === 'AbortError' || name === 'TimeoutError') {
+            throw new Error(
+                'Error generating entities from process: request timed out or was cancelled (check that the API is running).'
+            );
+        }
         const message = e instanceof Error ? e.message : String(e);
         throw new Error(`Error generating entities from process: ${message}`);
     }

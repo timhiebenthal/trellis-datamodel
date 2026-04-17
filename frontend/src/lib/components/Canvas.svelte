@@ -98,7 +98,6 @@
         displayNodes = filteredNodes();
     });
 
-
     // Sync changes from displayNodes back to $nodes store when users interact
     // This ensures drag operations and other changes are persisted
     $effect(() => {

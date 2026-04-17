@@ -372,7 +372,7 @@ export interface BusinessEventAnnotations {
 export interface Dimension {
     id: string;
     label: string;
-    entity_type: 'fact' | 'dimension' | 'unclassified';
+    entity_type: 'fact' | 'dimension' | 'unclassified' | 'entity' | undefined;
     annotation_type?: AnnotationType;
     description?: string;
 }

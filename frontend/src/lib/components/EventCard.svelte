@@ -2,6 +2,8 @@
     import Icon from "@iconify/svelte";
     import type { BusinessEvent, BusinessEventProcess } from "$lib/types";
     import { deleteBusinessEvent } from "$lib/api";
+    import { getCanvasFilterEntityIdsForEvent } from "$lib/businessEventCanvasFilter";
+    import { modelingStyle } from "$lib/stores";
     type Props = {
         event: BusinessEvent;
         process?: BusinessEventProcess;
@@ -76,8 +78,13 @@
         annotations.how.length > 0 || 
         annotations.why.length > 0
     );
-    const canGenerateEntities = $derived(hasDimensionEntries && hasHowManyEntries);
+    const canGenerateEntities = $derived(
+        $modelingStyle === 'entity_model' ? hasDimensionEntries : hasDimensionEntries && hasHowManyEntries
+    );
     const hasDerivedEntities = $derived(event.derived_entities.length > 0);
+
+    /** Derived + annotation-linked dimensions — used for canvas deep-link */
+    const canvasFilterEntityIds = $derived(getCanvasFilterEntityIdsForEvent(event));
 
     // Type badge colors
     const typeBadgeClass = $derived(() => {
@@ -124,13 +131,6 @@
         if (event.target === event.currentTarget) {
             handleDeleteCancel();
         }
-    }
-
-    function getDerivedEntityIds() {
-        const derivedEntities = event.derived_entities ?? [];
-        return derivedEntities
-            .map((entry) => (typeof entry === "string" ? entry : entry.entity_id))
-            .filter((id) => !!id);
     }
 
 </script>
@@ -195,7 +195,7 @@
 
         <!-- Status badges -->
         <div class="flex items-center gap-2 flex-shrink-0">
-            {#if annotationsFilledCount > 0}
+            {#if annotationsFilledCount > 0 && $modelingStyle === 'dimensional_model'}
                 <span
                     class="px-2 py-1 rounded text-xs font-medium border {annotationsBadgeColor()} flex items-center gap-1"
                     title="Annotations completion status"
@@ -256,20 +256,24 @@
                 class:cursor-pointer={canGenerateEntities}
                 title={
                     canGenerateEntities
-                        ? "Generate dimensional entities from annotations"
-                        : !hasHowManyEntries
-                            ? "Add 'How Many' entries to generate fact table"
-                            : "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
+                        ? $modelingStyle === 'entity_model'
+                            ? "Generate entities and relationships from annotations"
+                            : "Generate dimensional entities from annotations"
+                        : $modelingStyle === 'entity_model'
+                            ? "Add entries (Who, What, When, Where, How, or Why) to generate entities"
+                            : !hasHowManyEntries
+                                ? "Add 'How Many' entries to generate fact table"
+                                : "Add dimension entries (Who, What, When, Where, How, or Why) to generate entities"
                 }
             >
                 <Icon icon="lucide:sparkles" class="w-4 h-4" />
             </button>
 
-            {#if hasDerivedEntities}
+            {#if canvasFilterEntityIds.length > 0}
                 <a
-                    href="/canvas?entities={getDerivedEntityIds().join(',')}&eventText={encodeURIComponent(event.text)}"
+                    href="/canvas?entities={canvasFilterEntityIds.map(encodeURIComponent).join(',')}&eventText={encodeURIComponent(event.text)}"
                     class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                    title="View entities on canvas"
+                    title="View related entities on canvas"
                 >
                     <Icon icon="lucide:layout-dashboard" class="w-4 h-4" />
                 </a>

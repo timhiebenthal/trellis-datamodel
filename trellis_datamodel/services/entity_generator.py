@@ -397,15 +397,22 @@ def _generate_from_annotations_entity_model(
 
     prefixes = _entity_prefixes(config)
 
-    # Build central entity id/label from event text
-    base_name = _text_to_snake_case(event.text)
+    # Build central entity id/label — prefer first What annotation as the core concept
+    # name (e.g. "Employee makes Booking" → "booking"), fall back to full event text
+    # when no What entries exist at all.
+    first_what = next((e for e in (event.annotations.what or [])), None)
+    if first_what:
+        base_name = _text_to_snake_case(first_what.text)
+        label = _text_to_title_case(first_what.text)
+    else:
+        base_name = _text_to_snake_case(event.text)
+        label = _text_to_title_case(event.text)
+
     entity_id = base_name
     if prefixes:
         has_prefix = any(base_name.lower().startswith(p.lower()) for p in prefixes)
         if not has_prefix:
             entity_id = f"{prefixes[0]}{base_name}"
-
-    label = _text_to_title_case(event.text)
 
     # Build domain/tags
     domain = event.domain or None
@@ -433,6 +440,10 @@ def _generate_from_annotations_entity_model(
 
     for annotation_type, entry in non_how_many_entries:
         if entry.dimension_id:
+            # Skip self-referential relationships (linked What whose id matches
+            # the central entity we derived from its text)
+            if entry.dimension_id == entity_id:
+                continue
             pair = (entity_id, entry.dimension_id)
             if pair not in seen_rel_pairs:
                 relationships.append(
