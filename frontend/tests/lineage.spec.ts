@@ -65,6 +65,7 @@ test.describe('Lineage button behavior', () => {
         }
     });
 
+    // Requires dbt_company_dummy/target/manifest.json (gitignored). CI runs `dbt parse` before e2e.
     test('renders lineage edges for a model', async ({ page, request }) => {
         const originalConfig = await applyConfigOverrides(request, {
             ...getCompanyDummyConfigOverrides(),
