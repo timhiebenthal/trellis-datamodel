@@ -281,7 +281,7 @@ def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
     legacy_guidance_section = config.get("guidance")
     if guidance_section is None and legacy_guidance_section is not None:
         logger.warning(
-            "'guidance' is deprecated. Use 'entity_creation_guidance' with 'wizard.enabled'."
+            "'guidance' is deprecated. Use 'entity_creation_guidance' with 'enabled'."
         )
         guidance_section = legacy_guidance_section
 
