@@ -223,14 +223,18 @@ def generate_company_data(
     if cfg.DBT_COMPANY_DUMMY_PATH:
         default_path = cfg.DBT_COMPANY_DUMMY_PATH
         typer.echo(f"Output directory: {default_path}")
+        typer.echo()
         confirm = typer.prompt(
             "Generate CSV files to this directory? [y/n]",
             default="y",
         )
         if confirm.lower() not in ("y", "yes"):
+            typer.echo()
             default_path = typer.prompt("Enter output directory")
     else:
         default_path = typer.prompt("Enter output directory")
+
+    typer.echo()
 
     output_path = Path(default_path).resolve()
 

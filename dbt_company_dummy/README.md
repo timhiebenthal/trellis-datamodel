@@ -5,7 +5,7 @@ This directory contains two parallel dbt projects that implement different data 
 **Trellis does not ship dbt as a Python dependency.** Use your own dbt install or an isolated runner so it does not conflict with another `dbt-core` or the dbt Cloud CLI, for example:
 
 ```bash
-uvx --from dbt-duckdb dbt build --project-dir /path/to/output --profiles-dir /path/to/output
+uvx --from dbt-duckdb dbt run --project-dir /path/to/output --profiles-dir /path/to/output
 ```
 
 The `trellis generate-company-data` command only needs `pip install trellis-datamodel[dbt-example]` for CSV generation (pandas, faker, duckdb, tqdm).
@@ -151,13 +151,13 @@ Key model: `sale` (not `dim_sale` or `fact_sale`) - neutral representation
 ```bash
 # Kimball version
 cd dbt_company_dummy_kimball
-dbt build          # Build all models
+dbt run          # Build all models
 dbt docs generate  # Generate documentation
 dbt run --select invoice_revenue  # Run specific model
 
 # Entity version
 cd dbt_company_dummy_entity
-dbt build
+dbt run
 dbt docs generate
 dbt run --select invoice_revenue
 ```
@@ -170,13 +170,13 @@ dbt run --select invoice_revenue
 # Build Kimball version
 cd dbt_company_dummy_kimball
 dbt clean
-dbt build
+dbt run
 dbt docs generate
 
 # Build Entity version
 cd ../dbt_company_dummy_entity
 dbt clean
-dbt build
+dbt run
 dbt docs generate
 ```
 
@@ -346,7 +346,7 @@ If trellis fails to load with "manifest not found" error:
 
 ```bash
 cd dbt_company_dummy_kimball  # or entity
-dbt build
+dbt run
 dbt docs generate
 # Verify target/manifest.json exists
 ```
