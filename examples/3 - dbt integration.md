@@ -14,7 +14,7 @@ This enables bi-directional sync between your data model and dbt.
 
 Create a blank entity, then drag a dbt model into it to automatically populate the entity name, attributes, and descriptions.
 
-<video src="https://github.com/user-attachments/assets/84946628-65c7-4ea2-9918-059cd37c4268" controls></video>
+<video src="https://github.com/user-attachments/assets/318713ad-a43b-49a3-ae63-ec34559e7cbc" controls></video>
 
 ## Auto-Create Relationships
 
