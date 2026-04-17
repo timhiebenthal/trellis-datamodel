@@ -5,12 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.5] - 2026-04-17
 
 ### Fixed
 
 - **Wizard disable toggle coverage**: added an end-to-end canvas regression test that disables `entity_creation_guidance.enabled`, confirms the Create Entity wizard stays closed, and verifies entities are created directly.
 - **Guidance deprecation warning copy**: corrected the legacy `guidance` warning so it points users to `entity_creation_guidance.enabled`, matching the config format produced by `trellis init`.
+### Added
+- **Config UI: dbt model paths add/remove**: added "+ Add Path" button and remove (×) buttons for `dbt_model_paths` in the config page. Users can now set paths even when the config currently has none.
 
 ## [0.14.4] - 2026-04-17
 
