@@ -40,6 +40,7 @@
     
     // Reactive lineage layers for UI updates
     $: lineageLayers = config.lineage?.layers || [];
+    $: dbtModelPaths = config.dbt_model_paths || [];
 
     onMount(async () => {
         await loadConfig();
@@ -553,14 +554,14 @@
                                 <label for="dbt-model-paths-0" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     dbt Model Paths
                                 </label>
-                                {#each getFieldValue('dbt_model_paths') || [] as path, index}
+                                {#each dbtModelPaths as path, index (index)}
                                     <div class="flex items-center gap-2 mb-2">
                                         <input
                                             id={`dbt-model-paths-${index}`}
                                             type="text"
                                             value={path}
                                             oninput={(e) => {
-                                                const newPaths = [...(getFieldValue('dbt_model_paths') || [])];
+                                                const newPaths = [...dbtModelPaths];
                                                 newPaths[index] = e.currentTarget.value;
                                                 handleFieldChange('dbt_model_paths', newPaths);
                                             }}
@@ -570,7 +571,7 @@
                                         <button
                                             type="button"
                                             onclick={() => {
-                                                const newPaths = [...(getFieldValue('dbt_model_paths') || [])];
+                                                const newPaths = [...dbtModelPaths];
                                                 newPaths.splice(index, 1);
                                                 handleFieldChange('dbt_model_paths', newPaths);
                                             }}
@@ -581,13 +582,13 @@
                                         </button>
                                     </div>
                                 {/each}
-                                {#if (getFieldValue('dbt_model_paths') || []).length === 0}
+                                {#if dbtModelPaths.length === 0}
                                     <p class="mt-1.5 text-xs text-gray-500">Empty = all models included</p>
                                 {/if}
                                 <button
                                     type="button"
                                     onclick={() => {
-                                        const newPaths = [...(getFieldValue('dbt_model_paths') || []), ''];
+                                        const newPaths = [...dbtModelPaths, ''];
                                         handleFieldChange('dbt_model_paths', newPaths);
                                     }}
                                     class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
