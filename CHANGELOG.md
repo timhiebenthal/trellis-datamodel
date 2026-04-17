@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.4] - 2026-04-17
+
+### Changed
+
+- **dbt decoupling**: Removed `dbt-duckdb` (and thus `dbt-core`) from optional extras so no Trellis install path pulls in dbt Python packages, avoiding version conflicts with project adapters and `dbt` binary clashes with the dbt Cloud CLI.
+- **`[dbt-example]` extra pruned**: The extra name is unchanged, but it no longer pulls in dbt packages; it only includes generator dependencies: `duckdb`, `faker`, `pandas`, `tqdm`.
+- **Legacy cleanup**: Dropped unused `marimo` and `nba-api` from that extra.
+
+### Fixed
+
+- **`generate-company-data`**: Removed a misleading error path that suggested installing dbt via the old extra; missing pandas/faker now points at `[dbt-example]`. The generator prints an isolated `uvx`/`dbt-duckdb` build hint (or use a separate venv/pipx).
+
 ## [0.14.3] - 2026-04-17
 
 ### Added

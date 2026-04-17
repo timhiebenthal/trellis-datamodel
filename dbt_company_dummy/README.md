@@ -2,6 +2,14 @@
 
 This directory contains two parallel dbt projects that implement different data modeling approaches for the same business domain. This setup enables developers to compare, debug, and demonstrate traditional Kimball dimensional modeling versus entity-logic modeling.
 
+**Trellis does not ship dbt as a Python dependency.** Use your own dbt install or an isolated runner so it does not conflict with another `dbt-core` or the dbt Cloud CLI, for example:
+
+```bash
+uvx --from dbt-duckdb dbt build --project-dir /path/to/output --profiles-dir /path/to/output
+```
+
+The `trellis generate-company-data` command only needs `pip install trellis-datamodel[dbt-example]` for CSV generation (pandas, faker, duckdb, tqdm).
+
 ## Overview
 
 Two complete dbt projects are maintained side-by-side:

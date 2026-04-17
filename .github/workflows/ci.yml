@@ -42,6 +42,13 @@ jobs:
       - name: Run frontend unit tests
         run: cd frontend && npm run test:unit
 
+      # dbt_company_dummy/target/ is gitignored; Playwright lineage tests point at that manifest.
+      - name: Generate dbt manifest for company dummy (E2E lineage)
+        run: >
+          uvx --from dbt-duckdb dbt parse
+          --project-dir dbt_company_dummy
+          --profiles-dir dbt_company_dummy
+
       - name: Run frontend e2e tests
         run: cd frontend && npm run test:e2e
 
