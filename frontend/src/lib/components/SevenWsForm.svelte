@@ -617,7 +617,7 @@
                 id: dimensionId,
                 label: dimensionLabel,
                 description: '',
-                entity_type: (isEntityModel ? 'entity' : 'dimension') as 'entity' | 'dimension',
+                entity_type: isEntityModel ? undefined : ('dimension' as const),
                 ...(isEntityModel ? {} : { annotation_type: annotationType }),
                 position: { x: 100, y: 100 },
                 roles: []
@@ -1096,7 +1096,7 @@
                                                                 <!-- Create new dimension inline -->
                                                                 <div class="space-y-2">
                                                                     <label class="text-xs font-medium text-gray-600">
-                                                                        {$modelingStyle === 'entity_model' ? 'Create new entity' : 'Create new dimension'}
+                                                                        Create new dimension
                                                                     </label>
                                                                     <div class="flex items-center gap-2">
                                                                         <input
@@ -1141,7 +1141,7 @@
                                                                         for={`dimension-select-${entry.id}`}
                                                                         class="text-xs font-medium text-gray-600 whitespace-nowrap"
                                                                     >
-                                                                        {$modelingStyle === 'entity_model' ? 'Link to entity' : 'Generalize to'}
+                                                                        Generalize to
                                                                     </label>
                                                                     <select
                                                                         id={`dimension-select-${entry.id}`}
@@ -1161,7 +1161,7 @@
                                                                         {#each getAllowedDimensionsForType(annotationType.type) as dimension}
                                                                             <option value={dimension.id}>{dimension.label}</option>
                                                                         {/each}
-                                                                        <option value="__create_new__" class="text-blue-600 font-medium">{$modelingStyle === 'entity_model' ? '+ Create new entity…' : '+ Create new dimension...'}</option>
+                                                                        <option value="__create_new__" class="text-blue-600 font-medium">+ Create new dimension...</option>
                                                                     </select>
                                                                 </div>
                                                                 {#if entry.dimension_id}
