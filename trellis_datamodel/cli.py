@@ -197,7 +197,7 @@ def generate_company_data(
 
     Creates CSV files in <output_path>/data/ with departments, employees,
     leads, customers, products, orders, and order items. Then scaffolds a
-    dbt project; build it with dbt in an isolated toolchain (see post-run hint).
+    dbt project; when finished, the generator prints an example isolated dbt command.
 
     If dbt_company_dummy_path is set in trellis.yml, confirms the output path.
     Otherwise, prompts for an output directory.
@@ -287,21 +287,6 @@ def generate_company_data(
                 "✓ Company dummy data generation completed successfully!",
                 fg=typer.colors.GREEN,
             )
-        )
-        typer.echo()
-        typer.echo(
-            "To build the demo dbt project in isolation (avoids conflicts with your "
-            "project's dbt-core or the dbt Cloud CLI):"
-        )
-        typer.echo(
-            typer.style(
-                f"  uvx --from dbt-duckdb dbt build --project-dir {output_path} "
-                f"--profiles-dir {output_path}",
-                fg=typer.colors.CYAN,
-            )
-        )
-        typer.echo(
-            "Or install dbt-duckdb into a separate venv or pipx environment."
         )
     except FileNotFoundError as e:
         typer.echo(

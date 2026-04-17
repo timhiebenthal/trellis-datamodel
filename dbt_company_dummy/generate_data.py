@@ -1582,8 +1582,15 @@ def main():
     print("Scaffolding dbt project...")
     scaffold_dbt_project()
     print()
+    root = PROJECT_ROOT.resolve()
+    print("✓ dbt project scaffolded. Build artifacts for trellis with dbt in isolation (avoids")
+    print("  conflicts with your project's dbt-core or the dbt Cloud CLI), e.g.:")
     print(
-        f"✓ dbt project ready! Run 'cd {PROJECT_ROOT} && dbt run --profiles-dir .' to generate dbt artifacts needed for trellis."
+        f"  uvx --from dbt-duckdb dbt build --project-dir {root} --profiles-dir {root}"
+    )
+    print(
+        "  Or install dbt-duckdb in a separate venv or pipx. Then point trellis at "
+        "target/manifest.json (and catalog.json) under this directory."
     )
 
 
