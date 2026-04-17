@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.1] - 2026-04-17
+## [0.14.3] - 2026-04-17
 
 ### Added
 - **Generate Entities (entity model) — topology in one group**: relationship endpoints from the preview (e.g. Employee, Account) appear under **“From this generation”** together with the derived preview entity, instead of only under “Available in this event”.
