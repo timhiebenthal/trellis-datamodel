@@ -41,6 +41,8 @@
     let success = $state(false);
     /** When false, "existing canvas" options are limited to entities referenced by this event/process. */
     let topologyShowAllCanvasEntities = $state(false);
+    /** Bumps on each preview load so stale async completions do not leave `loading` stuck. */
+    let loadPreviewGeneration = $state(0);
 
     const positioner = new DimensionalModelPositioner();
 
@@ -97,16 +99,6 @@
             : new Set<string>()
     );
 
-    const dialogEntityOptions = $derived(
-        $modelingStyle === 'entity_model'
-            ? (previewData?.entities || []).map((e, i) => ({
-                  id: e.id,
-                  label: editedEntities[i]?.label || e.label,
-                  isNew: true as const,
-              }))
-            : []
-    );
-
     const fullExistingCanvasEntityOptions = $derived(
         $modelingStyle === 'entity_model' && previewData
             ? $nodes
@@ -144,24 +136,61 @@
         return Array.from(options.values());
     });
 
-    const combinedExistingOptions = $derived([
-        ...linkedEntityOptions,
-        ...existingCanvasEntityOptions
-    ].sort((a, b) => a.label.localeCompare(b.label)));
+    /** Preview entities plus relationship endpoints from the API preview (not yet on canvas). Shown under “From this generation”. */
+    const generationTopologyOptions = $derived.by(() => {
+        if ($modelingStyle !== 'entity_model' || !previewData) return [];
+        const byId = new Map<string, { id: string; label: string; isNew: boolean }>();
+        const entities = previewData.entities || [];
+        for (let i = 0; i < entities.length; i++) {
+            const e = entities[i];
+            byId.set(e.id, {
+                id: e.id,
+                label: editedEntities[i]?.label || e.label,
+                isNew: true,
+            });
+        }
+        for (const opt of linkedEntityOptions) {
+            if (!byId.has(opt.id)) {
+                byId.set(opt.id, { id: opt.id, label: opt.label, isNew: false });
+            }
+        }
+        return Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
+    });
+
+    /** On-canvas entities in scope (second group). */
+    const combinedExistingOptions = $derived(
+        [...existingCanvasEntityOptions].sort((a, b) => a.label.localeCompare(b.label))
+    );
 
     const selectGroups = $derived([
-        ...(dialogEntityOptions.length > 0 ? [{ label: 'From this generation', options: dialogEntityOptions }] : []),
-        ...(combinedExistingOptions.length > 0 ? [{ 
-            label: topologyShowAllCanvasEntities ? 'All available entities' : `Available in this ${mode === 'process' ? 'process' : 'event'}`, 
-            options: combinedExistingOptions 
-        }] : [])
+        ...(generationTopologyOptions.length > 0
+            ? [{ label: 'From this generation', options: generationTopologyOptions }]
+            : []),
+        ...(combinedExistingOptions.length > 0
+            ? [
+                  {
+                      label: topologyShowAllCanvasEntities
+                          ? 'All available entities'
+                          : `Available in this ${mode === 'process' ? 'process' : 'event'}`,
+                      options: combinedExistingOptions,
+                  },
+              ]
+            : []),
     ]);
 
     // Load preview data when dialog opens
     $effect(() => {
         if (open && mode) {
-            loadPreview();
-        } else if (!open) {
+            const ac = new AbortController();
+            // Use untrack so reactive reads/writes inside loadPreview (e.g. the
+            // loadPreviewGeneration counter and preview state) do not make this
+            // effect depend on them and self-retrigger in a loop.
+            untrack(() => {
+                void loadPreview(ac.signal);
+            });
+            return () => ac.abort();
+        }
+        if (!open) {
             // Reset state when dialog closes - use untrack to avoid triggering validation effect
             untrack(() => {
                 previewData = null;
@@ -172,23 +201,30 @@
                 validationErrors = [];
                 error = null;
                 success = false;
+                loading = false;
             });
         }
     });
 
-    async function loadPreview() {
+    async function loadPreview(abortSignal?: AbortSignal) {
         if (!mode) return;
 
+        const gen = ++loadPreviewGeneration;
         try {
             loading = true;
             error = null;
+            let result: GeneratedEntitiesResult | null = null;
             if (mode === 'event' && event) {
-                previewData = await generateEntitiesFromEvent(event.id);
+                result = await generateEntitiesFromEvent(event.id, { signal: abortSignal });
             } else if (mode === 'process' && process) {
-                previewData = await generateEntitiesFromProcess(process.id);
+                result = await generateEntitiesFromProcess(process.id, { signal: abortSignal });
             } else {
                 return;
             }
+            if (gen !== loadPreviewGeneration) {
+                return;
+            }
+            previewData = result;
             const existingDerivedIds =
                 mode === 'event'
                     ? (event?.derived_entities ?? [])
@@ -241,10 +277,22 @@
             });
 
             if (get(modelingStyle) === 'entity_model' && previewData) {
+                // Drop auto-generated relationship labels that are just the target
+                // entity's id or label (filler like “Employee” on employee→booking).
+                const isFillerLabel = (label: string, targetId: string): boolean => {
+                    const l = label.trim().toLowerCase();
+                    if (!l) return true;
+                    if (l === targetId.trim().toLowerCase()) return true;
+                    const targetEntity = previewData?.entities.find((e) => e.id === targetId);
+                    if (targetEntity?.label && l === targetEntity.label.trim().toLowerCase()) {
+                        return true;
+                    }
+                    return false;
+                };
                 editedRelationships = (previewData.relationships || []).map((rel) => ({
                     source: rel.source,
                     target: rel.target,
-                    label: rel.label || '',
+                    label: isFillerLabel(rel.label || '', rel.target) ? '' : (rel.label || ''),
                     type: rel.type || 'many_to_one',
                 }));
 
@@ -260,10 +308,18 @@
                 editedDraftedFields = [];
             }
         } catch (e) {
+            if (abortSignal?.aborted) {
+                return;
+            }
+            if (gen !== loadPreviewGeneration) {
+                return;
+            }
             error = e instanceof Error ? e.message : 'Failed to generate preview';
             console.error('Error generating preview:', error);
         } finally {
-            loading = false;
+            if (gen === loadPreviewGeneration) {
+                loading = false;
+            }
         }
     }
 
@@ -664,14 +720,68 @@
             }
 
             if ($modelingStyle === 'entity_model') {
+                // Create stub entities for relationship endpoints that are neither in the
+                // preview entities nor already on the canvas. These represent entities
+                // referenced by the event/process (e.g. Employee, Account) that must exist
+                // so their relationships can be drawn and they appear on the canvas.
+                const rels = editedRelationships.length > 0
+                    ? editedRelationships
+                    : (previewData.relationships || []);
+                const existingIdSet = new Set(nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id));
+                const previewIdSet = new Set(previewData.entities.map((e) => e.id));
+                const endpointIds = new Set<string>();
+                for (const rel of rels) {
+                    for (const id of [rel.source, rel.target]) {
+                        if (!id) continue;
+                        if (previewIdSet.has(id)) continue;
+                        if (existingIdSet.has(id)) continue;
+                        endpointIds.add(id);
+                    }
+                }
+                const inheritedDomain =
+                    mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
+                let stubIdx = 0;
+                // Prefer the original preview relationship label when naming stub nodes
+                // (it carries the nice display form e.g. "Employee"); the *edge* label itself
+                // is scrubbed of filler separately at preview-load time.
+                const previewRels = previewData.relationships || [];
+                for (const endpointId of endpointIds) {
+                    const incomingRel = previewRels.find((r) => r.target === endpointId);
+                    const outgoingRel = previewRels.find((r) => r.source === endpointId);
+                    const stubLabel =
+                        incomingRel?.label || outgoingRel?.label || endpointId;
+                    const newNode: Node = {
+                        id: endpointId,
+                        type: 'entity',
+                        position: {
+                            x: 200 + ((stubIdx % 5) * 260),
+                            y: 400 + (Math.floor(stubIdx / 5) * 220),
+                        },
+                        data: {
+                            label: stubLabel,
+                            entity_type: 'dimension',
+                            width: 280,
+                            panelHeight: 200,
+                            collapsed: false,
+                            domain: inheritedDomain || undefined,
+                            domains: inheritedDomain ? [inheritedDomain] : undefined,
+                        },
+                        zIndex: maxZIndex + 5 + stubIdx,
+                    };
+                    nodesToUse = [...nodesToUse, newNode];
+                    existingIdSet.add(endpointId);
+                    createdEntityIds.push(endpointId);
+                    stubIdx += 1;
+                }
+
                 for (const [entityId, fields] of fieldsByEntity) {
                     if (entityIdByIndex.includes(entityId) || createdEntityIds.includes(entityId)) continue;
-                    
+
                     const isOnCanvas = nodesToUse.some(n => n.id === entityId);
                     if (!isOnCanvas) {
                         const rel = previewData.relationships?.find(r => r.target === entityId || r.source === entityId);
                         const stubLabel = rel?.label || entityId;
-                        
+
                         const newNode: Node = {
                             id: entityId,
                             type: 'entity',
@@ -731,7 +841,20 @@
                 }
                 const allEntityIds = new Set(nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id));
 
-                // Create edges for relationships
+                // Treat any label that just restates the target's id/label as filler
+                // (e.g. backend emits "Employee" as the rel label on booking→employee).
+                const isEdgeFillerLabel = (rawLabel: string, targetId: string): boolean => {
+                    const l = (rawLabel || '').trim().toLowerCase();
+                    if (!l) return true;
+                    if (l === targetId.trim().toLowerCase()) return true;
+                    const targetNode = nodesToUse.find((n) => n.id === targetId);
+                    const targetNodeLabel = String((targetNode?.data as any)?.label || '');
+                    if (targetNodeLabel && l === targetNodeLabel.trim().toLowerCase()) {
+                        return true;
+                    }
+                    return false;
+                };
+
                 let updatedEdges = edgesToUse;
                 for (const rel of relsToCreate) {
                     const sourceId = idMapping.get(rel.source) || rel.source;
@@ -742,13 +865,32 @@
                         allEntityIds.has(sourceId) &&
                         allEntityIds.has(targetId)
                     ) {
+                        const cleanLabel = isEdgeFillerLabel(rel.label || '', targetId)
+                            ? ''
+                            : rel.label || '';
                         const relationship = {
                             source: sourceId,
                             target: targetId,
-                            label: rel.label || '',
+                            label: cleanLabel,
                             type: (rel.type || 'one_to_many') as 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many',
                         };
                         updatedEdges = mergeRelationshipIntoEdges(updatedEdges, relationship);
+                        // mergeRelationshipIntoEdges skips updating the label on an existing
+                        // edge; explicitly overwrite pre-existing filler labels so old runs
+                        // (e.g. "Employee") get cleaned up on regeneration.
+                        updatedEdges = updatedEdges.map((e) => {
+                            const samePair =
+                                (e.source === sourceId && e.target === targetId) ||
+                                (e.source === targetId && e.target === sourceId);
+                            if (!samePair) return e;
+                            const endpointForLabel = e.target;
+                            const existing = String((e.data as any)?.label ?? '');
+                            if (!isEdgeFillerLabel(existing, endpointForLabel)) return e;
+                            return {
+                                ...e,
+                                data: { ...(e.data || {}), label: cleanLabel },
+                            };
+                        });
                     }
                 }
                 $edges = updatedEdges;
@@ -1071,8 +1213,10 @@
 
                     {#if $modelingStyle === 'entity_model'}
                         <p class="text-sm text-gray-600">
-                            Assign each attribute to an entity and choose the source for each relationship. Entities
-                            created in this step appear under “From this generation” in the dropdowns.
+                            Assign each attribute to an entity and choose the source for each relationship. New entities
+                            from this preview and other relationship endpoints from the event appear under “From this
+                            generation”; entities already on the canvas (in scope) appear under “Available in this
+                            {mode === 'process' ? 'process' : 'event'}”.
                         </p>
                     {:else}
                         <!-- Dimensional: editable entity rows -->
