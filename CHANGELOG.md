@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-04-17
+
+### Added
+- **Generate Entities (entity model) — topology in one group**: relationship endpoints from the preview (e.g. Employee, Account) appear under **“From this generation”** together with the derived preview entity, instead of only under “Available in this event”.
+- **Create All — stub nodes for relationship endpoints**: when an endpoint is not yet on the canvas, Create All adds a lightweight dimension stub so edges can be created and the filtered canvas shows the full topology.
+
+### Fixed
+- **Generate preview dialog**: in-flight preview requests are aborted when the dialog closes; a server timeout avoids an endless spinner; the preview-loading effect no longer retriggered in a tight loop (which could freeze the browser); `loading` resets when the dialog closes.
+- **Relationship edge labels**: filler labels that only repeat the target entity’s name or id (as emitted by the generator) are cleared on the canvas; regenerating overwrites stale filler text on existing edges.
+
 ## [0.14.0] - 2026-04-14
 
 ### Added
