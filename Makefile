@@ -100,7 +100,7 @@ test-check:
 
 create_mock_dbt_project:
 	@echo "Creating mock project..."
-	uv pip install ".[dbt-example]" && uv run trellis generate-company-data
+	uv pip install ".[company-dummy]" && uv run trellis generate-company-data
 
 dbt_refresh:
 	@echo "Refreshing dbt artifacts ..."

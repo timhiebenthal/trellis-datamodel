@@ -197,12 +197,14 @@ def generate_company_data(
 
     Creates CSV files in <output_path>/data/ with departments, employees,
     leads, customers, products, orders, and order items. Then scaffolds a
-    dbt project that can be run with 'dbt run --profiles-dir .'.
+    dbt project; build it with dbt in an isolated toolchain (see post-run hint).
 
     If dbt_company_dummy_path is set in trellis.yml, confirms the output path.
     Otherwise, prompts for an output directory.
 
-    Requires: pip install trellis-datamodel[dbt-example] (for dbt-duckdb)
+    Requires: pip install trellis-datamodel[company-dummy] (pandas, faker,
+    duckdb, tqdm for CSV generation). dbt is not bundled; use uvx/pipx or a
+    separate venv to run dbt against the scaffold.
     """
     import subprocess
     import sys
@@ -253,13 +255,30 @@ def generate_company_data(
             )
             raise typer.Exit(1)
 
-    # Run the generator
+    # Run the generator (merge stderr into stdout for tqdm + tracebacks)
     try:
         result = subprocess.run(
             [sys.executable, str(generator_path), str(output_path)],
-            capture_output=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
         )
+        if result.stdout:
+            typer.echo(result.stdout, nl=False)
         if result.returncode != 0:
+            out = result.stdout or ""
+            if (
+                "Missing required dependency" in out
+                or "ModuleNotFoundError" in out
+                or "No module named" in out
+            ):
+                typer.echo(
+                    typer.style(
+                        "Missing generator dependencies. Install with:",
+                        fg=typer.colors.RED,
+                    )
+                )
+                typer.echo("  pip install trellis-datamodel[company-dummy]")
             raise typer.Exit(result.returncode)
 
         typer.echo()
@@ -269,6 +288,21 @@ def generate_company_data(
                 fg=typer.colors.GREEN,
             )
         )
+        typer.echo()
+        typer.echo(
+            "To build the demo dbt project in isolation (avoids conflicts with your "
+            "project's dbt-core or the dbt Cloud CLI):"
+        )
+        typer.echo(
+            typer.style(
+                f"  uvx --from dbt-duckdb dbt build --project-dir {output_path} "
+                f"--profiles-dir {output_path}",
+                fg=typer.colors.CYAN,
+            )
+        )
+        typer.echo(
+            "Or install dbt-duckdb into a separate venv or pipx environment."
+        )
     except FileNotFoundError as e:
         typer.echo(
             typer.style(
@@ -277,17 +311,6 @@ def generate_company_data(
             )
         )
         raise typer.Exit(1)
-    except Exception as e:
-        if "dbt" in str(e).lower() or "duckdb" in str(e).lower():
-            typer.echo(
-                typer.style(
-                    "Missing dbt dependency. Install with:",
-                    fg=typer.colors.RED,
-                )
-            )
-            typer.echo("  pip install trellis-datamodel[dbt-example]")
-            raise typer.Exit(1)
-        raise
 
 
 if __name__ == "__main__":
