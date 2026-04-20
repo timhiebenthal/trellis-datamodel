@@ -1,6 +1,6 @@
-# Contributing to Trellis Datamodel
+# Contributing to trellis Datamodel
 
-Thanks for helping improve Trellis Datamodel! This guide explains how to contribute and the expectations for inbound licensing.
+Thanks for helping improve trellis Datamodel! This guide explains how to contribute and the expectations for inbound licensing.
 
 ## Licensing
 - The project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). By contributing, you agree that your contributions are released under AGPL-3.0.

@@ -1,6 +1,6 @@
-# Trellis Datamodel Contributor License Agreement (Individual)
+# trellis Datamodel Contributor License Agreement (Individual)
 
-Thank you for your interest in contributing to Trellis Datamodel. This Contributor License Agreement ("CLA") clarifies the terms under which you may contribute to the project.
+Thank you for your interest in contributing to trellis Datamodel. This Contributor License Agreement ("CLA") clarifies the terms under which you may contribute to the project.
 
 ## 1. You retain ownership
 You keep your copyright to your contributions.

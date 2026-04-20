@@ -1,6 +1,6 @@
-# Trellis Data
+# trellis Data
 
-![Trellis Logo](resources/trellis_with_text.png)
+![trellis Logo](resources/trellis_with_text.png)
 
 A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and the Physical Implementation (currently with dbt-core).
 
@@ -13,7 +13,7 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 - Stakeholders can't easily understand model structure without technical context
 - Holistic Data Warehouse Automation Tools exists but do not integrate well with dbt and the Modern Data Stack
 
-**How Trellis helps:**
+**How trellis helps:**
 - Visual data model that stays in sync — reads directly from `manifest.json` / `catalog.json`
 - Sketch entities and with their fields and auto-generate schema.yml's for dbt
 - Draw relationships on canvas → auto-generates dbt `relationships` tests
@@ -27,11 +27,11 @@ A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data
 
 ## Dimensional Modeling Support
 
-Trellis includes native support for Kimball dimensional modeling, making it easier to design, visualize, and document star and snowflake schemas.
+trellis includes native support for Kimball dimensional modeling, making it easier to design, visualize, and document star and snowflake schemas.
 
 ## Business Events and Processes
 
-Trellis supports capturing granular business events with 7W annotations and grouping related events into named processes. Processes let you consolidate multiple events into a single fact table (discrete records) or model an accumulating snapshot for evolving workflows.
+trellis supports capturing granular business events with 7W annotations and grouping related events into named processes. Processes let you consolidate multiple events into a single fact table (discrete records) or model an accumulating snapshot for evolving workflows.
 
 ### Business Events File Structure
 
@@ -156,7 +156,7 @@ dimensional_modeling:
 
 ### Entity Model Prefix Support
 
-Trellis includes native support for configurable entity prefixes when using entity modeling style, allowing teams with established table naming conventions to maintain consistency while keeping entity labels clean.
+trellis includes native support for configurable entity prefixes when using entity modeling style, allowing teams with established table naming conventions to maintain consistency while keeping entity labels clean.
 
 #### Features
 
@@ -280,7 +280,7 @@ If this project gains traction, we might explore support for:
 - **Pydantic models** as a simple output format
 - Other frameworks like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) through adapter patterns, where compatibility allows
 
-This remains a vision for now — the current focus is on making Trellis work well with dbt-core.
+This remains a vision for now — the current focus is on making trellis work well with dbt-core.
 
 ## Prerequisites
 - **Node.js 22+ (or 20.19+) & npm**  
@@ -556,5 +556,5 @@ If you want to collaborate, reach out!
 - Thanks to [dbt-colibri](https://github.com/dbt-labs/dbt-colibri) for providing lineage extraction capabilities that enhance trellis's data model visualization features.
 
 ## License
-- Trellis Datamodel is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+- trellis Datamodel is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 - See [`NOTICE`](NOTICE) for a summary of copyright and licensing information.
