@@ -1,560 +1,81 @@
 # trellis Data
 
-![trellis Logo](resources/trellis_with_text.png)
+![trellis logo](resources/trellis_squared.svg)
 
-A lightweight, local-first tool to bridge Conceptual Data Modeling, Logical Data Modeling and the Physical Implementation (currently with dbt-core).
+**trellis** is a lightweight, local-first app that connects **conceptual** and **logical** data modeling with how you actually build the warehouse today—**dbt-core** first, with a live canvas that stays aligned to your project.
 
-## Motivation
+## Why trellis
 
-**Current workflow pains:**
-- ERD diagrams live in separate tools (Lucidchart, draw.io) and quickly become stale or unreadable for large projects
-- Data transformations are done isolated from the conceptual data model.
-- No single view connecting business concepts to logical schema
-- Stakeholders can't easily understand model structure without technical context
-- Holistic Data Warehouse Automation Tools exists but do not integrate well with dbt and the Modern Data Stack
+**Typical pain**
 
-**How trellis helps:**
-- Visual data model that stays in sync — reads directly from `manifest.json` / `catalog.json`
-- Sketch entities and with their fields and auto-generate schema.yml's for dbt
-- Draw relationships on canvas → auto-generates dbt `relationships` tests
-- Two views: **Conceptual** (entity names, descriptions) and **Logical** (columns, types, materializations) to jump between high-level architect and execution-view.
-- Organize entities based on subdirectories and tags from your pyhsical implementation.
-- Write description or tags back to your dbt-project
+- ERDs live in separate tools and go stale on real projects.
+- Transformations drift from the story the business understands.
+- Stakeholders can’t see structure without wading through SQL and YAML.
+- “All-in-one” warehouse designers rarely meet teams where they are (dbt, git, the modern stack).
 
-**Two Ways of getting started**
-- Greenfield: draft entities and fields before writing SQL, then sync to dbt YAML
-- Brownfield: document your existing data model by loading existing dbt models and utilize relationship tests to infer links
+**What you get**
 
-## Dimensional Modeling Support
+- One place to **see** entities, fields, relationships, and descriptions—tied to your repo, not a dead export.
+- **Conceptual** view for names and meaning; **Logical** view for columns, types, and materialization detail—switch without losing context.
+- **Greenfield**: sketch entities and attributes, then push structured artifacts into dbt.
+- **Brownfield**: load what you already modeled in dbt, infer links from relationship tests, and push descriptions and tags back into the project.
 
-trellis includes native support for Kimball dimensional modeling, making it easier to design, visualize, and document star and snowflake schemas.
+## What you can do
 
-## Business Events and Processes
+- **Visualize your data model** — canvas layout, conceptual vs logical views, less manual “diagram maintenance.”
+- **Work with your dbt project** — point at `manifest.json` / `catalog.json`, keep the diagram honest, round-trip descriptions and tags, and generate **relationship** tests from drawn links.
+- **Optional — Kimball-style modeling** — classify facts and dimensions, sensible default placement, and a **Bus Matrix** when your team thinks in stars/snowflakes; you can stay on plain entities if you prefer.
+- **Optional — business events & processes** — capture events with 7W-style annotations and group them into processes; most useful for **greenfield** and **dimensional** workflows. Skip this entirely if it’s not your methodology.
 
-trellis supports capturing granular business events with 7W annotations and grouping related events into named processes. Processes let you consolidate multiple events into a single fact table (discrete records) or model an accumulating snapshot for evolving workflows.
+## Getting started
 
-### Business Events File Structure
-
-Business events are stored in `business_events.yml`. Processes group events without deleting the originals and maintain a superset of annotations across member events.
-
-```yaml
-events:
-  - id: evt_20260127_001
-    text: customer places order
-    type: discrete
-    domain: sales
-    process_id: proc_20260127_001
-    created_at: "2026-01-27T09:15:00Z"
-    updated_at: "2026-01-27T09:15:00Z"
-    annotations:
-      who:
-        - id: entry_01
-          text: customer
-      what:
-        - id: entry_02
-          text: order
-      how_many:
-        - id: entry_03
-          text: order_amount
-    derived_entities: []
-
-processes:
-  - id: proc_20260127_001
-    name: order to cash
-    type: evolving
-    event_ids: [evt_20260127_001, evt_20260127_002]
-    created_at: "2026-01-27T09:20:00Z"
-    updated_at: "2026-01-27T09:25:00Z"
-    annotations_superset:
-      who:
-        - id: entry_01
-          text: customer
-      what:
-        - id: entry_02
-          text: order
-      how_many:
-        - id: entry_03
-          text: order_amount
-```
-
-Notes:
-- `process_id` links events to a process but does not remove the event.
-- `annotations_superset` is the union of member event 7Ws.
-- Resolving a process detaches events while keeping them intact.
-
-### Features
-
-**Entity Classification**
-- Classify entities as **fact** (transaction tables), **dimension** (descriptive tables), or **unclassified**
-- Manual classification during entity creation or via context menu
-- Automatic inference from dbt model naming patterns (e.g., `dim_customer` → dimension, `fct_orders` → fact)
-- Configurable inference patterns in `trellis.yml`
-
-**Smart Default Positioning**
-- Facts are automatically placed in the center area of the canvas
-- Dimensions are placed in an outer ring around facts
-- Reduces manual layout effort for star/snowflake schemas
-- Can be re-applied anytime with "Auto-Layout" button
-
-**Kimball Bus Matrix View**
-- Visual matrix showing dimensions (rows) and facts (columns)
-- Checkmarks (✓) indicate dimension-fact connections
-- Filter by dimension name, fact name, or tags
-- Click cells to highlight relationships on the canvas
-- Dedicated view mode accessible from navigation bar
-
-### Configuration
-
-Enable dimensional modeling features in `trellis.yml`:
-
-```yaml
-modeling_style: dimensional_model  # Options: dimensional_model or entity_model (default)
-
-dimensional_modeling:
-  inference_patterns:
-    dimension_prefix: ["dim_", "d_"]  # Prefixes for dimension tables
-    fact_prefix: ["fct_", "fact_"]  # Prefixes for fact tables
-```
-
-- `modeling_style: dimensional_model` enables all dimensional modeling features
-- `modeling_style: entity_model` (default) preserves current generic behavior
-- Inference patterns customize how entities are auto-classified from dbt model names
-
-### Entity Classification Workflow
-
-**Creating New Entities:**
-1. Click "Create Entity" button
-2. Fill in entity name and description
-3. Select entity type: Fact, Dimension, or Unclassified
-4. Entity is placed on canvas according to type (facts center, dimensions outer ring)
-
-**Loading Existing dbt Models:**
-1. System automatically infers entity types from naming patterns
-2. Entity type icons appear on nodes (database for fact, box for dimension)
-3. Override incorrect classifications via context menu: right-click → "Set as Fact/Dimension"
-
-**Bus Matrix Workflow:**
-1. Click "Bus Matrix" icon in navigation bar
-2. View dimensions (rows) and facts (columns)
-3. Checkmarks show connections between entities
-4. Filter to focus on specific dimensions, facts, or tags
-5. Click checkmark to highlight relationship on canvas
-
-### Use Cases
-
-**When to Use Dimensional Modeling:**
-- Designing data warehouses with star/snowflake schemas
-- Following Kimball methodology
-- Working with fact and dimension tables
-- Documenting data models for BI stakeholders
-
-**When to Use Entity Model:**
-- Generic data modeling (not strictly dimensional)
-- Mixed schema patterns
-- Legacy projects with inconsistent naming
-- Exploratory modeling
-
-### Entity Model Prefix Support
-
-trellis includes native support for configurable entity prefixes when using entity modeling style, allowing teams with established table naming conventions to maintain consistency while keeping entity labels clean.
-
-#### Features
-
-**Prefix Application**
-- Automatically applies configured prefix when saving unbound entities to dbt schema.yml files
-- Supports single prefix or multiple prefixes (e.g., `tbl_`, `entity_`, `t_`)
-- Uses first configured prefix for application when multiple are provided
-- Case-insensitive prefix detection prevents duplication (e.g., `TBL_CUSTOMER` won't become `tbl_TBL_CUSTOMER`)
-- Respects existing bound dbt_model values (bound entities don't get re-prefixed)
-
-**Prefix Stripping from Labels**
-- Configured prefixes are automatically stripped from entity labels displayed on the ERD canvas
-- Labels remain human-readable and meaningful without technical prefixes
-- Works for all entity labels: newly created entities, entities loaded from dbt models, and entities bound to existing dbt models
-- Preserves original casing of remaining label text after stripping
-
-#### Configuration
-
-Enable entity modeling prefix support in `trellis.yml`:
-
-```yaml
-modeling_style: entity_model  # Options: dimensional_model or entity_model (default)
-
-entity_modeling:
-  inference_patterns:
-    prefix: "tbl_"  # Single prefix
-    # OR
-    prefix: ["tbl_", "entity_", "t_"]  # Multiple prefixes
-```
-
-- `modeling_style: entity_model` (default) enables entity modeling features
-- `entity_modeling.inference_patterns.prefix` defines one or more prefixes to apply when saving entities
-- Empty prefix list (default) results in no behavior change for backward compatibility
-- When multiple prefixes are configured, the first in the list is used for application, but all are recognized for stripping
-
-#### Examples
-
-**Single Prefix Configuration:**
-```yaml
-entity_modeling:
-  inference_patterns:
-    prefix: "tbl_"
-```
-- Entity "Customer" on canvas saves to dbt as `tbl_customer`
-- Loading `tbl_customer` from dbt displays as "Customer" on canvas
-
-**Multiple Prefix Configuration:**
-```yaml
-entity_modeling:
-  inference_patterns:
-    prefix: ["tbl_", "entity_", "t_"]
-```
-- Entity "Product" on canvas saves to dbt as `tbl_product` (uses first prefix)
-- Loading `entity_product` from dbt displays as "Product" on canvas (strips any matching prefix)
-- Loading `t_order` from dbt displays as "Order" on canvas (strips any matching prefix)
-
-**Backward Compatibility:**
-- Existing `entity_model` projects continue to work without modification when prefix is empty (default)
-- No breaking changes to existing APIs or data structures
-- Simply add prefix configuration to enable the feature for new or existing projects
-
-## Tutorial & Guide
-
-Check out our [Full Tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) with video clips showing the core features in action.  Also [General Information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a) is available.
-
-### Configuration UI
-
-trellis provides a web-based configuration interface for editing `trellis.yml` settings.
-
-#### Accessing Configuration
-
-Navigate to `/config` in your browser (or click "Config" in the navigation bar) to access the configuration interface.
-
-#### Features
-
-- **Real-time Validation**: Backend validates all changes before saving, ensuring invalid values are rejected
-- **Atomic Writes**: All configuration changes create timestamped backups before overwriting the config file
-- **Conflict Detection**: If the config file is modified externally (e.g., by another editor), you'll be warned before overwriting
-- **Danger Zone**: Experimental features (lineage, exposures) require explicit acknowledgment before enabling
-- **Recovery UI**: Clear error messages and retry options if the config file is missing or unreadable
-
-#### Backup Behavior
-
-When you apply configuration changes:
-1. A backup is created with timestamp format: `trellis.yml.bak.YYYYMMDD-HHMMSS`
-2. The backup is saved in the same directory as `trellis.yml`
-3. The new configuration is written atomically (via temporary file + move operation)
-4. Multiple backups are preserved for safety
-
-#### Configuration Fields
-
-The config UI supports editing all user-facing fields:
-- Framework (dbt-core only, currently)
-- Modeling style (dimensional_model or entity_model)
-- Paths (dbt_project_path, dbt_manifest_path, dbt_catalog_path, data_model_file)
-- Entity creation guidance (wizard, warnings, description settings)
-- Dimensional modeling (dimension/fact prefixes)
-- Entity modeling (entity prefix)
-- Lineage (beta - layers configuration)
-- Exposures (beta - enabled status and layout)
-
-#### Validation Rules
-
-- Path fields validate that files exist (or provide clear warnings for optional paths like catalog)
-- Enum fields restrict values to valid options
-- Type checking ensures integers, booleans, and lists have correct formats
-- Backend validation is authoritative; frontend provides UX feedback but cannot bypass validation
-
-#### Normalization
-
-- Configuration is saved as normalized YAML for consistency
-- Comments in the original `trellis.yml` are not preserved (this is expected)
-- Formatting follows a standard pattern that the backend understands
-
-## Vision
-
-trellis is currently designed and tested specifically for **dbt-core**, but the vision is to be tool-agnostic. As the saying goes: *"tools evolve, concepts don't"* — data modeling concepts persist regardless of the transformation framework you use.
-
-If this project gains traction, we might explore support for:
-- **dbt-fusion** through adapter support
-- **Pydantic models** as a simple output format
-- Other frameworks like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) through adapter patterns, where compatibility allows
-
-This remains a vision for now — the current focus is on making trellis work well with dbt-core.
-
-## Prerequisites
-- **Node.js 22+ (or 20.19+) & npm**  
-  - Recommended: Use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version (e.g., `nvm install 22`).
-  - Note: System packages (`apt-get`) may be too old for the frontend dependencies.
-  - A `.nvmrc` file is included; run `nvm use` to switch to the correct version automatically.
-- **Python 3.11+ & [uv](https://github.com/astral-sh/uv)**  
-  - Install uv via `curl -LsSf https://astral.sh/uv/install.sh | sh` and ensure it's on your `$PATH`.
-- **Make** (optional) for convenience targets defined in the `Makefile`.
-
-## Installation
-
-### Install from PyPI
+**Install**
 
 ```bash
 pip install trellis-datamodel
-# or with uv
-uv pip install trellis-datamodel
+# or: uv pip install trellis-datamodel
 ```
 
-### Install from Source (Development)
+**Run next to your dbt project**
 
-```bash
-# Clone the repository
-git clone https://github.com/timhiebenthal/trellis-datamodel.git
-cd trellis-datamodel
+1. `cd /path/to/your/dbt-project`
+2. `trellis init` — creates `trellis.yml` (point it at your dbt paths and artifacts).
+3. `trellis run` — opens **http://localhost:8089** (use `trellis run --help` for port and config path).
 
-# Install in editable mode
-pip install -e .
-# or with uv
-uv pip install -e .
-```
+Generate **`manifest.json`** and **`catalog.json`** with `dbt docs generate` in your dbt project so trellis can load models; without them, the UI may start but show no dbt-backed entities.
 
-## Quick Start
+Install from source or hack on the app: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-1. **Navigate to your dbt project directory**
-   ```bash
-   cd /path/to/your/dbt-project
-   ```
+## Examples & walkthroughs
 
-2. **Initialize configuration**
-   ```bash
-   trellis init
-   ```
-   This creates a `trellis.yml` file. Edit it to point to your dbt manifest and catalog locations.
+Short video walkthroughs (GitHub renders the embedded clips):
 
-3. **Start the server**
-   ```bash
-   trellis run
-   ```
+| | |
+| --- | --- |
+| [Getting started](examples/1%20-%20Getting%20Started.md) | Init, settings in the UI, conceptual vs logical, relationships, push to dbt. |
+| [dbt integration](examples/3%20-%20dbt%20integration.md) | Link a project, mock data, bind entities to models, stay in sync with artifacts. |
+| [Documenting business processes](examples/2%20-%20Documenting%20Business%20Processes.md) | **Optional / experimental:** events, 7Ws, processes—enable in config or UI first. |
 
-   The server will start on **http://localhost:8089** and automatically open your browser.
-
-## Development Setup
-
-For local development with hot reload:
-
-### Install Dependencies
-Run these once per machine (or when dependencies change).
-
-1. **Backend**
-   ```bash
-   uv sync
-   ```
-2. **Frontend**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-**Terminal 1 – Backend**
-```bash
-make backend
-# or
-uv run trellis run
-```
-Backend serves the API at http://localhost:8089.
-
-**Terminal 2 – Frontend**
-```bash
-make frontend
-# or
-cd frontend && npm run dev
-```
-Frontend runs at http://localhost:5173 (for development with hot reload).
-
-## Building for Distribution
-
-To build the package with bundled frontend:
-
-```bash
-make build-package
-```
-
-This will:
-1. Build the frontend (`npm run build`)
-2. Copy static files to `trellis_datamodel/static/`
-3. Build the Python wheel (`uv build`)
-
-The wheel will be in `dist/` and can be installed with `pip install dist/trellis_datamodel-*.whl`.
-
-## CLI Options
-
-```bash
-trellis run [OPTIONS]
-
-Options:
-  --port, -p INTEGER    Port to run the server on [default: 8089]
-  --config, -c TEXT     Path to config file (trellis.yml or config.yml)
-  --no-browser          Don't open browser automatically
-  --help                Show help message
-```
-
-## dbt Metadata
-- Generate `manifest.json` and `catalog.json` by running `dbt docs generate` in your dbt project.
-- The UI reads these artifacts to power the ERD modeller.
-- Without these artifacts, the UI loads but shows no dbt models.
+More narrative walkthroughs and context: [full tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) · [general information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a).
 
 ## Configuration
 
-Run `trellis init` to create a starter `trellis.yml` file in your project.
-The generated file mirrors the annotated defaults in `trellis.yml.example`, so review that example when you need to customize optional sections (lineage, guidance, helpers).
+After `trellis init`, edit **`trellis.yml`**. Annotated options and defaults live in **[trellis.yml.example](trellis.yml.example)** (paths, modeling style, optional lineage/exposures, entity guidance, prefixes, etc.).
 
-Options:
+You can also open **`/config`** in the app to edit settings in the browser (validated saves; see example file for field meanings).
 
-- `framework`: Transformation framework to use. Currently supported: `dbt-core`. Future: `dbt-fusion`, `sqlmesh`, `bruin`, `pydantic`. Defaults to `dbt-core`.
-- `dbt_project_path`: Path to your dbt project directory (relative to `config.yml` or absolute). **Required**.
-- `dbt_manifest_path`: Path to `manifest.json` (relative to `dbt_project_path` or absolute). Defaults to `target/manifest.json`.
-- `dbt_catalog_path`: Path to `catalog.json` (relative to `dbt_project_path` or absolute). Defaults to `target/catalog.json`.
-- `data_model_file`: Path where the data model YAML will be saved (relative to `dbt_project_path` or absolute). Defaults to `data_model.yml`.
-- `dbt_model_paths`: List of path patterns to filter which dbt models are shown (e.g., `["3_core"]`). If empty, all models are included.
-- `dbt_company_dummy_path`: Helper dbt project used by `trellis generate-company-data`. Install generator deps with `pip install trellis-datamodel[dbt-example]` (pandas, faker, duckdb, tqdm). Trellis does not install dbt; after generating files, run dbt in isolation (e.g. `uvx --from dbt-duckdb dbt run --project-dir <dir> --profiles-dir <dir>`) so it does not clash with your project’s `dbt-core` or the dbt Cloud CLI. Run the command to create `./dbt_company_dummy` or update this path to an existing project.
-- `modeling_style`: Modeling style to use. Options: `entity_model` (default) or `dimensional_model`. Controls whether dimensional modeling features or entity modeling prefix features are enabled.
-- `entity_modeling.inference_patterns.prefix`: Prefix(es) to apply when saving entities and strip from labels in entity modeling mode. Can be a single string or list of strings. Defaults to empty list (no prefix). See "Entity Model Prefix Support" section for examples and details.
-- `lineage.enabled`: Feature flag for lineage UI + API. Defaults to `false` (opt-in).
-- `lineage.layers`: Ordered list of folder names to organize lineage bands. Prefer this nested structure; legacy `lineage_layers` is deprecated.
-- `exposures.enabled`: Feature flag for Exposures view mode. Defaults to `false` (opt-in). Set to `true` to enable the exposures view and API.
-- `exposures.default_layout`: Default table layout for exposures view. Options: `dashboards-as-rows` (default, dashboards as rows, entities as columns) or `entities-as-rows` (exposures as columns, entities as rows). Users can manually toggle between layouts.
-- `entity_creation_guidance`: Encounter-friendly guidance for the entity wizard (current defaults are shown in `trellis.yml.example`).
+## Vision
 
-**Example `trellis.yml`:**
-```yaml
-framework: dbt-core
-dbt_project_path: "./dbt_built"
-dbt_manifest_path: "target/manifest.json"
-dbt_catalog_path: "target/catalog.json"
-data_model_file: "data_model.yml"
-dbt_model_paths: []  # Empty list includes all models
-dbt_company_dummy_path: "./dbt_company_dummy"
-#lineage:
-#  enabled: false  # Set to true to enable lineage UI/endpoints
-#  layers: []
-#exposures:
-#  enabled: false  # Set to true to enable Exposures view (opt-in)
-#  default_layout: dashboards-as-rows  # Options: dashboards-as-rows (default) or entities-as-rows
-#entity_creation_guidance:
-#  enabled: true  # Set false to disable the step-by-step wizard
-#  push_warning_enabled: true
-#  min_description_length: 10
-#  disabled_guidance: []
-```
+trellis is built and tested around **dbt-core** today. The longer-term idea is to stay **tool-agnostic**—concepts outlive any one framework. Possible directions include dbt Fusion, Pydantic-flavored exports, or adapters for tools like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) where it makes sense. For now, the focus is a great experience with dbt-core.
 
-Lineage and entity creation guidance sections are documented fully in `trellis.yml.example`; the CLI leaves them commented out by default.
-```
+## Contributing
 
-
-## Testing
-
-### Frontend
-**Testing Libraries:**
-The following testing libraries are defined in `package.json` under `devDependencies` and are automatically installed when you run `npm install`:
-- [Vitest](https://vitest.dev/) (Unit testing)
-- [Playwright](https://playwright.dev/) (End-to-End testing)
-- [Testing Library](https://testing-library.com/) (DOM & Svelte testing utilities)
-- [jsdom](https://github.com/jsdom/jsdom) (DOM environment)
-
-> **Playwright system dependencies (Ubuntu/WSL2)**
->
-> The browsers downloaded by Playwright need a handful of native libraries. Install them before running `npm run test:e2e`:
->
-> ```bash
-> sudo apt-get update && sudo apt-get install -y \
->   libxcursor1 libxdamage1 libgtk-3-0 libpangocairo-1.0-0 libpango-1.0-0 \
->   libatk1.0-0 libcairo-gobject2 libcairo2 libgdk-pixbuf-2.0-0 libasound2 \
->   libnspr4 libnss3 libgbm1 libgles2-mesa libgtk-4-1 libgraphene-1.0-0 \
->   libxslt1.1 libwoff2dec0 libvpx7 libevent-2.1-7 libopus0 \
->   libgstallocators-1.0-0 libgstapp-1.0-0 libgstpbutils-1.0-0 libgstaudio-1.0-0 \
->   libgsttag-1.0-0 libgstvideo-1.0-0 libgstgl-1.0-0 libgstcodecparsers-1.0-0 \
->   libgstfft-1.0-0 libflite1 libflite1-plugins libwebpdemux2 libavif13 \
->   libharfbuzz-icu0 libwebpmux3 libenchant-2-2 libsecret-1-0 libhyphen0 \
->   libwayland-server0 libmanette-0.2-0 libx264-163
-> ```
-
-**Running Tests:**
-
-The test suite has multiple levels to catch different types of issues:
-
-```bash
-cd frontend
-
-# Quick smoke test (catches 500 errors, runtime crashes, ESM issues)
-# Fastest way to verify the app loads without errors
-npm run test:smoke
-
-# TypeScript/compilation check
-npm run check
-
-# Unit tests
-npm run test:unit
-
-# E2E tests (includes smoke test + full test suite)
-# Note: Requires backend running with test data (see Test Data Isolation below)
-npm run test:e2e
-
-# Run all tests (check + smoke + unit + e2e)
-npm run test
-```
-
-**Test Levels:**
-1. **`npm run check`** - TypeScript compilation errors
-2. **`npm run test:smoke`** - Runtime errors (500s, console errors, ESM issues) - **catches app crashes**
-3. **`npm run test:unit`** - Unit tests with Vitest
-4. **`npm run test:e2e`** - Full E2E tests with Playwright
-
-**Using Makefile:**
-```bash
-# From project root
-make test-smoke     # Quick smoke test
-make test-check     # TypeScript check
-make test-unit      # Unit tests
-make test-e2e       # E2E tests (auto-starts backend with test data)
-make test-all       # All tests
-```
-
-**Test Data Isolation:**
-E2E tests use a separate test data file (`frontend/tests/test_data_model.yml`) to avoid polluting your production data model. **Playwright automatically starts the backend** with the correct environment variable, so you don't need to manage it manually.
-
-```bash
-# Just run E2E tests - backend starts automatically with test data
-make test-e2e
-# OR:
-# cd frontend && npm run test:e2e
-```
-
-The test data file is automatically cleaned before and after test runs via Playwright's `globalSetup` and `globalTeardown`. Your production `data_model.yml` remains untouched.
-
-### Backend
-**Testing Libraries:**
-The following testing libraries are defined in `pyproject.toml` under `[project.optional-dependencies]` in the `dev` group:
-- [pytest](https://docs.pytest.org/) (Testing framework)
-- [httpx](https://www.python-httpx.org/) (Async HTTP client for API testing)
-
-**Installation:**
-Unlike `npm`, `uv sync` does not install optional dependencies by default. To include the testing libraries, run:
-```bash
-uv sync --extra dev
-```
-
-**Running Tests:**
-```bash
-uv run pytest
-```
-
-## Collaboration
-
-If you want to collaborate, reach out!
-
-## Contributing and CLA
-- Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow, testing, and PR guidelines.
-- All contributors must sign the CLA once per GitHub account. The CLA bot on pull requests will guide you; see [`CLA.md`](CLA.md) for details.
+Contributions welcome. Workflow, local dev, tests, and packaging: **[CONTRIBUTING.md](CONTRIBUTING.md)**. All contributors sign the CLA once per GitHub account—see **[CLA.md](CLA.md)** and the bot on your PR.
 
 ## Acknowledgments
-- Thanks to [dbt-colibri](https://github.com/dbt-labs/dbt-colibri) for providing lineage extraction capabilities that enhance trellis's data model visualization features.
+
+- [dbt-colibri](https://github.com/dbt-labs/dbt-colibri) for lineage-related capabilities that support trellis visualization.
 
 ## License
-- trellis Datamodel is licensed under the [GNU Affero General Public License v3.0](LICENSE).
-- See [`NOTICE`](NOTICE) for a summary of copyright and licensing information.
+
+trellis Datamodel is licensed under the **[GNU Affero General Public License v3.0](LICENSE)**. See **[NOTICE](NOTICE)** for a short summary of copyright and licensing.

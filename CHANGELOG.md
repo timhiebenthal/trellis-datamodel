@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.8] - 2026-04-20
+
+### Changed
+
+- **README**: Reworked for end users—benefits and workflows first, optional Kimball and business-events/7W called out last, video walkthroughs linked under `examples/`, configuration summarized with pointers to `trellis.yml.example` and `/config`, development and testing moved to CONTRIBUTING.
+- **Branding**: README uses stylized **trellis** (lowercase *t*) for the product name in prose.
+
+### Added
+
+- **CONTRIBUTING**: Expanded with prerequisites, local dev (backend/frontend), `make build-package`, `trellis run` CLI options, and full frontend/backend testing guidance (including Playwright system dependencies on Ubuntu/WSL2).
+
+See commit [`aa8ee6c02d30987a940dba5388bac8f067423858`](https://github.com/timhiebenthal/trellis-datamodel/commit/aa8ee6c02d30987a940dba5388bac8f067423858).
+
 ## [0.14.7] - 2026-04-17
 
 ### Fixed
