@@ -15,8 +15,9 @@
 - Stakeholders can’t see structure without wading through SQL and YAML.
 - “All-in-one” warehouse designers rarely meet teams where they are (dbt, git, the modern stack).
 
-**What you get**
+**What you get with trellis**
 
+- **Small PyPI install, local web app** — run it beside your dbt project; the canvas and model files (`data_model.yml`, dbt YAML) stay **in version control**, so names, relationships, and descriptions evolve like the rest of your code—not a one-off diagram export.
 - One place to **see** entities, fields, relationships, and descriptions—tied to your repo, not a dead export.
 - **Conceptual** view for names and meaning; **Logical** view for columns, types, and materialization detail—switch without losing context.
 - **Greenfield**: sketch entities and attributes, then push structured artifacts into dbt.
