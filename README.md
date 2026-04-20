@@ -1,6 +1,8 @@
 # trellis Data
 
-![trellis logo](resources/trellis_squared.svg)
+<p align="center">
+  <img src="resources/trellis_with_text.png" alt="trellis Data" width="420" />
+</p>
 
 **trellis** is a lightweight, local-first app that connects **conceptual** and **logical** data modeling with how you actually build the warehouse today—**dbt-core** first, with a live canvas that stays aligned to your project.
 
@@ -48,7 +50,7 @@ Install from source or hack on the app: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Examples & walkthroughs
 
-Short video walkthroughs (GitHub renders the embedded clips):
+Short video walkthroughs:
 
 | | |
 | --- | --- |
