@@ -22,7 +22,7 @@
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
     } from "$lib/stores";
-    import type { DbtModel, DraftedField, ModelSchemaColumn, EntityData, EntityRole } from "$lib/types";
+    import type { DbtModel, DraftedField, EntityData, EntityRole } from "$lib/types";
     import {
         inferRelationships,
         getLineage,
@@ -39,9 +39,10 @@
         toTitleCase,
         classifyModelTypeFromPrefixes,
     } from "$lib/utils";
+    import { mergeFields } from "$lib/utils/merged-fields";
+    import type { MergedField } from "$lib/utils/merged-fields";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
-    import UndescribedAttributesWarningModal from "./UndescribedAttributesWarningModal.svelte";
     import TagEditor from "./TagEditor.svelte";
     import { openLineageModal } from "$lib/stores";
     import Icon from "@iconify/svelte";
@@ -61,9 +62,6 @@
 
     const { updateNodeData } = useSvelteFlow();
     let showEntityTypeMenu = $state(false);
-    let showUndescribedAttributesWarning = $state(false);
-    let undescribedAttributeNames = $state<string[]>([]);
-    let warningResolve: ((value: boolean) => void) | null = null;
     // Delete and SourceEditor modals are rendered at page-level (outside SvelteFlow) via global stores
 
     // Batch editing support
@@ -214,81 +212,6 @@
         }
         previousModelIndex = currentModelIndex;
     });
-
-    // Show warning modal and wait for user decision
-    async function showUndescribedAttributesWarningModal(undescribedAttributes: string[]): Promise<boolean> {
-        undescribedAttributeNames = undescribedAttributes;
-        showUndescribedAttributesWarning = true;
-
-        return new Promise<boolean>((resolve) => {
-            warningResolve = resolve;
-        });
-    }
-
-    function handleWarningConfirm() {
-        if (warningResolve) {
-            warningResolve(true);
-            warningResolve = null;
-        }
-        showUndescribedAttributesWarning = false;
-    }
-
-    function handleWarningCancel() {
-        if (warningResolve) {
-            warningResolve(false);
-            warningResolve = null;
-        }
-        showUndescribedAttributesWarning = false;
-    }
-
-    async function saveSchema() {
-        if (!schemaManager || !modelDetails) return;
-
-        // Check for attributes without descriptions
-        const undescribedAttributes = schemaState.editableColumns
-            .filter((col) => col.name && (!col.description || col.description.trim().length === 0))
-            .map((col) => col.name);
-
-        if (undescribedAttributes.length > 0) {
-            const proceed = await showUndescribedAttributesWarningModal(undescribedAttributes);
-            if (!proceed) {
-                return;
-            }
-        }
-
-        try {
-            await schemaManager.saveSchema(data.description);
-            // Update node data with schema tags from SchemaManager
-            if (activeModelIndex === 0) {
-                updateNodeData(id, {
-                    tags: schemaState.displayTags,
-                    _schemaTags: schemaState.schemaTags,
-                    _manifestTags: schemaState.manifestTags,
-                });
-            }
-        } catch (e) {
-            // Error is already handled by SchemaManager
-            console.error('Schema save failed:', e);
-        }
-    }
-
-    function updateEditableColumn(
-        index: number,
-        updates: Partial<ModelSchemaColumn>,
-    ) {
-        if (!schemaManager) return;
-        schemaManager.updateEditableColumn(index, updates);
-    }
-
-    function addEditableColumn() {
-        if (!schemaManager) return;
-        schemaManager.addEditableColumn();
-    }
-
-    function deleteEditableColumn(index: number) {
-        if (!schemaManager) return;
-        schemaManager.deleteEditableColumn(index);
-    }
 
     function addAdditionalModel(modelId: string) {
         const current = (data.additional_models as string[]) || [];
@@ -795,6 +718,7 @@
 
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
+    let mergedFields = $derived(mergeFields(modelDetails?.columns, draftedFields));
 
     function addDraftedField() {
         const newField: DraftedField = {
@@ -1399,193 +1323,169 @@
                         </div>
                     {/if}
 
-                    {#if schemaState.isLoading}
-                        <div
-                            class="text-center text-gray-400 py-4 text-[10px] italic"
-                        >
-                            Loading schema...
-                        </div>
-                    {:else}
-                        <div
-                            class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
-                            style={`max-height:${columnPanelHeight}px`}
-                        >
-                            {#if schemaState.editableColumns.length > 0}
-                                {#each schemaState.editableColumns as col, index}
+                    <div
+                        class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
+                        style={`max-height:${columnPanelHeight}px`}
+                    >
+                        {#if mergedFields.length > 0}
+                            {#each mergedFields as field (field.name)}
+                                <div
+                                    class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
+                                    class:bg-blue-50={$draggingField?.nodeId !==
+                                        id && $draggingField !== null}
+                                    class:ring-2={$draggingField?.nodeId !==
+                                        id && $draggingField !== null}
+                                    class:ring-blue-300={$draggingField?.nodeId !==
+                                        id && $draggingField !== null}
+                                    ondragover={onFieldDragOver}
+                                    ondrop={(e) => onFieldDrop(field.name, e)}
+                                    role="presentation"
+                                >
                                     <div
-                                        class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
-                                        class:bg-blue-50={$draggingField?.nodeId !==
-                                            id && $draggingField !== null}
-                                        class:ring-2={$draggingField?.nodeId !==
-                                            id && $draggingField !== null}
-                                        class:ring-blue-300={$draggingField?.nodeId !==
-                                            id && $draggingField !== null}
-                                        ondragover={onFieldDragOver}
-                                        ondrop={(e) => onFieldDrop(col.name, e)}
-                                        role="presentation"
+                                        class="flex gap-1.5 mb-1 items-center"
                                     >
-                                        <div
-                                            class="flex gap-1.5 mb-1 items-center"
-                                        >
+                                        <span
+                                            class="inline-block h-2 w-2 rounded-full border border-primary-500 flex-shrink-0"
+                                            class:bg-primary-500={field.origin === 'dbt'}
+                                            data-origin={field.origin}
+                                            aria-label={field.origin === 'dbt'
+                                                ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
+                                                : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                            title={field.origin === 'dbt'
+                                                ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
+                                                : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                            role="img"
+                                        ></span>
+
+                                        {#if field.origin === 'dbt'}
+                                            <span
+                                                class="text-gray-400 text-xs select-none w-3 h-3"
+                                                draggable="true"
+                                                ondragstart={(e) => onFieldDragStart(field.name, e)}
+                                                ondragend={onFieldDragEnd}
+                                                role="presentation"
+                                                aria-hidden="true"
+                                                tabindex="-1"
+                                            >
+                                                <Icon icon="lucide:link" class="w-3 h-3" />
+                                            </span>
+                                            <div class="flex-1 flex flex-col gap-1">
+                                                <div class="flex items-center gap-1">
+                                                    <span class="flex-1 px-1.5 py-0.5 text-xs font-medium text-gray-700">{field.name}</span>
+                                                    <span class="w-20 px-1 py-0.5 text-[10px] uppercase text-gray-500 font-mono">{field.datatype ?? '—'}</span>
+                                                </div>
+                                                {#if field.description}
+                                                    <span class="w-full px-0 text-[10px] text-gray-400">{field.description}</span>
+                                                {/if}
+                                            </div>
+                                        {:else}
                                             <span
                                                 class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
                                                 draggable="true"
-                                                onmousedown={(e) =>
-                                                    e.stopPropagation()}
-                                                onpointerdown={(e) =>
-                                                    e.stopPropagation()}
-                                                ondragstart={(e) =>
-                                                    onFieldDragStart(
-                                                        col.name,
-                                                        e,
-                                                    )}
+                                                onmousedown={(e) => e.stopPropagation()}
+                                                onpointerdown={(e) => e.stopPropagation()}
+                                                ondragstart={(e) => onFieldDragStart(field.name, e)}
                                                 ondragend={onFieldDragEnd}
-                                                class:cursor-grabbing={$draggingField?.nodeId ===
-                                                    id &&
-                                                    $draggingField?.fieldName ===
-                                                        col.name}
+                                                class:cursor-grabbing={$draggingField?.nodeId === id &&
+                                                    $draggingField?.fieldName === field.name}
                                                 title="Drag to link to another field"
                                                 role="presentation"
                                                 aria-hidden="true"
                                                 tabindex="-1"
                                             >
-                                                <Icon
-                                                    icon="lucide:link"
-                                                    class="w-3 h-3"
-                                                />
+                                                <Icon icon="lucide:link" class="w-3 h-3" />
                                             </span>
-                                            <div
-                                                class="flex-1 flex flex-col gap-1"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-1"
-                                                >
+                                            <div class="flex-1 flex flex-col gap-1">
+                                                <div class="flex items-center gap-1">
                                                     <input
                                                         type="text"
-                                                        value={col.name}
+                                                        value={field.name}
                                                         oninput={(e) =>
-                                                            updateEditableColumn(
-                                                                index,
+                                                            updateDraftedField(
+                                                                field.draftIndex,
                                                                 {
-                                                                    name: (
-                                                                        e.target as HTMLInputElement
-                                                                    ).value,
+                                                                    name: (e.target as HTMLInputElement).value,
                                                                 },
                                                             )}
                                                         class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
-                                                        placeholder="column_name"
+                                                        placeholder="field_name"
                                                     />
-                                                    <input
-                                                        type="text"
-                                                        value={col.data_type ||
-                                                            ""}
-                                                        oninput={(e) =>
-                                                            updateEditableColumn(
-                                                                index,
+                                                    <select
+                                                        value={field.datatype}
+                                                        onchange={(e) =>
+                                                            updateDraftedField(
+                                                                field.draftIndex,
                                                                 {
-                                                                    data_type: (
-                                                                        e.target as HTMLInputElement
-                                                                    ).value,
+                                                                    datatype: (e.target as HTMLSelectElement).value as any,
                                                                 },
                                                             )}
                                                         class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
-                                                        placeholder="text"
-                                                    />
-                                                    <button
-                                                        onclick={() =>
-                                                            deleteEditableColumn(
-                                                                index,
-                                                            )}
-                                                        class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
-                                                        title="Delete column"
                                                     >
-                                                        <Icon
-                                                            icon="lucide:x"
-                                                            class="w-3 h-3"
-                                                        />
+                                                        <option value="text">text</option>
+                                                        <option value="int">int</option>
+                                                        <option value="float">float</option>
+                                                        <option value="bool">bool</option>
+                                                        <option value="date">date</option>
+                                                        <option value="timestamp">timestamp</option>
+                                                    </select>
+                                                    <button
+                                                        onclick={() => deleteDraftedField(field.draftIndex)}
+                                                        class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
+                                                        title="Delete field"
+                                                    >
+                                                        <Icon icon="lucide:x" class="w-3 h-3" />
                                                     </button>
                                                 </div>
                                                 <input
                                                     type="text"
-                                                    value={col.description ||
-                                                        ""}
+                                                    value={field.description ?? ''}
                                                     oninput={(e) =>
-                                                        updateEditableColumn(
-                                                            index,
+                                                        updateDraftedField(
+                                                            field.draftIndex,
                                                             {
-                                                                description: (
-                                                                    e.target as HTMLInputElement
-                                                                ).value,
+                                                                description: (e.target as HTMLInputElement).value,
                                                             },
                                                         )}
                                                     class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
                                                     placeholder="Description (optional)"
                                                 />
                                             </div>
-                                        </div>
+                                        {/if}
                                     </div>
-                                {/each}
-                            {:else}
-                                <div
-                                    class="text-center text-gray-400 py-4 text-[10px] italic"
-                                >
-                                    No columns defined
                                 </div>
-                            {/if}
-                        </div>
-
-                        <button
-                            onclick={addEditableColumn}
-                            class="mt-2 w-full text-xs text-primary-600 hover:bg-primary-50 p-1.5 rounded border border-primary-200 transition-colors font-medium flex items-center justify-center gap-1"
-                        >
-                            <Icon icon="lucide:plus" class="w-3 h-3" /> Add Column
-                        </button>
-
-                        {#if schemaState.error}
+                            {/each}
+                        {:else}
                             <div
-                                class="mt-2 p-2 bg-danger-50 border border-danger-200 rounded text-danger-800 text-[10px]"
+                                class="text-center text-gray-400 py-4 text-[10px] italic"
                             >
-                                {schemaState.error}
+                                No fields defined
                             </div>
                         {/if}
+                    </div>
 
-                        <div class="flex gap-2 mt-2">
-                            <button
-                                onclick={saveSchema}
-                                disabled={!schemaState.hasUnsavedChanges || schemaState.isSaving}
-                                class="flex-1 text-[10px] font-medium p-1.5 rounded border transition-colors flex items-center justify-center gap-1"
-                                class:text-primary-600={schemaState.hasUnsavedChanges &&
-                                    !schemaState.isSaving}
-                                class:hover:bg-primary-50={schemaState.hasUnsavedChanges &&
-                                    !schemaState.isSaving}
-                                class:border-primary-200={schemaState.hasUnsavedChanges &&
-                                    !schemaState.isSaving}
-                                class:text-gray-400={!schemaState.hasUnsavedChanges ||
-                                    schemaState.isSaving}
-                                class:border-gray-200={!schemaState.hasUnsavedChanges ||
-                                    schemaState.isSaving}
-                                class:cursor-not-allowed={!schemaState.hasUnsavedChanges ||
-                                    schemaState.isSaving}
-                            >
-                                {#if schemaState.isSaving}
-                                    <Icon
-                                        icon="lucide:loader-2"
-                                        class="w-3 h-3 animate-spin"
-                                    />
-                                    Saving...
-                                {:else}
-                                    <Icon icon="lucide:save" class="w-3 h-3" />
-                                    Save to YAML
-                                {/if}
-                            </button>
-                            <button
-                                class="text-[10px] text-danger-500 hover:bg-danger-50 p-1.5 rounded border border-danger-100 transition-colors font-medium"
-                                onclick={unbind}
-                            >
-                                Unbind
-                            </button>
+                    <button
+                        onclick={addDraftedField}
+                        class="mt-2 w-full text-xs text-primary-600 hover:bg-primary-50 p-1.5 rounded border border-primary-200 transition-colors font-medium flex items-center justify-center gap-1"
+                    >
+                        <Icon icon="lucide:plus" class="w-3 h-3" /> Add Field
+                    </button>
+
+                    {#if schemaState.error}
+                        <div
+                            class="mt-2 p-2 bg-danger-50 border border-danger-200 rounded text-danger-800 text-[10px]"
+                        >
+                            {schemaState.error}
                         </div>
                     {/if}
+
+                    <div class="flex gap-2 mt-2">
+                        <button
+                            class="flex-1 text-[10px] text-danger-500 hover:bg-danger-50 p-1.5 rounded border border-danger-100 transition-colors font-medium"
+                            onclick={unbind}
+                        >
+                            Unbind
+                        </button>
+                    </div>
                 </div>
             {:else}
                 <!-- When not bound to dbt model: show conceptual view OR field editor based on view mode -->
@@ -1685,8 +1585,8 @@
                             class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
                             style={`max-height:${columnPanelHeight}px`}
                         >
-                            {#if draftedFields.length > 0}
-                                {#each draftedFields as field, index}
+                            {#if mergedFields.length > 0}
+                                {#each mergedFields as field (field.name)}
                                     <div
                                         class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
                                         class:bg-blue-50={$draggingField?.nodeId !==
@@ -1696,126 +1596,122 @@
                                         class:ring-blue-300={$draggingField?.nodeId !==
                                             id && $draggingField !== null}
                                         ondragover={onFieldDragOver}
-                                        ondrop={(e) =>
-                                            onFieldDrop(field.name, e)}
+                                        ondrop={(e) => onFieldDrop(field.name, e)}
                                         role="presentation"
                                     >
                                         <div
                                             class="flex gap-1.5 mb-1 items-center"
                                         >
+                                            <!-- Origin indicator -->
                                             <span
-                                                class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
-                                                draggable="true"
-                                                onmousedown={(e) =>
-                                                    e.stopPropagation()}
-                                                onpointerdown={(e) =>
-                                                    e.stopPropagation()}
-                                                ondragstart={(e) =>
-                                                    onFieldDragStart(
-                                                        field.name,
-                                                        e,
-                                                    )}
-                                                ondragend={onFieldDragEnd}
-                                                class:cursor-grabbing={$draggingField?.nodeId ===
-                                                    id &&
-                                                    $draggingField?.fieldName ===
-                                                        field.name}
-                                                title="Drag to link to another field"
-                                                role="presentation"
-                                                aria-hidden="true"
-                                                tabindex="-1"
-                                            >
-                                                <Icon
-                                                    icon="lucide:link"
-                                                    class="w-3 h-3"
-                                                />
-                                            </span>
-                                            <div
-                                                class="flex-1 flex flex-col gap-1"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-1"
+                                                class="inline-block h-2 w-2 rounded-full border border-primary-500 flex-shrink-0"
+                                                class:bg-primary-500={field.origin === 'dbt'}
+                                                data-origin={field.origin}
+                                                aria-label={field.origin === 'dbt'
+                                                    ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
+                                                    : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                title={field.origin === 'dbt'
+                                                    ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
+                                                    : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                role="img"
+                                            ></span>
+
+                                            {#if field.origin === 'dbt'}
+                                                <!-- Read-only row for dbt-sourced columns -->
+                                                <span
+                                                    class="text-gray-400 text-xs select-none w-3 h-3"
+                                                    draggable="true"
+                                                    ondragstart={(e) => onFieldDragStart(field.name, e)}
+                                                    ondragend={onFieldDragEnd}
+                                                    role="presentation"
+                                                    aria-hidden="true"
+                                                    tabindex="-1"
                                                 >
+                                                    <Icon icon="lucide:link" class="w-3 h-3" />
+                                                </span>
+                                                <div class="flex-1 flex flex-col gap-1">
+                                                    <div class="flex items-center gap-1">
+                                                        <span class="flex-1 px-1.5 py-0.5 text-xs font-medium text-gray-700">{field.name}</span>
+                                                        <span class="w-20 px-1 py-0.5 text-[10px] uppercase text-gray-500 font-mono">{field.datatype ?? '—'}</span>
+                                                    </div>
+                                                    {#if field.description}
+                                                        <span class="w-full px-0 text-[10px] text-gray-400">{field.description}</span>
+                                                    {/if}
+                                                </div>
+                                            {:else}
+                                                <!-- Editable row for drafted fields -->
+                                                <span
+                                                    class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
+                                                    draggable="true"
+                                                    onmousedown={(e) => e.stopPropagation()}
+                                                    onpointerdown={(e) => e.stopPropagation()}
+                                                    ondragstart={(e) => onFieldDragStart(field.name, e)}
+                                                    ondragend={onFieldDragEnd}
+                                                    class:cursor-grabbing={$draggingField?.nodeId === id &&
+                                                        $draggingField?.fieldName === field.name}
+                                                    title="Drag to link to another field"
+                                                    role="presentation"
+                                                    aria-hidden="true"
+                                                    tabindex="-1"
+                                                >
+                                                    <Icon icon="lucide:link" class="w-3 h-3" />
+                                                </span>
+                                                <div class="flex-1 flex flex-col gap-1">
+                                                    <div class="flex items-center gap-1">
+                                                        <input
+                                                            type="text"
+                                                            value={field.name}
+                                                            oninput={(e) =>
+                                                                updateDraftedField(
+                                                                    field.draftIndex,
+                                                                    {
+                                                                        name: (e.target as HTMLInputElement).value,
+                                                                    },
+                                                                )}
+                                                            class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                                                            placeholder="field_name"
+                                                        />
+                                                        <select
+                                                            value={field.datatype}
+                                                            onchange={(e) =>
+                                                                updateDraftedField(
+                                                                    field.draftIndex,
+                                                                    {
+                                                                        datatype: (e.target as HTMLSelectElement).value as any,
+                                                                    },
+                                                                )}
+                                                            class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
+                                                        >
+                                                            <option value="text">text</option>
+                                                            <option value="int">int</option>
+                                                            <option value="float">float</option>
+                                                            <option value="bool">bool</option>
+                                                            <option value="date">date</option>
+                                                            <option value="timestamp">timestamp</option>
+                                                        </select>
+                                                        <button
+                                                            onclick={() => deleteDraftedField(field.draftIndex)}
+                                                            class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
+                                                            title="Delete field"
+                                                        >
+                                                            <Icon icon="lucide:x" class="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                     <input
                                                         type="text"
-                                                        value={field.name}
+                                                        value={field.description ?? ''}
                                                         oninput={(e) =>
                                                             updateDraftedField(
-                                                                index,
+                                                                field.draftIndex,
                                                                 {
-                                                                    name: (
-                                                                        e.target as HTMLInputElement
-                                                                    ).value,
+                                                                    description: (e.target as HTMLInputElement).value,
                                                                 },
                                                             )}
-                                                        class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
-                                                        placeholder="field_name"
+                                                        class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
+                                                        placeholder="Description (optional)"
                                                     />
-                                                    <select
-                                                        value={field.datatype}
-                                                        onchange={(e) =>
-                                                            updateDraftedField(
-                                                                index,
-                                                                {
-                                                                    datatype: (
-                                                                        e.target as HTMLSelectElement
-                                                                    )
-                                                                        .value as any,
-                                                                },
-                                                            )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
-                                                    >
-                                                        <option value="text"
-                                                            >text</option
-                                                        >
-                                                        <option value="int"
-                                                            >int</option
-                                                        >
-                                                        <option value="float"
-                                                            >float</option
-                                                        >
-                                                        <option value="bool"
-                                                            >bool</option
-                                                        >
-                                                        <option value="date"
-                                                            >date</option
-                                                        >
-                                                        <option
-                                                            value="timestamp"
-                                                            >timestamp</option
-                                                        >
-                                                    </select>
-                                                    <button
-                                                        onclick={() =>
-                                                            deleteDraftedField(
-                                                                index,
-                                                            )}
-                                                        class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
-                                                        title="Delete field"
-                                                    >
-                                                        <Icon
-                                                            icon="lucide:x"
-                                                            class="w-3 h-3"
-                                                        />
-                                                    </button>
                                                 </div>
-                                                <input
-                                                    type="text"
-                                                    value={field.description ||
-                                                        ""}
-                                                    oninput={(e) =>
-                                                        updateDraftedField(
-                                                            index,
-                                                            {
-                                                                description: (
-                                                                    e.target as HTMLInputElement
-                                                                ).value,
-                                                            },
-                                                        )}
-                                                    class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
-                                                    placeholder="Description (optional)"
-                                                />
-                                            </div>
+                                            {/if}
                                         </div>
                                     </div>
                                 {/each}
@@ -1946,13 +1842,6 @@
         ></div>
     {/if}
 </div>
-
-<UndescribedAttributesWarningModal
-    open={showUndescribedAttributesWarning}
-    attributeNames={undescribedAttributeNames}
-    onConfirm={handleWarningConfirm}
-    onCancel={handleWarningCancel}
-/>
 
 <style>
     .width-resize-handle {

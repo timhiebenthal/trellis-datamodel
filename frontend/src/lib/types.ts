@@ -1,6 +1,7 @@
 export interface DbtColumn {
     name: string;
     type: string;
+    description?: string;
 }
 
 export interface DbtModel {

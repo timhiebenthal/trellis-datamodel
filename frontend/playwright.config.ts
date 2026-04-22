@@ -1,40 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
-import * as fs from 'fs';
 import { fileURLToPath } from 'url';
+import { ensureE2ETrellisConfig, TEST_CONFIG_PATH } from './tests/ensure-e2e-trellis-config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path to test data file (isolated from production data)
-const TEST_DATA_MODEL_PATH = path.resolve(__dirname, 'tests/test_data_model.yml');
-
-// Path to test config file (created by global-setup.ts)
-const TEST_CONFIG_DIR = path.resolve(__dirname, 'tests/.trellis-test');
-const TEST_CONFIG_PATH = path.join(TEST_CONFIG_DIR, 'trellis.yml');
-
-// Ensure the Playwright backend always has a test config before servers start.
-// This mirrors the logic in tests/global-setup.ts so webServer startup never races
-// with config creation (seen as 500s when DATA_MODEL_PATH is empty).
-if (!fs.existsSync(TEST_CONFIG_DIR)) {
-    fs.mkdirSync(TEST_CONFIG_DIR, { recursive: true });
-}
-const TEST_CONFIG_CONTENT = `framework: dbt-core
-dbt_project_path: ${path.resolve(__dirname, '..', 'dbt_concept')}
-data_model_file: ${TEST_DATA_MODEL_PATH}
-modeling_style: dimensional_model
-lineage:
-  enabled: false
-bus_matrix:
-  enabled: true
-
-# Optional: enable other features if needed
-# business_events:
-#   enabled: true
-# exposures:
-#   enabled: true
-`;
-fs.writeFileSync(TEST_CONFIG_PATH, TEST_CONFIG_CONTENT);
+// Run before webServer: Playwright starts webServers before globalSetup, so the backend
+// must see a valid trellis.yml on first boot (see ensure-e2e-trellis-config.ts).
+ensureE2ETrellisConfig();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
