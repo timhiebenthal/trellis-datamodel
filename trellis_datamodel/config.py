@@ -64,17 +64,23 @@ if _TEST_DIR:
     # Test mode: use temp directory paths
     CONFIG_PATH = os.path.join(_TEST_DIR, "config.yml")
     FRAMEWORK: str = os.environ.get("DATAMODEL_FRAMEWORK", "dbt-core")
-    MANIFEST_PATH: str = os.environ.get(
-        "DATAMODEL_MANIFEST_PATH", os.path.join(_TEST_DIR, "manifest.json")
+    _manifest_env = (os.environ.get("DATAMODEL_MANIFEST_PATH") or "").strip()
+    MANIFEST_PATH: str = (
+        _manifest_env if _manifest_env else os.path.join(_TEST_DIR, "manifest.json")
     )
-    CATALOG_PATH: str = os.environ.get(
-        "DATAMODEL_CATALOG_PATH", os.path.join(_TEST_DIR, "catalog.json")
+    _catalog_env = (os.environ.get("DATAMODEL_CATALOG_PATH") or "").strip()
+    CATALOG_PATH: str = (
+        _catalog_env if _catalog_env else os.path.join(_TEST_DIR, "catalog.json")
     )
-    DATA_MODEL_PATH: str = os.environ.get(
-        "DATAMODEL_DATA_MODEL_PATH", os.path.join(_TEST_DIR, "data_model.yml")
+    _data_model_env = (os.environ.get("DATAMODEL_DATA_MODEL_PATH") or "").strip()
+    DATA_MODEL_PATH: str = (
+        _data_model_env if _data_model_env else os.path.join(_TEST_DIR, "data_model.yml")
     )
-    CANVAS_LAYOUT_PATH: str = os.environ.get(
-        "DATAMODEL_CANVAS_LAYOUT_PATH", os.path.join(_TEST_DIR, "canvas_layout.yml")
+    _canvas_layout_env = (os.environ.get("DATAMODEL_CANVAS_LAYOUT_PATH") or "").strip()
+    CANVAS_LAYOUT_PATH: str = (
+        _canvas_layout_env
+        if _canvas_layout_env
+        else os.path.join(_TEST_DIR, "canvas_layout.yml")
     )
     CANVAS_LAYOUT_VERSION_CONTROL: bool = (
         os.environ.get("DATAMODEL_CANVAS_LAYOUT_VERSION_CONTROL", "true").lower()
@@ -184,8 +190,9 @@ def _resolve_data_model_path(
     config_path: str, project_path: str, config: dict[str, Any], existing: str
 ) -> str:
     """Resolve data_model_file unless overridden by environment."""
-    if "DATAMODEL_DATA_MODEL_PATH" in os.environ:
-        return existing
+    env_override = os.environ.get("DATAMODEL_DATA_MODEL_PATH")
+    if env_override and env_override.strip():
+        return os.path.abspath(env_override)
 
     data_model_file = config.get("data_model_file")
     if not data_model_file:
@@ -481,9 +488,11 @@ def load_config(config_path: Optional[str] = None) -> None:
     global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG
 
     # Skip loading config file in test mode (paths already set via environment)
-    # Unless TRELLIS_CONFIG_PATH is explicitly set (for test configs)
-    if os.environ.get("DATAMODEL_TEST_DIR") and not os.environ.get(
-        "TRELLIS_CONFIG_PATH"
+    # unless a config file is explicitly selected (TRELLIS_CONFIG_PATH or CLI --config).
+    if (
+        os.environ.get("DATAMODEL_TEST_DIR")
+        and not os.environ.get("TRELLIS_CONFIG_PATH")
+        and not config_path
     ):
         return
 
