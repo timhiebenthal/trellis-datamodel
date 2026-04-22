@@ -58,6 +58,7 @@ import {
     import Icon from "$lib/components/Icon.svelte";
     import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
+    import { autoPromoteAllNodes } from "$lib/utils/auto-promote-nodes";
     import { 
         getIncompleteEntities, 
         getEntitiesWithUndescribedAttributes,
@@ -556,6 +557,13 @@ import {
                 // Load Manifest
                 const models = await getManifest();
                 $dbtModels = models;
+
+                // Auto-promote drafted fields whose names now appear in the manifest
+                const { nodes: promotedNodes, changed } = autoPromoteAllNodes($nodes, models);
+                if (changed) {
+                    $nodes = promotedNodes;
+                    // The $effect watching $nodes will trigger autoSaveService.save() automatically
+                }
 
                 // Load Data Model
                 const dataModel = await getDataModel();
