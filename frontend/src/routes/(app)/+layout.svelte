@@ -862,7 +862,9 @@ import {
                 <span class="text-xs text-gray-400 animate-pulse ml-2">Saving...</span>
             {/if}
             {#if loading}
-                <span class="text-xs text-primary-500 ml-2">Loading...</span>
+                <span class="text-xs text-primary-500 ml-2" data-testid="app-loading">Loading...</span>
+            {:else}
+                <span data-testid="app-ready" class="sr-only"></span>
             {/if}
         </div>
 

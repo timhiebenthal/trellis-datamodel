@@ -46,6 +46,8 @@ test.describe('Merged dbt + drafted fields', () => {
 
 		await page.goto('/');
 		await page.waitForSelector('[data-testid="canvas-ready"]', { timeout: 25000 });
+		// Wait for manifest + data model to finish loading before switching views
+		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		const nameInput = page.getByPlaceholder('Entity Name').first();
 		await expect(nameInput).toHaveValue('Clean Customer E2E', { timeout: 20000 });
