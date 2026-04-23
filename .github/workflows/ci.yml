@@ -43,12 +43,9 @@ jobs:
         run: cd frontend && npm run test:unit
 
       # dbt_company_dummy/target/ is gitignored; Playwright tests need both manifest + catalog.
-      # dbt docs generate runs the project and writes manifest.json + catalog.json.
+      # Must cd into the project dir so DuckDB resolves data/ paths correctly.
       - name: Generate dbt artifacts for company dummy (E2E tests)
-        run: >
-          uvx --from dbt-duckdb dbt docs generate
-          --project-dir dbt_company_dummy
-          --profiles-dir dbt_company_dummy
+        run: cd dbt_company_dummy && uvx --from dbt-duckdb dbt docs generate --profiles-dir .
 
       - name: Run frontend e2e tests
         run: cd frontend && npm run test:e2e
