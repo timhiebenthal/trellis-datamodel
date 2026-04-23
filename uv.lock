@@ -794,7 +794,7 @@ wheels = [
 
 [[package]]
 name = "trellis-datamodel"
-version = "0.15.0"
+version = "0.15.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
