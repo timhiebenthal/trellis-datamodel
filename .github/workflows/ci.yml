@@ -42,10 +42,13 @@ jobs:
       - name: Run frontend unit tests
         run: cd frontend && npm run test:unit
 
-      # dbt_company_dummy/target/ is gitignored; Playwright tests need both manifest + catalog.
-      # Pass data_path as an absolute path so DuckDB finds the CSV files regardless of cwd.
-      # dbt run materializes models into DuckDB (required for catalog column introspection).
-      # dbt docs generate then writes manifest.json + catalog.json with actual column types.
+      # dbt_company_dummy/data/*.csv is gitignored, so CI must regenerate the mock data
+      # before dbt can materialize anything. Playwright tests need catalog.json (column
+      # types), which only dbt docs generate produces — and that requires a prior dbt run
+      # against the real CSVs.
+      - name: Generate company dummy CSV data
+        run: uv run python dbt_company_dummy/generate_data.py
+
       - name: Generate dbt artifacts for company dummy (E2E tests)
         run: |
           DATA_PATH="$(pwd)/dbt_company_dummy/data"
