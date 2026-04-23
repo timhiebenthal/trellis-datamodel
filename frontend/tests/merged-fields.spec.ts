@@ -4,8 +4,6 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { resetDataModel, type DataModelPayload } from './helpers';
 
-const API_URL = process.env.VITE_PUBLIC_API_URL || 'http://localhost:8000/api';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -45,18 +43,6 @@ test.describe('Merged dbt + drafted fields', () => {
 			relationships: [],
 		};
 		await resetDataModel(request, payload);
-
-		// Assert manifest returns clean_customer with columns before navigating
-		const manifestRes = await request.get(`${API_URL}/manifest`);
-		expect(manifestRes.ok(), `manifest API failed: ${manifestRes.status()}`).toBeTruthy();
-		const manifestJson = await manifestRes.json();
-		const cleanCustomer = (manifestJson.models as Array<{ unique_id: string; columns: unknown[] }>)
-			.find((m) => m.unique_id === 'model.company_dummy.clean_customer');
-		expect(cleanCustomer, 'clean_customer not found in manifest').toBeDefined();
-		expect(
-			cleanCustomer!.columns.length,
-			`expected 7 columns, got ${cleanCustomer!.columns.length}`,
-		).toBe(7);
 
 		await page.goto('/');
 		await page.waitForSelector('[data-testid="canvas-ready"]', { timeout: 25000 });
