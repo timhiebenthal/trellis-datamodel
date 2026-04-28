@@ -137,8 +137,85 @@ describe('entity-grouping', () => {
 
 			const result = groupEntitiesByDomain(entities);
 
-			// Non-Unassigned groups preserve input order
-			expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Zebra', 'Apple', 'Mango']);
+			// Default sort is A-Z
+			expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Apple', 'Mango', 'Zebra']);
+		});
+
+		describe('Name sorting', () => {
+			it('should sort entities A-Z within a named domain group when sortDirection is asc', () => {
+				const entities = [
+					createEntity('1', 'Zebra', 'Sales'),
+					createEntity('2', 'Apple', 'Sales'),
+					createEntity('3', 'Mango', 'Sales'),
+				];
+
+				const result = groupEntitiesByDomain(entities, 'asc');
+
+				expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Apple', 'Mango', 'Zebra']);
+			});
+
+			it('should sort entities Z-A within a named domain group when sortDirection is desc', () => {
+				const entities = [
+					createEntity('1', 'Apple', 'Sales'),
+					createEntity('2', 'Zebra', 'Sales'),
+					createEntity('3', 'Mango', 'Sales'),
+				];
+
+				const result = groupEntitiesByDomain(entities, 'desc');
+
+				expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Zebra', 'Mango', 'Apple']);
+			});
+
+			it('should sort Unassigned group A-Z when sortDirection is asc', () => {
+				const entities = [
+					createEntity('1', 'Zebra'),
+					createEntity('2', 'Apple'),
+					createEntity('3', 'Mango'),
+				];
+
+				const result = groupEntitiesByDomain(entities, 'asc');
+
+				expect(result.get('Unassigned')?.map((e) => e.label)).toEqual(['Apple', 'Mango', 'Zebra']);
+			});
+
+			it('should sort Unassigned group Z-A when sortDirection is desc', () => {
+				const entities = [
+					createEntity('1', 'Apple'),
+					createEntity('2', 'Zebra'),
+					createEntity('3', 'Mango'),
+				];
+
+				const result = groupEntitiesByDomain(entities, 'desc');
+
+				expect(result.get('Unassigned')?.map((e) => e.label)).toEqual(['Zebra', 'Mango', 'Apple']);
+			});
+
+			it('should sort multi-domain entities consistently in each group', () => {
+				const entities = [
+					createEntity('1', 'Zebra', undefined, undefined, ['Sales', 'Marketing']),
+					createEntity('2', 'Apple', undefined, undefined, ['Sales', 'Marketing']),
+					createEntity('3', 'Mango', 'Sales'),
+				];
+
+				const result = groupEntitiesByDomain(entities, 'asc');
+
+				expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Apple', 'Mango', 'Zebra']);
+				expect(result.get('Marketing')?.map((e) => e.label)).toEqual(['Apple', 'Zebra']);
+			});
+
+			it('should sort multiple domain groups consistently', () => {
+				const entities = [
+					createEntity('1', 'Zebra', 'Sales'),
+					createEntity('2', 'Apple', 'Inventory'),
+					createEntity('3', 'Mango', 'Sales'),
+					createEntity('4', 'Banana', 'Inventory'),
+				];
+
+				const result = groupEntitiesByDomain(entities, 'asc');
+
+				expect(result.get('Sales')?.map((e) => e.label)).toEqual(['Mango', 'Zebra']);
+				expect(result.get('Inventory')?.map((e) => e.label)).toEqual(['Apple', 'Banana']);
+			});
 		});
 
 		it('should handle case-sensitive domain names', () => {
