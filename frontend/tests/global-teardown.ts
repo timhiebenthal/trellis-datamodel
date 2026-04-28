@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const TEST_DATA_MODEL_PATH = path.resolve(__dirname, 'test_data_model.yml');
 
 async function globalTeardown() {
     // Clean up temporary test config directory after all tests

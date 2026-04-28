@@ -42,12 +42,18 @@ jobs:
       - name: Run frontend unit tests
         run: cd frontend && npm run test:unit
 
-      # dbt_company_dummy/target/ is gitignored; Playwright lineage tests point at that manifest.
-      - name: Generate dbt manifest for company dummy (E2E lineage)
-        run: >
-          uvx --from dbt-duckdb dbt parse
-          --project-dir dbt_company_dummy
-          --profiles-dir dbt_company_dummy
+      # dbt_company_dummy/data/*.csv is gitignored, so CI must regenerate the mock data
+      # before dbt can materialize anything. Playwright tests need catalog.json (column
+      # types), which only dbt docs generate produces — and that requires a prior dbt run
+      # against the real CSVs.
+      - name: Generate company dummy CSV data
+        run: uv run python dbt_company_dummy/generate_data.py
+
+      - name: Generate dbt artifacts for company dummy (E2E tests)
+        run: |
+          DATA_PATH="$(pwd)/dbt_company_dummy/data"
+          uvx --from dbt-duckdb dbt run --project-dir dbt_company_dummy --profiles-dir dbt_company_dummy --vars "data_path: $DATA_PATH"
+          uvx --from dbt-duckdb dbt docs generate --project-dir dbt_company_dummy --profiles-dir dbt_company_dummy --vars "data_path: $DATA_PATH"
 
       - name: Run frontend e2e tests
         run: cd frontend && npm run test:e2e
