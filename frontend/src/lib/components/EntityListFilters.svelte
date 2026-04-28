@@ -147,8 +147,8 @@
 		}));
 	}
 
-	function toggleGroupByMode(mode: 'domain' | 'type') {
-		entityListFilters.update((filters) => ({ ...filters, groupByMode: mode }));
+	function toggleGroupByEntityType() {
+		entityListFilters.update((filters) => ({ ...filters, groupByEntityType: !filters.groupByEntityType }));
 	}
 
 	// Clear all filters
@@ -160,7 +160,7 @@
 			selectedTags: [],
 			selectedEntityTypes: [],
 			sortDirection: filters.sortDirection,
-			groupByMode: filters.groupByMode,
+			groupByEntityType: filters.groupByEntityType,
 		}));
 	}
 
@@ -399,8 +399,8 @@
 		<label class="flex items-center gap-2 cursor-pointer select-none">
 			<input
 				type="checkbox"
-				checked={$entityListFilters.groupByMode === 'type'}
-				onchange={() => toggleGroupByMode($entityListFilters.groupByMode === 'type' ? 'domain' : 'type')}
+				checked={$entityListFilters.groupByEntityType}
+				onchange={toggleGroupByEntityType}
 				class="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 cursor-pointer"
 			/>
 			<span class="text-xs font-medium text-gray-600">Group by type</span>
