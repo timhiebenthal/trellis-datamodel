@@ -288,7 +288,7 @@ export async function updateModelSchema(
             ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
             : `${API_BASE}/models/${encodedModel}/schema`;
         const res = await fetch(url, {
-            method: 'PUT',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ columns }),
         });

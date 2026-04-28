@@ -71,6 +71,9 @@ def clean_test_files():
     cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
     cfg.Bus_MATRIX_ENABLED = True  # Default to enabled
     cfg.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
+    cfg.DATA_MODEL_PATH = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
+    cfg.CANVAS_LAYOUT_PATH = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
+    cfg.DBT_PROJECT_PATH = _TEST_TEMP_DIR
 
 
 @pytest.fixture
@@ -174,8 +177,11 @@ def test_client(mock_manifest):
         cfg_module.EXPOSURES_ENABLED = False
         cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
         cfg_module.Bus_MATRIX_ENABLED = True
-        # Ensure MANIFEST_PATH is set to the test directory manifest (mock_manifest creates it)
+        # Ensure paths are set to the test directory (reset any contamination from test_config.py etc.)
         cfg_module.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
+        cfg_module.DATA_MODEL_PATH = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
+        cfg_module.CANVAS_LAYOUT_PATH = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
+        cfg_module.DBT_PROJECT_PATH = _TEST_TEMP_DIR
 
         # Reload routes modules to ensure they use the updated config
         routes_modules = [

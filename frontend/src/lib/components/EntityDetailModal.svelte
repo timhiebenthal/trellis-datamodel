@@ -1,8 +1,10 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
-	import { getSourceSystemSuggestions, getBusinessEventProcesses } from '$lib/api';
-	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole } from '$lib/types';
+	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest } from '$lib/api';
+	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn } from '$lib/types';
+	import { mergeFields } from '$lib/utils/merged-fields';
+	import type { MergedField } from '$lib/utils/merged-fields';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
@@ -109,53 +111,44 @@
 		return $nodes.find((n) => n.id === $entityDetailModal.entityId) || null;
 	});
 
-	// Entity attributes (from dbt model or drafted fields)
-	let entityAttributes = $derived.by(() => {
-		if (!currentEntity) return [];
-
-		const data = currentEntity.data as unknown as EntityData;
-		const dbtModelId = data?.dbt_model;
-		const draftedFields = data?.drafted_fields || [];
-
-		// If bound to dbt model, get columns from dbtModels store
-		if (dbtModelId) {
-			const model = $dbtModels.find((m) => m.unique_id === dbtModelId);
-			if (model && model.columns) {
-				return model.columns.map((col) => ({
-					name: col.name,
-					type: col.type || 'unknown',
-					description: '',
-					origin: undefined as string | undefined
-				}));
-			}
-		}
-
-		// Otherwise, show drafted fields
-		return draftedFields.map((field) => ({
-			name: field.name,
-			type: field.datatype || 'unknown',
-			description: field.description || '',
-			origin: field.origin
-		}));
-	});
-
-	// Check if entity is bound to dbt model (attributes are read-only if bound)
+	// Check if entity is bound to dbt model
 	let isBoundEntity = $derived.by(() => {
 		if (!currentEntity) return false;
 		const data = currentEntity.data as unknown as EntityData;
 		return !!data?.dbt_model;
 	});
 
+	// Look up the bound dbt model
+	let boundModel = $derived(
+		currentEntity
+			? $dbtModels.find((m) => m.unique_id === (currentEntity?.data as unknown as EntityData)?.dbt_model) ?? null
+			: null,
+	);
+
 	// Editable drafted fields state
 	let editableDraftedFields = $state<DraftedField[]>([]);
 
-	// Initialize editable drafted fields when modal opens
-	$effect(() => {
-		if ($entityDetailModal.open && currentEntity && !isBoundEntity) {
-			const data = currentEntity.data as unknown as EntityData;
-			editableDraftedFields = [...(data?.drafted_fields || [])];
-		}
-	});
+	// Pending description edits for materialized (dbt) columns — written to schema.yml on save
+	let materializedDescriptionEdits = $state<Map<string, string>>(new Map());
+
+	// Feedback banners for materialize action
+	let materializeWarnings = $state<string[]>([]);
+	let materializeError = $state('');
+
+	// Merged field list: dbt columns first, then drafted fields that don't collide
+	let mergedFields = $derived<MergedField[]>(mergeFields(boundModel?.columns, editableDraftedFields));
+
+	// Export-friendly shape for Excel/Markdown export helpers
+	let entityAttributes = $derived(
+		mergedFields.map((f) => ({
+			name: f.name,
+			type: f.datatype || 'unknown',
+			description: f.origin === 'dbt'
+				? (materializedDescriptionEdits.get(f.name) ?? f.description ?? '')
+				: (f.description ?? ''),
+			origin: f.origin === 'dbt' ? undefined : (editableDraftedFields[f.draftIndex]?.origin),
+		})),
+	);
 
 	function updateDraftedField(index: number, updates: Partial<DraftedField>) {
 		editableDraftedFields = editableDraftedFields.map((field, i) =>
@@ -235,31 +228,47 @@
 		return models;
 	});
 
-	// Initialize form when modal opens
+	// Full form sync only when opening the modal or switching entities — not when
+	// currentEntity gets a new object reference after manifest refresh / autosave
+	// (otherwise materialize banners and in-progress edits are wiped).
+	let lastModalFormEntityId: string | null = null;
 	$effect(() => {
-		if ($entityDetailModal.open && currentEntity) {
-			const data = currentEntity.data as unknown as EntityData;
-			entityName = data.label || '';
-			entityDescription = data.description || '';
-			entityDomains = normalizeDomains(data.domains, data.domain);
-			entityTags = [...(data.tags || [])];
-			entitySourceSystems = [...(data.source_system || [])];
-			entityType = data.entity_type || 'unclassified';
-			annotationType = data.annotation_type;
-			entityRoles = [...((data as any).roles || [])];
-			tagInput = '';
-			domainInput = '';
-			sourceInput = '';
-			roleInput = '';
-			editingRoleName = null;
-			editingRoleValue = '';
-			deletingRoleName = null;
-			sourceSuggestions = [];
-			showSourceSuggestions = false;
-			activeSourceSuggestionIndex = 0;
-			showDeleteConfirm = false;
-			isDirty = false;
+		const open = $entityDetailModal.open;
+		const entity = currentEntity;
+
+		if (!open) {
+			lastModalFormEntityId = null;
+			return;
 		}
+		if (!entity) return;
+		if (lastModalFormEntityId === entity.id) return;
+		lastModalFormEntityId = entity.id;
+
+		const data = entity.data as unknown as EntityData;
+		editableDraftedFields = [...(data?.drafted_fields || [])];
+		entityName = data.label || '';
+		entityDescription = data.description || '';
+		entityDomains = normalizeDomains(data.domains, data.domain);
+		entityTags = [...(data.tags || [])];
+		entitySourceSystems = [...(data.source_system || [])];
+		entityType = data.entity_type || 'unclassified';
+		annotationType = data.annotation_type;
+		entityRoles = [...((data as any).roles || [])];
+		tagInput = '';
+		domainInput = '';
+		sourceInput = '';
+		roleInput = '';
+		editingRoleName = null;
+		editingRoleValue = '';
+		deletingRoleName = null;
+		sourceSuggestions = [];
+		showSourceSuggestions = false;
+		activeSourceSuggestionIndex = 0;
+		showDeleteConfirm = false;
+		isDirty = false;
+		materializedDescriptionEdits = new Map();
+		materializeWarnings = [];
+		materializeError = '';
 	});
 
 	// Load source system suggestions when modal opens
@@ -342,9 +351,9 @@
 			entityType !== (data.entity_type || 'unclassified') ||
 			annotationType !== data.annotation_type ||
 			JSON.stringify(entityRoles.sort()) !== JSON.stringify([...((data as any).roles || [])].sort()) ||
-			(!isBoundEntity &&
-				JSON.stringify(editableDraftedFields) !==
-					JSON.stringify(data?.drafted_fields || []));
+			materializedDescriptionEdits.size > 0 ||
+			JSON.stringify(editableDraftedFields) !==
+				JSON.stringify(data?.drafted_fields || []);
 
 		isDirty = hasChanges;
 	});
@@ -566,7 +575,7 @@
 		deletingRoleName = null;
 	}
 
-	function handleSave() {
+	async function handleSave() {
 		if (!currentEntity || !entityName.trim()) return;
 		if (sourceInput.trim().length > 0) {
 			addSourceSystem();
@@ -594,7 +603,7 @@
 							annotation_type: entityType === 'dimension' ? annotationType : undefined,
 							roles: entityType === 'dimension' && entityRoles.length > 0 ? entityRoles : undefined,
 							drafted_fields:
-								!isBoundEntity && editableDraftedFields.length > 0
+								editableDraftedFields.length > 0
 									? editableDraftedFields
 									: undefined
 						}
@@ -603,6 +612,26 @@
 				return node;
 			});
 		});
+
+		// If any materialized description edits, write them to schema.yml
+		if (isBoundEntity && boundModel && materializedDescriptionEdits.size > 0) {
+			try {
+				const columns: ModelSchemaColumn[] = (boundModel.columns ?? []).map((c) => ({
+					name: c.name,
+					data_type: c.type,
+					description: materializedDescriptionEdits.get(c.name) ?? (c as any).description ?? '',
+				}));
+				await updateModelSchema(boundModel.name, boundModel.version ?? undefined, columns);
+				const models = await getManifest();
+				dbtModels.set(models);
+				materializedDescriptionEdits = new Map();
+			} catch (e: unknown) {
+				const msg = e instanceof Error ? e.message : 'Failed to save descriptions to schema.yml';
+				console.error('Schema update failed:', msg);
+				// Surface the error so the user can retry — do not roll back the canvas save
+				materializeError = msg;
+			}
+		}
 
 		// Push to history for undo/redo
 		pushHistory();
@@ -614,6 +643,39 @@
 
 		// Close modal
 		closeModal();
+	}
+
+	async function materializeDraft(draftIndex: number) {
+		if (!boundModel) return;
+		const draft = editableDraftedFields[draftIndex];
+		if (!draft) return;
+		materializeError = '';
+		try {
+			const columns: ModelSchemaColumn[] = [
+				...(boundModel.columns ?? []).map((c) => ({
+					name: c.name,
+					data_type: c.type,
+					description: (c as any).description ?? '',
+				})),
+				{
+					name: draft.name,
+					data_type: draft.datatype && draft.datatype !== 'unknown' ? draft.datatype : 'text',
+					description: draft.description ?? '',
+				},
+			];
+			await updateModelSchema(boundModel.name, boundModel.version ?? undefined, columns);
+			const warning = `Column '${draft.name}' added to schema.yml. You still need to add it to the SQL in ${boundModel.name}.sql.`;
+			materializeWarnings = materializeWarnings.includes(warning)
+				? materializeWarnings
+				: [...materializeWarnings, warning];
+			// Remove from drafts — it's now materialized in schema.yml
+			editableDraftedFields = editableDraftedFields.filter((_, i) => i !== draftIndex);
+			// Refresh manifest so auto-promotion runs
+			const models = await getManifest();
+			dbtModels.set(models);
+		} catch (e: unknown) {
+			materializeError = e instanceof Error ? e.message : 'Failed to materialize field';
+		}
 	}
 
 	function handleCancel() {
@@ -651,6 +713,16 @@
 	}
 
 
+	// Build legacy attributes shape from mergedFields for export helpers
+	function buildExportAttributes(): Array<{ name: string; type: string; description?: string; origin?: string }> {
+		return mergedFields.map((f) => ({
+			name: f.name,
+			type: f.datatype ?? '',
+			description: f.description ?? '',
+			origin: f.origin === 'dbt' ? (boundModel?.unique_id ?? 'dbt') : 'drafted',
+		}));
+	}
+
 	async function handleExportToExcel() {
 		if (!currentEntity) return;
 
@@ -662,7 +734,7 @@
 			// Call export function with all required data
 			exportEntityToExcel(
 				currentEntity.data as unknown as EntityData,
-				entityAttributes,
+				buildExportAttributes(),
 				$edges,
 				$nodes,
 				entityId,
@@ -685,7 +757,7 @@
 			const entityId = currentEntity.id;
 			const markdown = formatEntityAsMarkdown(
 				currentEntity.data as unknown as EntityData,
-				entityAttributes,
+				buildExportAttributes(),
 				$edges,
 				$nodes,
 				entityId,
@@ -1223,107 +1295,75 @@
 						</div>
 					{/if}
 
-					<!-- Attributes -->
-					{#if isBoundEntity}
-						<!-- Read-only attributes for bound entities -->
-						{#if entityAttributes.length > 0}
-							<div>
-								<label class="block text-sm font-semibold text-gray-700 mb-3">
-									Attributes ({entityAttributes.length}) - Read Only
-								</label>
-								<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
-									<table class="w-full text-sm">
-										<thead class="bg-gray-100">
-											<tr>
-												<th class="px-4 py-2 text-left font-semibold text-gray-700">Name</th>
-												<th class="px-4 py-2 text-left font-semibold text-gray-700">Type</th>
-												<th class="px-4 py-2 text-left font-semibold text-gray-700">Description</th>
-												<th class="px-4 py-2 text-left font-semibold text-gray-700">Origin</th>
-											</tr>
-										</thead>
-										<tbody class="divide-y divide-gray-200">
-											{#each entityAttributes as attr}
-												<tr class="hover:bg-gray-50">
-													<td class="px-4 py-2 font-medium text-gray-900">{attr.name}</td>
-													<td class="px-4 py-2 text-gray-600 font-mono text-xs">{attr.type}</td>
-													<td class="px-4 py-2 text-gray-600">{attr.description || '—'}</td>
-													<td class="px-4 py-2 text-gray-400 font-mono text-xs">{attr.origin || '—'}</td>
-												</tr>
-											{/each}
-										</tbody>
-									</table>
+					<!-- Attributes (merged dbt + drafted) -->
+					<div>
+						<label class="block text-sm font-semibold text-gray-700 mb-3">
+							Attributes ({mergedFields.length})
+							{#if isBoundEntity}<span class="font-normal text-xs text-gray-400 ml-1">— dbt columns are read-only</span>{/if}
+						</label>
+
+						{#if materializeWarnings.length > 0}
+							<div class="mb-3 px-3 py-2 bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-lg flex items-start gap-2">
+								<Icon icon="lucide:alert-triangle" class="w-4 h-4 mt-0.5 shrink-0" />
+								<div class="space-y-1">
+									{#each materializeWarnings as warning}
+										<div>{warning}</div>
+									{/each}
 								</div>
-								<p class="mt-2 text-xs text-gray-500 italic">
-									Attributes are managed in the dbt schema file. Edit them on the canvas in logical
-									view.
-								</p>
+								<button onclick={() => (materializeWarnings = [])} class="ml-auto text-amber-600 hover:text-amber-800" aria-label="Dismiss warning">
+									<Icon icon="lucide:x" class="w-4 h-4" />
+								</button>
 							</div>
 						{/if}
-					{:else}
-						<!-- Editable attributes for unbound entities -->
-						<div>
-							<label class="block text-sm font-semibold text-gray-700 mb-3">
-								Attributes ({editableDraftedFields.length})
-							</label>
-							<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
-								{#if editableDraftedFields.length > 0}
-									<!-- Header row -->
-									<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
-										<div class="col-span-1"></div>
-										<div class="col-span-2">Name</div>
-										<div class="col-span-1">Type</div>
-										<div class="col-span-4">Description</div>
-										<div class="col-span-3">Origin</div>
-										<div class="col-span-1"></div>
-									</div>
-									<!-- Attribute rows -->
-									<div class="divide-y divide-gray-200">
-										{#each editableDraftedFields as field, index}
-											<div class="relative">
-												{#if dropIndex === index && dropPosition === 'before'}
-													<DropIndicator position="before" />
-												{/if}
-												<div
-													class="px-3 py-2 hover:bg-gray-50 group transition-colors"
-													class:opacity-40={dragIndex === index}
-													ondragover={(e) => onAttributeDragOver(index, e)}
-													ondrop={(e) => onAttributeDrop(index, e)}
-												>
-													<div class="grid grid-cols-12 gap-2 items-center">
-													<!-- Drag handle -->
-													<div class="col-span-1 flex justify-center">
-														<span
-															draggable="true"
-															ondragstart={(e) => onAttributeDragStart(index, e)}
-															ondragend={onAttributeDragEnd}
-															class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing hover:text-gray-500"
-															title="Drag to reorder"
-														>
-															<Icon icon="lucide:grip-vertical" class="w-4 h-4" />
-														</span>
-													</div>
-													<!-- Name -->
-													<div class="col-span-2">
+						{#if materializeError}
+							<div class="mb-3 px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg">{materializeError}</div>
+						{/if}
+
+						<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+							{#if mergedFields.length > 0}
+								<!-- Header -->
+								<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
+									<div class="col-span-2">Name</div>
+									<div class="col-span-1">Type</div>
+									<div class="col-span-6">Description</div>
+									<div class="col-span-2">Origin</div>
+									<div class="col-span-1"></div>
+								</div>
+								<div class="divide-y divide-gray-200">
+									{#each mergedFields as field (field.name)}
+										<div
+											class="px-3 py-2 hover:bg-gray-50 group transition-colors"
+											data-testid={`merged-field-row-${field.name}`}
+										>
+											<div class="grid grid-cols-12 gap-2 items-center">
+												<!-- Name -->
+												<div class="col-span-2">
+													{#if field.origin === 'draft'}
 														<input
 															type="text"
 															value={field.name}
-															oninput={(e) =>
-																updateDraftedField(index, {
-																	name: (e.target as HTMLInputElement).value
-																})}
+															oninput={(e) => updateDraftedField(field.draftIndex, { name: (e.target as HTMLInputElement).value })}
 															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
 															placeholder="attribute_name"
 														/>
-													</div>
-													<!-- Type -->
-													<div class="col-span-1">
+													{:else}
+														<input
+															type="text"
+															value={field.name}
+															readonly
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm bg-gray-50 cursor-default"
+															placeholder="attribute_name"
+														/>
+													{/if}
+												</div>
+												<!-- Type -->
+												<div class="col-span-1">
+													{#if field.origin === 'dbt'}
+														<span class="px-1 py-2 text-xs font-mono uppercase text-gray-500">{field.datatype ?? '—'}</span>
+													{:else}
 														<select
 															value={field.datatype}
-															onchange={(e) =>
-																updateDraftedField(index, {
-																	datatype: (e.target as HTMLSelectElement)
-																		.value as any
-																})}
+															onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as any })}
 															class="w-full px-1 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
 														>
 															<option value="text">text</option>
@@ -1333,68 +1373,98 @@
 															<option value="date">date</option>
 															<option value="timestamp">timestamp</option>
 														</select>
-													</div>
-													<!-- Description -->
-													<div class="col-span-4">
+													{/if}
+												</div>
+												<!-- Description (editable for both origins) -->
+												<div class="col-span-6">
+													{#if field.origin === 'dbt'}
 														<input
 															type="text"
-															value={field.description || ''}
-															oninput={(e) =>
-																updateDraftedField(index, {
-																	description: (e.target as HTMLInputElement).value
-																})}
+															value={materializedDescriptionEdits.get(field.name) ?? field.description ?? ''}
+															oninput={(e) => {
+																const map = new Map(materializedDescriptionEdits);
+																map.set(field.name, (e.target as HTMLInputElement).value);
+																materializedDescriptionEdits = map;
+															}}
 															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
 															placeholder="Description (optional)"
 														/>
-													</div>
-													<!-- Origin -->
-													<div class="col-span-3">
+													{:else}
 														<input
 															type="text"
-         													value={field.origin || ''}
-															oninput={(e) =>
-																updateDraftedField(index, {
-																	origin: (e.target as HTMLInputElement).value || undefined
-																})}
+															value={field.description ?? ''}
+															oninput={(e) => updateDraftedField(field.draftIndex, { description: (e.target as HTMLInputElement).value })}
 															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-															placeholder="e.g. source.schema.table.column"
+															placeholder="Description (optional)"
 														/>
-													</div>
-													<!-- Delete button -->
-													<div class="col-span-1 flex justify-end">
+													{/if}
+												</div>
+												<!-- Origin label -->
+												<div class="col-span-2 text-xs text-gray-400 font-mono truncate" title={field.origin === 'dbt' ? 'dbt model' : 'drafted'}>
+													{#if field.origin === 'dbt'}
+														<span
+															class="inline-flex items-center"
+															aria-label={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+															title={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+														>
+															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 text-gray-400 opacity-70" aria-hidden="true" />
+														</span>
+													{:else}
+														<input
+															type="text"
+															value={editableDraftedFields[field.draftIndex]?.origin ?? ''}
+															oninput={(e) => updateDraftedField(field.draftIndex, { origin: (e.target as HTMLInputElement).value })}
+															class="w-full px-2 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+															placeholder="Origin"
+															aria-label={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
+															title={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
+														/>
+													{/if}
+												</div>
+												<!-- Actions -->
+												<div class="col-span-1 flex justify-end gap-1">
+													{#if field.origin === 'draft'}
+														{#if isBoundEntity && boundModel}
+															<button
+																type="button"
+																onclick={() => materializeDraft(field.draftIndex)}
+																class="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded transition-colors"
+																aria-label={`Materialize ${field.name} into ${boundModel.name}'s schema.yml`}
+																title={`Write to ${boundModel.name}'s schema.yml`}
+															>
+																<Icon icon="lucide:arrow-up-to-line" class="w-3.5 h-3.5" />
+															</button>
+														{/if}
 														<button
 															type="button"
-															onclick={() => deleteDraftedField(index)}
+															onclick={() => deleteDraftedField(field.draftIndex)}
 															class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
 															title="Delete attribute"
 														>
 															<Icon icon="lucide:trash-2" class="w-4 h-4" />
 														</button>
-													</div>
+													{/if}
 												</div>
-												</div>
-											{#if dropIndex === index && dropPosition === 'after'}
-												<DropIndicator position="after" />
-											{/if}
 											</div>
-										{/each}
-									</div>
-								{:else}
-									<div class="p-6 text-center text-gray-400 text-sm italic">
-										No attributes defined
-									</div>
-								{/if}
-							</div>
-							<button
-								type="button"
-								onclick={addDraftedField}
-								class="mt-3 w-full px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center justify-center gap-2"
-							>
-								<Icon icon="lucide:plus" class="w-4 h-4" />
-								Add Attribute
-							</button>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<div class="p-6 text-center text-gray-400 text-sm italic">
+									No attributes defined
+								</div>
+							{/if}
 						</div>
-					{/if}
+
+						<button
+							type="button"
+							onclick={addDraftedField}
+							class="mt-3 w-full px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center justify-center gap-2"
+						>
+							<Icon icon="lucide:plus" class="w-4 h-4" />
+							Add Attribute
+						</button>
+					</div>
 
 					<!-- Bound dbt Models (Read-only) -->
 					{#if boundModels.length > 0}

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0b1] - 2026-04-22
+
+### Added
+
+- **Merged dbt + drafted fields**: Bound entities show a single attribute list combining manifest columns and `drafted_fields`, with origin indicators (materialized vs drafted) in the entity detail modal and on the canvas in logical view.
+- **Materialize from modal**: Draft-only rows can be written to the bound model’s `schema.yml` from the entity modal, with a reminder that SQL still needs updating; manifest refresh follows.
+- **Manifest column descriptions in modal**: Edits to materialized column descriptions in the modal are persisted to `schema.yml` on Save when there are pending description overrides.
+- **Silent auto-promotion**: After each manifest reload, drafted fields whose names match a manifest column are removed from the entity’s `drafted_fields` and the canvas auto-saves when changes occur.
+
+### Changed
+
+- **Canvas logical view (bound entities)**: The node chip no longer embeds the full schema.yml column editor (“Save to YAML” / per-column CRUD). Use the entity detail modal for materializing new columns and editing column descriptions; the chip lists merged manifest + draft fields with drag-to-link preserved.
+
+### Fixed
+
+- **Schema save from UI**: The client now POSTs to `/api/models/{model}/schema` (matching the API); using PUT returned 405 and broke Materialize / description saves in the browser.
+- **Playwright + backend boot**: Test `trellis.yml` and dbt artifacts are prepared when `playwright.config.ts` loads, before `webServer` starts (Playwright starts web servers before `globalSetup`, so the previous order could leave `DATA_MODEL_PATH` unset on first request).
+- **Test-mode env overrides**: Under `DATAMODEL_TEST_DIR`, empty-string `DATAMODEL_DATA_MODEL_PATH` / manifest / catalog / canvas env vars are ignored so defaults apply instead of blank paths.
+- **Entity detail modal**: Opening the modal no longer re-initializes the whole form on every `currentEntity` reference change (e.g. after manifest refresh), which had cleared the post-materialize SQL-gap banner immediately.
+
 ## [0.14.8] - 2026-04-20
 
 ### Changed
