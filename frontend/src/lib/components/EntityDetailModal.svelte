@@ -1317,10 +1317,9 @@
 							{#if mergedFields.length > 0}
 								<!-- Header -->
 								<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
-									<div class="col-span-1"></div>
 									<div class="col-span-2">Name</div>
 									<div class="col-span-1">Type</div>
-									<div class="col-span-5">Description</div>
+									<div class="col-span-6">Description</div>
 									<div class="col-span-2">Origin</div>
 									<div class="col-span-1"></div>
 								</div>
@@ -1331,19 +1330,6 @@
 											data-testid={`merged-field-row-${field.name}`}
 										>
 											<div class="grid grid-cols-12 gap-2 items-center">
-												<!-- Origin indicator -->
-												<div class="col-span-1 flex justify-center">
-													<span
-														class="inline-block h-2.5 w-2.5 rounded-full border border-primary-500"
-														class:bg-primary-500={field.origin === 'dbt'}
-														aria-label={field.origin === 'dbt'
-															? `Materialized in dbt model ${boundModel?.name ?? ''}`
-															: `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${boundModel?.name ?? ''}'s schema.yml.`}
-														title={field.origin === 'dbt'
-															? `Materialized in dbt model ${boundModel?.name ?? ''}`
-															: `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${boundModel?.name ?? ''}'s schema.yml.`}
-													></span>
-												</div>
 												<!-- Name -->
 												<div class="col-span-2">
 													{#if field.origin === 'draft'}
@@ -1384,7 +1370,7 @@
 													{/if}
 												</div>
 												<!-- Description (editable for both origins) -->
-												<div class="col-span-5">
+												<div class="col-span-6">
 													{#if field.origin === 'dbt'}
 														<input
 															type="text"
@@ -1408,8 +1394,26 @@
 													{/if}
 												</div>
 												<!-- Origin label -->
-												<div class="col-span-2 text-xs text-gray-400 font-mono truncate" title={field.origin}>
-													{field.origin === 'dbt' ? 'dbt model' : 'drafted'}
+												<div class="col-span-2 text-xs text-gray-400 font-mono truncate" title={field.origin === 'dbt' ? 'dbt model' : 'drafted'}>
+													{#if field.origin === 'dbt'}
+														<span
+															class="inline-flex items-center"
+															aria-label={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+															title={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+														>
+															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 text-gray-400 opacity-70" aria-hidden="true" />
+														</span>
+													{:else}
+														<input
+															type="text"
+															value={editableDraftedFields[field.draftIndex]?.origin ?? ''}
+															oninput={(e) => updateDraftedField(field.draftIndex, { origin: (e.target as HTMLInputElement).value })}
+															class="w-full px-2 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+															placeholder="Origin"
+															aria-label={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
+															title={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
+														/>
+													{/if}
 												</div>
 												<!-- Actions -->
 												<div class="col-span-1 flex justify-end gap-1">
@@ -1419,7 +1423,8 @@
 																type="button"
 																onclick={() => materializeDraft(field.draftIndex)}
 																class="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded transition-colors"
-																title={`Write to ${boundModel.name}'s schema.yml`}
+																aria-label={`Materialize ${field.name} into ${boundModel.name}'s schema.yml`}
+																title={`Materialize this row into ${boundModel.name}'s schema.yml`}
 															>
 																<Icon icon="lucide:arrow-up-to-line" class="w-3.5 h-3.5" />
 															</button>

@@ -38,13 +38,12 @@ describe('mergeFields', () => {
 		expect(result[0].origin).toBe('dbt');
 	});
 
-	it('does not merge when names differ only by case (case-sensitive)', () => {
+	it('omits a draft when its name differs from a dbt column only by case', () => {
 		const dbtCols: DbtColumn[] = [{ name: 'id', type: 'int' }];
 		const drafted: DraftedField[] = [{ name: 'ID', datatype: 'bigint' }];
 		const result = mergeFields(dbtCols, drafted);
-		expect(result).toHaveLength(2);
+		expect(result).toHaveLength(1);
 		expect(result[0]).toMatchObject({ origin: 'dbt', name: 'id' });
-		expect(result[1]).toMatchObject({ origin: 'draft', name: 'ID' });
 	});
 
 	it('draftIndex reflects original index in drafted array after a collision at index 0', () => {

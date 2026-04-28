@@ -10,20 +10,26 @@ export type MergedField =
       draftIndex: number;
     };
 
+function normalizeFieldName(name: string): string {
+  return name.toLowerCase();
+}
+
 export function mergeFields(
   dbtColumns: DbtColumn[] | undefined,
   drafted: DraftedField[] | undefined,
 ): MergedField[] {
-  const dbtNames = new Set((dbtColumns ?? []).map((c) => c.name));
-  const dbtRows: MergedField[] = (dbtColumns ?? []).map((c) => ({
+  const dbtColumnList = dbtColumns ?? [];
+  const draftedList = drafted ?? [];
+  const dbtCanonicalNames = new Set(dbtColumnList.map((c) => normalizeFieldName(c.name)));
+  const dbtRows: MergedField[] = dbtColumnList.map((c) => ({
     origin: 'dbt' as const,
     name: c.name,
     datatype: c.type,
     description: c.description,
   }));
   const draftRows: MergedField[] = [];
-  (drafted ?? []).forEach((d, i) => {
-    if (dbtNames.has(d.name)) return;
+  draftedList.forEach((d, i) => {
+    if (dbtCanonicalNames.has(normalizeFieldName(d.name))) return;
     draftRows.push({
       origin: 'draft' as const,
       name: d.name,

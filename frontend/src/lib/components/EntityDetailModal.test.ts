@@ -88,7 +88,13 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
   it('shows Materialize button on draft rows but not on dbt rows', async () => {
     setupBoundEntityWithDraft();
     await renderModal();
-    const materializeButtons = screen.getAllByTitle(/Write to.*schema\.yml/i);
+    const materializeButtons = screen.getAllByTitle(/Materialize this row into.*schema\.yml/i);
     expect(materializeButtons).toHaveLength(1);
+  });
+
+  it('shows editable origin input for draft rows', async () => {
+    setupBoundEntityWithDraft();
+    await renderModal();
+    expect(screen.getByPlaceholderText('Origin')).toBeInTheDocument();
   });
 });
