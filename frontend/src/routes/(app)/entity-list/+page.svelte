@@ -29,6 +29,7 @@
 					annotation_type: data.annotation_type,
 					source_system: data.source_system,
 					domain: data.domain,
+					domains: data.domains,
 				};
 			});
 	});
