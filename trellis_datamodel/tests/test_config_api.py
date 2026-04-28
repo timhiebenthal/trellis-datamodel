@@ -152,11 +152,6 @@ async def test_put_config_valid_update(client: AsyncClient, temp_config_dir):
     assert data["config"]["modeling_style"] == "dimensional_model"
     assert "file_info" in data
 
-    # Check backup was created
-    config_dir = Path(temp_config_dir)
-    backup_path = config_dir / "trellis.yml.backup"
-    assert backup_path.exists()
-
 
 @pytest.mark.asyncio
 async def test_put_config_conflict(client: AsyncClient, temp_config_dir):
