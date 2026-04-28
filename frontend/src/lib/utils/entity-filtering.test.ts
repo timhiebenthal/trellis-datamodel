@@ -9,7 +9,8 @@ describe('entity-filtering', () => {
 		label: string,
 		domain?: string,
 		tags?: string[],
-		domains?: string[]
+		domains?: string[],
+		entity_type?: 'dimension' | 'fact' | 'unclassified'
 	): Entity => ({
 		id,
 		label,
@@ -17,7 +18,7 @@ describe('entity-filtering', () => {
 		domains,
 		tags,
 		description: '',
-		entity_type: 'dimension',
+		entity_type: entity_type ?? 'dimension',
 		attributes: [],
 	});
 
@@ -513,6 +514,133 @@ describe('entity-filtering', () => {
 				expect(result).toHaveLength(1);
 				expect(result[0].label).toBe('Customer');
 			});
+		});
+	});
+
+	describe('Entity type filtering', () => {
+		it('should return all entities when selectedEntityTypes is empty', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Event', 'Sales', [], [], 'unclassified'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedEntityTypes: [],
+			});
+
+			expect(result).toHaveLength(3);
+		});
+
+		it('should filter entities to dimensions only', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Event', 'Sales', [], [], 'unclassified'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedEntityTypes: ['dimension'],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Customer');
+		});
+
+		it('should filter entities to facts only', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension'),
+				createEntity('2', 'Sales Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Revenue', 'Finance', [], [], 'fact'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedEntityTypes: ['fact'],
+			});
+
+			expect(result).toHaveLength(2);
+			expect(result.map((e) => e.label)).toEqual(['Sales Order', 'Revenue']);
+		});
+
+		it('should filter entities to unclassified only', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Event', 'Sales', [], [], 'unclassified'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedEntityTypes: ['unclassified'],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Event');
+		});
+
+		it('should treat missing entity_type as unclassified', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension'),
+				{ ...createEntity('2', 'Mystery', 'Sales'), entity_type: undefined },
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedEntityTypes: ['unclassified'],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Mystery');
+		});
+
+		it('should use OR logic within selected entity types', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension'),
+				createEntity('2', 'Sales Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Event', 'Sales', [], [], 'unclassified'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedEntityTypes: ['dimension', 'fact'],
+			});
+
+			expect(result).toHaveLength(2);
+			expect(result.map((e) => e.label)).toEqual(['Customer', 'Sales Order']);
+		});
+
+		it('should combine entity type filter with search, domain, and tag filters', () => {
+			const entities = [
+				createEntity('1', 'Customer Master', 'Sales', ['pii'], [], 'dimension'),
+				createEntity('2', 'Customer Order', 'Sales', ['transactional'], [], 'fact'),
+				createEntity('3', 'Product', 'Inventory', ['pii'], [], 'dimension'),
+				createEntity('4', 'Revenue Event', 'Finance', ['pii'], [], 'unclassified'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: 'customer',
+				selectedDomains: ['Sales'],
+				selectedTags: ['pii'],
+				selectedEntityTypes: ['dimension'],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Customer Master');
 		});
 	});
 });
