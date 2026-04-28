@@ -1,13 +1,12 @@
 """
 Config service for managing trellis.yml through the API.
 
-Handles loading, validation, conflict detection, backup, and atomic writes.
+Handles loading, validation, conflict detection, and atomic writes.
 """
 
 import hashlib
 import logging
 import os
-import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -377,23 +376,6 @@ def _validate_paths(config: Dict[str, Any], config_path: str) -> list[str]:
     return messages
 
 
-def _create_backup(config_path: str) -> Optional[str]:
-    """
-    Create a backup of the config file.
-
-    Returns path to backup file or None if backup failed.
-    Uses a single .backup file instead of timestamped backups.
-    """
-    try:
-        backup_path = f"{config_path}.backup"
-
-        shutil.copy2(config_path, backup_path)
-        logger.info(f"Created backup: {backup_path}")
-        return backup_path
-    except Exception as e:
-        logger.error(f"Failed to create backup: {e}")
-        return None
-
 
 def _atomic_write(config_path: str, config: Dict[str, Any]) -> None:
     """
@@ -503,7 +485,7 @@ def save_config(
     expected_hash: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     """
-    Save config with validation, conflict detection, and backup.
+    Save config with validation, conflict detection, and atomic write.
 
     Returns:
         Tuple of (saved_config, conflict_message)
@@ -542,20 +524,7 @@ def save_config(
     if not is_valid:
         raise CustomValidationError(f"Config validation failed: {error_msg}")
 
-    # Create backup before overwrite
-    backup_path = _create_backup(config_path)
-
     # Atomically write config
     _atomic_write(config_path, normalized)
-
-    # Return saved config with new file info
-    file_info = {
-        "path": config_path,
-        "mtime": _get_file_mtime(config_path),
-        "hash": _get_file_hash(config_path),
-    }
-
-    if backup_path:
-        file_info["backup_path"] = backup_path
 
     return normalized, conflict_message

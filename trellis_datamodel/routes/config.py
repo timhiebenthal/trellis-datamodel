@@ -97,10 +97,9 @@ async def get_config_schema():
 @config_router.put("")
 async def update_config(request: ConfigUpdateRequest) -> Dict[str, Any]:
     """
-    Update configuration with validation, conflict detection, and backup.
+    Update configuration with validation, conflict detection, and atomic write.
 
-    Validates the config, checks for conflicts (mtime/hash), creates a backup,
-    and atomically writes the new config.
+    Validates the config, checks for conflicts (mtime/hash), and atomically writes the new config.
 
     If a conflict is detected, returns 409 with conflict details.
     If validation fails, returns 422 with validation errors.
