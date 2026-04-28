@@ -50,7 +50,7 @@
 
 	// Group filtered entities by domain
 	const groupedEntities = $derived.by(() => {
-		return groupEntitiesByDomain(filteredEntities);
+		return groupEntitiesByDomain(filteredEntities, $entityListFilters.sortDirection);
 	});
 
 	// Sort domain groups: named domains alphabetically, then "Unassigned" last
