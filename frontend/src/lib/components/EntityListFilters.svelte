@@ -13,6 +13,7 @@
 
 	let searchTermLocal = $state($entityListFilters.searchTerm);
 	let searchDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
+	let lastSyncedSearchTerm = $entityListFilters.searchTerm;
 
 	// Extract unique domains from entity nodes
 	let allDomains = $derived.by(() => {
@@ -121,20 +122,56 @@
 		exportDataModelToExcel($nodes, $edges, $modelingStyle === 'dimensional_model');
 	}
 
+	function toggleEntityType(type: 'dimension' | 'fact' | 'unclassified') {
+		entityListFilters.update((filters) => {
+			const types = [...filters.selectedEntityTypes];
+			if (types.includes(type)) {
+				return { ...filters, selectedEntityTypes: types.filter((t) => t !== type) };
+			} else {
+				return { ...filters, selectedEntityTypes: [...types, type] };
+			}
+		});
+	}
+
+	function removeEntityType(type: 'dimension' | 'fact' | 'unclassified') {
+		entityListFilters.update((filters) => ({
+			...filters,
+			selectedEntityTypes: filters.selectedEntityTypes.filter((t) => t !== type),
+		}));
+	}
+
+	function toggleSortDirection() {
+		entityListFilters.update((filters) => ({
+			...filters,
+			sortDirection: filters.sortDirection === 'asc' ? 'desc' : 'asc',
+		}));
+	}
+
+	function toggleGroupByEntityType() {
+		entityListFilters.update((filters) => ({ ...filters, groupByEntityType: !filters.groupByEntityType }));
+	}
+
 	// Clear all filters
 	function clearAllFilters() {
 		searchTermLocal = '';
-		entityListFilters.set({
+		entityListFilters.update((filters) => ({
 			searchTerm: '',
 			selectedDomains: [],
 			selectedTags: [],
-		});
+			selectedEntityTypes: [],
+			sortDirection: filters.sortDirection,
+			groupByEntityType: filters.groupByEntityType,
+		}));
 	}
 
 	// Sync local search term when store changes externally
 	$effect(() => {
-		if (searchTermLocal !== $entityListFilters.searchTerm) {
-			searchTermLocal = $entityListFilters.searchTerm;
+		const storeSearchTerm = $entityListFilters.searchTerm;
+		if (storeSearchTerm !== lastSyncedSearchTerm) {
+			lastSyncedSearchTerm = storeSearchTerm;
+			if (searchTermLocal !== storeSearchTerm) {
+				searchTermLocal = storeSearchTerm;
+			}
 		}
 	});
 </script>
@@ -177,7 +214,7 @@
 			</button>
 
 			<!-- Clear Filters Button -->
-			{#if $entityListFilters.searchTerm || $entityListFilters.selectedDomains.length > 0 || $entityListFilters.selectedTags.length > 0}
+			{#if $entityListFilters.searchTerm || $entityListFilters.selectedDomains.length > 0 || $entityListFilters.selectedTags.length > 0 || $entityListFilters.selectedEntityTypes.length > 0}
 				<button
 					type="button"
 					onclick={clearAllFilters}
@@ -307,6 +344,81 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Type Filter -->
+		<div class="flex items-center gap-2">
+			<span class="text-xs font-medium text-gray-600 uppercase">Type:</span>
+
+			<!-- Selected types as chips -->
+			{#if $entityListFilters.selectedEntityTypes.length > 0}
+				<div class="flex flex-wrap gap-1">
+					{#each $entityListFilters.selectedEntityTypes as type}
+						{@const typeLabel = type === 'dimension' ? 'Dimension' : type === 'fact' ? 'Fact' : 'Unclassified'}
+						{@const typeClass = type === 'dimension' ? 'bg-green-100 text-green-700 border-green-200' : type === 'fact' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-300'}
+						<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border {typeClass}">
+							{typeLabel}
+							<button
+								onclick={() => removeEntityType(type)}
+								class="hover:opacity-75 transition-opacity"
+								title="Remove {typeLabel}"
+							>
+								<Icon icon="lucide:x" class="w-3 h-3" />
+							</button>
+						</span>
+					{/each}
+				</div>
+			{/if}
+
+			<!-- Type dropdown -->
+			<div class="relative">
+				<select
+					value=""
+					onchange={(e) => {
+						const val = e.currentTarget.value as 'dimension' | 'fact' | 'unclassified';
+						if (val) {
+							toggleEntityType(val);
+							e.currentTarget.value = '';
+						}
+					}}
+					class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer"
+				>
+					<option value="" disabled selected>
+						{$entityListFilters.selectedEntityTypes.length > 0 ? 'Add type...' : 'All'}
+					</option>
+					<option value="dimension" disabled={$entityListFilters.selectedEntityTypes.includes('dimension')}>Dimension</option>
+					<option value="fact" disabled={$entityListFilters.selectedEntityTypes.includes('fact')}>Fact</option>
+					<option value="unclassified" disabled={$entityListFilters.selectedEntityTypes.includes('unclassified')}>Unclassified</option>
+				</select>
+				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+					<Icon icon="lucide:chevron-down" class="w-3 h-3" />
+				</div>
+			</div>
+		</div>
+
+		<!-- Group By Type Checkbox -->
+		<label class="flex items-center gap-2 cursor-pointer select-none">
+			<input
+				type="checkbox"
+				checked={$entityListFilters.groupByEntityType}
+				onchange={toggleGroupByEntityType}
+				class="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 cursor-pointer"
+			/>
+			<span class="text-xs font-medium text-gray-600">Group by type</span>
+		</label>
+
+		<!-- Sort Direction Toggle -->
+		<div class="flex items-center gap-2">
+			<span class="text-xs font-medium text-gray-600 uppercase">Sort:</span>
+			<button
+				type="button"
+				onclick={toggleSortDirection}
+				class="inline-flex items-center gap-1 px-2 py-1.5 text-xs border border-gray-300 rounded bg-white hover:bg-gray-50 transition-colors font-medium text-gray-700"
+				title="Toggle sort direction"
+			>
+				<Icon icon={$entityListFilters.sortDirection === 'asc' ? 'lucide:arrow-up-a-z' : 'lucide:arrow-down-z-a'} class="w-3.5 h-3.5" />
+				{$entityListFilters.sortDirection === 'asc' ? 'A–Z' : 'Z–A'}
+			</button>
+		</div>
 	</div>
 </div>
 

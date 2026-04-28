@@ -28,12 +28,22 @@ export function filterEntities(
 		searchTerm: string;
 		selectedDomains: string[];
 		selectedTags: string[];
+		selectedEntityTypes?: Array<'dimension' | 'fact' | 'unclassified'>;
 	}
 ): Entity[] {
 	return entities.filter((entity) => {
 		// Filter by search term (case-insensitive substring match on label)
 		if (!matchesSearchTerm(entity.label, filters.searchTerm)) {
 			return false;
+		}
+
+		// Filter by entity type (OR logic within types; if empty, show all)
+		if (filters.selectedEntityTypes && filters.selectedEntityTypes.length > 0) {
+			const effectiveType: 'dimension' | 'fact' | 'unclassified' =
+				entity.entity_type ?? 'unclassified';
+			if (!filters.selectedEntityTypes.includes(effectiveType)) {
+				return false;
+			}
 		}
 
 		// Filter by domains (OR logic: if selectedDomains is empty, show all)

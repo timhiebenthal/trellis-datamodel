@@ -50,7 +50,7 @@
 
 	// Group filtered entities by domain
 	const groupedEntities = $derived.by(() => {
-		return groupEntitiesByDomain(filteredEntities);
+		return groupEntitiesByDomain(filteredEntities, $entityListFilters.sortDirection);
 	});
 
 	// Sort domain groups: named domains alphabetically, then "Unassigned" last
@@ -59,15 +59,34 @@
 		return groups.sort((a, b) => {
 			const [domainA] = a;
 			const [domainB] = b;
-
-			// "Unassigned" always goes last
 			if (domainA === 'Unassigned') return 1;
 			if (domainB === 'Unassigned') return -1;
-
-			// Otherwise sort alphabetically
 			return domainA.localeCompare(domainB);
 		});
 	});
+
+	// Collapse state for type sub-groups keyed as "domain::typeName"
+	let typeGroupCollapseState = $state<Record<string, boolean>>({});
+
+	function isTypeGroupExpanded(domain: string, typeName: string): boolean {
+		return typeGroupCollapseState[`${domain}::${typeName}`] !== false;
+	}
+
+	function toggleTypeGroupCollapse(domain: string, typeName: string) {
+		typeGroupCollapseState[`${domain}::${typeName}`] = !isTypeGroupExpanded(domain, typeName);
+	}
+
+	// Sub-group entities by type within a domain group (only non-empty groups)
+	function subGroupByType(entities: Entity[]): Array<[string, Entity[]]> {
+		const dims = entities.filter((e) => (e.entity_type ?? 'unclassified') === 'dimension');
+		const facts = entities.filter((e) => (e.entity_type ?? 'unclassified') === 'fact');
+		const unclassified = entities.filter((e) => (e.entity_type ?? 'unclassified') === 'unclassified');
+		const result: Array<[string, Entity[]]> = [];
+		if (dims.length) result.push(['Dimensions', dims]);
+		if (facts.length) result.push(['Facts', facts]);
+		if (unclassified.length) result.push(['Unclassified', unclassified]);
+		return result;
+	}
 
 	// Selection mode is active when any entities are selected
 	const selectionMode = $derived($entitySelection.size > 0);
@@ -255,9 +274,33 @@
 					<!-- Domain Entities (collapsible) -->
 					{#if isDomainExpanded(domain)}
 						<div class="bg-white border-b border-gray-200 overflow-hidden">
-							{#each domainEntities as entity (entity.id)}
-								<EntityRow {entity} />
-							{/each}
+							{#if $entityListFilters.groupByEntityType}
+								{#each subGroupByType(domainEntities) as [typeName, typeEntities]}
+									<button
+										onclick={() => toggleTypeGroupCollapse(domain, typeName)}
+										class="w-full flex items-center gap-2 px-4 py-1.5 bg-gray-50 border-b border-gray-100 hover:bg-gray-100 transition-colors group"
+									>
+										<CollapseChevron expanded={isTypeGroupExpanded(domain, typeName)} sizeClass="w-3 h-3" />
+										<Icon
+											icon={typeName === 'Dimensions' ? 'lucide:list' : typeName === 'Facts' ? 'lucide:bar-chart-3' : 'lucide:circle-dashed'}
+											class="w-3 h-3 {typeName === 'Dimensions' ? 'text-green-600' : typeName === 'Facts' ? 'text-blue-600' : 'text-gray-400'}"
+										/>
+										<span class="text-xs font-semibold uppercase tracking-wide {typeName === 'Dimensions' ? 'text-green-700' : typeName === 'Facts' ? 'text-blue-700' : 'text-gray-500'}">
+											{typeName}
+										</span>
+										<span class="text-xs text-gray-400 ml-1">({typeEntities.length})</span>
+									</button>
+									{#if isTypeGroupExpanded(domain, typeName)}
+										{#each typeEntities as entity (entity.id)}
+											<EntityRow {entity} />
+										{/each}
+									{/if}
+								{/each}
+							{:else}
+								{#each domainEntities as entity (entity.id)}
+									<EntityRow {entity} />
+								{/each}
+							{/if}
 						</div>
 					{/if}
 				</div>

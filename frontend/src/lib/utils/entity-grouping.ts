@@ -1,14 +1,17 @@
 import type { Entity } from '$lib/types';
 
+export type SortDirection = 'asc' | 'desc';
+
 /**
  * Group entities by their domain field(s)
  * Entities without domains go into "Unassigned" group
- * "Unassigned" entities are sorted alphabetically by label
+ * All groups are sorted by label according to sortDirection (default 'asc')
  *
  * @param entities - Array of entities to group
+ * @param sortDirection - Sort direction for entities within each group
  * @returns Map with domain keys and entity arrays as values
  */
-export function groupEntitiesByDomain(entities: Entity[]): Map<string, Entity[]> {
+export function groupEntitiesByDomain(entities: Entity[], sortDirection: SortDirection = 'asc'): Map<string, Entity[]> {
 	const groupMap = new Map<string, Entity[]>();
 
 	function getDomainsForGrouping(entity: Entity): string[] {
@@ -35,7 +38,7 @@ export function groupEntitiesByDomain(entities: Entity[]): Map<string, Entity[]>
 		});
 	});
 
-	// De-duplicate within groups (multi-domain can add the same entity multiple times)
+	// De-duplicate and sort every group by label
 	groupMap.forEach((group, key) => {
 		const uniqueMap = new Map<string, Entity>();
 		group.forEach((entity) => {
@@ -43,16 +46,58 @@ export function groupEntitiesByDomain(entities: Entity[]): Map<string, Entity[]>
 				uniqueMap.set(entity.id, entity);
 			}
 		});
-		groupMap.set(key, Array.from(uniqueMap.values()));
+		const sorted = Array.from(uniqueMap.values()).sort((a, b) => {
+			const cmp = a.label.localeCompare(b.label);
+			return sortDirection === 'desc' ? -cmp : cmp;
+		});
+		groupMap.set(key, sorted);
 	});
 
-	// Sort "Unassigned" group alphabetically by label
-	if (groupMap.has('Unassigned')) {
-		const unassignedGroup = groupMap.get('Unassigned')!;
-		unassignedGroup.sort((a, b) => a.label.localeCompare(b.label));
-	}
-
 	return groupMap;
+}
+
+const TYPE_GROUP_ORDER = ['Dimensions', 'Facts', 'Unclassified'] as const;
+const TYPE_GROUP_LABELS: Record<string, string> = {
+	dimension: 'Dimensions',
+	fact: 'Facts',
+	unclassified: 'Unclassified',
+};
+
+/**
+ * Group entities by their entity_type (Dimensions / Facts / Unclassified)
+ * Entities with missing entity_type go into "Unclassified"
+ * Groups appear in order: Dimensions, Facts, Unclassified (empty groups omitted)
+ *
+ * @param entities - Array of entities to group
+ * @param sortDirection - Sort direction for entities within each group
+ * @returns Map with type-group keys and entity arrays as values
+ */
+export function groupEntitiesByType(entities: Entity[], sortDirection: SortDirection = 'asc'): Map<string, Entity[]> {
+	const groupMap = new Map<string, Entity[]>();
+
+	entities.forEach((entity) => {
+		const key = TYPE_GROUP_LABELS[entity.entity_type ?? 'unclassified'] ?? 'Unclassified';
+		if (!groupMap.has(key)) {
+			groupMap.set(key, []);
+		}
+		groupMap.get(key)!.push(entity);
+	});
+
+	// Sort each group by label
+	groupMap.forEach((group, key) => {
+		const sorted = [...group].sort((a, b) => {
+			const cmp = a.label.localeCompare(b.label);
+			return sortDirection === 'desc' ? -cmp : cmp;
+		});
+		groupMap.set(key, sorted);
+	});
+
+	// Return in canonical order (Dimensions → Facts → Unclassified)
+	const ordered = new Map<string, Entity[]>();
+	TYPE_GROUP_ORDER.forEach((key) => {
+		if (groupMap.has(key)) ordered.set(key, groupMap.get(key)!);
+	});
+	return ordered;
 }
 
 /**
