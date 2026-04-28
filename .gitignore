@@ -1,5 +1,8 @@
 backend/backend.log
 dbt_company_dummy/data/*
+dbt_demo/
+dbt_company_dummy_entity/
+dbt_company_dummy_kimball/
 dbt_built/logs/dbt.log
 dbt_built/.user.yml
 dbt_built/nba.duckdb
