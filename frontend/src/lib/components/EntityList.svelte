@@ -65,6 +65,17 @@
 		});
 	});
 
+	// Collapse state for type sub-groups keyed as "domain::typeName"
+	let typeGroupCollapseState = $state<Record<string, boolean>>({});
+
+	function isTypeGroupExpanded(domain: string, typeName: string): boolean {
+		return typeGroupCollapseState[`${domain}::${typeName}`] !== false;
+	}
+
+	function toggleTypeGroupCollapse(domain: string, typeName: string) {
+		typeGroupCollapseState[`${domain}::${typeName}`] = !isTypeGroupExpanded(domain, typeName);
+	}
+
 	// Sub-group entities by type within a domain group (only non-empty groups)
 	function subGroupByType(entities: Entity[]): Array<[string, Entity[]]> {
 		const dims = entities.filter((e) => (e.entity_type ?? 'unclassified') === 'dimension');
@@ -265,7 +276,11 @@
 						<div class="bg-white border-b border-gray-200 overflow-hidden">
 							{#if $entityListFilters.groupByEntityType}
 								{#each subGroupByType(domainEntities) as [typeName, typeEntities]}
-									<div class="flex items-center gap-2 px-4 py-1.5 bg-gray-50 border-b border-gray-100">
+									<button
+										onclick={() => toggleTypeGroupCollapse(domain, typeName)}
+										class="w-full flex items-center gap-2 px-4 py-1.5 bg-gray-50 border-b border-gray-100 hover:bg-gray-100 transition-colors group"
+									>
+										<CollapseChevron expanded={isTypeGroupExpanded(domain, typeName)} sizeClass="w-3 h-3" />
 										<Icon
 											icon={typeName === 'Dimensions' ? 'lucide:list' : typeName === 'Facts' ? 'lucide:bar-chart-3' : 'lucide:circle-dashed'}
 											class="w-3 h-3 {typeName === 'Dimensions' ? 'text-green-600' : typeName === 'Facts' ? 'text-blue-600' : 'text-gray-400'}"
@@ -274,10 +289,12 @@
 											{typeName}
 										</span>
 										<span class="text-xs text-gray-400 ml-1">({typeEntities.length})</span>
-									</div>
-									{#each typeEntities as entity (entity.id)}
-										<EntityRow {entity} />
-									{/each}
+									</button>
+									{#if isTypeGroupExpanded(domain, typeName)}
+										{#each typeEntities as entity (entity.id)}
+											<EntityRow {entity} />
+										{/each}
+									{/if}
 								{/each}
 							{:else}
 								{#each domainEntities as entity (entity.id)}
