@@ -90,25 +90,20 @@ class TestBusMatrixEndpoint:
         assert isinstance(result["connections"], list)
 
     def test_identifies_dimensions(self, sample_data_model, enable_bus_matrix):
-        """Test that dimensions are correctly identified."""
+        """Test that only entities with entity_type == 'dimension' are returned."""
         result = get_bus_matrix()
 
-        # Should return entities with entity_type == "dimension" in dimensions array
         dimension_ids = {d["id"] for d in result["dimensions"]}
-        assert "dim_customer" in dimension_ids
-        assert "dim_product" in dimension_ids
-        assert "dim_date" in dimension_ids
-        assert len(result["dimensions"]) == 4
+        assert dimension_ids == {"dim_customer", "dim_product", "dim_date"}
+        assert len(result["dimensions"]) == 3
 
     def test_identifies_facts(self, sample_data_model, enable_bus_matrix):
-        """Test that facts are correctly identified."""
+        """Test that only entities with entity_type == 'fact' are returned."""
         result = get_bus_matrix()
 
-        # Should return entities with entity_type == "fact" in facts array
         fact_ids = {f["id"] for f in result["facts"]}
-        assert "fct_orders" in fact_ids
-        assert "fct_sales" in fact_ids
-        assert len(result["facts"]) == 3
+        assert fact_ids == {"fct_orders", "fct_sales"}
+        assert len(result["facts"]) == 2
 
     def test_detects_connections(self, sample_data_model, enable_bus_matrix):
         """Test correct connection detection."""
@@ -221,7 +216,7 @@ class TestBusMatrixEndpoint:
         assert result["connections"] == []
 
     def test_no_dimensions_or_facts(self, temp_data_model_path, enable_bus_matrix, monkeypatch):
-        """Test when no entities have entity_type set."""
+        """Test that unclassified-only data model returns empty dimensions and facts."""
         # Create data model with only unclassified entities
         data = {
             "version": 0.1,
@@ -246,11 +241,8 @@ class TestBusMatrixEndpoint:
 
         result = get_bus_matrix()
 
-        # Note: Based on the code, unclassified entities ARE included
-        # The code filters for entity_type in ["dimension", "unclassified"] and ["fact", "unclassified"]
-        # So we expect unclassified entities to appear in BOTH dimensions and facts
-        assert len(result["dimensions"]) == 2
-        assert len(result["facts"]) == 2
+        assert result["dimensions"] == []
+        assert result["facts"] == []
 
     def test_reverse_direction_connections(self, temp_data_model_path, enable_bus_matrix, monkeypatch):
         """Test connections work regardless of direction."""
@@ -290,18 +282,14 @@ class TestBusMatrixEndpoint:
         assert result2["connections"][0]["fact_id"] == "fct_b"
 
     def test_unclassified_entities_ignored(self, sample_data_model, enable_bus_matrix):
-        """Test unclassified entities don't appear in matrix when dimensions/facts present."""
+        """Test that unclassified entities are excluded from Bus Matrix dimensions and facts."""
         result = get_bus_matrix()
 
-        # Note: Based on the actual implementation, unclassified entities ARE included
-        # The code explicitly includes entity_type "unclassified" in both dimensions and facts
-        # This test verifies that behavior
-        all_entity_ids = {e["id"] for e in result["dimensions"]} | {
-            e["id"] for e in result["facts"]
-        }
+        dimension_ids = {d["id"] for d in result["dimensions"]}
+        fact_ids = {f["id"] for f in result["facts"]}
 
-        # The unclassified entity should appear since the code includes it
-        assert "unclassified_entity" in all_entity_ids
+        assert "unclassified_entity" not in dimension_ids
+        assert "unclassified_entity" not in fact_ids
 
     def test_connections_only_between_dimension_and_fact(self, sample_data_model, enable_bus_matrix):
         """Test only dimension-fact connections included."""

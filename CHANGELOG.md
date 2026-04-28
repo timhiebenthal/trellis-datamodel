@@ -17,10 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Materialize from modal**: Draft-only rows can be written to the bound model’s `schema.yml` from the entity modal, with a reminder that SQL still needs updating; manifest refresh follows.
 - **Manifest column descriptions in modal**: Edits to materialized column descriptions in the modal are persisted to `schema.yml` on Save when there are pending description overrides.
 - **Silent auto-promotion**: After each manifest reload, drafted fields whose names match a manifest column are removed from the entity’s `drafted_fields` and the canvas auto-saves when changes occur.
+- **Bus Matrix usage counts**: Each dimension label now shows a green badge with the number of currently-visible facts it connects to; each fact column header shows a blue badge with the number of currently-visible dimensions. Counts update as filters change.
+- **Bus Matrix sort controls**: Two sort selects let users order dimensions and facts independently by display label (A-Z) or by visible connection count (descending).
+- **Bus Matrix full-matrix export**: An "Export full matrix" button downloads `trellis-bus-matrix.xlsx` — a workbook with a `Matrix` sheet (dimensions as rows, facts as columns) and a `Longlist` sheet (every dimension-fact pair with `TRUE`/`FALSE` linked values). Export always uses the complete unfiltered dataset regardless of active UI filters.
 
 ### Changed
 
 - **Canvas logical view (bound entities)**: The node chip no longer embeds the full schema.yml column editor (“Save to YAML” / per-column CRUD). Use the entity detail modal for materializing new columns and editing column descriptions; the chip lists merged manifest + draft fields with drag-to-link preserved.
+- **Bus Matrix strict classification**: The Bus Matrix now includes only entities with `entity_type: dimension` or `entity_type: fact`; `unclassified` entities no longer appear as rows or columns.
 
 ### Fixed
 

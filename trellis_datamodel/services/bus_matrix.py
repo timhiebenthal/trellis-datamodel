@@ -66,11 +66,8 @@ def get_bus_matrix(
     entities = data_model.get("entities", [])
     relationships = data_model.get("relationships", [])
 
-    # Filter dimensions and facts - include unclassified entities for now
-    dimensions = [
-        e for e in entities if e.get("entity_type") in ["dimension", "unclassified"]
-    ]
-    facts = [e for e in entities if e.get("entity_type") in ["fact", "unclassified"]]
+    dimensions = [e for e in entities if e.get("entity_type") == "dimension"]
+    facts = [e for e in entities if e.get("entity_type") == "fact"]
 
     # Apply tag filter if specified
     if tag:
