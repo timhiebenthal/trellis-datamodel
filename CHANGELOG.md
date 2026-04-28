@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bus Matrix usage counts**: Each dimension label now shows a green badge with the number of currently-visible facts it connects to; each fact column header shows a blue badge with the number of currently-visible dimensions. Counts update as filters change.
 - **Bus Matrix sort controls**: Two sort selects let users order dimensions and facts independently by display label (A-Z) or by visible connection count (descending).
 - **Bus Matrix full-matrix export**: An "Export full matrix" button downloads `trellis-bus-matrix.xlsx` — a workbook with a `Matrix` sheet (dimensions as rows, facts as columns) and a `Longlist` sheet (every dimension-fact pair with `TRUE`/`FALSE` linked values). Export always uses the complete unfiltered dataset regardless of active UI filters.
+- **Entity List type filter**: The Entity List toolbar now has a compact Type filter (Dimension, Fact, Unclassified) with colored chips matching the existing Domain and Tag filter style. Type filters compose with search, domain, and tag filters using AND semantics; multiple selected types use OR logic within the group.
+- **Entity List name sort**: A visible A–Z / Z–A sort toggle in the filters toolbar controls entity ordering within every domain group. Clearing filters resets search, domains, tags, and type selection while preserving the chosen sort direction.
 
 ### Changed
 
