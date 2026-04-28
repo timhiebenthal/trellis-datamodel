@@ -90,7 +90,7 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
   it('shows Materialize button on draft rows but not on dbt rows', async () => {
     setupBoundEntityWithDraft();
     await renderModal();
-    const materializeButtons = screen.getAllByTitle(/Materialize this row into.*schema\.yml/i);
+    const materializeButtons = screen.getAllByTitle(/Write to.*schema.yml/i);
     expect(materializeButtons).toHaveLength(1);
   });
 
@@ -100,15 +100,15 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     expect(screen.getByPlaceholderText('Origin')).toBeInTheDocument();
   });
 
-  it('keeps a materialized draft visible until dbt artifacts expose it as a dbt column', async () => {
+  it('removes draft from list after materializing and shows SQL-gap warning', async () => {
     setupBoundEntityWithDraft();
     await renderModal();
 
-    await fireEvent.click(screen.getByTitle(/Materialize this row into.*schema\.yml/i));
+    await fireEvent.click(screen.getByTitle(/Write to.*schema.yml/i));
 
     await waitFor(() => {
       expect(updateModelSchema).toHaveBeenCalled();
-      expect(screen.getByDisplayValue('pending_col')).toBeInTheDocument();
+      expect(screen.queryByDisplayValue('pending_col')).not.toBeInTheDocument();
       expect(screen.getByText(/Column 'pending_col' added to schema\.yml/i)).toBeInTheDocument();
     });
   });
