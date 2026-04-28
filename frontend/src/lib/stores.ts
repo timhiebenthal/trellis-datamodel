@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import type { Node, Edge } from '@xyflow/svelte';
-import type { DbtModel, FieldDragState } from './types';
+import type { DbtModel, EntityListFilters, FieldDragState } from './types';
 
 /**
  * Deep clone that handles Svelte 5 Proxy objects (which structuredClone cannot clone).
@@ -53,11 +53,13 @@ export const bulkEditModal = writable<{
 }>({ open: false, selectedEntityIds: [] });
 
 // Filter state
-export const entityListFilters = writable<{
-	searchTerm: string;
-	selectedDomains: string[];
-	selectedTags: string[];
-}>({ searchTerm: '', selectedDomains: [], selectedTags: [] });
+export const entityListFilters = writable<EntityListFilters>({
+	searchTerm: '',
+	selectedDomains: [],
+	selectedTags: [],
+	selectedEntityTypes: [],
+	sortDirection: 'asc',
+});
 
 // Bulk selection
 export const entitySelection = writable<Set<string>>(new Set());
