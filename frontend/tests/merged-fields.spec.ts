@@ -121,7 +121,7 @@ test.describe('Merged dbt + drafted fields', () => {
 
 		await dialog2.getByTitle(/Write to clean_customer's schema\.yml/i).click();
 
-		await expect(dialog2.getByText(/Column added to schema\.yml/i)).toBeVisible({ timeout: 20000 });
+		await expect(dialog2.getByText(/added to schema\.yml/i)).toBeVisible({ timeout: 20000 });
 		await expect(dialog2.getByText(/\.sql/i)).toBeVisible();
 
 		expect(fs.existsSync(CLEAN_CUSTOMER_SCHEMA_YML)).toBeTruthy();

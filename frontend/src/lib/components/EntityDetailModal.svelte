@@ -668,6 +668,8 @@
 			materializeWarnings = materializeWarnings.includes(warning)
 				? materializeWarnings
 				: [...materializeWarnings, warning];
+			// Remove from drafts — it's now materialized in schema.yml
+			editableDraftedFields = editableDraftedFields.filter((_, i) => i !== draftIndex);
 			// Refresh manifest so auto-promotion runs
 			const models = await getManifest();
 			dbtModels.set(models);
