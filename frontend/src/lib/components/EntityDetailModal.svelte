@@ -1428,7 +1428,7 @@
 																onclick={() => materializeDraft(field.draftIndex)}
 																class="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded transition-colors"
 																aria-label={`Materialize ${field.name} into ${boundModel.name}'s schema.yml`}
-																title={`Materialize this row into ${boundModel.name}'s schema.yml`}
+																title={`Write to ${boundModel.name}'s schema.yml`}
 															>
 																<Icon icon="lucide:arrow-up-to-line" class="w-3.5 h-3.5" />
 															</button>
