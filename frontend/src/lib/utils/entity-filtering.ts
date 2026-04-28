@@ -31,7 +31,7 @@ export function filterEntities(
 		selectedEntityTypes?: Array<'dimension' | 'fact' | 'unclassified'>;
 	}
 ): Entity[] {
-	return entities.filter((entity) => {
+	const result = entities.filter((entity) => {
 		// Filter by search term (case-insensitive substring match on label)
 		if (!matchesSearchTerm(entity.label, filters.searchTerm)) {
 			return false;
@@ -72,4 +72,6 @@ export function filterEntities(
 
 		return true;
 	});
+
+	return result;
 }

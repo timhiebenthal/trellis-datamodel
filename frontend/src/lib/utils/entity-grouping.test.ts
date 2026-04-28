@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupEntitiesByDomain, groupEntitiesByTag } from './entity-grouping';
+import { groupEntitiesByDomain, groupEntitiesByTag, groupEntitiesByType } from './entity-grouping';
 import type { Entity } from '$lib/types';
 
 describe('entity-grouping', () => {
@@ -495,6 +495,90 @@ describe('entity-grouping', () => {
 			expect(result.get('tag-a')?.map((e) => e.label)).toEqual(['Apple', 'Zebra']);
 			// tag-b should have Mango and Zebra (alphabetical)
 			expect(result.get('tag-b')?.map((e) => e.label)).toEqual(['Mango', 'Zebra']);
+		});
+	});
+
+	describe('groupEntitiesByType', () => {
+		const createTypedEntity = (
+			id: string,
+			label: string,
+			entity_type?: 'dimension' | 'fact' | 'unclassified'
+		): Entity => ({
+			id,
+			label,
+			description: '',
+			entity_type,
+			attributes: [],
+		});
+
+		it('should group entities into Dimensions, Facts, and Unclassified', () => {
+			const entities = [
+				createTypedEntity('1', 'Customer', 'dimension'),
+				createTypedEntity('2', 'Sales Order', 'fact'),
+				createTypedEntity('3', 'Event', 'unclassified'),
+			];
+
+			const result = groupEntitiesByType(entities);
+
+			expect(result.size).toBe(3);
+			expect(result.get('Dimensions')).toHaveLength(1);
+			expect(result.get('Facts')).toHaveLength(1);
+			expect(result.get('Unclassified')).toHaveLength(1);
+		});
+
+		it('should treat missing entity_type as Unclassified', () => {
+			const entities = [
+				createTypedEntity('1', 'Customer', 'dimension'),
+				{ ...createTypedEntity('2', 'Mystery'), entity_type: undefined },
+			];
+
+			const result = groupEntitiesByType(entities);
+
+			expect(result.get('Unclassified')).toHaveLength(1);
+			expect(result.get('Unclassified')?.[0].label).toBe('Mystery');
+		});
+
+		it('should sort entities A-Z within each type group by default', () => {
+			const entities = [
+				createTypedEntity('1', 'Zebra', 'dimension'),
+				createTypedEntity('2', 'Apple', 'dimension'),
+				createTypedEntity('3', 'Mango', 'dimension'),
+			];
+
+			const result = groupEntitiesByType(entities);
+
+			expect(result.get('Dimensions')?.map((e) => e.label)).toEqual(['Apple', 'Mango', 'Zebra']);
+		});
+
+		it('should sort entities Z-A within each type group when sortDirection is desc', () => {
+			const entities = [
+				createTypedEntity('1', 'Apple', 'fact'),
+				createTypedEntity('2', 'Zebra', 'fact'),
+				createTypedEntity('3', 'Mango', 'fact'),
+			];
+
+			const result = groupEntitiesByType(entities, 'desc');
+
+			expect(result.get('Facts')?.map((e) => e.label)).toEqual(['Zebra', 'Mango', 'Apple']);
+		});
+
+		it('should return only non-empty groups', () => {
+			const entities = [
+				createTypedEntity('1', 'Customer', 'dimension'),
+				createTypedEntity('2', 'Order', 'dimension'),
+			];
+
+			const result = groupEntitiesByType(entities);
+
+			expect(result.size).toBe(1);
+			expect(result.has('Dimensions')).toBe(true);
+			expect(result.has('Facts')).toBe(false);
+			expect(result.has('Unclassified')).toBe(false);
+		});
+
+		it('should handle empty entities array', () => {
+			const result = groupEntitiesByType([]);
+			expect(result.size).toBe(0);
 		});
 	});
 });

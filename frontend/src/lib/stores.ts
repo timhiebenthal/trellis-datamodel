@@ -59,6 +59,7 @@ export const entityListFilters = writable<EntityListFilters>({
 	selectedTags: [],
 	selectedEntityTypes: [],
 	sortDirection: 'asc',
+	groupByMode: 'domain',
 });
 
 // Bulk selection

@@ -464,6 +464,7 @@ export interface EntityListFilters {
     selectedTags: string[];
     selectedEntityTypes: Array<'dimension' | 'fact' | 'unclassified'>;
     sortDirection: 'asc' | 'desc';
+    groupByMode: 'domain' | 'type';
 }
 
 export interface EntityDetailModalState {
