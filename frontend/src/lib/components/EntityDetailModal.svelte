@@ -132,7 +132,7 @@
 	let materializedDescriptionEdits = $state<Map<string, string>>(new Map());
 
 	// Feedback banners for materialize action
-	let materializeWarning = $state('');
+	let materializeWarnings = $state<string[]>([]);
 	let materializeError = $state('');
 
 	// Merged field list: dbt columns first, then drafted fields that don't collide
@@ -267,7 +267,7 @@
 		showDeleteConfirm = false;
 		isDirty = false;
 		materializedDescriptionEdits = new Map();
-		materializeWarning = '';
+		materializeWarnings = [];
 		materializeError = '';
 	});
 
@@ -649,7 +649,6 @@
 		if (!boundModel) return;
 		const draft = editableDraftedFields[draftIndex];
 		if (!draft) return;
-		materializeWarning = '';
 		materializeError = '';
 		try {
 			const columns: ModelSchemaColumn[] = [
@@ -665,9 +664,10 @@
 				},
 			];
 			await updateModelSchema(boundModel.name, boundModel.version ?? undefined, columns);
-			// Remove the draft locally (will be re-filtered out by mergeFields once manifest refreshes anyway)
-			editableDraftedFields = editableDraftedFields.filter((_, i) => i !== draftIndex);
-			materializeWarning = `Column added to schema.yml. You still need to add '${draft.name}' to the SQL in ${boundModel.name}.sql.`;
+			const warning = `Column '${draft.name}' added to schema.yml. You still need to add it to the SQL in ${boundModel.name}.sql.`;
+			materializeWarnings = materializeWarnings.includes(warning)
+				? materializeWarnings
+				: [...materializeWarnings, warning];
 			// Refresh manifest so auto-promotion runs
 			const models = await getManifest();
 			dbtModels.set(models);
@@ -1300,11 +1300,15 @@
 							{#if isBoundEntity}<span class="font-normal text-xs text-gray-400 ml-1">— dbt columns are read-only</span>{/if}
 						</label>
 
-						{#if materializeWarning}
+						{#if materializeWarnings.length > 0}
 							<div class="mb-3 px-3 py-2 bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-lg flex items-start gap-2">
 								<Icon icon="lucide:alert-triangle" class="w-4 h-4 mt-0.5 shrink-0" />
-								<span>{materializeWarning}</span>
-								<button onclick={() => (materializeWarning = '')} class="ml-auto text-amber-600 hover:text-amber-800" aria-label="Dismiss warning">
+								<div class="space-y-1">
+									{#each materializeWarnings as warning}
+										<div>{warning}</div>
+									{/each}
+								</div>
+								<button onclick={() => (materializeWarnings = [])} class="ml-auto text-amber-600 hover:text-amber-800" aria-label="Dismiss warning">
 									<Icon icon="lucide:x" class="w-4 h-4" />
 								</button>
 							</div>

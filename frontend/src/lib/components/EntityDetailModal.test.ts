@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/svelte';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
 import { nodes, dbtModels, entityDetailModal } from '$lib/stores';
 import type { DbtModel } from '$lib/types';
+import { updateModelSchema } from '$lib/api';
 
 // Mock heavy API/navigation deps so they don't crash in jsdom
 vi.mock('$lib/api', () => ({
@@ -48,6 +49,7 @@ async function renderModal() {
 
 describe('EntityDetailModal — merged dbt+draft fields', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     nodes.set([]);
     dbtModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
@@ -96,5 +98,18 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     setupBoundEntityWithDraft();
     await renderModal();
     expect(screen.getByPlaceholderText('Origin')).toBeInTheDocument();
+  });
+
+  it('keeps a materialized draft visible until dbt artifacts expose it as a dbt column', async () => {
+    setupBoundEntityWithDraft();
+    await renderModal();
+
+    await fireEvent.click(screen.getByTitle(/Materialize this row into.*schema\.yml/i));
+
+    await waitFor(() => {
+      expect(updateModelSchema).toHaveBeenCalled();
+      expect(screen.getByDisplayValue('pending_col')).toBeInTheDocument();
+      expect(screen.getByText(/Column 'pending_col' added to schema\.yml/i)).toBeInTheDocument();
+    });
   });
 });
