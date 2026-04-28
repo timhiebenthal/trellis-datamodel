@@ -240,42 +240,122 @@
 
             <!-- Filter and Sort Controls -->
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
-                <div class="flex flex-wrap items-center gap-4">
-                    <div class="flex items-center gap-2">
-                        <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
-                        <span class="text-sm font-medium text-gray-700">Filters:</span>
-                    </div>
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
+                            <span class="text-sm font-medium text-gray-700">Filters:</span>
+                        </div>
 
-                    <!-- Dimension Filter -->
-                    <div class="flex items-center gap-2">
-                        <label for="dimension-filter" class="text-xs text-gray-600">Dimensions:</label>
-                        <select
-                            id="dimension-filter"
-                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            onchange={(e) => {
-                                const value = (e.target as HTMLSelectElement).value;
-                                if (value) {
-                                    if (!dimensionFilter.includes(value)) {
-                                        dimensionFilter = [...dimensionFilter, value];
+                        <!-- Dimension Filter -->
+                        <div class="flex items-center gap-2">
+                            <label for="dimension-filter" class="text-xs text-gray-600">Dimensions:</label>
+                            <select
+                                id="dimension-filter"
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                onchange={(e) => {
+                                    const value = (e.target as HTMLSelectElement).value;
+                                    if (value) {
+                                        if (!dimensionFilter.includes(value)) {
+                                            dimensionFilter = [...dimensionFilter, value];
+                                        }
+                                        (e.target as HTMLSelectElement).value = '';
                                     }
-                                    (e.target as HTMLSelectElement).value = '';
-                                }
-                            }}
-                        >
-                            <option value="">Select dimension...</option>
-                            {#each dimensions as dimension}
-                                {#if !dimensionFilter.includes(dimension.id)}
-                                    <option value={dimension.id}>{dimension.label}</option>
-                                {/if}
+                                }}
+                            >
+                                <option value="">Select dimension...</option>
+                                {#each dimensions as dimension}
+                                    {#if !dimensionFilter.includes(dimension.id)}
+                                        <option value={dimension.id}>{dimension.label}</option>
+                                    {/if}
+                                {/each}
+                            </select>
+                            {#each dimensionFilter as dimId}
+                                {#each dimensions.filter(d => d.id === dimId) as dimension}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
+                                        {dimension.label}
+                                        <button
+                                            onclick={() => {
+                                                dimensionFilter = dimensionFilter.filter(id => id !== dimId);
+                                            }}
+                                            class="hover:text-primary-900"
+                                        >
+                                            <Icon icon="lucide:x" class="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                {/each}
                             {/each}
-                        </select>
-                        {#each dimensionFilter as dimId}
-                            {#each dimensions.filter(d => d.id === dimId) as dimension}
+                        </div>
+
+                        <!-- Fact Filter -->
+                        <div class="flex items-center gap-2">
+                            <label for="fact-filter" class="text-xs text-gray-600">Facts:</label>
+                            <select
+                                id="fact-filter"
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                onchange={(e) => {
+                                    const value = (e.target as HTMLSelectElement).value;
+                                    if (value) {
+                                        if (!factFilter.includes(value)) {
+                                            factFilter = [...factFilter, value];
+                                        }
+                                        (e.target as HTMLSelectElement).value = '';
+                                    }
+                                }}
+                            >
+                                <option value="">Select fact...</option>
+                                {#each facts as fact}
+                                    {#if !factFilter.includes(fact.id)}
+                                        <option value={fact.id}>{fact.label}</option>
+                                    {/if}
+                                {/each}
+                            </select>
+                            {#each factFilter as factId}
+                                {#each facts.filter(f => f.id === factId) as fact}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
+                                        {fact.label}
+                                        <button
+                                            onclick={() => {
+                                                factFilter = factFilter.filter(id => id !== factId);
+                                            }}
+                                            class="hover:text-primary-900"
+                                        >
+                                            <Icon icon="lucide:x" class="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                {/each}
+                            {/each}
+                        </div>
+
+                        <!-- Tag Filter -->
+                        <div class="flex items-center gap-2">
+                            <label for="tag-filter" class="text-xs text-gray-600">Tags:</label>
+                            <select
+                                id="tag-filter"
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                onchange={(e) => {
+                                    const value = (e.target as HTMLSelectElement).value;
+                                    if (value) {
+                                        if (!tagFilter.includes(value)) {
+                                            tagFilter = [...tagFilter, value];
+                                        }
+                                        (e.target as HTMLSelectElement).value = '';
+                                    }
+                                }}
+                            >
+                                <option value="">Select tag...</option>
+                                {#each availableTags as tag}
+                                    {#if !tagFilter.includes(tag)}
+                                        <option value={tag}>{tag}</option>
+                                    {/if}
+                                {/each}
+                            </select>
+                            {#each tagFilter as tag}
                                 <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
-                                    {dimension.label}
+                                    {tag}
                                     <button
                                         onclick={() => {
-                                            dimensionFilter = dimensionFilter.filter(id => id !== dimId);
+                                            tagFilter = tagFilter.filter(t => t !== tag);
                                         }}
                                         class="hover:text-primary-900"
                                     >
@@ -283,131 +363,55 @@
                                     </button>
                                 </span>
                             {/each}
-                        {/each}
+                        </div>
+
+                        <!-- Clear All Filters -->
+                        {#if dimensionFilter.length > 0 || factFilter.length > 0 || tagFilter.length > 0}
+                            <button
+                                onclick={() => {
+                                    dimensionFilter = [];
+                                    factFilter = [];
+                                    tagFilter = [];
+                                }}
+                                class="text-xs text-gray-600 hover:text-gray-800 underline"
+                            >
+                                Clear all filters
+                            </button>
+                        {/if}
                     </div>
 
-                    <!-- Fact Filter -->
-                    <div class="flex items-center gap-2">
-                        <label for="fact-filter" class="text-xs text-gray-600">Facts:</label>
-                        <select
-                            id="fact-filter"
-                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            onchange={(e) => {
-                                const value = (e.target as HTMLSelectElement).value;
-                                if (value) {
-                                    if (!factFilter.includes(value)) {
-                                        factFilter = [...factFilter, value];
-                                    }
-                                    (e.target as HTMLSelectElement).value = '';
-                                }
-                            }}
-                        >
-                            <option value="">Select fact...</option>
-                            {#each facts as fact}
-                                {#if !factFilter.includes(fact.id)}
-                                    <option value={fact.id}>{fact.label}</option>
-                                {/if}
-                            {/each}
-                        </select>
-                        {#each factFilter as factId}
-                            {#each facts.filter(f => f.id === factId) as fact}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
-                                    {fact.label}
-                                    <button
-                                        onclick={() => {
-                                            factFilter = factFilter.filter(id => id !== factId);
-                                        }}
-                                        class="hover:text-primary-900"
-                                    >
-                                        <Icon icon="lucide:x" class="w-3 h-3" />
-                                    </button>
-                                </span>
-                            {/each}
-                        {/each}
-                    </div>
+                    <div class="flex flex-wrap items-center gap-4">
+                        <!-- Sort Controls -->
+                        <div class="flex items-center gap-2">
+                            <Icon icon="lucide:arrow-up-down" class="w-4 h-4 text-gray-500" />
+                            <span class="text-sm font-medium text-gray-700">Sort:</span>
+                        </div>
 
-                    <!-- Tag Filter -->
-                    <div class="flex items-center gap-2">
-                        <label for="tag-filter" class="text-xs text-gray-600">Tags:</label>
-                        <select
-                            id="tag-filter"
-                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            onchange={(e) => {
-                                const value = (e.target as HTMLSelectElement).value;
-                                if (value) {
-                                    if (!tagFilter.includes(value)) {
-                                        tagFilter = [...tagFilter, value];
-                                    }
-                                    (e.target as HTMLSelectElement).value = '';
-                                }
-                            }}
-                        >
-                            <option value="">Select tag...</option>
-                            {#each availableTags as tag}
-                                {#if !tagFilter.includes(tag)}
-                                    <option value={tag}>{tag}</option>
-                                {/if}
-                            {/each}
-                        </select>
-                        {#each tagFilter as tag}
-                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs">
-                                {tag}
-                                <button
-                                    onclick={() => {
-                                        tagFilter = tagFilter.filter(t => t !== tag);
-                                    }}
-                                    class="hover:text-primary-900"
-                                >
-                                    <Icon icon="lucide:x" class="w-3 h-3" />
-                                </button>
-                            </span>
-                        {/each}
-                    </div>
+                        <div class="flex items-center gap-2">
+                            <label for="dimension-sort" class="text-xs text-gray-600">Dimensions:</label>
+                            <select
+                                id="dimension-sort"
+                                aria-label="Sort dimensions"
+                                bind:value={dimensionSort}
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="label-asc">Label A-Z</option>
+                                <option value="count-desc">Usage Count ↓</option>
+                            </select>
+                        </div>
 
-                    <!-- Clear All Filters -->
-                    {#if dimensionFilter.length > 0 || factFilter.length > 0 || tagFilter.length > 0}
-                        <button
-                            onclick={() => {
-                                dimensionFilter = [];
-                                factFilter = [];
-                                tagFilter = [];
-                            }}
-                            class="text-xs text-gray-600 hover:text-gray-800 underline"
-                        >
-                            Clear all filters
-                        </button>
-                    {/if}
-
-                    <!-- Sort Controls -->
-                    <div class="flex items-center gap-2 border-l border-gray-200 pl-4">
-                        <Icon icon="lucide:arrow-up-down" class="w-4 h-4 text-gray-500" />
-                        <span class="text-sm font-medium text-gray-700">Sort:</span>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <label for="dimension-sort" class="text-xs text-gray-600">Dimensions:</label>
-                        <select
-                            id="dimension-sort"
-                            aria-label="Sort dimensions"
-                            bind:value={dimensionSort}
-                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="label-asc">Label A-Z</option>
-                            <option value="count-desc">Usage Count ↓</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <label for="fact-sort" class="text-xs text-gray-600">Facts:</label>
-                        <select
-                            id="fact-sort"
-                            aria-label="Sort facts"
-                            bind:value={factSort}
-                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="label-asc">Label A-Z</option>
-                            <option value="count-desc">Usage Count ↓</option>
-                        </select>
+                        <div class="flex items-center gap-2">
+                            <label for="fact-sort" class="text-xs text-gray-600">Facts:</label>
+                            <select
+                                id="fact-sort"
+                                aria-label="Sort facts"
+                                bind:value={factSort}
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="label-asc">Label A-Z</option>
+                                <option value="count-desc">Usage Count ↓</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
