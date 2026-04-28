@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-04-28
+
+### Fixed
+
+- **Filter/sort toolbar consistency**: Aligned the filter and sort controls across Bus Matrix, Entity List, and Business Events — filters on the left, sort always on the right, no all-caps labels. Bus Matrix toolbar is now a single row with compact dropdowns and a subtle divider between the filter and sort sections.
+
 ## [0.15.0] - 2026-04-28
 
 ### Removed

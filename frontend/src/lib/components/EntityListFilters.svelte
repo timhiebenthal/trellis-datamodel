@@ -229,24 +229,139 @@
 	</div>
 
 	<!-- Filters Row -->
-	<div class="flex flex-wrap items-center gap-4">
-		<!-- Domain Filter -->
-		{#if allDomains.length > 0}
-			<div class="flex items-center gap-2">
-				<span class="text-xs font-medium text-gray-600 uppercase">Domain:</span>
+	<div class="flex items-center justify-between gap-4 flex-wrap">
+		<div class="flex flex-wrap items-center gap-4">
+			<!-- Domain Filter -->
+			{#if allDomains.length > 0}
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-gray-600">Domain:</span>
 
-				<!-- Selected domains as chips -->
-				{#if $entityListFilters.selectedDomains.length > 0}
+					<!-- Selected domains as chips -->
+					{#if $entityListFilters.selectedDomains.length > 0}
+						<div class="flex flex-wrap gap-1">
+							{#each $entityListFilters.selectedDomains as domain}
+								<span
+									class="inline-flex items-center gap-1.5 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs font-medium border border-primary-200"
+								>
+									{domain}
+									<button
+										onclick={() => removeDomain(domain)}
+										class="text-primary-600 hover:text-primary-900 transition-colors"
+										title="Remove {domain}"
+									>
+										<Icon icon="lucide:x" class="w-3 h-3" />
+									</button>
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Domain dropdown -->
+					<div class="relative">
+						<select
+							value=""
+							onchange={(e) => {
+								const val = e.currentTarget.value;
+								if (val) {
+									toggleDomain(val);
+									e.currentTarget.value = '';
+								}
+							}}
+							class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer"
+						>
+							<option value="" disabled selected>
+								{$entityListFilters.selectedDomains.length > 0 ? 'Add domain...' : 'All'}
+							</option>
+							{#each allDomains as domain}
+								<option
+									value={domain}
+									disabled={$entityListFilters.selectedDomains.includes(domain)}
+								>
+									{domain}
+								</option>
+							{/each}
+						</select>
+						<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+							<Icon icon="lucide:chevron-down" class="w-3 h-3" />
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Tag Filter -->
+			{#if allTags.length > 0}
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-gray-600">Tag:</span>
+
+					<!-- Selected tags as chips -->
+					{#if $entityListFilters.selectedTags.length > 0}
+						<div class="flex flex-wrap gap-1">
+							{#each $entityListFilters.selectedTags as tag}
+								<span
+									class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium border border-gray-300"
+								>
+									{tag}
+									<button
+										onclick={() => removeTag(tag)}
+										class="text-gray-600 hover:text-gray-900 transition-colors"
+										title="Remove {tag}"
+									>
+										<Icon icon="lucide:x" class="w-3 h-3" />
+									</button>
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Tag dropdown -->
+					<div class="relative">
+						<select
+							value=""
+							disabled={allTags.length === 0}
+							onchange={(e) => {
+								const val = e.currentTarget.value;
+								if (val) {
+									toggleTag(val);
+									e.currentTarget.value = '';
+								}
+							}}
+							class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+						>
+							<option value="" disabled selected>
+								{allTags.length === 0 ? 'No tags' : $entityListFilters.selectedTags.length > 0 ? 'Add tag...' : 'All'}
+							</option>
+							{#each allTags as tag}
+								<option
+									value={tag}
+									disabled={$entityListFilters.selectedTags.includes(tag)}
+								>
+									{tag}
+								</option>
+							{/each}
+						</select>
+						<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+							<Icon icon="lucide:chevron-down" class="w-3 h-3" />
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Type Filter -->
+			<div class="flex items-center gap-2">
+				<span class="text-xs text-gray-600">Type:</span>
+
+				<!-- Selected types as chips -->
+				{#if $entityListFilters.selectedEntityTypes.length > 0}
 					<div class="flex flex-wrap gap-1">
-						{#each $entityListFilters.selectedDomains as domain}
-							<span
-								class="inline-flex items-center gap-1.5 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs font-medium border border-primary-200"
-							>
-								{domain}
+						{#each $entityListFilters.selectedEntityTypes as type}
+							{@const typeLabel = type === 'dimension' ? 'Dimension' : type === 'fact' ? 'Fact' : 'Unclassified'}
+							{@const typeClass = type === 'dimension' ? 'bg-green-100 text-green-700 border-green-200' : type === 'fact' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-300'}
+							<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border {typeClass}">
+								{typeLabel}
 								<button
-									onclick={() => removeDomain(domain)}
-									class="text-primary-600 hover:text-primary-900 transition-colors"
-									title="Remove {domain}"
+									onclick={() => removeEntityType(type)}
+									class="hover:opacity-75 transition-opacity"
+									title="Remove {typeLabel}"
 								>
 									<Icon icon="lucide:x" class="w-3 h-3" />
 								</button>
@@ -255,160 +370,47 @@
 					</div>
 				{/if}
 
-				<!-- Domain dropdown -->
+				<!-- Type dropdown -->
 				<div class="relative">
 					<select
 						value=""
 						onchange={(e) => {
-							const val = e.currentTarget.value;
+							const val = e.currentTarget.value as 'dimension' | 'fact' | 'unclassified';
 							if (val) {
-								toggleDomain(val);
+								toggleEntityType(val);
 								e.currentTarget.value = '';
 							}
 						}}
 						class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer"
 					>
 						<option value="" disabled selected>
-							{$entityListFilters.selectedDomains.length > 0 ? 'Add domain...' : 'All'}
+							{$entityListFilters.selectedEntityTypes.length > 0 ? 'Add type...' : 'All'}
 						</option>
-						{#each allDomains as domain}
-							<option
-								value={domain}
-								disabled={$entityListFilters.selectedDomains.includes(domain)}
-							>
-								{domain}
-							</option>
-						{/each}
+						<option value="dimension" disabled={$entityListFilters.selectedEntityTypes.includes('dimension')}>Dimension</option>
+						<option value="fact" disabled={$entityListFilters.selectedEntityTypes.includes('fact')}>Fact</option>
+						<option value="unclassified" disabled={$entityListFilters.selectedEntityTypes.includes('unclassified')}>Unclassified</option>
 					</select>
 					<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
 						<Icon icon="lucide:chevron-down" class="w-3 h-3" />
 					</div>
 				</div>
 			</div>
-		{/if}
 
-		<!-- Tag Filter -->
-		{#if allTags.length > 0}
-			<div class="flex items-center gap-2">
-				<span class="text-xs font-medium text-gray-600 uppercase">Tag:</span>
-
-				<!-- Selected tags as chips -->
-				{#if $entityListFilters.selectedTags.length > 0}
-					<div class="flex flex-wrap gap-1">
-						{#each $entityListFilters.selectedTags as tag}
-							<span
-								class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium border border-gray-300"
-							>
-								{tag}
-								<button
-									onclick={() => removeTag(tag)}
-									class="text-gray-600 hover:text-gray-900 transition-colors"
-									title="Remove {tag}"
-								>
-									<Icon icon="lucide:x" class="w-3 h-3" />
-								</button>
-							</span>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Tag dropdown -->
-				<div class="relative">
-					<select
-						value=""
-						disabled={allTags.length === 0}
-						onchange={(e) => {
-							const val = e.currentTarget.value;
-							if (val) {
-								toggleTag(val);
-								e.currentTarget.value = '';
-							}
-						}}
-						class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-					>
-						<option value="" disabled selected>
-							{allTags.length === 0 ? 'No tags' : $entityListFilters.selectedTags.length > 0 ? 'Add tag...' : 'All'}
-						</option>
-						{#each allTags as tag}
-							<option
-								value={tag}
-								disabled={$entityListFilters.selectedTags.includes(tag)}
-							>
-								{tag}
-							</option>
-						{/each}
-					</select>
-					<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-						<Icon icon="lucide:chevron-down" class="w-3 h-3" />
-					</div>
-				</div>
-			</div>
-		{/if}
-
-		<!-- Type Filter -->
-		<div class="flex items-center gap-2">
-			<span class="text-xs font-medium text-gray-600 uppercase">Type:</span>
-
-			<!-- Selected types as chips -->
-			{#if $entityListFilters.selectedEntityTypes.length > 0}
-				<div class="flex flex-wrap gap-1">
-					{#each $entityListFilters.selectedEntityTypes as type}
-						{@const typeLabel = type === 'dimension' ? 'Dimension' : type === 'fact' ? 'Fact' : 'Unclassified'}
-						{@const typeClass = type === 'dimension' ? 'bg-green-100 text-green-700 border-green-200' : type === 'fact' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-300'}
-						<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border {typeClass}">
-							{typeLabel}
-							<button
-								onclick={() => removeEntityType(type)}
-								class="hover:opacity-75 transition-opacity"
-								title="Remove {typeLabel}"
-							>
-								<Icon icon="lucide:x" class="w-3 h-3" />
-							</button>
-						</span>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Type dropdown -->
-			<div class="relative">
-				<select
-					value=""
-					onchange={(e) => {
-						const val = e.currentTarget.value as 'dimension' | 'fact' | 'unclassified';
-						if (val) {
-							toggleEntityType(val);
-							e.currentTarget.value = '';
-						}
-					}}
-					class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer"
-				>
-					<option value="" disabled selected>
-						{$entityListFilters.selectedEntityTypes.length > 0 ? 'Add type...' : 'All'}
-					</option>
-					<option value="dimension" disabled={$entityListFilters.selectedEntityTypes.includes('dimension')}>Dimension</option>
-					<option value="fact" disabled={$entityListFilters.selectedEntityTypes.includes('fact')}>Fact</option>
-					<option value="unclassified" disabled={$entityListFilters.selectedEntityTypes.includes('unclassified')}>Unclassified</option>
-				</select>
-				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-					<Icon icon="lucide:chevron-down" class="w-3 h-3" />
-				</div>
-			</div>
+			<!-- Group By Type Checkbox -->
+			<label class="flex items-center gap-2 cursor-pointer select-none">
+				<input
+					type="checkbox"
+					checked={$entityListFilters.groupByEntityType}
+					onchange={toggleGroupByEntityType}
+					class="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 cursor-pointer"
+				/>
+				<span class="text-xs text-gray-600">Group by type</span>
+			</label>
 		</div>
 
-		<!-- Group By Type Checkbox -->
-		<label class="flex items-center gap-2 cursor-pointer select-none">
-			<input
-				type="checkbox"
-				checked={$entityListFilters.groupByEntityType}
-				onchange={toggleGroupByEntityType}
-				class="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 cursor-pointer"
-			/>
-			<span class="text-xs font-medium text-gray-600">Group by type</span>
-		</label>
-
 		<!-- Sort Direction Toggle -->
-		<div class="flex items-center gap-2">
-			<span class="text-xs font-medium text-gray-600 uppercase">Sort:</span>
+		<div class="flex items-center gap-2 shrink-0">
+			<span class="text-xs text-gray-600">Sort:</span>
 			<button
 				type="button"
 				onclick={toggleSortDirection}

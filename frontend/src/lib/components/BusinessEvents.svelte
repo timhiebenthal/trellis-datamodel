@@ -864,49 +864,49 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div class="flex items-center gap-4 flex-wrap">
+                        <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500 shrink-0" />
                         {#if $modelingStyle !== 'entity_model'}
                         <div class="flex items-center gap-2">
-                            <Icon icon="lucide:filter" class="w-4 h-4 text-gray-500" />
-                            <span class="text-sm font-medium text-gray-700">Filter by type:</span>
+                            <label class="text-xs text-gray-600">Type:</label>
+                            <select
+                                bind:value={selectedFilter}
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value="all">All</option>
+                                <option value="discrete">Discrete</option>
+                                <option value="evolving">Evolving</option>
+                                <option value="recurring">Recurring</option>
+                            </select>
                         </div>
-                        <select
-                            bind:value={selectedFilter}
-                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        >
-                            <option value="all">All</option>
-                            <option value="discrete">Discrete</option>
-                            <option value="evolving">Evolving</option>
-                            <option value="recurring">Recurring</option>
-                        </select>
                         {/if}
 
                         <div class="flex items-center gap-2">
-                            <span class="text-sm font-medium text-gray-700">Filter by domain:</span>
+                            <label class="text-xs text-gray-600">Domain:</label>
+                            <select
+                                bind:value={selectedDomain}
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value={null}>All Domains</option>
+                                {#each domains as domain}
+                                    <option value={domain}>{toTitleCase(domain)}</option>
+                                {/each}
+                                <option value="unassigned">Unassigned</option>
+                            </select>
                         </div>
-                        <select
-                            bind:value={selectedDomain}
-                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        >
-                            <option value={null}>All Domains</option>
-                            {#each domains as domain}
-                                <option value={domain}>{toTitleCase(domain)}</option>
-                            {/each}
-                            <option value="unassigned">Unassigned</option>
-                        </select>
 
                         <div class="flex items-center gap-2">
-                            <span class="text-sm font-medium text-gray-700">Filter by process:</span>
+                            <label class="text-xs text-gray-600">Process:</label>
+                            <select
+                                bind:value={selectedProcess}
+                                class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value={null}>All Processes</option>
+                                {#each activeProcesses as process}
+                                    <option value={process.id}>{process.name}</option>
+                                {/each}
+                                <option value="ungrouped">Ungrouped</option>
+                            </select>
                         </div>
-                        <select
-                            bind:value={selectedProcess}
-                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        >
-                            <option value={null}>All Processes</option>
-                            {#each activeProcesses as process}
-                                <option value={process.id}>{process.name}</option>
-                            {/each}
-                            <option value="ungrouped">Ungrouped</option>
-                        </select>
                     </div>
 
                     <!-- Multi-select controls -->
