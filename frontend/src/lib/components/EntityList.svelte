@@ -10,7 +10,7 @@
 	import type { Node } from '@xyflow/svelte';
 	import type { Entity, EntityData } from '$lib/types';
 	import { filterEntities } from '$lib/utils/entity-filtering';
-	import { groupEntitiesByDomain } from '$lib/utils/entity-grouping';
+	import { groupEntitiesByDomain, groupEntitiesByType } from '$lib/utils/entity-grouping';
 	import EntityRow from './EntityRow.svelte';
 	import CollapseChevron from './CollapseChevron.svelte';
 	import Icon from '@iconify/svelte';
@@ -48,23 +48,24 @@
 		return filterEntities(entities, $entityListFilters);
 	});
 
-	// Group filtered entities by domain
+	// Group filtered entities by domain or type
 	const groupedEntities = $derived.by(() => {
-		return groupEntitiesByDomain(filteredEntities, $entityListFilters.sortDirection);
+		return $entityListFilters.groupByMode === 'type'
+			? groupEntitiesByType(filteredEntities, $entityListFilters.sortDirection)
+			: groupEntitiesByDomain(filteredEntities, $entityListFilters.sortDirection);
 	});
 
 	// Sort domain groups: named domains alphabetically, then "Unassigned" last
 	const sortedDomainGroups = $derived.by(() => {
 		const groups = Array.from(groupedEntities.entries());
+		if ($entityListFilters.groupByMode === 'type') {
+			return groups; // already in canonical Dimensions → Facts → Unclassified order
+		}
 		return groups.sort((a, b) => {
 			const [domainA] = a;
 			const [domainB] = b;
-
-			// "Unassigned" always goes last
 			if (domainA === 'Unassigned') return 1;
 			if (domainB === 'Unassigned') return -1;
-
-			// Otherwise sort alphabetically
 			return domainA.localeCompare(domainB);
 		});
 	});

@@ -13,6 +13,7 @@
 
 	let searchTermLocal = $state($entityListFilters.searchTerm);
 	let searchDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
+	let lastSyncedSearchTerm = $entityListFilters.searchTerm;
 
 	// Extract unique domains from entity nodes
 	let allDomains = $derived.by(() => {
@@ -146,6 +147,10 @@
 		}));
 	}
 
+	function toggleGroupByMode(mode: 'domain' | 'type') {
+		entityListFilters.update((filters) => ({ ...filters, groupByMode: mode }));
+	}
+
 	// Clear all filters
 	function clearAllFilters() {
 		searchTermLocal = '';
@@ -155,13 +160,18 @@
 			selectedTags: [],
 			selectedEntityTypes: [],
 			sortDirection: filters.sortDirection,
+			groupByMode: filters.groupByMode,
 		}));
 	}
 
 	// Sync local search term when store changes externally
 	$effect(() => {
-		if (searchTermLocal !== $entityListFilters.searchTerm) {
-			searchTermLocal = $entityListFilters.searchTerm;
+		const storeSearchTerm = $entityListFilters.searchTerm;
+		if (storeSearchTerm !== lastSyncedSearchTerm) {
+			lastSyncedSearchTerm = storeSearchTerm;
+			if (searchTermLocal !== storeSearchTerm) {
+				searchTermLocal = storeSearchTerm;
+			}
 		}
 	});
 </script>
@@ -384,6 +394,17 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Group By Type Checkbox -->
+		<label class="flex items-center gap-2 cursor-pointer select-none">
+			<input
+				type="checkbox"
+				checked={$entityListFilters.groupByMode === 'type'}
+				onchange={() => toggleGroupByMode($entityListFilters.groupByMode === 'type' ? 'domain' : 'type')}
+				class="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 cursor-pointer"
+			/>
+			<span class="text-xs font-medium text-gray-600">Group by type</span>
+		</label>
 
 		<!-- Sort Direction Toggle -->
 		<div class="flex items-center gap-2">
