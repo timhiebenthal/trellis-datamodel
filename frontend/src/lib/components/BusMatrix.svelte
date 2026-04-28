@@ -150,7 +150,7 @@
         for (const dim of allDimensions) {
             const row = [getEntityLabel(dim)];
             for (const fact of allFacts) {
-                row.push(fullLookup.has(`${dim.id}-${fact.id}`) ? '✓' : '');
+                row.push(fullLookup.has(`${dim.id}-${fact.id}`) ? 'x' : '');
             }
             matrixRows.push(row);
         }
