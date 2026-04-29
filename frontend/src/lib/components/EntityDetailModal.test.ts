@@ -59,6 +59,27 @@ function setupUnboundEntityWithDraftOrigin() {
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
+/** Bound model + extra drafted row with a user-defined origin (merged export path). */
+function setupBoundEntityWithDraftOrigin() {
+  nodes.set([{
+    id: 'node-1',
+    type: 'entity',
+    position: { x: 0, y: 0 },
+    data: {
+      label: 'Mixed Entity',
+      dbt_model: 'model.proj.entity_x',
+      drafted_fields: [{
+        name: 'extra_col',
+        datatype: 'text',
+        description: 'Draft column',
+        origin: 'LINEAGE:user_defined',
+      }],
+    } as any,
+  }] as any);
+  dbtModels.set([mockDbtModel]);
+  entityDetailModal.set({ open: true, entityId: 'node-1' });
+}
+
 async function renderModal() {
   // Dynamically import to ensure mocks are hoisted
   const { default: EntityDetailModal } = await import('./EntityDetailModal.svelte');
@@ -126,7 +147,7 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     expect(screen.getByPlaceholderText('Origin')).toBeInTheDocument();
   });
 
-  it('copies drafted field origin into markdown export', async () => {
+  it('Copy as Markdown: unbound entity copies title, drafted origins, and relationships placeholder', async () => {
     setupUnboundEntityWithDraftOrigin();
     await renderModal();
 
@@ -134,9 +155,33 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     await fireEvent.click(screen.getByText('Copy as Markdown'));
 
     await waitFor(() => {
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('| appointment_id | text | Unique identifier | DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID |')
+      expect(navigator.clipboard.writeText).toHaveBeenCalled();
+      const markdown = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(markdown).toContain('# Appointment');
+      expect(markdown).toContain('## Attributes');
+      expect(markdown).toContain('| Name | Type | Description | Origin |');
+      expect(markdown).toContain(
+        '| appointment_id | text | Unique identifier | DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID |'
       );
+      expect(markdown).toContain('## Relationships');
+      expect(markdown).toContain('No relationships defined');
+    });
+  });
+
+  it('Copy as Markdown: bound entity uses dbt model unique_id for materialized rows and preserves draft origin', async () => {
+    setupBoundEntityWithDraftOrigin();
+    await renderModal();
+
+    await fireEvent.click(screen.getByLabelText('Export options'));
+    await fireEvent.click(screen.getByText('Copy as Markdown'));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalled();
+      const markdown = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(markdown).toContain('# Mixed Entity');
+      expect(markdown).toContain('| id | int |  | model.proj.entity_x |');
+      expect(markdown).toContain('| created_at | timestamp |  | model.proj.entity_x |');
+      expect(markdown).toContain('| extra_col | text | Draft column | LINEAGE:user_defined |');
     });
   });
 
