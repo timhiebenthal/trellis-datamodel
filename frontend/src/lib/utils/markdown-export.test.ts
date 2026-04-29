@@ -177,35 +177,85 @@ describe('markdown-export utilities', () => {
 	});
 
 	describe('formatEntityAsMarkdown - Special Characters', () => {
-		it('should escape pipe characters in attribute names', () => {
+		it('should encode pipe characters in attribute names as HTML entities', () => {
 			const attributesWithPipes = [
 				{ name: 'field|with|pipes', type: 'varchar', description: 'Test field' }
 			];
 
 			const result = formatEntityAsMarkdown(mockEntity, attributesWithPipes, [], mockNodes, 'customer');
 
-			expect(result).toContain('field\\|with\\|pipes');
+			expect(result).toContain('field&#124;with&#124;pipes');
 			expect(result).not.toContain('field|with|pipes');
 		});
 
-		it('should escape pipe characters in attribute types', () => {
+		it('should encode pipe characters in attribute types as HTML entities', () => {
 			const attributesWithPipes = [
 				{ name: 'field', type: 'varchar|int', description: 'Test field' }
 			];
 
 			const result = formatEntityAsMarkdown(mockEntity, attributesWithPipes, [], mockNodes, 'customer');
 
-			expect(result).toContain('varchar\\|int');
+			expect(result).toContain('varchar&#124;int');
 		});
 
-		it('should escape pipe characters in descriptions', () => {
+		it('should encode pipe characters in descriptions as HTML entities', () => {
 			const attributesWithPipes = [
 				{ name: 'field', type: 'varchar', description: 'A|B|C description' }
 			];
 
 			const result = formatEntityAsMarkdown(mockEntity, attributesWithPipes, [], mockNodes, 'customer');
 
-			expect(result).toContain('A\\|B\\|C');
+			expect(result).toContain('A&#124;B&#124;C');
+		});
+
+		// Real-world origin lines often use " | " between warehouse hops; raw pipes must not split GFM tables.
+		it.each([
+			{
+				label: 'NIP status (DH1 | DH2 / alt)',
+				name: 'refund_status_code',
+				origin:
+					'DH1: DATA_MART_MAIN.T_DIM_NIP_STATUS.REFUND_STATUS | DH2: CBUS_CUSTOMER_REFUND_MASTER.REFUND_STATUS / CBUS_REFUND.REFUND_STATUS',
+				expectEncoded: 'DH1: DATA_MART_MAIN.T_DIM_NIP_STATUS.REFUND_STATUS &#124; DH2:',
+			},
+			{
+				label: 'appointment (DH1 | DH2)',
+				name: 'activity_id',
+				origin: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID | DH2: CBUS_APPOINTMENT.APPOINTMENT_AID',
+				expectEncoded: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID &#124; DH2: CBUS_APPOINTMENT.APPOINTMENT_AID',
+			},
+			{
+				label: 'minimal split',
+				name: 'x',
+				origin: 'A | B',
+				expectEncoded: 'A &#124; B',
+			},
+		])(
+			'should encode pipes in origin without extra table columns ($label)',
+			({ name, origin, expectEncoded }) => {
+				const attributes = [{ name, type: 'text', description: 'd', origin }];
+				const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
+				const row = result.split('\n').find((l) => l.startsWith(`| ${name} `));
+				expect(row).toBeDefined();
+				expect((row!.match(/\|/g) || []).length).toBe(5);
+				expect(row).toContain(expectEncoded);
+			}
+		);
+
+		it('should flatten newlines in table cells so one row stays one line', () => {
+			const attributes = [
+				{
+					name: 'x',
+					type: 'text',
+					description: 'Line1\nLine2',
+					origin: 'a\nb'
+				}
+			];
+			const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
+			const row = result.split('\n').find((l) => l.startsWith('| x |'));
+			expect(row).toBeDefined();
+			expect(row).toContain('Line1 Line2');
+			expect(row).toContain('a b');
+			expect(row).not.toContain('\n');
 		});
 
 		it('should handle asterisks in entity labels', () => {
@@ -242,8 +292,8 @@ describe('markdown-export utilities', () => {
 
 			const result = formatEntityAsMarkdown(mockEntity, attributesWithSpecialChars, [], mockNodes, 'customer');
 
-			expect(result).toContain('field_\\|*test');
-			expect(result).toContain('varchar\\|text');
+			expect(result).toContain('field_&#124;*test');
+			expect(result).toContain('varchar&#124;text');
 			expect(result).toContain('[brackets]');
 		});
 	});

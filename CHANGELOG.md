@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Markdown export origins**: Drafted attributes now copy their saved origin mappings into the Markdown export instead of showing the generic `drafted` label.
+- **Markdown attribute tables**: Pipe characters inside attribute cells (especially `DH1: … | DH2: …` origins) are encoded as `&#124;` and newlines are flattened so pipe tables do not gain spurious columns in strict Markdown renderers.
 
 ## [0.15.1] - 2026-04-28
 

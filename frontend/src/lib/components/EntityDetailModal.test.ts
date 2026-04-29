@@ -51,7 +51,7 @@ function setupUnboundEntityWithDraftOrigin() {
         name: 'appointment_id',
         datatype: 'text',
         description: 'Unique identifier',
-        origin: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID',
+        origin: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID | DH2: CBUS_APPOINTMENT.APPOINTMENT_AID',
       }],
     } as any,
   }] as any);
@@ -161,7 +161,7 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
       expect(markdown).toContain('## Attributes');
       expect(markdown).toContain('| Name | Type | Description | Origin |');
       expect(markdown).toContain(
-        '| appointment_id | text | Unique identifier | DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID |'
+        '| appointment_id | text | Unique identifier | DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID &#124; DH2: CBUS_APPOINTMENT.APPOINTMENT_AID |'
       );
       expect(markdown).toContain('## Relationships');
       expect(markdown).toContain('No relationships defined');

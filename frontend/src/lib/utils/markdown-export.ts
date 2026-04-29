@@ -3,13 +3,16 @@ import type { EntityData } from '$lib/types';
 import { formatEntityType, formatAnnotationType, formatRelationshipType } from './excel-export';
 
 /**
- * Escapes pipe characters in markdown table cells to prevent breaking table formatting.
- *
- * @param text - The text to escape
- * @returns Text with pipes escaped as \|
+ * Prepares a value for a GFM pipe table cell: single-line text and no raw `|` characters.
+ * Newlines break table rows; unescaped `|` adds spurious columns (e.g. DH1 | DH2 origins).
+ * HTML entity `&#124;` renders as a pipe in virtually all Markdown viewers and avoids
+ * backslash-escape quirks across renderers.
  */
-function escapePipes(text: string): string {
-	return text.replace(/\|/g, '\\|');
+function markdownTableCell(value: unknown): string {
+	const s = String(value ?? '')
+		.replace(/\r\n|\n|\r/g, ' ')
+		.replace(/\t/g, ' ');
+	return s.replace(/\|/g, '&#124;');
 }
 
 /**
@@ -60,10 +63,10 @@ export function formatEntityAsMarkdown(
 		lines.push('|------|------|-------------|--------|');
 
 		for (const attr of attributes) {
-			const name = escapePipes(attr.name);
-			const type = escapePipes(attr.type);
-			const description = escapePipes(attr.description || '');
-			const origin = escapePipes(attr.origin || '');
+			const name = markdownTableCell(attr.name);
+			const type = markdownTableCell(attr.type);
+			const description = markdownTableCell(attr.description ?? '');
+			const origin = markdownTableCell(attr.origin ?? '');
 			lines.push(`| ${name} | ${type} | ${description} | ${origin} |`);
 		}
 	}
