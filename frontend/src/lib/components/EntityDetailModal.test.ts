@@ -39,6 +39,26 @@ function setupBoundEntityWithDraft() {
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
+function setupUnboundEntityWithDraftOrigin() {
+  nodes.set([{
+    id: 'node-1',
+    type: 'entity',
+    position: { x: 0, y: 0 },
+    data: {
+      label: 'Appointment',
+      entity_type: 'dimension',
+      drafted_fields: [{
+        name: 'appointment_id',
+        datatype: 'text',
+        description: 'Unique identifier',
+        origin: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID',
+      }],
+    } as any,
+  }] as any);
+  dbtModels.set([]);
+  entityDetailModal.set({ open: true, entityId: 'node-1' });
+}
+
 async function renderModal() {
   // Dynamically import to ensure mocks are hoisted
   const { default: EntityDetailModal } = await import('./EntityDetailModal.svelte');
@@ -50,6 +70,11 @@ async function renderModal() {
 describe('EntityDetailModal — merged dbt+draft fields', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
     nodes.set([]);
     dbtModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
@@ -57,6 +82,7 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it('renders 3 rows for 2 dbt columns + 1 draft on a bound entity', async () => {
@@ -98,6 +124,20 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     setupBoundEntityWithDraft();
     await renderModal();
     expect(screen.getByPlaceholderText('Origin')).toBeInTheDocument();
+  });
+
+  it('copies drafted field origin into markdown export', async () => {
+    setupUnboundEntityWithDraftOrigin();
+    await renderModal();
+
+    await fireEvent.click(screen.getByLabelText('Export options'));
+    await fireEvent.click(screen.getByText('Copy as Markdown'));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining('| appointment_id | text | Unique identifier | DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID |')
+      );
+    });
   });
 
   it('removes draft from list after materializing and shows SQL-gap warning', async () => {

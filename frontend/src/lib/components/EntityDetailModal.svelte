@@ -715,12 +715,15 @@
 
 	// Build legacy attributes shape from mergedFields for export helpers
 	function buildExportAttributes(): Array<{ name: string; type: string; description?: string; origin?: string }> {
-		return mergedFields.map((f) => ({
+		const attributes = mergedFields.map((f) => ({
 			name: f.name,
 			type: f.datatype ?? '',
 			description: f.description ?? '',
-			origin: f.origin === 'dbt' ? (boundModel?.unique_id ?? 'dbt') : 'drafted',
+			origin: f.origin === 'dbt'
+				? (boundModel?.unique_id ?? 'dbt')
+				: (editableDraftedFields[f.draftIndex]?.origin ?? ''),
 		}));
+		return attributes;
 	}
 
 	async function handleExportToExcel() {
@@ -755,9 +758,10 @@
 		isCopyingMarkdown = true;
 		try {
 			const entityId = currentEntity.id;
+			const exportAttributes = buildExportAttributes();
 			const markdown = formatEntityAsMarkdown(
 				currentEntity.data as unknown as EntityData,
-				buildExportAttributes(),
+				exportAttributes,
 				$edges,
 				$nodes,
 				entityId,
