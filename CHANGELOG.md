@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.3] - 2026-04-29
+
+### Added
+
+- **Markdown export coverage**: Vitest `it.each` with real-world origin strings (`DH1: … | DH2: …`); Entity detail modal tests for Copy as Markdown including origins that contain ` | ` (asserts `&#124;` in the clipboard payload).
+
 ## [0.15.2] - 2026-04-29
 
 ### Fixed
