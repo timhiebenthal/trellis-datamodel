@@ -1343,7 +1343,7 @@
 										ondragover={field.origin === 'draft' ? (e) => onAttributeDragOver(field.draftIndex, e) : undefined}
 										ondrop={field.origin === 'draft' ? (e) => onAttributeDrop(field.draftIndex, e) : undefined}
 										ondragend={field.origin === 'draft' ? onAttributeDragEnd : undefined}
-										style={dragIndex === field.draftIndex ? 'opacity: 0.5;' : ''}
+										style={field.origin === 'draft' && dragIndex === field.draftIndex ? 'opacity: 0.5;' : ''}
 									>
 											<div class="grid grid-cols-12 gap-2 items-center">
 											<!-- Name -->
@@ -1459,7 +1459,7 @@
 												{/if}
 											</div>
 										</div>
-										{#if dropIndex === field.draftIndex && dropPosition !== null}
+										{#if field.origin === 'draft' && dropIndex === field.draftIndex && dropPosition !== null}
 											<DropIndicator position={dropPosition} />
 										{/if}
 									</div>
