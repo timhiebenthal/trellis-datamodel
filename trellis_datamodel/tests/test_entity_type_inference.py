@@ -350,10 +350,8 @@ class TestApplyEntityTypeInferenceUnbound:
         return {"entities": entities, "relationships": []}
 
     def _mock_adapter(self, inferred_types):
-        from unittest.mock import MagicMock, patch
-        adapter = MagicMock()
-        adapter.infer_entity_types.return_value = inferred_types
-        return patch("trellis_datamodel.routes.data_model.get_adapter", return_value=adapter)
+        from unittest.mock import patch
+        return patch.object(DbtCoreAdapter, "infer_entity_types", return_value=inferred_types)
 
     def test_unbound_dim_entity_inferred_as_dimension(self):
         """Unbound entity whose ID starts with dim_ is inferred as dimension."""
