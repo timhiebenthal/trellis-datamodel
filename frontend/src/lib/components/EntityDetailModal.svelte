@@ -1334,15 +1334,23 @@
 									<div class="col-span-1"></div>
 								</div>
 								<div class="divide-y divide-gray-200">
-									{#each mergedFields as field (field.name)}
-										<div
-											class="px-3 py-2 hover:bg-gray-50 group transition-colors"
-											data-testid={`merged-field-row-${field.name}`}
-										>
+								{#each mergedFields as field (field.origin === 'draft' ? `draft-${field.draftIndex}` : `dbt-${field.name}`)}
+									<div
+										class="relative px-3 py-2 hover:bg-gray-50 group transition-colors"
+										data-testid={`merged-field-row-${field.name}`}
+										draggable={field.origin === 'draft'}
+										ondragstart={field.origin === 'draft' ? (e) => onAttributeDragStart(field.draftIndex, e) : undefined}
+										ondragover={field.origin === 'draft' ? (e) => onAttributeDragOver(field.draftIndex, e) : undefined}
+										ondrop={field.origin === 'draft' ? (e) => onAttributeDrop(field.draftIndex, e) : undefined}
+										ondragend={field.origin === 'draft' ? onAttributeDragEnd : undefined}
+										style={field.origin === 'draft' && dragIndex === field.draftIndex ? 'opacity: 0.5;' : ''}
+									>
 											<div class="grid grid-cols-12 gap-2 items-center">
-												<!-- Name -->
-												<div class="col-span-2">
-													{#if field.origin === 'draft'}
+											<!-- Name -->
+											<div class="col-span-2">
+												{#if field.origin === 'draft'}
+													<div class="flex items-center gap-1">
+														<Icon icon="lucide:grip-vertical" class="w-4 h-4 text-gray-300 cursor-grab active:cursor-grabbing shrink-0" />
 														<input
 															type="text"
 															value={field.name}
@@ -1350,7 +1358,8 @@
 															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
 															placeholder="attribute_name"
 														/>
-													{:else}
+													</div>
+												{:else}
 														<input
 															type="text"
 															value={field.name}
@@ -1425,32 +1434,35 @@
 														/>
 													{/if}
 												</div>
-												<!-- Actions -->
-												<div class="col-span-1 flex justify-end gap-1">
-													{#if field.origin === 'draft'}
-														{#if isBoundEntity && boundModel}
-															<button
-																type="button"
-																onclick={() => materializeDraft(field.draftIndex)}
-																class="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded transition-colors"
-																aria-label={`Materialize ${field.name} into ${boundModel.name}'s schema.yml`}
-																title={`Write to ${boundModel.name}'s schema.yml`}
-															>
-																<Icon icon="lucide:arrow-up-to-line" class="w-3.5 h-3.5" />
-															</button>
-														{/if}
+										<!-- Actions -->
+										<div class="col-span-1 flex justify-end gap-1 items-center">
+											{#if field.origin === 'draft'}
+												{#if isBoundEntity && boundModel}
 														<button
 															type="button"
-															onclick={() => deleteDraftedField(field.draftIndex)}
-															class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-															title="Delete attribute"
+															onclick={() => materializeDraft(field.draftIndex)}
+															class="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded transition-colors"
+															aria-label={`Materialize ${field.name} into ${boundModel.name}'s schema.yml`}
+															title={`Write to ${boundModel.name}'s schema.yml`}
 														>
-															<Icon icon="lucide:trash-2" class="w-4 h-4" />
+															<Icon icon="lucide:arrow-up-to-line" class="w-3.5 h-3.5" />
 														</button>
 													{/if}
-												</div>
+													<button
+														type="button"
+														onclick={() => deleteDraftedField(field.draftIndex)}
+														class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+														title="Delete attribute"
+													>
+														<Icon icon="lucide:trash-2" class="w-4 h-4" />
+													</button>
+												{/if}
 											</div>
 										</div>
+										{#if field.origin === 'draft' && dropIndex === field.draftIndex && dropPosition !== null}
+											<DropIndicator position={dropPosition} />
+										{/if}
+									</div>
 									{/each}
 								</div>
 							{:else}
