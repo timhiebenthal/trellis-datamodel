@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.4] - 2026-05-08
+
+### Fixed
+
+- **Entity detail modal — attribute name input**: Typing a full attribute name no longer loses focus after each character. Root cause was the Svelte keyed-each using `field.name` as the key, which destroyed and recreated the input on every keystroke; fixed by using a stable `draft-{draftIndex}` key.
+- **Entity detail modal — attribute drag-to-reorder**: Drag handles and drop events were wired up in the data model but never attached to the DOM. Rows now have `draggable`, `ondragstart`, `ondragover`, `ondrop`, and `ondragend` handlers, restoring the ability to reorder attributes by dragging.
+
 ## [0.15.3] - 2026-04-29
 
 ### Added
