@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Entity detail modal — attribute name input**: Typing a full attribute name no longer loses focus after each character. Root cause was the Svelte keyed-each using `field.name` as the key, which destroyed and recreated the input on every keystroke; fixed by using a stable `draft-{draftIndex}` key.
 - **Entity detail modal — attribute drag-to-reorder**: Drag handles and drop events were wired up in the data model but never attached to the DOM. Rows now have `draggable`, `ondragstart`, `ondragover`, `ondrop`, and `ondragend` handlers, restoring the ability to reorder attributes by dragging.
+- **Unbound entity type inference**: Unbound entities (not linked to a dbt model) whose ID matches a configured dimension or fact prefix (e.g. `dim_`, `fct_`) are now automatically classified on load, matching the existing behaviour for bound entities.
 
 ## [0.15.3] - 2026-04-29
 

@@ -5,6 +5,7 @@ import os
 import pytest
 from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
 from trellis_datamodel import config as cfg
+from trellis_datamodel.routes.data_model import _infer_type_from_name, _apply_entity_type_inference
 
 
 class TestEntityTypeInference:
@@ -295,3 +296,106 @@ class TestEntityTypeInference:
         assert entity_types["fact_sales"] == "fact"
         assert entity_types["staging_data"] == "unclassified"
         assert entity_types["raw_users"] == "unclassified"
+
+
+class TestInferTypeFromName:
+    """Unit tests for the _infer_type_from_name helper."""
+
+    DIM_PREFIXES = ["dim_", "d_"]
+    FACT_PREFIXES = ["fct_", "fact_"]
+
+    def test_dim_prefix_returns_dimension(self):
+        assert _infer_type_from_name("dim_customer", self.DIM_PREFIXES, self.FACT_PREFIXES) == "dimension"
+
+    def test_d_prefix_returns_dimension(self):
+        assert _infer_type_from_name("d_product", self.DIM_PREFIXES, self.FACT_PREFIXES) == "dimension"
+
+    def test_fct_prefix_returns_fact(self):
+        assert _infer_type_from_name("fct_orders", self.DIM_PREFIXES, self.FACT_PREFIXES) == "fact"
+
+    def test_fact_prefix_returns_fact(self):
+        assert _infer_type_from_name("fact_revenue", self.DIM_PREFIXES, self.FACT_PREFIXES) == "fact"
+
+    def test_case_insensitive(self):
+        assert _infer_type_from_name("DIM_Customer", self.DIM_PREFIXES, self.FACT_PREFIXES) == "dimension"
+        assert _infer_type_from_name("FCT_Orders", self.DIM_PREFIXES, self.FACT_PREFIXES) == "fact"
+
+    def test_no_match_returns_none(self):
+        assert _infer_type_from_name("staging_data", self.DIM_PREFIXES, self.FACT_PREFIXES) is None
+        assert _infer_type_from_name("raw_users", self.DIM_PREFIXES, self.FACT_PREFIXES) is None
+
+    def test_double_underscore_id_matches(self):
+        """Entity IDs like dim__account (generated with double underscore) still match dim_ prefix."""
+        assert _infer_type_from_name("dim__account", self.DIM_PREFIXES, self.FACT_PREFIXES) == "dimension"
+
+
+class TestApplyEntityTypeInferenceUnbound:
+    """Tests for the unbound-entity ID-prefix fallback in _apply_entity_type_inference."""
+
+    @pytest.fixture(autouse=True)
+    def setup_config(self):
+        original_enabled = cfg.DIMENSIONAL_MODELING_CONFIG.enabled
+        original_dim = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+        original_fact = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix
+        cfg.DIMENSIONAL_MODELING_CONFIG.enabled = True
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = ["dim_", "d_"]
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = ["fct_", "fact_"]
+        yield
+        cfg.DIMENSIONAL_MODELING_CONFIG.enabled = original_enabled
+        cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix = original_dim
+        cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix = original_fact
+        DbtCoreAdapter.reset_inference_cache()
+
+    def _make_model_data(self, entities):
+        return {"entities": entities, "relationships": []}
+
+    def _mock_adapter(self, inferred_types):
+        from unittest.mock import MagicMock, patch
+        adapter = MagicMock()
+        adapter.infer_entity_types.return_value = inferred_types
+        return patch("trellis_datamodel.routes.data_model.get_adapter", return_value=adapter)
+
+    def test_unbound_dim_entity_inferred_as_dimension(self):
+        """Unbound entity whose ID starts with dim_ is inferred as dimension."""
+        with self._mock_adapter({}):
+            model_data = self._make_model_data([
+                {"id": "dim__account", "label": "Account", "entity_type": "unclassified"},
+            ])
+            result = _apply_entity_type_inference(model_data)
+        assert result["entities"][0]["entity_type"] == "dimension"
+
+    def test_unbound_fact_entity_inferred_as_fact(self):
+        """Unbound entity whose ID starts with fct_ is inferred as fact."""
+        with self._mock_adapter({}):
+            model_data = self._make_model_data([
+                {"id": "fct_transactions", "label": "Transactions"},
+            ])
+            result = _apply_entity_type_inference(model_data)
+        assert result["entities"][0]["entity_type"] == "fact"
+
+    def test_manually_set_type_not_overridden(self):
+        """A manually saved entity_type is never overwritten by inference."""
+        with self._mock_adapter({}):
+            model_data = self._make_model_data([
+                {"id": "dim__account", "label": "Account", "entity_type": "fact"},
+            ])
+            result = _apply_entity_type_inference(model_data)
+        assert result["entities"][0]["entity_type"] == "fact"
+
+    def test_no_prefix_match_stays_unclassified(self):
+        """Unbound entity with a random/timestamp ID stays unclassified."""
+        with self._mock_adapter({}):
+            model_data = self._make_model_data([
+                {"id": "1684123456789", "label": "New Entity"},
+            ])
+            result = _apply_entity_type_inference(model_data)
+        assert result["entities"][0].get("entity_type") is None
+
+    def test_manifest_inference_takes_precedence(self):
+        """Bound entity classified via manifest is not re-evaluated by ID fallback."""
+        with self._mock_adapter({"dim_customer": "dimension"}):
+            model_data = self._make_model_data([
+                {"id": "dim_customer", "label": "Customer", "entity_type": "unclassified"},
+            ])
+            result = _apply_entity_type_inference(model_data)
+        assert result["entities"][0]["entity_type"] == "dimension"
