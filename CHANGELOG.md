@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.7] - 2026-05-15
+
+### CI
+
+- **Automated release pipeline**: Merges `release.yml` and `publish.yml` into a single workflow. Version bumps in `pyproject.toml` merged to `main` now automatically create a GitHub Release and trigger a PyPI publish. Manual beta publishing via `workflow_dispatch` with an explicit version input is still supported.
+
 ## [0.15.6] - 2026-05-15
 
 ### Fixed

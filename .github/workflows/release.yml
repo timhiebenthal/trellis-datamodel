@@ -1,50 +1,117 @@
-name: Auto Release on Version Bump
+name: Release & Publish
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.16.0b1)"
+        required: true
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      skip: ${{ steps.resolve.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Detect version bump
-        id: version
+      - name: Resolve version
+        id: resolve
         run: |
-          NEW=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
-          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | cut -d'"' -f2 || echo "")
-          echo "new=$NEW" >> $GITHUB_OUTPUT
-          echo "old=$OLD" >> $GITHUB_OUTPUT
-          if [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Check tag does not already exist
-        if: steps.version.outputs.changed == 'true'
-        id: tag_check
-        run: |
-          TAG="v${{ steps.version.outputs.new }}"
-          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
-            echo "Tag $TAG already exists — skipping release."
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            NEW=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
+            OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | cut -d'"' -f2 || echo "")
+            echo "version=$NEW" >> $GITHUB_OUTPUT
+            if [ -z "$NEW" ] || [ "$NEW" == "$OLD" ]; then
+              echo "skip=true" >> $GITHUB_OUTPUT
+            elif git ls-remote --tags origin "v$NEW" | grep -q "v$NEW"; then
+              echo "Tag v$NEW already exists — skipping." >&2
+              echo "skip=true" >> $GITHUB_OUTPUT
+            else
+              echo "skip=false" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Create GitHub Release
-        if: steps.version.outputs.changed == 'true' && steps.tag_check.outputs.skip == 'false'
+        if: steps.resolve.outputs.skip == 'false' && github.event_name != 'workflow_dispatch'
         run: |
-          gh release create "v${{ steps.version.outputs.new }}" \
-            --title "v${{ steps.version.outputs.new }}" \
+          gh release create "v${{ steps.resolve.outputs.version }}" \
+            --title "v${{ steps.resolve.outputs.version }}" \
             --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: release
+    if: needs.release.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Copy frontend to static
+        run: |
+          rm -rf trellis_datamodel/static/*
+          cp -r frontend/build/* trellis_datamodel/static/
+
+      - name: Version Check
+        env:
+          RELEASE_TAG: v${{ needs.release.outputs.version }}
+        run: python scripts/check_version.py
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
