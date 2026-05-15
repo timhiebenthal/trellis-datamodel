@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Packaging
 
-- **PyPI pre-release**: Package version `0.15.5b1` for beta testing elsewhere (`pip install trellis-datamodel==0.15.5b1` after publish).
+- **PyPI pre-release**: Package version `0.15.5b2` for beta testing elsewhere (`pip install trellis-datamodel==0.15.5b2` after publish).
 
 ### Fixed
 
-- **`schema.yml` keeps stale columns after renames/deletes (#98)**: `YamlHandler.update_columns_batch` only added/updated columns and never removed ones missing from the incoming list, so renaming or deleting fields in `data_model.yml` left orphaned entries (and outdated `data_tests`) behind in `schema.yml`. The batch update now rebuilds the column list in the order of the incoming payload, reusing existing column entries by name so custom `data_tests`/`meta` are preserved while missing names are dropped.
+- **`schema.yml` keeps stale columns after renames/deletes (#98)**: Two code paths were affected. `YamlHandler.update_columns_batch` only added/updated columns and never removed ones missing from the incoming list, so renaming or deleting fields in `data_model.yml` left orphaned entries (and outdated `data_tests`) behind in `schema.yml`. The "push to dbt" flow (`DbtCoreAdapter.sync_relationships`) had the same additive pattern for `drafted_fields`, which is why the first beta still left stale columns on push-to-dbt. Both paths now rebuild the column list from the incoming payload, reusing existing column entries by name so custom `data_tests`/`meta` are preserved while missing names are dropped. `sync_relationships` only prunes when the entity actually carries a `drafted_fields` key, so relationship-only syncs do not wipe existing columns.
 
 ## [0.15.4] - 2026-05-08
 

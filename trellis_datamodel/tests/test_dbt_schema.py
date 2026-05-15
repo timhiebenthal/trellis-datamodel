@@ -285,6 +285,63 @@ class TestSyncDbtTests:
         assert result["status"] == "success"
         assert len(result["files"]) == 2  # One for each entity
 
+    def test_sync_dbt_tests_removes_stale_drafted_fields(
+        self, test_client, temp_dir, temp_data_model_path, mock_manifest
+    ):
+        """Regression for #98: when a drafted_field is renamed/removed in
+        data_model.yml, the corresponding column must disappear from schema.yml
+        on the next "push to dbt" run instead of accumulating alongside the new
+        name."""
+        sql_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(sql_dir, exist_ok=True)
+        with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+            f.write("SELECT 1")
+
+        yml_path = os.path.join(sql_dir, "users.yml")
+        with open(yml_path, "w") as f:
+            yaml.dump(
+                {
+                    "version": 2,
+                    "models": [
+                        {
+                            "name": "users",
+                            "columns": [
+                                {"name": "id", "data_type": "int"},
+                                {"name": "old_email", "data_type": "text"},
+                                {"name": "to_delete", "data_type": "text"},
+                            ],
+                        }
+                    ],
+                },
+                f,
+            )
+
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.test_project.users",
+                    "drafted_fields": [
+                        {"name": "id", "datatype": "int"},
+                        {"name": "new_email", "datatype": "text"},
+                    ],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        with open(yml_path, "r") as f:
+            saved = yaml.safe_load(f)
+        names = [c["name"] for c in saved["models"][0]["columns"]]
+        assert names == ["id", "new_email"]
+
     def test_syncs_relationship_tests_with_entity_type(
         self, test_client, temp_dir, temp_data_model_path
     ):
