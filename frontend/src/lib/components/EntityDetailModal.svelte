@@ -168,11 +168,17 @@
 	}
 
 	// Drag-to-reorder state for drafted fields
+	let lastMouseDownTarget: HTMLElement | null = null;
 	let dragIndex = $state<number | null>(null);
 	let dropIndex = $state<number | null>(null);
 	let dropPosition = $state<'before' | 'after' | null>(null);
 
 	function onAttributeDragStart(index: number, e: DragEvent) {
+		const mouseDownTag = lastMouseDownTarget?.tagName ?? null;
+		if (mouseDownTag === 'INPUT' || mouseDownTag === 'SELECT' || mouseDownTag === 'TEXTAREA') {
+			e.preventDefault();
+			return;
+		}
 		e.dataTransfer!.effectAllowed = 'move';
 		// Defer state update so browser captures drag image before DOM changes
 		setTimeout(() => {
@@ -1335,29 +1341,30 @@
 								</div>
 								<div class="divide-y divide-gray-200">
 								{#each mergedFields as field (field.origin === 'draft' ? `draft-${field.draftIndex}` : `dbt-${field.name}`)}
-									<div
-										class="relative px-3 py-2 hover:bg-gray-50 group transition-colors"
-										data-testid={`merged-field-row-${field.name}`}
-										draggable={field.origin === 'draft'}
-										ondragstart={field.origin === 'draft' ? (e) => onAttributeDragStart(field.draftIndex, e) : undefined}
-										ondragover={field.origin === 'draft' ? (e) => onAttributeDragOver(field.draftIndex, e) : undefined}
-										ondrop={field.origin === 'draft' ? (e) => onAttributeDrop(field.draftIndex, e) : undefined}
-										ondragend={field.origin === 'draft' ? onAttributeDragEnd : undefined}
-										style={field.origin === 'draft' && dragIndex === field.draftIndex ? 'opacity: 0.5;' : ''}
-									>
+								<div
+									class="relative px-3 py-2 hover:bg-gray-50 group transition-colors"
+									data-testid={`merged-field-row-${field.name}`}
+									draggable={field.origin === 'draft'}
+									ondragstart={field.origin === 'draft' ? (e) => onAttributeDragStart(field.draftIndex, e) : undefined}
+									ondragover={field.origin === 'draft' ? (e) => onAttributeDragOver(field.draftIndex, e) : undefined}
+									ondrop={field.origin === 'draft' ? (e) => onAttributeDrop(field.draftIndex, e) : undefined}
+									ondragend={field.origin === 'draft' ? onAttributeDragEnd : undefined}
+									style={field.origin === 'draft' && dragIndex === field.draftIndex ? 'opacity: 0.5;' : ''}
+								onmousedown={field.origin === 'draft' ? (e) => { lastMouseDownTarget = e.target as HTMLElement; } : undefined}
+								>
 											<div class="grid grid-cols-12 gap-2 items-center">
 											<!-- Name -->
 											<div class="col-span-2">
 												{#if field.origin === 'draft'}
 													<div class="flex items-center gap-1">
 														<Icon icon="lucide:grip-vertical" class="w-4 h-4 text-gray-300 cursor-grab active:cursor-grabbing shrink-0" />
-														<input
-															type="text"
-															value={field.name}
-															oninput={(e) => updateDraftedField(field.draftIndex, { name: (e.target as HTMLInputElement).value })}
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
-															placeholder="attribute_name"
-														/>
+						<input
+														type="text"
+														value={field.name}
+														oninput={(e) => updateDraftedField(field.draftIndex, { name: (e.target as HTMLInputElement).value })}
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+														placeholder="attribute_name"
+													/>
 													</div>
 												{:else}
 														<input
@@ -1374,11 +1381,11 @@
 													{#if field.origin === 'dbt'}
 														<span class="px-1 py-2 text-xs font-mono uppercase text-gray-500">{field.datatype ?? '—'}</span>
 													{:else}
-														<select
-															value={field.datatype}
-															onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as any })}
-															class="w-full px-1 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
-														>
+						<select
+														value={field.datatype}
+														onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as any })}
+														class="w-full px-1 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
+													>
 															<option value="text">text</option>
 															<option value="int">int</option>
 															<option value="float">float</option>
@@ -1390,26 +1397,26 @@
 												</div>
 												<!-- Description (editable for both origins) -->
 												<div class="col-span-6">
-													{#if field.origin === 'dbt'}
-														<input
-															type="text"
-															value={materializedDescriptionEdits.get(field.name) ?? field.description ?? ''}
-															oninput={(e) => {
-																const map = new Map(materializedDescriptionEdits);
-																map.set(field.name, (e.target as HTMLInputElement).value);
-																materializedDescriptionEdits = map;
-															}}
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-															placeholder="Description (optional)"
-														/>
-													{:else}
-														<input
-															type="text"
-															value={field.description ?? ''}
-															oninput={(e) => updateDraftedField(field.draftIndex, { description: (e.target as HTMLInputElement).value })}
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-															placeholder="Description (optional)"
-														/>
+												{#if field.origin === 'dbt'}
+													<input
+														type="text"
+														value={materializedDescriptionEdits.get(field.name) ?? field.description ?? ''}
+														oninput={(e) => {
+															const map = new Map(materializedDescriptionEdits);
+															map.set(field.name, (e.target as HTMLInputElement).value);
+															materializedDescriptionEdits = map;
+														}}
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+														placeholder="Description (optional)"
+													/>
+												{:else}
+													<input
+														type="text"
+														value={field.description ?? ''}
+														oninput={(e) => updateDraftedField(field.draftIndex, { description: (e.target as HTMLInputElement).value })}
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+														placeholder="Description (optional)"
+													/>
 													{/if}
 												</div>
 												<!-- Origin label -->
@@ -1423,12 +1430,12 @@
 															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 text-gray-400 opacity-70" aria-hidden="true" />
 														</span>
 													{:else}
-														<input
-															type="text"
-															value={editableDraftedFields[field.draftIndex]?.origin ?? ''}
-															oninput={(e) => updateDraftedField(field.draftIndex, { origin: (e.target as HTMLInputElement).value })}
-															class="w-full px-2 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-															placeholder="Origin"
+													<input
+														type="text"
+														value={editableDraftedFields[field.draftIndex]?.origin ?? ''}
+														oninput={(e) => updateDraftedField(field.draftIndex, { origin: (e.target as HTMLInputElement).value })}
+														class="w-full px-2 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+														placeholder="Origin"
 															aria-label={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
 															title={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
 														/>
