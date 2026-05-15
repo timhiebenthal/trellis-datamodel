@@ -1006,25 +1006,32 @@ class DbtCoreAdapter:
             if entity_tags is not None:
                 self.yaml_handler.update_model_tags(model_entry, entity_tags)
 
-            # Sync Drafted Fields
-            drafted_fields = entity.get("drafted_fields", [])
-            for field in drafted_fields:
-                f_name = field.get("name")
-                f_type = field.get("datatype")
-                f_desc = field.get("description")
-                f_origin = field.get("origin")
-                if f_desc and f_origin:
-                    f_desc = f"{f_desc} | Origin: {f_origin}"
-                elif f_origin:
-                    f_desc = f"Origin: {f_origin}"
+            # Sync Drafted Fields. When drafted_fields is provided we treat it as
+            # the authoritative column list — fields removed/renamed in the data
+            # model must disappear from schema.yml (issue #98). Entities without a
+            # drafted_fields key are left untouched so relationship-only syncs
+            # don't wipe existing columns.
+            if "drafted_fields" in entity:
+                columns_payload: list[dict[str, Any]] = []
+                for field in entity.get("drafted_fields") or []:
+                    f_name = field.get("name")
+                    if not f_name:
+                        continue
+                    f_desc = field.get("description")
+                    f_origin = field.get("origin")
+                    if f_desc and f_origin:
+                        f_desc = f"{f_desc} | Origin: {f_origin}"
+                    elif f_origin:
+                        f_desc = f"Origin: {f_origin}"
+                    columns_payload.append(
+                        {
+                            "name": f_name,
+                            "data_type": field.get("datatype"),
+                            "description": f_desc,
+                        }
+                    )
 
-                if not f_name:
-                    continue
-
-                col = self.yaml_handler.ensure_column(model_entry, f_name)
-                self.yaml_handler.update_column(
-                    col, data_type=f_type, description=f_desc
-                )
+                self.yaml_handler.update_columns_batch(model_entry, columns_payload)
 
             # Sync Relationships (FKs)
             # Build a map of which fields should have which relationship tests
