@@ -1,0 +1,50 @@
+name: Auto Release on Version Bump
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect version bump
+        id: version
+        run: |
+          NEW=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
+          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | cut -d'"' -f2 || echo "")
+          echo "new=$NEW" >> $GITHUB_OUTPUT
+          echo "old=$OLD" >> $GITHUB_OUTPUT
+          if [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check tag does not already exist
+        if: steps.version.outputs.changed == 'true'
+        id: tag_check
+        run: |
+          TAG="v${{ steps.version.outputs.new }}"
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "Tag $TAG already exists — skipping release."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.changed == 'true' && steps.tag_check.outputs.skip == 'false'
+        run: |
+          gh release create "v${{ steps.version.outputs.new }}" \
+            --title "v${{ steps.version.outputs.new }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
