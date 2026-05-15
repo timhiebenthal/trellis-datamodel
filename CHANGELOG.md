@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.6] - 2026-05-15
+
+### Fixed
+
+- **Entity detail modal — text selection in drafted attribute rows ([#97](https://github.com/timhiebenthal/trellis-datamodel/issues/97))**: Click-drag inside name, description, origin, or type controls no longer starts a row drag. `dragstart` reports the draggable row as `event.target`, not the focused input, so the handler now uses the prior `mousedown` target to cancel the drag when interaction began on `input` / `select` / `textarea`, restoring normal text selection and edge scrolling in those fields.
+
 ## [0.15.5] - 2026-05-15
 
 ### Packaging
