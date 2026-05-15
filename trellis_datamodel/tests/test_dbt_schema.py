@@ -721,6 +721,50 @@ class TestUpdateModelSchema:
         yml_path = os.path.join(sql_dir, "users.yml")
         assert os.path.exists(yml_path)
 
+    def test_removes_renamed_and_deleted_columns(
+        self, test_client, temp_dir, mock_manifest
+    ):
+        """Regression: renaming or deleting fields in data_model.yml must
+        propagate to schema.yml instead of leaving stale columns behind.
+        See issue #98."""
+        sql_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(sql_dir, exist_ok=True)
+        with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+            f.write("SELECT 1")
+
+        yml_path = os.path.join(sql_dir, "users.yml")
+        with open(yml_path, "w") as f:
+            yaml.dump(
+                {
+                    "version": 2,
+                    "models": [
+                        {
+                            "name": "users",
+                            "columns": [
+                                {"name": "id", "data_type": "int"},
+                                {"name": "old_email", "data_type": "text"},
+                                {"name": "to_delete", "data_type": "text"},
+                            ],
+                        }
+                    ],
+                },
+                f,
+            )
+
+        request_data = {
+            "columns": [
+                {"name": "id", "data_type": "int"},
+                {"name": "new_email", "data_type": "text"},
+            ],
+        }
+        response = test_client.post("/api/models/users/schema", json=request_data)
+        assert response.status_code == 200
+
+        with open(yml_path, "r") as f:
+            saved = yaml.safe_load(f)
+        names = [c["name"] for c in saved["models"][0]["columns"]]
+        assert names == ["id", "new_email"]
+
 
 class TestInferRelationships:
     """Tests for GET /api/infer-relationships endpoint."""

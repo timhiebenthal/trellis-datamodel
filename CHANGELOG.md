@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Packaging
+
+- **PyPI pre-release**: Package version `0.15.5b1` for beta testing elsewhere (`pip install trellis-datamodel==0.15.5b1` after publish).
+
+### Fixed
+
+- **`schema.yml` keeps stale columns after renames/deletes (#98)**: `YamlHandler.update_columns_batch` only added/updated columns and never removed ones missing from the incoming list, so renaming or deleting fields in `data_model.yml` left orphaned entries (and outdated `data_tests`) behind in `schema.yml`. The batch update now rebuilds the column list in the order of the incoming payload, reusing existing column entries by name so custom `data_tests`/`meta` are preserved while missing names are dropped.
+
 ## [0.15.4] - 2026-05-08
 
 ### Fixed
