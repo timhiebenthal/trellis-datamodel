@@ -1,5 +1,6 @@
 """Tests for configuration loading."""
 
+import os
 import textwrap
 from pathlib import Path
 
@@ -423,3 +424,43 @@ def test_entity_modeling_disabled_when_dimensional_model(monkeypatch, tmp_path):
     assert cfg.MODELING_STYLE == "dimensional_model"
     assert cfg.ENTITY_MODELING_CONFIG.enabled is False
     assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == []
+
+
+# ===== Bruin Adapter Configuration Tests (Stream C) =====
+
+
+def test_load_bruin_config(monkeypatch, tmp_path):
+    """Test loading Bruin-specific config values."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: bruin
+        bruin_pipeline_path: "./pipeline"
+        bruin_asset_paths:
+          - "03_core"
+        data_model_file: "data_model.yml"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.FRAMEWORK == "bruin"
+    assert cfg.BRUIN_PIPELINE_PATH == os.path.abspath(os.path.join(str(tmp_path), "pipeline"))
+    assert cfg.BRUIN_ASSET_PATHS == ["03_core"]
+
+
+def test_bruin_config_missing_pipeline_path(monkeypatch, tmp_path):
+    """Test that Bruin config without pipeline_path falls back to empty string."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: bruin
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.FRAMEWORK == "bruin"
+    assert cfg.BRUIN_PIPELINE_PATH == ""

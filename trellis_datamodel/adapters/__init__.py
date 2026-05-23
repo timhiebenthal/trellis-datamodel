@@ -8,10 +8,11 @@ from typing import Union
 
 from trellis_datamodel import config as cfg
 from .base import TransformationAdapter
+from .bruin import BruinAdapter
 from .dbt_core import DbtCoreAdapter
 
 
-def get_adapter() -> Union[DbtCoreAdapter, TransformationAdapter]:
+def get_adapter() -> Union[DbtCoreAdapter, BruinAdapter, TransformationAdapter]:
     """
     Get the appropriate adapter based on the configured framework.
 
@@ -31,10 +32,17 @@ def get_adapter() -> Union[DbtCoreAdapter, TransformationAdapter]:
             model_paths=cfg.DBT_MODEL_PATHS,
         )
 
+    if cfg.FRAMEWORK == "bruin":
+        return BruinAdapter(
+            pipeline_path=cfg.BRUIN_PIPELINE_PATH,
+            data_model_path=cfg.DATA_MODEL_PATH,
+            asset_paths=cfg.BRUIN_ASSET_PATHS,
+        )
+
     raise ValueError(
         f"Unknown framework: {cfg.FRAMEWORK}. "
-        f"Supported frameworks: dbt-core"
+        f"Supported frameworks: dbt-core, bruin"
     )
 
 
-__all__ = ["get_adapter", "TransformationAdapter", "DbtCoreAdapter"]
+__all__ = ["get_adapter", "BruinAdapter", "DbtCoreAdapter", "TransformationAdapter"]

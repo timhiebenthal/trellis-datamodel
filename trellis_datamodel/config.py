@@ -88,6 +88,8 @@ if _TEST_DIR:
     )
     DBT_PROJECT_PATH: str = _TEST_DIR
     DBT_MODEL_PATHS: list[str] = ["3_core"]
+    BRUIN_PIPELINE_PATH: str = ""
+    BRUIN_ASSET_PATHS: list[str] = []
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
@@ -112,6 +114,8 @@ else:
     CANVAS_LAYOUT_VERSION_CONTROL: bool = True
     DBT_PROJECT_PATH: str = ""
     DBT_MODEL_PATHS: list[str] = []
+    BRUIN_PIPELINE_PATH: str = ""
+    BRUIN_ASSET_PATHS: list[str] = []
     FRONTEND_BUILD_DIR: str = ""
     DBT_COMPANY_DUMMY_PATH: str = ""
     LINEAGE_LAYERS: list[str] = []
@@ -234,6 +238,15 @@ def _resolve_frontend_build_dir(config_path: str, config: dict[str, Any]) -> str
     return os.path.abspath(
         os.path.join(_resolve_base_path(config_path), "frontend", "build")
     )
+
+
+def _resolve_bruin_pipeline_path(config_path: str, config: dict[str, Any]) -> str:
+    """Resolve bruin_pipeline_path relative to config file directory."""
+    pipeline_path = config.get("bruin_pipeline_path")
+    if not pipeline_path:
+        return ""
+    base_dir = _resolve_base_path(config_path)
+    return _resolve_path(base_dir, pipeline_path)
 
 
 def _resolve_company_dummy_path(config_path: str, config: dict[str, Any]) -> str:
@@ -485,7 +498,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS
 
     # Skip loading config file in test mode (paths already set via environment)
     # unless a config file is explicitly selected (TRELLIS_CONFIG_PATH or CLI --config).
@@ -507,6 +520,11 @@ def load_config(config_path: Optional[str] = None) -> None:
 
     # 0. Framework
     FRAMEWORK = config.get("framework", "dbt-core")
+
+    # 0a. Bruin config (when framework is bruin)
+    if FRAMEWORK == "bruin":
+        BRUIN_PIPELINE_PATH = _resolve_bruin_pipeline_path(CONFIG_PATH, config)
+        BRUIN_ASSET_PATHS = config.get("bruin_asset_paths", [])
 
     # 1. Project path (required for other resolutions)
     DBT_PROJECT_PATH = _resolve_project_path(CONFIG_PATH, config)
@@ -641,3 +659,7 @@ def print_config() -> None:
         logger.info("Entity prefixes: %s", ENTITY_MODELING_CONFIG.entity_prefix)
     if DBT_COMPANY_DUMMY_PATH:
         logger.info("dbt company dummy path: %s", DBT_COMPANY_DUMMY_PATH)
+    if FRAMEWORK == "bruin":
+        logger.info("Bruin pipeline path: %s", BRUIN_PIPELINE_PATH)
+        if BRUIN_ASSET_PATHS:
+            logger.info("Bruin asset paths: %s", BRUIN_ASSET_PATHS)

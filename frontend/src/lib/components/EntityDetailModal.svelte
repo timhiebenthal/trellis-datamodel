@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
-	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
+	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle, configStatus } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
@@ -1404,14 +1404,14 @@
 													{/if}
 												</div>
 												<!-- Origin label -->
-												<div class="col-span-2 text-xs text-gray-400 font-mono truncate" title={field.origin === 'dbt' ? 'dbt model' : 'drafted'}>
+												<div class="col-span-2 text-xs text-gray-400 font-mono truncate" title={field.origin === 'dbt' ? ($configStatus?.framework === 'bruin' ? 'Defined in Bruin asset' : 'dbt model') : 'drafted'}>
 													{#if field.origin === 'dbt'}
 														<span
 															class="inline-flex items-center"
-															aria-label={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
-															title={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+															aria-label={$configStatus?.framework === 'bruin' ? `Defined in Bruin asset '${boundModel?.name ?? ''}'` : `Materialized in dbt model '${boundModel?.name ?? ''}'`}
+															title={$configStatus?.framework === 'bruin' ? `Defined in Bruin asset '${boundModel?.name ?? ''}'` : `Materialized in dbt model '${boundModel?.name ?? ''}'`}
 														>
-															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 text-gray-400 opacity-70" aria-hidden="true" />
+															<Icon icon={$configStatus?.framework === 'bruin' ? 'lucide:database' : 'simple-icons:dbt'} class="h-3.5 w-3.5 text-gray-400 opacity-70" aria-hidden="true" />
 														</span>
 													{:else}
 														<input

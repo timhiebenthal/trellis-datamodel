@@ -1,9 +1,10 @@
 """
-Schema service for dbt schema file operations.
+Schema service for transformation framework schema operations.
 
-Handles reading, writing, and syncing dbt schema YAML files. This service
-encapsulates all business logic for dbt schema.yml operations, including:
-- Reading model schemas from YAML files
+Handles reading, writing, and syncing schema definitions across supported
+transformation frameworks. This service encapsulates all business logic
+for schema operations, including:
+- Reading model schemas from YAML files or Bruin assets
 - Writing/updating model schemas
 - Syncing relationship tests from data model to schema files
 - Inferring relationships from existing schema files
@@ -29,6 +30,7 @@ from trellis_datamodel.utils.path_validation import (
     ensure_data_model_path_exists,
     validate_data_model_path,
     validate_dbt_project_path,
+    validate_pipeline_path,
 )
 
 
@@ -54,8 +56,15 @@ def save_dbt_schema(
 
     Raises:
         ConfigurationError: If dbt_project_path is not configured
+        ConfigurationError: If framework is bruin (dbt-only operation)
         FileOperationError: If schema save fails
     """
+    if cfg.FRAMEWORK == "bruin":
+        raise ConfigurationError(
+            "dbt schema generation is not available for Bruin framework. "
+            "Use save_model_schema instead."
+        )
+
     validate_dbt_project_path()
 
     try:
@@ -81,8 +90,15 @@ def sync_dbt_tests() -> list[Path]:
 
     Raises:
         ConfigurationError: If dbt_project_path or data_model_path is not configured
+        ConfigurationError: If framework is bruin (dbt-only operation)
         FileOperationError: If data model file not found or sync fails
     """
+    if cfg.FRAMEWORK == "bruin":
+        raise ConfigurationError(
+            "dbt test sync is not available for Bruin framework. "
+            "Relationships are managed in data_model.yml."
+        )
+
     validate_dbt_project_path()
     data_model_path = validate_data_model_path()
 
@@ -135,7 +151,7 @@ def sync_dbt_tests() -> list[Path]:
 
 def get_model_schema(model_name: str, version: int | None = None) -> dict[str, Any]:
     """
-    Get the schema for a specific model from its YAML file.
+    Get the schema for a specific model from its YAML file or Bruin asset.
 
     Args:
         model_name: Name of the model
@@ -145,11 +161,14 @@ def get_model_schema(model_name: str, version: int | None = None) -> dict[str, A
         Dictionary with model_name, description, columns, tags, file_path
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured
+        ConfigurationError: If dbt_project_path/pipeline_path is not configured
         NotFoundError: If model not found
         FileOperationError: If schema read fails
     """
-    validate_dbt_project_path()
+    if cfg.FRAMEWORK == "bruin":
+        validate_pipeline_path()
+    else:
+        validate_dbt_project_path()
 
     try:
         adapter = get_adapter()
@@ -178,7 +197,7 @@ def update_model_schema(
     version: int | None = None,
 ) -> Path:
     """
-    Update the schema for a specific model in its YAML file.
+    Update the schema for a specific model in its YAML file or Bruin asset.
 
     Args:
         model_name: Name of the model to update
@@ -191,11 +210,14 @@ def update_model_schema(
         Path to the updated schema file
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured
+        ConfigurationError: If dbt_project_path/pipeline_path is not configured
         NotFoundError: If model not found
         FileOperationError: If schema update fails
     """
-    validate_dbt_project_path()
+    if cfg.FRAMEWORK == "bruin":
+        validate_pipeline_path()
+    else:
+        validate_dbt_project_path()
 
     try:
         adapter = get_adapter()
@@ -226,10 +248,14 @@ def infer_relationships(include_unbound: bool = False) -> list[dict[str, Any]]:
         List of inferred relationships
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured or no schema files found
+        ConfigurationError: If dbt_project_path/pipeline_path is not configured
+            or no schema files found
         FileOperationError: If schema files cannot be read
     """
-    validate_dbt_project_path()
+    if cfg.FRAMEWORK == "bruin":
+        validate_pipeline_path()
+    else:
+        validate_dbt_project_path()
 
     try:
         adapter = get_adapter()

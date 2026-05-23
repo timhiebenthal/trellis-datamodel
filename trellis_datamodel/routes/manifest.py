@@ -47,6 +47,32 @@ async def get_config_status():
         # Default to trellis.yml (primary config file name)
         config_filename = "trellis.yml"
 
+    if cfg.FRAMEWORK == "bruin":
+        pipeline_path_exists = (
+            os.path.exists(cfg.BRUIN_PIPELINE_PATH) if cfg.BRUIN_PIPELINE_PATH else False
+        )
+        data_model_exists = (
+            os.path.exists(cfg.DATA_MODEL_PATH) if cfg.DATA_MODEL_PATH else False
+        )
+
+        error = None
+        if not config_present:
+            error = "Config file not found."
+        elif not cfg.BRUIN_PIPELINE_PATH:
+            error = "bruin_pipeline_path not set in config."
+        elif not pipeline_path_exists:
+            error = f"Pipeline path not found at {cfg.BRUIN_PIPELINE_PATH}"
+
+        return {
+            "config_present": config_present,
+            "config_filename": config_filename,
+            "framework": cfg.FRAMEWORK,
+            "bruin_pipeline_path": cfg.BRUIN_PIPELINE_PATH,
+            "pipeline_path_exists": pipeline_path_exists,
+            "data_model_exists": data_model_exists,
+            "error": error,
+        }
+
     manifest_exists = os.path.exists(cfg.MANIFEST_PATH) if cfg.MANIFEST_PATH else False
     catalog_exists = os.path.exists(cfg.CATALOG_PATH) if cfg.CATALOG_PATH else False
     data_model_exists = (
@@ -88,7 +114,7 @@ async def get_config_info():
     except Exception:
         model_dirs = []
 
-    return {
+    response: dict = {
         "config_path": config_path,
         "framework": cfg.FRAMEWORK,
         "dbt_project_path": cfg.DBT_PROJECT_PATH,
@@ -145,6 +171,15 @@ async def get_config_info():
             else []
         ),
     }
+
+    if cfg.FRAMEWORK == "bruin":
+        response["bruin_pipeline_path"] = cfg.BRUIN_PIPELINE_PATH
+        response["bruin_asset_paths"] = cfg.BRUIN_ASSET_PATHS
+        response["pipeline_path_exists"] = bool(
+            cfg.BRUIN_PIPELINE_PATH and os.path.exists(cfg.BRUIN_PIPELINE_PATH)
+        )
+
+    return response
 
 
 @router.get("/manifest")

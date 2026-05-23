@@ -998,42 +998,44 @@ import {
                 </button>
             {/if}
 
-            <button
-                onclick={handleInferFromDbt}
-                disabled={syncing || loading}
-                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
-                title="Import relationship tests from dbt yml files"
-            >
-                <Icon icon="lucide:download" class="w-3.5 h-3.5" />
-                Pull from dbt
-            </button>
+            {#if $configStatus?.framework !== 'bruin'}
+                <button
+                    onclick={handleInferFromDbt}
+                    disabled={syncing || loading}
+                    class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                    title="Import relationship tests from dbt yml files"
+                >
+                    <Icon icon="lucide:download" class="w-3.5 h-3.5" />
+                    Pull from dbt
+                </button>
 
-            <button
-                onclick={handleSyncDbt}
-                disabled={syncing || loading}
-                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm relative"
-                class:bg-primary-600={!needsSync}
-                class:hover:bg-primary-700={!needsSync}
-                class:bg-amber-600={needsSync}
-                class:hover:bg-amber-700={needsSync}
-                class:animate-pulse={needsSync}
-                title={needsSync 
-                    ? "⚠️ Changes in data model need to be pushed to dbt schema files" 
-                    : "Sync entity & field-definitions and relationship-tests to dbt schema.yml files"}
-            >
-                {#if syncing}
-                    <Icon icon="lucide:loader-2" class="w-3.5 h-3.5 animate-spin" />
-                {:else}
-                    <Icon icon="lucide:upload" class="w-3.5 h-3.5" />
-                {/if}
-                Push to dbt
-                {#if needsSync && !syncing}
-                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                    </span>
-                {/if}
-            </button>
+                <button
+                    onclick={handleSyncDbt}
+                    disabled={syncing || loading}
+                    class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm relative"
+                    class:bg-primary-600={!needsSync}
+                    class:hover:bg-primary-700={!needsSync}
+                    class:bg-amber-600={needsSync}
+                    class:hover:bg-amber-700={needsSync}
+                    class:animate-pulse={needsSync}
+                    title={needsSync 
+                        ? "⚠️ Changes in data model need to be pushed to dbt schema files" 
+                        : "Sync entity & field-definitions and relationship-tests to dbt schema.yml files"}
+                >
+                    {#if syncing}
+                        <Icon icon="lucide:loader-2" class="w-3.5 h-3.5 animate-spin" />
+                    {:else}
+                        <Icon icon="lucide:upload" class="w-3.5 h-3.5" />
+                    {/if}
+                    Push to dbt
+                    {#if needsSync && !syncing}
+                        <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                        </span>
+                    {/if}
+                </button>
+            {/if}
         </div>
     </header>
 

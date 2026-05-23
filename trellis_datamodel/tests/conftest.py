@@ -74,6 +74,9 @@ def clean_test_files():
     cfg.DATA_MODEL_PATH = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
     cfg.CANVAS_LAYOUT_PATH = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
     cfg.DBT_PROJECT_PATH = _TEST_TEMP_DIR
+    cfg.FRAMEWORK = "dbt-core"
+    cfg.BRUIN_PIPELINE_PATH = ""
+    cfg.BRUIN_ASSET_PATHS = []
 
 
 @pytest.fixture

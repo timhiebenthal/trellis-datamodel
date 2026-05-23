@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0b1] - 2026-05-24
+
+### Added
+
+- **Bruin adapter**: New `BruinAdapter` implementing the `TransformationAdapter` protocol, enabling Trellis to read and write Bruin pipeline assets via inline `@bruin` YAML comment blocks in SQL and Python source files — no manifest or catalog required.
+- **`@bruin` block parser** (`utils/bruin_parser.py`): Extracts YAML metadata from `/* @bruin ... @bruin */` (SQL) and `"""@bruin ... @bruin"""` (Python) comment blocks; scans pipeline directories recursively with subdirectory filtering.
+- **`@bruin` block rewriter** (`utils/bruin_rewriter.py`): Modifies `@bruin` blocks inline with atomic writes and round-trip YAML preservation; maps `ColumnSchema.data_type` → Bruin's `type` field for column updates.
+- **Bruin config**: New `framework: bruin` option in `trellis.yml` with `bruin_pipeline_path` and `bruin_asset_paths` settings; `validate_pipeline_path()` for Bruin-specific path validation.
+- **Framework-aware service guards**: `services/manifest.py` and `services/schema.py` now route to `validate_pipeline_path()` for Bruin and `validate_manifest_path()`/`validate_dbt_project_path()` for dbt-core; `save_dbt_schema()` and `sync_dbt_tests()` raise `ConfigurationError` for Bruin (dbt-only operations).
+- **Framework-aware route responses**: `/api/config-status` returns `pipeline_path_exists` and Bruin-specific error messages when `framework: bruin`; `/api/config-info` includes `bruin_pipeline_path` and `bruin_asset_paths`; `/api/dbt-schema` and `/api/sync-dbt-tests` return 400 for Bruin.
+- **Frontend framework switching**: Sidebar shows Bruin favicon + "Bruin Assets" label when `framework: bruin`; EntityDetailModal shows `lucide:database` icon and "Defined in Bruin asset" tooltip; config page offers `bruin` framework option with Bruin-specific path fields; dbt-only Push/Pull buttons hidden for Bruin.
+- **`trellis.yml.example`**: Added commented Bruin config section.
+
+### Changed
+
+- **Service docstrings**: `services/manifest.py` and `services/schema.py` module docstrings generalized from "dbt" to "transformation framework" where appropriate.
+
 ## [0.15.3] - 2026-04-29
 
 ### Added

@@ -522,13 +522,24 @@
         <div class="border-t border-gray-200 mb-3"></div>
 
         <!-- dbt Models Header -->
-        <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of dbt">
-            <img
-                src="https://www.getdbt.com/favicon.ico"
-                alt="dbt icon"
-                class="w-4 h-4 flex-shrink-0"
-            />
-            <span class="text-xs font-semibold text-gray-600">dbt Models</span>
+        <div class="mb-2 flex items-center gap-2" title={$configStatus?.framework === 'bruin'
+            ? 'These assets are read from Bruin pipeline source files'
+            : 'These models are read from manifest/catalog artifacts of dbt'}>
+            {#if $configStatus?.framework === 'bruin'}
+                <img
+                    src="https://getbruin.com/favicon.ico"
+                    alt="Bruin icon"
+                    class="w-4 h-4 flex-shrink-0"
+                />
+                <span class="text-xs font-semibold text-gray-600">Bruin Assets</span>
+            {:else}
+                <img
+                    src="https://www.getdbt.com/favicon.ico"
+                    alt="dbt icon"
+                    class="w-4 h-4 flex-shrink-0"
+                />
+                <span class="text-xs font-semibold text-gray-600">dbt Models</span>
+            {/if}
         </div>
 
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
@@ -550,7 +561,7 @@
                         <div class="text-gray-500 text-sm mb-4">
                             No models found
                         </div>
-                        {#if $configStatus && (!$configStatus.config_present || !$configStatus.dbt_project_path || !$configStatus.manifest_exists)}
+                        {#if $configStatus && (!$configStatus.config_present || ($configStatus.framework === 'bruin' ? (!$configStatus.bruin_pipeline_path || !$configStatus.pipeline_path_exists) : (!$configStatus.dbt_project_path || !$configStatus.manifest_exists)))}
                             <div
                                 class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800 text-left"
                             >
@@ -575,7 +586,7 @@
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
-                                                d="M19 2v2.859A9.97 9.97 0 0 0 12 2C6.477 2 2 6.477 2 12a10 10 0 0 0 .832 4M5 22v-2.859A9.97 9.97 0 0 0 12 22c5.523 0 10-4.477 10-10a10 10 0 0 0-.832-4"
+                                                d="M19 2v2.859A9.97 9.97 0 0 0 12 2C6.477 2 2 6.477 2 12a10 10 0 0 0 .832 4M5 22v-2.859A9.97 9.97 0 0 0 12 22c5.523 0 10-5.477 10-10a10 10 0 0 0-.832-4"
                                             />
                                         </g>
                                     </svg>
@@ -583,19 +594,30 @@
                                 </strong><br />
                                 {#if !$configStatus.config_present}
                                     Missing <code>{$configStatus.config_filename || 'trellis.yml'}</code>.
-                                {:else if !$configStatus.dbt_project_path}
-                                    Set <code>dbt_project_path</code> in config.
-                                {:else if !$configStatus.manifest_exists}
-                                    Manifest not found.<br />
-                                    <span class="text-[10px] mt-1 block opacity-75">
-                                        {#if $configStatus.catalog_exists === false}
-                                            Run <code>dbt docs generate</code> to create manifest.json and catalog.json.
-                                        {:else}
-                                            Run <code>dbt compile</code> to create manifest.json.
-                                        {/if}
-                                        <br />
-                                        Check the <strong>Config Info</strong> button for configuration details.
-                                    </span>
+                                {:else if $configStatus.framework === 'bruin'}
+                                    {#if !$configStatus.bruin_pipeline_path}
+                                        Set <code>bruin_pipeline_path</code> in config.
+                                    {:else if !$configStatus.pipeline_path_exists}
+                                        Pipeline path not found.<br />
+                                        <span class="text-[10px] mt-1 block opacity-75">
+                                            Check the <strong>Config Info</strong> button for configuration details.
+                                        </span>
+                                    {/if}
+                                {:else}
+                                    {#if !$configStatus.dbt_project_path}
+                                        Set <code>dbt_project_path</code> in config.
+                                    {:else if !$configStatus.manifest_exists}
+                                        Manifest not found.<br />
+                                        <span class="text-[10px] mt-1 block opacity-75">
+                                            {#if $configStatus.catalog_exists === false}
+                                                Run <code>dbt docs generate</code> to create manifest.json and catalog.json.
+                                            {:else}
+                                                Run <code>dbt compile</code> to create manifest.json.
+                                            {/if}
+                                            <br />
+                                            Check the <strong>Config Info</strong> button for configuration details.
+                                        </span>
+                                    {/if}
                                 {/if}
                             </div>
                         {/if}

@@ -34,6 +34,31 @@ def validate_dbt_project_path() -> str:
     return cfg.DBT_PROJECT_PATH
 
 
+def validate_pipeline_path() -> str:
+    """
+    Validate that bruin_pipeline_path is configured and exists.
+
+    Returns:
+        The validated bruin_pipeline_path
+
+    Raises:
+        ConfigurationError: If path is not configured or doesn't exist
+    """
+    import trellis_datamodel.config as _cfg
+
+    if not _cfg.BRUIN_PIPELINE_PATH:
+        raise ConfigurationError(
+            "bruin_pipeline_path is not configured. Please set it in trellis.yml"
+        )
+
+    if not os.path.exists(_cfg.BRUIN_PIPELINE_PATH):
+        raise ConfigurationError(
+            f"bruin_pipeline_path does not exist: {_cfg.BRUIN_PIPELINE_PATH}"
+        )
+
+    return _cfg.BRUIN_PIPELINE_PATH
+
+
 def validate_manifest_path() -> str:
     """
     Validate that manifest_path is configured and exists.

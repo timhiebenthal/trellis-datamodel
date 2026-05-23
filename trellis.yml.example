@@ -66,6 +66,10 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #  enabled: false  # Set to true to enable lineage UI/endpoints
 #  layers: []  # Ordered folder names that become lineage layers
 
+# Bruin pipeline configuration (only used when framework: bruin)
+# bruin_pipeline_path: "./pipeline"   # Path to Bruin pipeline directory
+# bruin_asset_paths: []               # Subdirectory filters (e.g., ["03_core", "04_mart"])
+
 # Entity creation guidance (preferred block). Defaults match new schema.
 #entity_creation_guidance:
 #  enabled: true  # Set false to disable the step-by-step wizard

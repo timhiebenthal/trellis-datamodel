@@ -29,7 +29,8 @@
     let conflictWarning: string | null = null;
     let conflictInfo: any = null;
 
-    // Reactive modeling style for conditional rendering
+    // Reactive framework and modeling style for conditional rendering
+    $: framework = config.framework;
     $: modelingStyle = config.modeling_style;
 
     // Entity guidance toggle state for dependent fields
@@ -414,7 +415,7 @@
                                     onchange={(e) => handleFieldChange('framework', e.currentTarget.value)}
                                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                                 >
-                                    {#each getEnumOptions('framework', ['dbt-core']) as value}
+                                    {#each getEnumOptions('framework', ['dbt-core', 'bruin']) as value}
                                         <option value={value}>{value}</option>
                                     {/each}
                                 </select>
@@ -448,70 +449,141 @@
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
                         <div class="flex items-center gap-2 mb-4">
                             <h2 class="text-lg font-semibold text-gray-900">Paths</h2>
-                            <Tooltip text="Configure file paths to your dbt project artifacts and data model files. These paths tell trellis where to find your transformation metadata.">
+                            <Tooltip text="Configure file paths to your project artifacts and data model files. These paths tell trellis where to find your transformation metadata.">
                                 <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
                             </Tooltip>
                         </div>
                         <div class="space-y-4">
-                            <div>
-                                <label for="dbt-project-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                    dbt Project Path
-                                </label>
-                                <input
-                                    id="dbt-project-path-input"
-                                    type="text"
-                                    value={getFieldValue('dbt_project_path')}
-                                    oninput={(e) => handleFieldChange('dbt_project_path', e.currentTarget.value)}
-                                    placeholder="./dbt_project"
-                                    class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_project_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
-                                />
-                                {#if getFieldMetadata('dbt_project_path')?.description}
-                                    <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_project_path')?.description}</p>
-                                {/if}
-                                {#if validationErrors['dbt_project_path']}
-                                    <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_project_path']}</p>
-                                {/if}
-                            </div>
+                            {#if framework === 'bruin'}
+                                <div>
+                                    <label for="bruin-pipeline-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Bruin Pipeline Path
+                                    </label>
+                                    <input
+                                        id="bruin-pipeline-path-input"
+                                        type="text"
+                                        value={getFieldValue('bruin_pipeline_path') || ''}
+                                        oninput={(e) => handleFieldChange('bruin_pipeline_path', e.currentTarget.value || null)}
+                                        placeholder="./pipeline"
+                                        class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['bruin_pipeline_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
+                                    />
+                                    {#if getFieldMetadata('bruin_pipeline_path')?.description}
+                                        <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('bruin_pipeline_path')?.description}</p>
+                                    {/if}
+                                    {#if validationErrors['bruin_pipeline_path']}
+                                        <p class="mt-1 text-xs text-red-600">{validationErrors['bruin_pipeline_path']}</p>
+                                    {/if}
+                                </div>
 
-                            <div>
-                                <label for="dbt-manifest-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Manifest Path
-                                </label>
-                                <input
-                                    id="dbt-manifest-path-input"
-                                    type="text"
-                                    value={getFieldValue('dbt_manifest_path')}
-                                    oninput={(e) => handleFieldChange('dbt_manifest_path', e.currentTarget.value)}
-                                    placeholder="target/manifest.json"
-                                    class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_manifest_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
-                                />
-                                {#if getFieldMetadata('dbt_manifest_path')?.description}
-                                    <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_manifest_path')?.description}</p>
-                                {/if}
-                                {#if validationErrors['dbt_manifest_path']}
-                                    <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_manifest_path']}</p>
-                                {/if}
-                            </div>
+                                <div>
+                                    <label for="bruin-asset-paths-0" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Bruin Asset Paths
+                                    </label>
+                                    {#each (getFieldValue('bruin_asset_paths') || []) as path, index (index)}
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <input
+                                                id={`bruin-asset-paths-${index}`}
+                                                type="text"
+                                                value={path}
+                                                oninput={(e) => {
+                                                    const newPaths = [...(getFieldValue('bruin_asset_paths') || [])];
+                                                    newPaths[index] = e.currentTarget.value;
+                                                    handleFieldChange('bruin_asset_paths', newPaths);
+                                                }}
+                                                placeholder="assets/"
+                                                class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onclick={() => {
+                                                    const newPaths = [...(getFieldValue('bruin_asset_paths') || [])];
+                                                    newPaths.splice(index, 1);
+                                                    handleFieldChange('bruin_asset_paths', newPaths);
+                                                }}
+                                                class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium"
+                                                title="Remove path"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    {/each}
+                                    {#if (getFieldValue('bruin_asset_paths') || []).length === 0}
+                                        <p class="mt-1.5 text-xs text-gray-500">No asset paths configured</p>
+                                    {/if}
+                                    <button
+                                        type="button"
+                                        onclick={() => {
+                                            const newPaths = [...(getFieldValue('bruin_asset_paths') || []), ''];
+                                            handleFieldChange('bruin_asset_paths', newPaths);
+                                        }}
+                                        class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
+                                    >
+                                        + Add Path
+                                    </button>
+                                </div>
+                            {/if}
 
-                            <div>
-                                <label for="dbt-catalog-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Catalog Path
-                                </label>
-                                <input
-                                    id="dbt-catalog-path-input"
-                                    type="text"
-                                    value={getFieldValue('dbt_catalog_path')}
-                                    oninput={(e) => handleFieldChange('dbt_catalog_path', e.currentTarget.value)}
-                                    placeholder="target/catalog.json"
-                                    class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_catalog_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
-                                />
-                                {#if getFieldMetadata('dbt_catalog_path')?.description}
-                                    <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_catalog_path')?.description}</p>
-                                {/if}
-                                {#if validationErrors['dbt_catalog_path']}
-                                    <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_catalog_path']}</p>
-                                {/if}
-                            </div>
+                            {#if framework !== 'bruin'}
+                                <div>
+                                    <label for="dbt-project-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        dbt Project Path
+                                    </label>
+                                    <input
+                                        id="dbt-project-path-input"
+                                        type="text"
+                                        value={getFieldValue('dbt_project_path')}
+                                        oninput={(e) => handleFieldChange('dbt_project_path', e.currentTarget.value)}
+                                        placeholder="./dbt_project"
+                                        class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_project_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
+                                    />
+                                    {#if getFieldMetadata('dbt_project_path')?.description}
+                                        <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_project_path')?.description}</p>
+                                    {/if}
+                                    {#if validationErrors['dbt_project_path']}
+                                        <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_project_path']}</p>
+                                    {/if}
+                                </div>
+
+                                <div>
+                                    <label for="dbt-manifest-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Manifest Path
+                                    </label>
+                                    <input
+                                        id="dbt-manifest-path-input"
+                                        type="text"
+                                        value={getFieldValue('dbt_manifest_path')}
+                                        oninput={(e) => handleFieldChange('dbt_manifest_path', e.currentTarget.value)}
+                                        placeholder="target/manifest.json"
+                                        class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_manifest_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
+                                    />
+                                    {#if getFieldMetadata('dbt_manifest_path')?.description}
+                                        <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_manifest_path')?.description}</p>
+                                    {/if}
+                                    {#if validationErrors['dbt_manifest_path']}
+                                        <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_manifest_path']}</p>
+                                    {/if}
+                                </div>
+
+                                <div>
+                                    <label for="dbt-catalog-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        Catalog Path
+                                    </label>
+                                    <input
+                                        id="dbt-catalog-path-input"
+                                        type="text"
+                                        value={getFieldValue('dbt_catalog_path')}
+                                        oninput={(e) => handleFieldChange('dbt_catalog_path', e.currentTarget.value)}
+                                        placeholder="target/catalog.json"
+                                        class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['dbt_catalog_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
+                                    />
+                                    {#if getFieldMetadata('dbt_catalog_path')?.description}
+                                        <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_catalog_path')?.description}</p>
+                                    {/if}
+                                    {#if validationErrors['dbt_catalog_path']}
+                                        <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_catalog_path']}</p>
+                                    {/if}
+                                </div>
+                            {/if}
 
                             <div>
                                 <label for="data-model-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -533,69 +605,71 @@
                                 {/if}
                             </div>
 
-                            <div>
-                                <label for="dbt-company-dummy-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                    dbt Company Dummy Path
-                                </label>
-                                <input
-                                    id="dbt-company-dummy-path-input"
-                                    type="text"
-                                    value={getFieldValue('dbt_company_dummy_path') || ''}
-                                    oninput={(e) => handleFieldChange('dbt_company_dummy_path', e.currentTarget.value || null)}
-                                    placeholder="./dbt_company_dummy"
-                                    class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
-                                />
-                                {#if getFieldMetadata('dbt_company_dummy_path')?.description}
-                                    <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_company_dummy_path')?.description}</p>
-                                {/if}
-                            </div>
+                            {#if framework !== 'bruin'}
+                                <div>
+                                    <label for="dbt-company-dummy-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        dbt Company Dummy Path
+                                    </label>
+                                    <input
+                                        id="dbt-company-dummy-path-input"
+                                        type="text"
+                                        value={getFieldValue('dbt_company_dummy_path') || ''}
+                                        oninput={(e) => handleFieldChange('dbt_company_dummy_path', e.currentTarget.value || null)}
+                                        placeholder="./dbt_company_dummy"
+                                        class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                    />
+                                    {#if getFieldMetadata('dbt_company_dummy_path')?.description}
+                                        <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('dbt_company_dummy_path')?.description}</p>
+                                    {/if}
+                                </div>
 
-                            <div>
-                                <label for="dbt-model-paths-0" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                    dbt Model Paths
-                                </label>
-                                {#each dbtModelPaths as path, index (index)}
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <input
-                                            id={`dbt-model-paths-${index}`}
-                                            type="text"
-                                            value={path}
-                                            oninput={(e) => {
-                                                const newPaths = [...dbtModelPaths];
-                                                newPaths[index] = e.currentTarget.value;
-                                                handleFieldChange('dbt_model_paths', newPaths);
-                                            }}
-                                            placeholder="3_core"
-                                            class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
-                                        />
-                                        <button
-                                            type="button"
-                                            onclick={() => {
-                                                const newPaths = [...dbtModelPaths];
-                                                newPaths.splice(index, 1);
-                                                handleFieldChange('dbt_model_paths', newPaths);
-                                            }}
-                                            class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium"
-                                            title="Remove path"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                {/each}
-                                {#if dbtModelPaths.length === 0}
-                                    <p class="mt-1.5 text-xs text-gray-500">Empty = all models included</p>
-                                {/if}
-                                <button
-                                    type="button"
-                                    onclick={() => {
-                                        const newPaths = [...dbtModelPaths, ''];
-                                        handleFieldChange('dbt_model_paths', newPaths);
-                                    }}
-                                    class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
-                                >
-                                    + Add Path
-                                </button>
-                            </div>
+                                <div>
+                                    <label for="dbt-model-paths-0" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                        dbt Model Paths
+                                    </label>
+                                    {#each dbtModelPaths as path, index (index)}
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <input
+                                                id={`dbt-model-paths-${index}`}
+                                                type="text"
+                                                value={path}
+                                                oninput={(e) => {
+                                                    const newPaths = [...dbtModelPaths];
+                                                    newPaths[index] = e.currentTarget.value;
+                                                    handleFieldChange('dbt_model_paths', newPaths);
+                                                }}
+                                                placeholder="3_core"
+                                                class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onclick={() => {
+                                                    const newPaths = [...dbtModelPaths];
+                                                    newPaths.splice(index, 1);
+                                                    handleFieldChange('dbt_model_paths', newPaths);
+                                                }}
+                                                class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium"
+                                                title="Remove path"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    {/each}
+                                    {#if dbtModelPaths.length === 0}
+                                        <p class="mt-1.5 text-xs text-gray-500">Empty = all models included</p>
+                                    {/if}
+                                    <button
+                                        type="button"
+                                        onclick={() => {
+                                            const newPaths = [...dbtModelPaths, ''];
+                                            handleFieldChange('dbt_model_paths', newPaths);
+                                        }}
+                                        class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
+                                    >
+                                        + Add Path
+                                    </button>
+                                </div>
+                            {/if}
                         </div>
                     </div>
 

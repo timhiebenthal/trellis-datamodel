@@ -195,6 +195,9 @@ export interface ConfigInfo {
     label_prefixes?: string[];
     dimension_prefix?: string[];
     fact_prefix?: string[];
+    bruin_pipeline_path?: string;
+    bruin_asset_paths?: string[];
+    pipeline_path_exists?: boolean;
 }
 
 export interface FieldDragState {

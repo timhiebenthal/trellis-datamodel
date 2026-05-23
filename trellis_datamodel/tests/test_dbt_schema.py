@@ -1600,3 +1600,111 @@ class TestModelSchemaVersionHandling:
         assert v2_cols[0]["description"] == "Updated PK"
         assert versions[2].get("config", {}).get("tags") == ["core"]
         assert updated["models"][0]["latest_version"] == 2
+
+
+class TestBruinSchemaService:
+    """Tests for schema service with Bruin framework."""
+
+    def test_get_model_schema_uses_pipeline_path_in_bruin(self, monkeypatch, temp_dir):
+        """When framework is bruin, get_model_schema calls validate_pipeline_path instead of validate_dbt_project_path."""
+        import sys
+        from trellis_datamodel.exceptions import ConfigurationError, NotFoundError
+
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "FRAMEWORK", "bruin")
+        monkeypatch.setattr(config_module, "BRUIN_PIPELINE_PATH", temp_dir)
+        monkeypatch.setattr(config_module, "BRUIN_ASSET_PATHS", [])
+
+        # validate_dbt_project_path should NOT be called for Bruin
+        monkeypatch.setattr(
+            "trellis_datamodel.services.schema.validate_dbt_project_path",
+            lambda: (_ for _ in ()).throw(
+                ConfigurationError("should not be called")
+            ),
+        )
+
+        from trellis_datamodel.services.schema import get_model_schema
+
+        # Should NOT get ConfigurationError from validate_dbt_project_path
+        # Instead, it will hit NotFoundError since model doesn't exist
+        with pytest.raises(NotFoundError):
+            get_model_schema("nonexistent_model")
+
+    def test_save_dbt_schema_raises_in_bruin(self, monkeypatch):
+        """When framework is bruin, save_dbt_schema raises ConfigurationError."""
+        import sys
+        from trellis_datamodel.exceptions import ConfigurationError
+
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "FRAMEWORK", "bruin")
+
+        from trellis_datamodel.services.schema import save_dbt_schema
+
+        with pytest.raises(
+            ConfigurationError, match="dbt schema generation is not available"
+        ):
+            save_dbt_schema(entity_id="test", model_name="test", fields=[])
+
+    def test_sync_dbt_tests_raises_in_bruin(self, monkeypatch):
+        """When framework is bruin, sync_dbt_tests raises ConfigurationError."""
+        import sys
+        from trellis_datamodel.exceptions import ConfigurationError
+
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "FRAMEWORK", "bruin")
+
+        from trellis_datamodel.services.schema import sync_dbt_tests
+
+        with pytest.raises(
+            ConfigurationError, match="dbt test sync is not available"
+        ):
+            sync_dbt_tests()
+
+    def test_update_model_schema_uses_pipeline_path_in_bruin(self, monkeypatch, temp_dir):
+        """When framework is bruin, update_model_schema calls validate_pipeline_path."""
+        import sys
+        from trellis_datamodel.exceptions import ConfigurationError, NotFoundError
+
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "FRAMEWORK", "bruin")
+        monkeypatch.setattr(config_module, "BRUIN_PIPELINE_PATH", temp_dir)
+        monkeypatch.setattr(config_module, "BRUIN_ASSET_PATHS", [])
+
+        # validate_dbt_project_path should NOT be called for Bruin
+        monkeypatch.setattr(
+            "trellis_datamodel.services.schema.validate_dbt_project_path",
+            lambda: (_ for _ in ()).throw(
+                ConfigurationError("should not be called")
+            ),
+        )
+
+        from trellis_datamodel.services.schema import update_model_schema
+
+        # Should NOT get ConfigurationError from validate_dbt_project_path
+        with pytest.raises(NotFoundError):
+            update_model_schema("nonexistent_model", columns=[])
+
+    def test_infer_relationships_uses_pipeline_path_in_bruin(self, monkeypatch, temp_dir):
+        """When framework is bruin, infer_relationships calls validate_pipeline_path."""
+        import sys
+        from trellis_datamodel.exceptions import ConfigurationError
+
+        config_module = sys.modules["trellis_datamodel.config"]
+        monkeypatch.setattr(config_module, "FRAMEWORK", "bruin")
+        monkeypatch.setattr(config_module, "BRUIN_PIPELINE_PATH", temp_dir)
+        monkeypatch.setattr(config_module, "BRUIN_ASSET_PATHS", [])
+
+        # validate_dbt_project_path should NOT be called for Bruin
+        monkeypatch.setattr(
+            "trellis_datamodel.services.schema.validate_dbt_project_path",
+            lambda: (_ for _ in ()).throw(
+                ConfigurationError("should not be called")
+            ),
+        )
+
+        from trellis_datamodel.services.schema import infer_relationships
+
+        # Should NOT get ConfigurationError from validate_dbt_project_path
+        # BruinAdapter.infer_relationships returns []
+        result = infer_relationships()
+        assert result == []
