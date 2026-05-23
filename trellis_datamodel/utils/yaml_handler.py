@@ -421,23 +421,39 @@ class YamlHandler:
         columns_data: List[Dict[str, Any]],
     ) -> None:
         """
-        Update multiple columns at once.
+        Replace the column list of a model with ``columns_data``.
 
-        Args:
-            model: Model entry
-            columns_data: List of column dicts with name, data_type, description
+        Existing column entries are reused (preserving tests, meta, and any
+        other round-tripped keys) when their ``name`` appears in
+        ``columns_data``. Columns missing from the incoming list are dropped,
+        so renames/deletions in the data model propagate to schema.yml.
+        Final order follows ``columns_data``.
         """
+        existing_by_name: Dict[str, CommentedMap] = {}
+        for col in model.get("columns", []) or []:
+            name = col.get("name") if isinstance(col, dict) else None
+            if name:
+                existing_by_name[name] = col
+
+        new_columns = CommentedSeq()
         for col_data in columns_data:
             col_name = col_data.get("name")
             if not col_name:
                 continue
 
-            col = self.ensure_column(model, col_name)
+            col = existing_by_name.get(col_name)
+            if col is None:
+                col = CommentedMap()
+                col["name"] = col_name
+
             self.update_column(
                 col,
                 data_type=col_data.get("data_type"),
                 description=col_data.get("description"),
             )
+            new_columns.append(col)
+
+        model["columns"] = new_columns
 
     def get_columns(self, model: CommentedMap) -> List[Dict[str, Any]]:
         """

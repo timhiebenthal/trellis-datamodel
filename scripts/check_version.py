@@ -35,7 +35,7 @@ def main():
     pyproject_version = get_version_from_pyproject()
 
     # Get release tag from environment variable or GitHub event
-    release_tag = os.environ.get("GITHUB_REF_NAME") or os.environ.get("RELEASE_TAG", "")
+    release_tag = os.environ.get("RELEASE_TAG") or os.environ.get("GITHUB_REF_NAME", "")
 
     # For release events, try to get from GITHUB_REF
     if not release_tag and os.environ.get("GITHUB_EVENT_NAME") == "release":

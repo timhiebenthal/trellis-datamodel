@@ -133,12 +133,29 @@ def _merge_layout_into_model(
     return model_data
 
 
+def _infer_type_from_name(name: str, dim_prefixes: List[str], fact_prefixes: List[str]) -> str | None:
+    """Infer entity type from a name string using configured dim/fact prefixes."""
+    name_lower = name.lower()
+    for prefix in dim_prefixes:
+        if name_lower.startswith(prefix.lower()):
+            return "dimension"
+    for prefix in fact_prefixes:
+        if name_lower.startswith(prefix.lower()):
+            return "fact"
+    return None
+
+
 def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Apply entity type inference to model data when dimensional modeling is enabled.
 
     Inference is only applied to entities that don't already have entity_type set.
     Manually set entity_type values are preserved.
+
+    Two-pass inference:
+    1. Manifest-based: bound entities whose dbt model name matches dim_/fct_ prefixes.
+    2. ID-based fallback: unbound entities not in the manifest but whose entity ID
+       itself matches the configured dimension/fact prefix patterns.
     """
     try:
         adapter = get_adapter()
@@ -147,22 +164,30 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
         print(f"Warning: Could not infer entity types: {e}")
         return model_data
 
+    dim_prefixes: List[str] = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
+    fact_prefixes: List[str] = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix
+
     entities = model_data.get("entities", [])
     for entity in entities:
         entity_id = entity.get("id")
         if not entity_id:
             continue
 
-        # Apply inference if entity_type is missing or still unclassified
         existing_type = entity.get("entity_type")
         should_infer = existing_type is None or existing_type == "unclassified"
-        if should_infer and entity_id in inferred_types:
+        if not should_infer:
+            continue
+
+        if entity_id in inferred_types:
+            # Manifest-based inference (bound entities)
             entity["entity_type"] = inferred_types[entity_id]
-            print(
-                f"Inferred entity_type '{inferred_types[entity_id]}' for entity '{entity_id}'"
-            )
+            print(f"Inferred entity_type '{inferred_types[entity_id]}' for entity '{entity_id}'")
         else:
-            pass
+            # ID-based fallback for unbound entities not in the dbt manifest
+            inferred = _infer_type_from_name(entity_id, dim_prefixes, fact_prefixes)
+            if inferred:
+                entity["entity_type"] = inferred
+                print(f"Inferred entity_type '{inferred}' for unbound entity '{entity_id}' from ID prefix")
 
     return model_data
 
@@ -345,10 +370,6 @@ def _split_model_and_layout(
         # Only persist source_system for unbound entities (not for bound entities)
         if "source_system" in entity and not entity.get("dbt_model"):
             model_entity["source_system"] = entity["source_system"]
-            # Log instrumentation
-            print(
-                f"DEBUG: Entity {entity_id} is unbound, persisting source_system: {entity.get('source_system')}"
-            )
 
         model_data["entities"].append(model_entity)
 

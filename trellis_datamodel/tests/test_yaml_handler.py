@@ -174,6 +174,47 @@ class TestYamlHandlerColumnOperations:
         assert model["columns"][0]["data_type"] == "int"
         assert model["columns"][1]["description"] == "User name"
 
+    def test_update_columns_batch_removes_missing_columns(self):
+        """Renamed/deleted fields in data_model.yml must disappear from schema.yml."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "orders"})
+        model["columns"] = CommentedSeq(
+            [
+                CommentedMap({"name": "order_id", "data_type": "int"}),
+                CommentedMap({"name": "old_name", "data_type": "text"}),
+                CommentedMap({"name": "amount", "data_type": "numeric"}),
+            ]
+        )
+
+        handler.update_columns_batch(
+            model,
+            [
+                {"name": "order_id", "data_type": "int"},
+                {"name": "new_name", "data_type": "text"},
+                {"name": "amount", "data_type": "numeric"},
+            ],
+        )
+
+        names = [c["name"] for c in model["columns"]]
+        assert names == ["order_id", "new_name", "amount"]
+        assert "old_name" not in names
+
+    def test_update_columns_batch_preserves_existing_metadata(self):
+        """Reused columns must keep tests/meta the user added in schema.yml."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "orders"})
+        order_id_col = CommentedMap({"name": "order_id", "data_type": "int"})
+        order_id_col["data_tests"] = CommentedSeq(["not_null"])
+        model["columns"] = CommentedSeq([order_id_col])
+
+        handler.update_columns_batch(
+            model,
+            [{"name": "order_id", "data_type": "int", "description": "PK"}],
+        )
+
+        assert list(model["columns"][0]["data_tests"]) == ["not_null"]
+        assert model["columns"][0]["description"] == "PK"
+
     def test_get_columns(self):
         handler = YamlHandler()
         model = CommentedMap(

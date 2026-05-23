@@ -21,6 +21,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Service docstrings**: `services/manifest.py` and `services/schema.py` module docstrings generalized from "dbt" to "transformation framework" where appropriate.
+## [0.15.7] - 2026-05-15
+
+### CI
+
+- **Automated release pipeline**: Merges `release.yml` and `publish.yml` into a single workflow. Version bumps in `pyproject.toml` merged to `main` now automatically create a GitHub Release and trigger a PyPI publish. Manual beta publishing via `workflow_dispatch` with an explicit version input is still supported.
+
+## [0.15.6] - 2026-05-15
+
+### Fixed
+
+- **Entity detail modal — text selection in drafted attribute rows ([#97](https://github.com/timhiebenthal/trellis-datamodel/issues/97))**: Click-drag inside name, description, origin, or type controls no longer starts a row drag. `dragstart` reports the draggable row as `event.target`, not the focused input, so the handler now uses the prior `mousedown` target to cancel the drag when interaction began on `input` / `select` / `textarea`, restoring normal text selection and edge scrolling in those fields.
+
+## [0.15.5] - 2026-05-15
+
+### Packaging
+
+- **PyPI pre-release**: Package version `0.15.5b2` for beta testing elsewhere (`pip install trellis-datamodel==0.15.5b2` after publish).
+
+### Fixed
+
+- **`schema.yml` keeps stale columns after renames/deletes (#98)**: Two code paths were affected. `YamlHandler.update_columns_batch` only added/updated columns and never removed ones missing from the incoming list, so renaming or deleting fields in `data_model.yml` left orphaned entries (and outdated `data_tests`) behind in `schema.yml`. The "push to dbt" flow (`DbtCoreAdapter.sync_relationships`) had the same additive pattern for `drafted_fields`, which is why the first beta still left stale columns on push-to-dbt. Both paths now rebuild the column list from the incoming payload, reusing existing column entries by name so custom `data_tests`/`meta` are preserved while missing names are dropped. `sync_relationships` only prunes when the entity actually carries a `drafted_fields` key, so relationship-only syncs do not wipe existing columns.
+
+## [0.15.4] - 2026-05-08
+
+### Fixed
+
+- **Entity detail modal — attribute name input**: Typing a full attribute name no longer loses focus after each character. Root cause was the Svelte keyed-each using `field.name` as the key, which destroyed and recreated the input on every keystroke; fixed by using a stable `draft-{draftIndex}` key.
+- **Entity detail modal — attribute drag-to-reorder**: Drag handles and drop events were wired up in the data model but never attached to the DOM. Rows now have `draggable`, `ondragstart`, `ondragover`, `ondrop`, and `ondragend` handlers, restoring the ability to reorder attributes by dragging.
+- **Unbound entity type inference**: Unbound entities (not linked to a dbt model) whose ID matches a configured dimension or fact prefix (e.g. `dim_`, `fct_`) are now automatically classified on load, matching the existing behaviour for bound entities.
 
 ## [0.15.3] - 2026-04-29
 
