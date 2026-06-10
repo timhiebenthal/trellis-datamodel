@@ -8,7 +8,7 @@
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
-	import { exportEntityToExcel } from '$lib/utils/excel-export';
+	import { exportEntityToExcel, formatRelationshipType, formatRelationshipKeys } from '$lib/utils/excel-export';
 	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
 	import { goto } from '$app/navigation';
 	import DropIndicator from './DropIndicator.svelte';
@@ -109,6 +109,32 @@
 	let currentEntity = $derived.by(() => {
 		if (!$entityDetailModal.open || !$entityDetailModal.entityId) return null;
 		return $nodes.find((n) => n.id === $entityDetailModal.entityId) || null;
+	});
+
+	// Read-only relationships for the current entity, derived from the edges that touch it.
+	// Mirrors the markdown/Excel export: related entity, direction, cardinality, join keys.
+	let entityRelationships = $derived.by(() => {
+		const id = currentEntity?.id;
+		if (!id) return [];
+		return $edges
+			.filter((e) => e.source === id || e.target === id)
+			.map((e) => {
+				const isOutgoing = e.source === id;
+				const relatedId = isOutgoing ? e.target : e.source;
+				const relatedName = ($nodes.find((n) => n.id === relatedId)?.data?.label as string) || relatedId;
+				const sourceName = ($nodes.find((n) => n.id === e.source)?.data?.label as string) || e.source;
+				const targetName = ($nodes.find((n) => n.id === e.target)?.data?.label as string) || e.target;
+				const data = e.data as Record<string, unknown> | undefined;
+				return {
+					edgeId: e.id,
+					relatedId,
+					relatedName,
+					isOutgoing,
+					cardinality: formatRelationshipType((data?.type as string) || 'unknown'),
+					keys: formatRelationshipKeys(data, sourceName, targetName),
+					label: (data?.label as string) || ''
+				};
+			});
 	});
 
 	// Check if entity is bound to dbt model
@@ -791,6 +817,16 @@
 
 	function closeModal() {
 		$entityDetailModal = { open: false, entityId: null };
+	}
+
+	// Navigate the modal to a related entity. Warns on unsaved changes, mirroring handleCancel.
+	function openRelatedEntity(entityId: string) {
+		if (!entityId || entityId === currentEntity?.id) return;
+		if (isDirty) {
+			const confirmed = confirm('You have unsaved changes. Switch entities without saving?');
+			if (!confirmed) return;
+		}
+		entityDetailModal.set({ open: true, entityId });
 	}
 
 	// Annotation type options for dimensions
@@ -1504,6 +1540,42 @@
 										<Icon icon="lucide:layers" class="w-4 h-4 text-primary-600" />
 										<span class="font-mono text-sm text-gray-900">{model}</span>
 									</div>
+								</div>
+							{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Relationships (read-only, click an entity to navigate) -->
+					{#if entityRelationships.length > 0}
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 mb-3">
+								Relationships ({entityRelationships.length})
+							</label>
+							<div class="space-y-2">
+							{#each entityRelationships as rel (rel.edgeId)}
+								<div class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+									<div class="flex items-center gap-2 flex-wrap">
+										<Icon
+											icon={rel.isOutgoing ? 'lucide:arrow-right' : 'lucide:arrow-left'}
+											class="w-4 h-4 text-gray-400 shrink-0"
+										/>
+										<button
+											type="button"
+											onclick={() => openRelatedEntity(rel.relatedId)}
+											class="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
+										>
+											{rel.relatedName}
+										</button>
+										<span class="text-xs text-gray-500">
+											({rel.cardinality}, {rel.isOutgoing ? 'Outgoing' : 'Incoming'})
+										</span>
+									</div>
+									{#if rel.keys}
+										<div class="mt-1 ml-6 font-mono text-xs text-gray-500">{rel.keys}</div>
+									{:else if rel.label}
+										<div class="mt-1 ml-6 text-xs text-gray-500 italic">{rel.label}</div>
+									{/if}
 								</div>
 							{/each}
 							</div>

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.9] - 2026-06-10
+
+### Added
+
+- **Relationships section in the entity detail modal**: The EntityDetailModal now shows the entity's relationships directly on screen, previously they appeared only in the Markdown/Excel export, not the modal UI. Each relationship lists the related entity (a clickable link that navigates the modal to that entity), the direction (incoming/outgoing), the cardinality (e.g. 1:N), and the table-qualified join keys (`source_model.source_field = target_model.target_field`). The list reuses the same `formatRelationshipKeys` / `formatRelationshipType` helpers as the exports, so the modal and exports stay consistent. Navigating to another entity warns first if there are unsaved changes.
+
 ## [0.15.8] - 2026-06-10
 
 ### Changed
