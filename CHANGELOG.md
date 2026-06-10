@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.8] - 2026-06-10
+
+### Fixed
+
+- **Relationship name shows as `-` in entity exports**: Markdown and Excel exports read the relationship name from the top-level `edge.label`, which is always undefined. The name is stored at `edge.data.label` (set in `aggregateRelationshipsIntoEdges`), so every relationship rendered as `via "-"` in exports even though the canvas editor displayed the correct name. All three export sites now read `edge.data.label`. Test fixtures that encoded the wrong edge shape (label at the top level instead of under `data`), which had masked the bug, were corrected.
+
 ## [0.15.7] - 2026-05-15
 
 ### CI
