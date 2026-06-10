@@ -8,6 +8,7 @@ import {
   formatEntityType,
   formatAnnotationType,
   formatRelationshipType,
+  formatRelationshipKeys,
   generateOverviewSheet,
   generateAttributesSheet,
   generateRelationshipsSheet,
@@ -253,10 +254,45 @@ describe('Sheet Generators', () => {
       expect(sheet.data[0]).toEqual(['Related Entity', 'Relationship Label', 'Relationship Type', 'Direction']);
     });
 
+    it('should use concrete join keys in the relationship cell when available', () => {
+      const edges = [
+        {
+          source: 'entity1',
+          target: 'entity2',
+          data: {
+            label: 'belongs to',
+            type: 'many_to_one',
+            source_field: 'customer_id',
+            target_field: 'id'
+          }
+        }
+      ];
+      const nodes = [
+        { id: 'entity1', data: { label: 'Order' } },
+        { id: 'entity2', data: { label: 'Customer' } }
+      ];
+
+      const sheet = generateRelationshipsSheet(edges, 'entity1', nodes);
+      expect(sheet.data[1]).toEqual(['Customer', 'customer_id = id', 'N:1', 'Outgoing']);
+    });
+
     it('should handle no relationships', () => {
       const sheet = generateRelationshipsSheet([], 'entity1', []);
       expect(sheet).toBeDefined();
       expect(sheet.data[1]).toEqual(['No relationships defined', '', '', '']);
+    });
+  });
+
+  describe('formatRelationshipKeys', () => {
+    it('returns source = target when both fields present', () => {
+      expect(formatRelationshipKeys({ source_field: 'a_id', target_field: 'b_id' })).toBe('a_id = b_id');
+    });
+
+    it('returns null when either field is missing', () => {
+      expect(formatRelationshipKeys({ source_field: 'a_id' })).toBeNull();
+      expect(formatRelationshipKeys({ target_field: 'b_id' })).toBeNull();
+      expect(formatRelationshipKeys({})).toBeNull();
+      expect(formatRelationshipKeys(undefined)).toBeNull();
     });
   });
 });

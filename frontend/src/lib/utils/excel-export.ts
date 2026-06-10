@@ -120,6 +120,25 @@ export function formatRelationshipType(type: string): string {
 }
 
 /**
+ * Formats the concrete join keys of a relationship edge as `source_field = target_field`.
+ *
+ * The keys come from the edge's `data.source_field` / `data.target_field` (the same fields
+ * the canvas lineage view renders). Returns null when either key is missing so callers can
+ * fall back to the business label.
+ *
+ * @param data - The edge `data` object
+ * @returns A `source = target` join expression, or null when keys are unavailable
+ */
+export function formatRelationshipKeys(data: Record<string, unknown> | null | undefined): string | null {
+	const sourceField = data?.source_field as string | undefined;
+	const targetField = data?.target_field as string | undefined;
+	if (sourceField && targetField) {
+		return `${sourceField} = ${targetField}`;
+	}
+	return null;
+}
+
+/**
  * Generates Overview sheet with entity metadata in key-value format
  * @param entity - Entity data from EntityDetailModal
  * @returns Configured XLSX worksheet with bold headers and column widths
@@ -186,7 +205,7 @@ export function generateRelationshipsSheet(
 
 			return [
 				relatedEntity?.data?.label || relatedEntityId,
-				edge.data?.label || '-',
+				formatRelationshipKeys(edge.data) ?? (edge.data?.label || '-'),
 				formatRelationshipType(edge.data?.type || 'unknown'),
 				isOutgoing ? 'Outgoing' : 'Incoming'
 			];
@@ -383,7 +402,7 @@ export function generateDataModelOverviewSheet(
 			rows.push([
 				nodeById.get(edge.source) ?? edge.source,
 				nodeById.get(edge.target) ?? edge.target,
-				edge.data?.label ?? '',
+				formatRelationshipKeys(edge.data) ?? (edge.data?.label ?? ''),
 				formatRelationshipType(edge.data?.type ?? 'unknown')
 			]);
 		}

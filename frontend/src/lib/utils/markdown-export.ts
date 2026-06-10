@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/svelte';
 import type { EntityData } from '$lib/types';
-import { formatEntityType, formatAnnotationType, formatRelationshipType } from './excel-export';
+import { formatEntityType, formatAnnotationType, formatRelationshipType, formatRelationshipKeys } from './excel-export';
 
 /**
  * Prepares a value for a GFM pipe table cell: single-line text and no raw `|` characters.
@@ -90,11 +90,14 @@ export function formatEntityAsMarkdown(
 			const relatedEntityId = isOutgoing ? edge.target : edge.source;
 			const relatedEntity = allNodes.find(n => n.id === relatedEntityId);
 			const relatedEntityName = relatedEntity?.data?.label || relatedEntityId;
-			const relationshipLabel = edge.data?.label || '-';
+			// Prefer the concrete join keys (source_field = target_field); fall back to the
+			// business label, then "-", when keys are unavailable.
+			const joinKeys = formatRelationshipKeys(edge.data);
+			const via = joinKeys ?? `"${edge.data?.label || '-'}"`;
 			const relationshipType = formatRelationshipType(edge.data?.type || 'unknown');
 			const direction = isOutgoing ? 'Outgoing' : 'Incoming';
 
-			lines.push(`- **${relatedEntityName}** via "${relationshipLabel}" (${relationshipType}, ${direction})`);
+			lines.push(`- **${relatedEntityName}** via ${via} (${relationshipType}, ${direction})`);
 		}
 	}
 

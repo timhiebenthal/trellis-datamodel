@@ -323,6 +323,66 @@ describe('markdown-export utilities', () => {
 			expect(result).toContain('- **Order** via "-" (1:N, Outgoing)');
 		});
 
+		it('should show concrete join keys (source = target) when available, without quotes', () => {
+			const edgesWithKeys = [
+				{
+					id: 'edge1',
+					source: 'customer',
+					target: 'order',
+					data: {
+						label: 'customer',
+						type: 'one_to_many',
+						source_field: 'invoice_recipient_id',
+						target_field: 'customer_number'
+					}
+				}
+			];
+
+			const result = formatEntityAsMarkdown(mockEntity, [], edgesWithKeys, mockNodes, 'customer');
+
+			expect(result).toContain('- **Order** via invoice_recipient_id = customer_number (1:N, Outgoing)');
+		});
+
+		it('should prefer join keys over the business label', () => {
+			const edgesWithKeys = [
+				{
+					id: 'edge1',
+					source: 'customer',
+					target: 'order',
+					data: {
+						label: 'places',
+						type: 'one_to_many',
+						source_field: 'customer_id',
+						target_field: 'customer_id'
+					}
+				}
+			];
+
+			const result = formatEntityAsMarkdown(mockEntity, [], edgesWithKeys, mockNodes, 'customer');
+
+			expect(result).toContain('via customer_id = customer_id');
+			expect(result).not.toContain('via "places"');
+		});
+
+		it('should fall back to the label when only one join key is present', () => {
+			const edgesPartialKeys = [
+				{
+					id: 'edge1',
+					source: 'customer',
+					target: 'order',
+					data: {
+						label: 'has',
+						type: 'one_to_many',
+						source_field: 'customer_id'
+					}
+				}
+			];
+
+			const result = formatEntityAsMarkdown(mockEntity, [], edgesPartialKeys, mockNodes, 'customer');
+
+			expect(result).toContain('- **Order** via "has" (1:N, Outgoing)');
+		});
+
 		it('should handle relationship without data.type', () => {
 			const edgesWithoutType = [
 				{
