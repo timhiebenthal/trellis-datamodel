@@ -33,15 +33,13 @@ describe('markdown-export utilities', () => {
 				id: 'edge1',
 				source: 'customer',
 				target: 'order',
-				label: 'has',
-				data: { type: 'one_to_many' }
+				data: { label: 'has', type: 'one_to_many' }
 			},
 			{
 				id: 'edge2',
 				source: 'address',
 				target: 'customer',
-				label: 'lives_at',
-				data: { type: 'many_to_one' }
+				data: { label: 'lives_at', type: 'many_to_one' }
 			}
 		];
 
@@ -158,8 +156,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'other1',
 					target: 'other2',
-					label: 'unrelated',
-					data: { type: 'one_to_one' }
+					data: { label: 'unrelated', type: 'one_to_one' }
 				}
 			];
 
@@ -317,8 +314,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'order',
-					label: null,
-					data: { type: 'one_to_many' }
+					data: { label: null, type: 'one_to_many' }
 				}
 			];
 
@@ -333,8 +329,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'order',
-					label: 'related_to',
-					data: {}
+					data: { label: 'related_to' }
 				}
 			];
 
@@ -350,8 +345,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'unknown_entity',
-					label: 'relates_to',
-					data: { type: 'one_to_many' }
+					data: { label: 'relates_to', type: 'one_to_many' }
 				}
 			];
 
@@ -367,22 +361,19 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'order',
-					label: 'one_many',
-					data: { type: 'one_to_many' }
+					data: { label: 'one_many', type: 'one_to_many' }
 				},
 				{
 					id: 'edge2',
 					source: 'order',
 					target: 'customer',
-					label: 'many_one',
-					data: { type: 'many_to_one' }
+					data: { label: 'many_one', type: 'many_to_one' }
 				},
 				{
 					id: 'edge3',
 					source: 'customer',
 					target: 'profile',
-					label: 'one_one',
-					data: { type: 'one_to_one' }
+					data: { label: 'one_one', type: 'one_to_one' }
 				}
 			];
 

@@ -186,7 +186,7 @@ export function generateRelationshipsSheet(
 
 			return [
 				relatedEntity?.data?.label || relatedEntityId,
-				edge.label || '-',
+				edge.data?.label || '-',
 				formatRelationshipType(edge.data?.type || 'unknown'),
 				isOutgoing ? 'Outgoing' : 'Incoming'
 			];
@@ -383,7 +383,7 @@ export function generateDataModelOverviewSheet(
 			rows.push([
 				nodeById.get(edge.source) ?? edge.source,
 				nodeById.get(edge.target) ?? edge.target,
-				edge.label ?? '',
+				edge.data?.label ?? '',
 				formatRelationshipType(edge.data?.type ?? 'unknown')
 			]);
 		}

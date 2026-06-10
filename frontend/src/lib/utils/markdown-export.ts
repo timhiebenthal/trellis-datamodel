@@ -90,7 +90,7 @@ export function formatEntityAsMarkdown(
 			const relatedEntityId = isOutgoing ? edge.target : edge.source;
 			const relatedEntity = allNodes.find(n => n.id === relatedEntityId);
 			const relatedEntityName = relatedEntity?.data?.label || relatedEntityId;
-			const relationshipLabel = edge.label || '-';
+			const relationshipLabel = edge.data?.label || '-';
 			const relationshipType = formatRelationshipType(edge.data?.type || 'unknown');
 			const direction = isOutgoing ? 'Outgoing' : 'Incoming';
 

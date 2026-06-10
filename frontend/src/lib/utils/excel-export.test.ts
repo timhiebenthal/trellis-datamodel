@@ -240,8 +240,7 @@ describe('Sheet Generators', () => {
         {
           source: 'entity1',
           target: 'entity2',
-          label: 'belongs to',
-          data: { type: 'many_to_one' }
+          data: { label: 'belongs to', type: 'many_to_one' }
         }
       ];
       const nodes = [
@@ -357,7 +356,7 @@ describe('generateDataModelOverviewSheet', () => {
       { type: 'entity', id: 'e2', data: { label: 'Customer', entity_type: 'dimension' } }
     ] as unknown as Node[];
     const edges = [
-      { source: 'e1', target: 'e2', label: 'placed by', data: { type: 'many_to_one' } }
+      { source: 'e1', target: 'e2', data: { label: 'placed by', type: 'many_to_one' } }
     ];
     const sheet = generateDataModelOverviewSheet(nodes, edges);
     const allRows: string[][] = sheet.data;
