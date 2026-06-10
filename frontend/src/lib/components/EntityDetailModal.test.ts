@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { get } from 'svelte/store';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
-import { nodes, dbtModels, entityDetailModal } from '$lib/stores';
+import { nodes, edges, dbtModels, entityDetailModal } from '$lib/stores';
 import type { DbtModel } from '$lib/types';
 import { updateModelSchema } from '$lib/api';
 
@@ -196,5 +197,84 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
       expect(screen.queryByDisplayValue('pending_col')).not.toBeInTheDocument();
       expect(screen.getByText(/Column 'pending_col' added to schema\.yml/i)).toBeInTheDocument();
     });
+  });
+});
+
+describe('EntityDetailModal — Relationships section', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    nodes.set([]);
+    edges.set([]);
+    dbtModels.set([]);
+    entityDetailModal.set({ open: false, entityId: null });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  function setupEntityWithRelationship() {
+    nodes.set([
+      { id: 'node-lead', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Lead' } },
+      { id: 'node-ir', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Invoice Recipient' } },
+    ] as any);
+    edges.set([
+      {
+        id: 'e-ir-lead',
+        source: 'node-ir',
+        target: 'node-lead',
+        type: 'custom',
+        data: {
+          label: 'customer',
+          type: 'one_to_many',
+          source_field: 'invoice_recipient_id',
+          target_field: 'customer_number',
+          models: [{ source_model_name: 'invoice_recipient', target_model_name: 'dim__lead' }],
+        },
+      },
+    ] as any);
+    entityDetailModal.set({ open: true, entityId: 'node-lead' });
+  }
+
+  it('lists relationships with direction, cardinality, and table-qualified join keys', async () => {
+    setupEntityWithRelationship();
+    await renderModal();
+
+    expect(screen.getByText(/Relationships \(1\)/)).toBeInTheDocument();
+    // Edge source is node-ir, current entity is node-lead → incoming.
+    expect(screen.getByText(/\(1:N, Incoming\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Invoice Recipient' })).toBeInTheDocument();
+    expect(
+      screen.getByText('invoice_recipient.invoice_recipient_id = dim__lead.customer_number')
+    ).toBeInTheDocument();
+  });
+
+  it('navigates the modal to the related entity when its name is clicked', async () => {
+    setupEntityWithRelationship();
+    await renderModal();
+
+    // Currently showing Lead.
+    expect(screen.getByDisplayValue('Lead')).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Invoice Recipient' }));
+
+    await waitFor(() => {
+      expect(get(entityDetailModal).entityId).toBe('node-ir');
+      // Form reloaded to the related entity.
+      expect(screen.getByDisplayValue('Invoice Recipient')).toBeInTheDocument();
+    });
+  });
+
+  it('does not render the Relationships section when the entity has no edges', async () => {
+    nodes.set([
+      { id: 'node-lead', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Lead' } },
+    ] as any);
+    edges.set([]);
+    entityDetailModal.set({ open: true, entityId: 'node-lead' });
+    await renderModal();
+
+    expect(screen.queryByText(/Relationships \(/)).not.toBeInTheDocument();
   });
 });
