@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.8] - 2026-06-10
+
+### Changed
+
+- **Entity exports show concrete join keys for relationships**: The "Relationships" section of the Markdown and Excel exports now renders each relationship with its table-qualified join keys, `via source_model.source_field = target_model.target_field` (e.g. `via invoice_recipient.invoice_recipient_id = dim__lead.customer_number`), matching the canvas lineage view. Table qualifiers come from the edge's model names, falling back to the entity labels when no model is bound. This is more useful than the business label for understanding the join. When join keys are unavailable, the export falls back to the business label, then `-`.
+
+### Fixed
+
+- **Relationship name shows as `-` in entity exports**: Markdown and Excel exports read the relationship name from the top-level `edge.label`, which is always undefined. The name is stored at `edge.data.label` (set in `aggregateRelationshipsIntoEdges`), so every relationship rendered as `via "-"` in exports even though the canvas editor displayed the correct name. All export sites now read `edge.data`. Test fixtures that encoded the wrong edge shape (label at the top level instead of under `data`), which had masked the bug, were corrected.
+
 ## [0.15.7] - 2026-05-15
 
 ### CI

@@ -33,15 +33,13 @@ describe('markdown-export utilities', () => {
 				id: 'edge1',
 				source: 'customer',
 				target: 'order',
-				label: 'has',
-				data: { type: 'one_to_many' }
+				data: { label: 'has', type: 'one_to_many' }
 			},
 			{
 				id: 'edge2',
 				source: 'address',
 				target: 'customer',
-				label: 'lives_at',
-				data: { type: 'many_to_one' }
+				data: { label: 'lives_at', type: 'many_to_one' }
 			}
 		];
 
@@ -158,8 +156,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'other1',
 					target: 'other2',
-					label: 'unrelated',
-					data: { type: 'one_to_one' }
+					data: { label: 'unrelated', type: 'one_to_one' }
 				}
 			];
 
@@ -317,8 +314,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'order',
-					label: null,
-					data: { type: 'one_to_many' }
+					data: { label: null, type: 'one_to_many' }
 				}
 			];
 
@@ -327,14 +323,83 @@ describe('markdown-export utilities', () => {
 			expect(result).toContain('- **Order** via "-" (1:N, Outgoing)');
 		});
 
+		it('should show table-qualified join keys (model.field = model.field) when model names are present', () => {
+			const edgesWithKeys = [
+				{
+					id: 'edge1',
+					source: 'customer',
+					target: 'order',
+					data: {
+						label: 'customer',
+						type: 'one_to_many',
+						source_field: 'invoice_recipient_id',
+						target_field: 'customer_number',
+						models: [
+							{
+								source_model_name: 'invoice_recipient',
+								target_model_name: 'dim__lead',
+								source_field: 'invoice_recipient_id',
+								target_field: 'customer_number'
+							}
+						]
+					}
+				}
+			];
+
+			const result = formatEntityAsMarkdown(mockEntity, [], edgesWithKeys, mockNodes, 'customer');
+
+			expect(result).toContain(
+				'- **Order** via invoice_recipient.invoice_recipient_id = dim__lead.customer_number (1:N, Outgoing)'
+			);
+		});
+
+		it('should qualify keys with entity labels when the edge carries no model names', () => {
+			const edgesWithKeys = [
+				{
+					id: 'edge1',
+					source: 'customer',
+					target: 'order',
+					data: {
+						label: 'places',
+						type: 'one_to_many',
+						source_field: 'customer_id',
+						target_field: 'customer_id'
+					}
+				}
+			];
+
+			const result = formatEntityAsMarkdown(mockEntity, [], edgesWithKeys, mockNodes, 'customer');
+
+			expect(result).toContain('via customer.customer_id = order.customer_id');
+			expect(result).not.toContain('via "places"');
+		});
+
+		it('should fall back to the label when only one join key is present', () => {
+			const edgesPartialKeys = [
+				{
+					id: 'edge1',
+					source: 'customer',
+					target: 'order',
+					data: {
+						label: 'has',
+						type: 'one_to_many',
+						source_field: 'customer_id'
+					}
+				}
+			];
+
+			const result = formatEntityAsMarkdown(mockEntity, [], edgesPartialKeys, mockNodes, 'customer');
+
+			expect(result).toContain('- **Order** via "has" (1:N, Outgoing)');
+		});
+
 		it('should handle relationship without data.type', () => {
 			const edgesWithoutType = [
 				{
 					id: 'edge1',
 					source: 'customer',
 					target: 'order',
-					label: 'related_to',
-					data: {}
+					data: { label: 'related_to' }
 				}
 			];
 
@@ -350,8 +415,7 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'unknown_entity',
-					label: 'relates_to',
-					data: { type: 'one_to_many' }
+					data: { label: 'relates_to', type: 'one_to_many' }
 				}
 			];
 
@@ -367,22 +431,19 @@ describe('markdown-export utilities', () => {
 					id: 'edge1',
 					source: 'customer',
 					target: 'order',
-					label: 'one_many',
-					data: { type: 'one_to_many' }
+					data: { label: 'one_many', type: 'one_to_many' }
 				},
 				{
 					id: 'edge2',
 					source: 'order',
 					target: 'customer',
-					label: 'many_one',
-					data: { type: 'many_to_one' }
+					data: { label: 'many_one', type: 'many_to_one' }
 				},
 				{
 					id: 'edge3',
 					source: 'customer',
 					target: 'profile',
-					label: 'one_one',
-					data: { type: 'one_to_one' }
+					data: { label: 'one_one', type: 'one_to_one' }
 				}
 			];
 
