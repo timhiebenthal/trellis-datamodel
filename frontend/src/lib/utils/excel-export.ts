@@ -120,22 +120,40 @@ export function formatRelationshipType(type: string): string {
 }
 
 /**
- * Formats the concrete join keys of a relationship edge as `source_field = target_field`.
+ * Formats the concrete join keys of a relationship edge as a fully-qualified
+ * `source_model.source_field = target_model.target_field` expression, matching the
+ * canvas lineage view (e.g. `invoice_recipient.invoice_recipient_id = dim__lead.customer_number`).
  *
- * The keys come from the edge's `data.source_field` / `data.target_field` (the same fields
- * the canvas lineage view renders). Returns null when either key is missing so callers can
- * fall back to the business label.
+ * Keys come from `data.source_field` / `data.target_field`. The table qualifier comes from
+ * `data.models[0].source_model_name` / `target_model_name`, falling back to the supplied
+ * entity names (the canvas does the same), lowercased to match the lineage rendering. When a
+ * qualifier is unavailable the field is emitted unprefixed. Returns null when either key is
+ * missing so callers can fall back to the business label.
  *
  * @param data - The edge `data` object
- * @returns A `source = target` join expression, or null when keys are unavailable
+ * @param sourceName - Fallback name for the source side (e.g. the source entity label)
+ * @param targetName - Fallback name for the target side (e.g. the target entity label)
+ * @returns A qualified `source = target` join expression, or null when keys are unavailable
  */
-export function formatRelationshipKeys(data: Record<string, unknown> | null | undefined): string | null {
+export function formatRelationshipKeys(
+	data: Record<string, unknown> | null | undefined,
+	sourceName?: string | null,
+	targetName?: string | null
+): string | null {
 	const sourceField = data?.source_field as string | undefined;
 	const targetField = data?.target_field as string | undefined;
-	if (sourceField && targetField) {
-		return `${sourceField} = ${targetField}`;
+	if (!sourceField || !targetField) {
+		return null;
 	}
-	return null;
+
+	const models = data?.models as Array<Record<string, unknown>> | undefined;
+	const sourceModel = (models?.[0]?.source_model_name as string | undefined) || sourceName || undefined;
+	const targetModel = (models?.[0]?.target_model_name as string | undefined) || targetName || undefined;
+
+	const sourceExpr = sourceModel ? `${sourceModel.toLowerCase()}.${sourceField}` : sourceField;
+	const targetExpr = targetModel ? `${targetModel.toLowerCase()}.${targetField}` : targetField;
+
+	return `${sourceExpr} = ${targetExpr}`;
 }
 
 /**
@@ -202,10 +220,12 @@ export function generateRelationshipsSheet(
 			const isOutgoing = edge.source === entityId;
 			const relatedEntityId = isOutgoing ? edge.target : edge.source;
 			const relatedEntity = allNodes.find(n => n.id === relatedEntityId);
+			const sourceName = (allNodes.find(n => n.id === edge.source)?.data?.label as string) || edge.source;
+			const targetName = (allNodes.find(n => n.id === edge.target)?.data?.label as string) || edge.target;
 
 			return [
 				relatedEntity?.data?.label || relatedEntityId,
-				formatRelationshipKeys(edge.data) ?? (edge.data?.label || '-'),
+				formatRelationshipKeys(edge.data, sourceName, targetName) ?? (edge.data?.label || '-'),
 				formatRelationshipType(edge.data?.type || 'unknown'),
 				isOutgoing ? 'Outgoing' : 'Incoming'
 			];
@@ -402,7 +422,7 @@ export function generateDataModelOverviewSheet(
 			rows.push([
 				nodeById.get(edge.source) ?? edge.source,
 				nodeById.get(edge.target) ?? edge.target,
-				formatRelationshipKeys(edge.data) ?? (edge.data?.label ?? ''),
+				formatRelationshipKeys(edge.data, nodeById.get(edge.source), nodeById.get(edge.target)) ?? (edge.data?.label ?? ''),
 				formatRelationshipType(edge.data?.type ?? 'unknown')
 			]);
 		}

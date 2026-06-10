@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Entity exports show concrete join keys for relationships**: The "Relationships" section of the Markdown and Excel exports now renders each relationship as `via source_field = target_field` (e.g. `via invoice_recipient_id = customer_number`), taken from the edge's `source_field` / `target_field`, the same keys shown in the canvas lineage view. This is more useful than the business label for understanding the join. When join keys are unavailable, the export falls back to the business label, then `-`.
+- **Entity exports show concrete join keys for relationships**: The "Relationships" section of the Markdown and Excel exports now renders each relationship with its table-qualified join keys, `via source_model.source_field = target_model.target_field` (e.g. `via invoice_recipient.invoice_recipient_id = dim__lead.customer_number`), matching the canvas lineage view. Table qualifiers come from the edge's model names, falling back to the entity labels when no model is bound. This is more useful than the business label for understanding the join. When join keys are unavailable, the export falls back to the business label, then `-`.
 
 ### Fixed
 

@@ -273,7 +273,8 @@ describe('Sheet Generators', () => {
       ];
 
       const sheet = generateRelationshipsSheet(edges, 'entity1', nodes);
-      expect(sheet.data[1]).toEqual(['Customer', 'customer_id = id', 'N:1', 'Outgoing']);
+      // No model names on the edge, so keys are qualified with the entity labels (lowercased).
+      expect(sheet.data[1]).toEqual(['Customer', 'order.customer_id = customer.id', 'N:1', 'Outgoing']);
     });
 
     it('should handle no relationships', () => {
@@ -284,8 +285,32 @@ describe('Sheet Generators', () => {
   });
 
   describe('formatRelationshipKeys', () => {
-    it('returns source = target when both fields present', () => {
+    it('returns unqualified source = target when no model names or fallback names are given', () => {
       expect(formatRelationshipKeys({ source_field: 'a_id', target_field: 'b_id' })).toBe('a_id = b_id');
+    });
+
+    it('qualifies with edge model names (lowercased) when present', () => {
+      const data = {
+        source_field: 'invoice_recipient_id',
+        target_field: 'customer_number',
+        models: [{ source_model_name: 'Invoice_Recipient', target_model_name: 'dim__lead' }]
+      };
+      expect(formatRelationshipKeys(data)).toBe('invoice_recipient.invoice_recipient_id = dim__lead.customer_number');
+    });
+
+    it('falls back to supplied entity names (lowercased) when the edge has no model names', () => {
+      expect(formatRelationshipKeys({ source_field: 'a_id', target_field: 'b_id' }, 'Orders', 'Customers')).toBe(
+        'orders.a_id = customers.b_id'
+      );
+    });
+
+    it('prefers edge model names over supplied fallback names', () => {
+      const data = {
+        source_field: 'a_id',
+        target_field: 'b_id',
+        models: [{ source_model_name: 'fct_orders', target_model_name: 'dim_customers' }]
+      };
+      expect(formatRelationshipKeys(data, 'Orders', 'Customers')).toBe('fct_orders.a_id = dim_customers.b_id');
     });
 
     it('returns null when either field is missing', () => {

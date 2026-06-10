@@ -323,7 +323,7 @@ describe('markdown-export utilities', () => {
 			expect(result).toContain('- **Order** via "-" (1:N, Outgoing)');
 		});
 
-		it('should show concrete join keys (source = target) when available, without quotes', () => {
+		it('should show table-qualified join keys (model.field = model.field) when model names are present', () => {
 			const edgesWithKeys = [
 				{
 					id: 'edge1',
@@ -333,17 +333,27 @@ describe('markdown-export utilities', () => {
 						label: 'customer',
 						type: 'one_to_many',
 						source_field: 'invoice_recipient_id',
-						target_field: 'customer_number'
+						target_field: 'customer_number',
+						models: [
+							{
+								source_model_name: 'invoice_recipient',
+								target_model_name: 'dim__lead',
+								source_field: 'invoice_recipient_id',
+								target_field: 'customer_number'
+							}
+						]
 					}
 				}
 			];
 
 			const result = formatEntityAsMarkdown(mockEntity, [], edgesWithKeys, mockNodes, 'customer');
 
-			expect(result).toContain('- **Order** via invoice_recipient_id = customer_number (1:N, Outgoing)');
+			expect(result).toContain(
+				'- **Order** via invoice_recipient.invoice_recipient_id = dim__lead.customer_number (1:N, Outgoing)'
+			);
 		});
 
-		it('should prefer join keys over the business label', () => {
+		it('should qualify keys with entity labels when the edge carries no model names', () => {
 			const edgesWithKeys = [
 				{
 					id: 'edge1',
@@ -360,7 +370,7 @@ describe('markdown-export utilities', () => {
 
 			const result = formatEntityAsMarkdown(mockEntity, [], edgesWithKeys, mockNodes, 'customer');
 
-			expect(result).toContain('via customer_id = customer_id');
+			expect(result).toContain('via customer.customer_id = order.customer_id');
 			expect(result).not.toContain('via "places"');
 		});
 

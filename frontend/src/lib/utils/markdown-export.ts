@@ -90,9 +90,12 @@ export function formatEntityAsMarkdown(
 			const relatedEntityId = isOutgoing ? edge.target : edge.source;
 			const relatedEntity = allNodes.find(n => n.id === relatedEntityId);
 			const relatedEntityName = relatedEntity?.data?.label || relatedEntityId;
-			// Prefer the concrete join keys (source_field = target_field); fall back to the
-			// business label, then "-", when keys are unavailable.
-			const joinKeys = formatRelationshipKeys(edge.data);
+			// Entity labels qualify the join keys when the edge carries no model names.
+			const sourceName = (allNodes.find(n => n.id === edge.source)?.data?.label as string) || edge.source;
+			const targetName = (allNodes.find(n => n.id === edge.target)?.data?.label as string) || edge.target;
+			// Prefer the concrete, table-qualified join keys; fall back to the business label,
+			// then "-", when keys are unavailable.
+			const joinKeys = formatRelationshipKeys(edge.data, sourceName, targetName);
 			const via = joinKeys ?? `"${edge.data?.label || '-'}"`;
 			const relationshipType = formatRelationshipType(edge.data?.type || 'unknown');
 			const direction = isOutgoing ? 'Outgoing' : 'Incoming';
