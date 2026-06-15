@@ -11,7 +11,10 @@ Governing rule: when Trellis and dbt disagree, dbt is right.
 from __future__ import annotations
 
 import copy
+import os
 from typing import Any
+
+import yaml
 
 
 # ---------------------------------------------------------------------------
@@ -160,3 +163,49 @@ def reconcile_data_model(
             changed = True
 
     return result, changed
+
+
+# ---------------------------------------------------------------------------
+# IO wrapper
+# ---------------------------------------------------------------------------
+
+def reconcile_dbt() -> tuple[dict[str, Any], bool]:
+    """
+    Load manifest + data_model.yml, reconcile, write back if changed.
+
+    Returns:
+        (data_model, changed) — the (possibly updated) data model dict and
+        whether the file was rewritten. A missing, empty, or unparseable
+        manifest is a safe no-op.
+    """
+    from trellis_datamodel import config as cfg
+    from trellis_datamodel.adapters import get_adapter
+    from trellis_datamodel.utils.yaml_handler import YamlHandler
+
+    data_model_path = getattr(cfg, "DATA_MODEL_PATH", None)
+    if not data_model_path or not os.path.exists(data_model_path):
+        return {}, False
+
+    try:
+        with open(data_model_path, "r") as f:
+            data_model = yaml.safe_load(f) or {}
+    except Exception:
+        return {}, False
+
+    # Load manifest models — guard against missing/broken manifest
+    try:
+        adapter = get_adapter()
+        manifest_models = adapter.get_models()
+    except Exception:
+        return data_model, False
+
+    if not manifest_models:
+        return data_model, False
+
+    reconciled, changed = reconcile_data_model(data_model, manifest_models)
+
+    if changed:
+        handler = YamlHandler()
+        handler.save_file(data_model_path, reconciled)
+
+    return reconciled, changed
