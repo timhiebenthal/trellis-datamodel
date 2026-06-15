@@ -42,6 +42,7 @@ export interface DraftedField {
     datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp' | 'unknown';
     description?: string;
     origin?: string;
+    source?: 'dbt' | 'draft';
 }
 
 export interface EntityData {
