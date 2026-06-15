@@ -38,6 +38,59 @@ class TestSaveDbtSchema:
         assert model["description"] == "User entity"
         assert len(model["columns"]) == 2
 
+    def test_push_is_non_destructive_for_unlisted_columns(
+        self, test_client, temp_dir, mock_manifest
+    ):
+        """Pushing a subset of fields must not delete columns already in schema.yml
+        that are absent from the incoming field list (e.g. added by a developer directly)."""
+        sql_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(sql_dir, exist_ok=True)
+        with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+            f.write("SELECT 1")
+
+        yml_path = os.path.join(sql_dir, "users.yml")
+        with open(yml_path, "w") as f:
+            yaml.dump(
+                {
+                    "version": 2,
+                    "models": [
+                        {
+                            "name": "users",
+                            "columns": [
+                                {"name": "id", "data_type": "int"},
+                                {"name": "name", "data_type": "text"},
+                                {"name": "legacy_col", "data_type": "text"},
+                            ],
+                        }
+                    ],
+                },
+                f,
+            )
+
+        # Push only id + name — legacy_col must survive
+        response = test_client.post(
+            "/api/dbt-schema",
+            json={
+                "entity_id": "users",
+                "model_name": "users",
+                "fields": [
+                    {"name": "id", "datatype": "int"},
+                    {"name": "name", "datatype": "text"},
+                ],
+            },
+        )
+        assert response.status_code == 200
+
+        with open(yml_path, "r") as f:
+            saved = yaml.safe_load(f)
+
+        col_names = [c["name"] for c in saved["models"][0]["columns"]]
+        assert "legacy_col" in col_names, (
+            f"legacy_col was deleted by push; got columns: {col_names}"
+        )
+        assert "id" in col_names
+        assert "name" in col_names
+
     def test_preserves_versioned_models_and_versions(
         self, test_client, temp_dir, temp_data_model_path
     ):
@@ -245,6 +298,78 @@ class TestSaveDbtSchema:
                 }
             }
         ]
+
+
+    def test_save_dbt_schema_removes_stale_relationship_test(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """save_dbt_schema must remove a relationship test from a field that was
+        previously an FK but is no longer one (relationship removed or type changed)."""
+        # First push: orders.customer_id has a many_to_one FK → customers
+        data_model_with_rel = {
+            "version": 0.1,
+            "entities": [
+                {"id": "orders", "label": "Orders"},
+                {"id": "customers", "label": "Customers"},
+            ],
+            "relationships": [
+                {
+                    "source": "orders",
+                    "target": "customers",
+                    "type": "many_to_one",
+                    "source_field": "customer_id",
+                    "target_field": "id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model_with_rel, f)
+
+        response = test_client.post(
+            "/api/dbt-schema",
+            json={
+                "entity_id": "orders",
+                "model_name": "orders",
+                "fields": [{"name": "customer_id", "datatype": "int"}],
+            },
+        )
+        assert response.status_code == 200
+        yml_path = response.json()["file_path"]
+
+        with open(yml_path) as f:
+            schema = yaml.safe_load(f)
+        rel_tests = schema["models"][0]["columns"][0].get("data_tests", [])
+        assert any("relationships" in t for t in rel_tests), "Relationship test not written in first push"
+
+        # Second push: relationship removed — customer_id is no longer an FK
+        data_model_no_rel = {
+            "version": 0.1,
+            "entities": [
+                {"id": "orders", "label": "Orders"},
+                {"id": "customers", "label": "Customers"},
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model_no_rel, f)
+
+        response2 = test_client.post(
+            "/api/dbt-schema",
+            json={
+                "entity_id": "orders",
+                "model_name": "orders",
+                "fields": [{"name": "customer_id", "datatype": "int"}],
+            },
+        )
+        assert response2.status_code == 200
+
+        with open(yml_path) as f:
+            schema2 = yaml.safe_load(f)
+        remaining_tests = schema2["models"][0]["columns"][0].get("data_tests", [])
+        has_rel_test = any("relationships" in t for t in remaining_tests)
+        assert not has_rel_test, (
+            f"Stale relationship test not removed; data_tests: {remaining_tests}"
+        )
 
 
 class TestSyncDbtTests:
