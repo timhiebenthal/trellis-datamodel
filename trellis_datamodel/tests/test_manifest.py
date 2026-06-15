@@ -110,6 +110,14 @@ class TestGetManifest:
         assert users_model["materialization"] == "table"
         assert users_model["tags"] == ["core"]
 
+    def test_column_descriptions_included(self, test_client):
+        response = test_client.get("/api/manifest")
+        assert response.status_code == 200
+        models = response.json()["models"]
+        users = next(m for m in models if m["name"] == "users")
+        col = next(c for c in users["columns"] if c["name"] == "id")
+        assert col.get("description") == "Primary key"
+
     def test_filters_by_model_path(self, test_client, temp_dir, mock_manifest):
         # Update manifest to have models in different paths
         with open(mock_manifest, "r") as f:

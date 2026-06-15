@@ -455,6 +455,56 @@ class YamlHandler:
 
         model["columns"] = new_columns
 
+    def merge_columns_non_destructive(
+        self,
+        model: CommentedMap,
+        columns_data: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Merge ``columns_data`` into the model's existing column list without
+        deleting columns that are absent from the incoming list.
+
+        - Incoming columns that already exist: updated (data_type, description).
+        - Incoming columns that are new: appended.
+        - Existing columns not in the incoming list: preserved unchanged.
+
+        Order: incoming columns first (in incoming order), then surviving
+        existing columns not present in the incoming list.
+        """
+        existing_by_name: Dict[str, CommentedMap] = {}
+        existing_order: List[str] = []
+        for col in model.get("columns", []) or []:
+            name = col.get("name") if isinstance(col, dict) else None
+            if name:
+                existing_by_name[name] = col
+                existing_order.append(name)
+
+        incoming_names: List[str] = []
+        new_columns = CommentedSeq()
+
+        for col_data in columns_data:
+            col_name = col_data.get("name")
+            if not col_name:
+                continue
+            incoming_names.append(col_name)
+            col = existing_by_name.get(col_name)
+            if col is None:
+                col = CommentedMap()
+                col["name"] = col_name
+            self.update_column(
+                col,
+                data_type=col_data.get("data_type"),
+                description=col_data.get("description"),
+            )
+            new_columns.append(col)
+
+        incoming_set = set(incoming_names)
+        for name in existing_order:
+            if name not in incoming_set:
+                new_columns.append(existing_by_name[name])
+
+        model["columns"] = new_columns
+
     def get_columns(self, model: CommentedMap) -> List[Dict[str, Any]]:
         """
         Extract columns from a model as a list of dicts.

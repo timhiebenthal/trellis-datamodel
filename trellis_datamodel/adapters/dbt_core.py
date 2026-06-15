@@ -499,11 +499,16 @@ class DbtCoreAdapter:
                         {
                             "name": col.get("name"),
                             "type": col.get("type") or col.get("data_type"),
+                            "description": col.get("comment") or col.get("description"),
                         }
                     )
             else:
                 for col_name, col_data in node.get("columns", {}).items():
-                    columns.append({"name": col_name, "type": col_data.get("type")})
+                    columns.append({
+                        "name": col_name,
+                        "type": col_data.get("type"),
+                        "description": col_data.get("description"),
+                    })
 
             # Extract materialization
             config = node.get("config", {})
@@ -1121,6 +1126,8 @@ class DbtCoreAdapter:
         # Build a map of field names to relationships for this entity
         relationships = data_model.get("relationships", [])
         field_to_relationship: dict[str, dict] = {}
+        # Track ALL fields involved in any relationship for this entity (for stale test cleanup)
+        all_relationship_fields: set[str] = set()
         # Map entity -> dbt model name for refs
         entity_model_name = {
             e.get("id"): self._entity_to_model_name(e)
@@ -1163,6 +1170,12 @@ class DbtCoreAdapter:
                 fk_field = target_field
                 ref_entity = source_id
                 ref_field = source_field
+
+            # Track all fields involved in relationships for this entity
+            if source_id == entity_id:
+                all_relationship_fields.add(source_field)
+            if target_id == entity_id:
+                all_relationship_fields.add(target_field)
 
             if fk_entity == entity_id:
                 field_to_relationship[fk_field] = {
@@ -1214,7 +1227,7 @@ class DbtCoreAdapter:
             version_entry = self.yaml_handler.ensure_model_version(
                 model_entry, target_version
             )
-            self.yaml_handler.update_columns_batch(version_entry, columns)
+            self.yaml_handler.merge_columns_non_destructive(version_entry, columns)
 
             if entity_description:
                 self.yaml_handler.update_model_description(
@@ -1231,12 +1244,29 @@ class DbtCoreAdapter:
                     model_entry, entity_description
                 )
 
-            self.yaml_handler.update_columns_batch(model_entry, columns)
+            self.yaml_handler.merge_columns_non_destructive(model_entry, columns)
 
             if tags is not None:
                 self.yaml_handler.update_model_tags(model_entry, tags)
 
             schema_entry = model_entry
+
+        # Remove stale relationship tests: any column that has a relationship test
+        # but is not a current FK for this entity.
+        fk_fields = set(field_to_relationship.keys())
+        if "columns" in schema_entry:
+            for col in schema_entry.get("columns", []):
+                col_name = col.get("name")
+                if not col_name or col_name in fk_fields:
+                    continue
+                # Check whether this column currently has a relationship test
+                has_rel_test = any(
+                    isinstance(t, dict) and "relationships" in t
+                    for key in ("data_tests", "tests")
+                    for t in col.get(key, [])
+                )
+                if has_rel_test:
+                    self.yaml_handler.remove_relationship_test(col)
 
         # Apply relationship tests after columns are written
         for field in fields:
