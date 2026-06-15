@@ -506,7 +506,7 @@ class DbtCoreAdapter:
                 for col_name, col_data in node.get("columns", {}).items():
                     columns.append({
                         "name": col_name,
-                        "type": col_data.get("type"),
+                        "type": col_data.get("type") or col_data.get("data_type"),
                         "description": col_data.get("description"),
                     })
 

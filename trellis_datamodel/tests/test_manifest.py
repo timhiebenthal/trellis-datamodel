@@ -118,6 +118,17 @@ class TestGetManifest:
         col = next(c for c in users["columns"] if c["name"] == "id")
         assert col.get("description") == "Primary key"
 
+    def test_column_type_from_data_type_key(self, test_client):
+        """Manifest columns using data_type (not type) must have their type passed through.
+        Real dbt manifests use data_type; type is often absent or null."""
+        response = test_client.get("/api/manifest")
+        models = response.json()["models"]
+        users = next(m for m in models if m["name"] == "users")
+        col = next(c for c in users["columns"] if c["name"] == "id")
+        assert col.get("type") == "integer", (
+            f"Expected 'integer' from data_type key, got: {col.get('type')}"
+        )
+
     def test_filters_by_model_path(self, test_client, temp_dir, mock_manifest):
         # Update manifest to have models in different paths
         with open(mock_manifest, "r") as f:
