@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0-beta.2] - 2026-06-15
+
+### Fixed
+
+- **Column types no longer overwritten to `unknown` on push**: dbt manifest columns store their type under `data_type`, not `type`. The manifest fallback in `get_models()` only read `type`, returning `None` for most real projects — reconciliation then wrote `datatype: unknown` for every materialized field. Fixed to read `data_type` as fallback, matching the catalog path.
+
 ## [0.16.0-beta.1] - 2026-06-15
 
 ### Added
