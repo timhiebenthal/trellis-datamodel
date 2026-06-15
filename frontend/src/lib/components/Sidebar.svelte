@@ -10,6 +10,7 @@
         factPrefixes,
         entityTypeFilter,
         modelBoundFilter,
+        sidebarSearchTerm,
     } from "$lib/stores";
     import type { DbtModel, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
@@ -23,6 +24,8 @@
 
     let searchTerm = $state("");
     let collapsed = $state(false);
+
+    $effect(() => { sidebarSearchTerm.set(searchTerm); });
 
     function inferModelVersion(model: DbtModel): number | null {
         if (model.version !== undefined && model.version !== null) {

@@ -2,7 +2,7 @@
     import { getContext } from 'svelte';
     import { readable, type Readable } from 'svelte/store';
     import { page } from '$app/stores';
-    import { viewMode, nodes, edges } from '$lib/stores';
+    import { viewMode, nodes, edges, sidebarSearchTerm } from '$lib/stores';
     import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
 
@@ -36,9 +36,15 @@
     const entitiesParam = $derived($page.url.searchParams.get('entities'));
     const eventTextParam = $derived($page.url.searchParams.get('eventText'));
 
-    // Parse comma-separated entity IDs from URL parameter
+    // Parse comma-separated entity IDs from URL parameter, or filter by sidebar search term
     const filteredEntityIds = $derived(
-        entitiesParam ? entitiesParam.split(',').filter(id => id.trim()) : null
+        entitiesParam
+            ? entitiesParam.split(',').filter(id => id.trim())
+            : $sidebarSearchTerm.trim()
+                ? $nodes
+                    .filter(n => n.type === 'entity' && (n.data as any)?.label?.toLowerCase().includes($sidebarSearchTerm.trim().toLowerCase()))
+                    .map(n => n.id)
+                : null
     );
 
     // Pass event text for banner display

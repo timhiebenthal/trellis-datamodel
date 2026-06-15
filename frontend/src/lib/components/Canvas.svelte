@@ -78,7 +78,7 @@
     // Entity filtering logic
     // Filter nodes to show only entities with IDs in filteredEntityIds
     const filteredNodes = $derived(() => {
-        if (!filteredEntityIds || filteredEntityIds.length === 0) {
+        if (!filteredEntityIds) {
             return $nodes;
         }
 
@@ -129,7 +129,7 @@
 
     // Filter edges to only show connections between filtered entities
     const displayEdges = $derived(() => {
-        if (!filteredEntityIds || filteredEntityIds.length === 0) {
+        if (!filteredEntityIds) {
             return $edges;
         }
 
@@ -152,7 +152,7 @@
 
     // Calculate filtered entity count (exclude group nodes)
     const filteredEntityCount = $derived(() => {
-        if (!filteredEntityIds || filteredEntityIds.length === 0) {
+        if (!filteredEntityIds) {
             return 0;
         }
         return displayNodes.filter(node => node.type === 'entity').length;
