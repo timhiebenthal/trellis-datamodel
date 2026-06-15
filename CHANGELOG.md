@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-06-15
+
+### Added
+
+- **dbt reconciliation — `data_model.yml` as single source of truth**: Trellis now reconciles the compiled dbt manifest into `data_model.yml` on startup. Each bound entity's field list is enriched with its materialized dbt columns tagged `source: dbt`, alongside any unmatched drafted fields (`source: draft`). The file is self-contained and readable offline without a live manifest. Reconciliation is non-destructive: a model absent from the manifest (e.g. after a partial `dbt compile --select`) never removes its existing materialized fields.
+- **`POST /api/reconcile-dbt` endpoint**: Triggers manifest→`data_model.yml` reconciliation on demand. Returns `{status, changed, data_model}`. Called automatically by the frontend on app load after the manifest is fetched.
+- **Live schema.yml description read**: When opening the entity detail modal for a bound entity, Trellis fetches column descriptions directly from `schema.yml` (via `GET /api/models/{name}/schema`) rather than from the manifest. Lag-free — edited descriptions are visible immediately after save without running `dbt compile`. Priority: user edit > live `schema.yml` value > manifest value.
+- **`DraftedField.source` provenance marker**: TypeScript and YAML `drafted_fields` entries gain an optional `source: 'dbt' | 'draft'` field. `source: dbt` fields are dbt-owned and read-only (except description); `source: draft` fields are Trellis-authored. Missing `source` is treated as `draft` for backward compatibility.
+- **Collapsible entity sections in undescribed attributes warning**: The multi-entity view in the undescribed attributes modal now shows collapsible sections per entity, making it easier to navigate large lists.
+
+### Fixed
+
+- **`get_models()` now includes column descriptions**: The `/api/manifest` endpoint previously stripped column descriptions silently. Descriptions from the manifest (and `comment` from the catalog) are now included in each column entry.
+- **Catalog column names normalized to lowercase**: When a dbt catalog is present (e.g. after `dbt docs generate`), column names were returned in the database's native case (uppercase in Snowflake). This caused a mismatch with the lowercase names in `schema.yml`, breaking description lookup and display. Column names from the catalog are now normalized to lowercase. Descriptions are sourced from the manifest rather than the empty catalog.
+- **Column types read from `data_type` key**: dbt manifest columns store their type under `data_type`, not `type`. The manifest fallback only read `type`, returning null for most projects and causing reconciliation to write `datatype: unknown` for every materialized field.
+- **Non-destructive push**: `POST /api/dbt-schema` no longer deletes columns from `schema.yml` that are absent from the entity's field list. Columns added directly by developers outside Trellis are preserved.
+- **Stale relationship tests cleaned up on push**: `POST /api/dbt-schema` now removes `relationships` tests from columns that were previously FKs but are no longer, matching the behavior of `POST /api/sync-dbt-tests`.
+
 ## [0.16.0-beta.3] - 2026-06-15
 
 ### Fixed
