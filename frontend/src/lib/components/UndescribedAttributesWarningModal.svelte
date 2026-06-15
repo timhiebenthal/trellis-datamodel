@@ -40,6 +40,18 @@
     function handleConfirm() {
         onConfirm();
     }
+
+    let collapsedEntities = $state(new Set<string>());
+
+    function toggleEntity(entityId: string) {
+        const next = new Set(collapsedEntities);
+        if (next.has(entityId)) {
+            next.delete(entityId);
+        } else {
+            next.add(entityId);
+        }
+        collapsedEntities = next;
+    }
 </script>
 
 {#if open}
@@ -82,25 +94,36 @@
             <!-- Attribute List -->
             {#if isMultipleEntities}
                 <!-- Multiple entities view -->
-                <div class="mb-6 max-h-64 overflow-y-auto border border-gray-200 rounded-md">
+                <div class="mb-6 max-h-96 overflow-y-auto border border-gray-200 rounded-md">
                     {#each entitiesWithAttributes! as entity}
+                        {@const collapsed = collapsedEntities.has(entity.entityId)}
                         <div class="border-b border-gray-200 last:border-b-0">
-                            <div class="px-3 py-2 bg-gray-50">
+                            <button
+                                class="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-left transition-colors"
+                                onclick={() => toggleEntity(entity.entityId)}
+                                aria-expanded={!collapsed}
+                            >
+                                <Icon
+                                    icon="lucide:chevron-down"
+                                    class="w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform {collapsed ? '-rotate-90' : ''}"
+                                />
                                 <span class="font-medium text-gray-900">{entity.entityLabel}</span>
                                 {#if entity.entityId !== entity.entityLabel}
-                                    <span class="text-gray-500 ml-2 text-xs">({entity.entityId})</span>
+                                    <span class="text-gray-500 text-xs">({entity.entityId})</span>
                                 {/if}
-                                <span class="text-gray-500 text-xs ml-2">
-                                    ({entity.attributeNames.length} {entity.attributeNames.length === 1 ? 'attribute' : 'attributes'})
+                                <span class="text-gray-400 text-xs ml-auto">
+                                    {entity.attributeNames.length} {entity.attributeNames.length === 1 ? 'attribute' : 'attributes'}
                                 </span>
-                            </div>
-                            <ul class="divide-y divide-gray-100">
-                                {#each entity.attributeNames as attributeName}
-                                    <li class="px-3 py-1.5 text-sm pl-6">
-                                        <span class="font-mono text-gray-700">{attributeName}</span>
-                                    </li>
-                                {/each}
-                            </ul>
+                            </button>
+                            {#if !collapsed}
+                                <ul class="divide-y divide-gray-100">
+                                    {#each entity.attributeNames as attributeName}
+                                        <li class="px-3 py-1.5 text-sm pl-8">
+                                            <span class="font-mono text-gray-700">{attributeName}</span>
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
                         </div>
                     {/each}
                 </div>
