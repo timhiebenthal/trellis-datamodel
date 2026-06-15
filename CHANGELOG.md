@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0-beta.3] - 2026-06-15
+
+### Fixed
+
+- **Catalog column names normalized to lowercase**: When a dbt catalog is present (e.g. after `dbt docs generate`), column names were returned in the database's native case (uppercase in Snowflake/DW). This caused a mismatch with the lowercase names in `schema.yml`, breaking description lookup and display. Column names from the catalog are now normalized to lowercase, consistent with the manifest and YAML. Descriptions are now sourced from the manifest (which holds YAML-documented descriptions) rather than the catalog (which holds empty database comments).
+
 ## [0.16.0-beta.2] - 2026-06-15
 
 ### Fixed

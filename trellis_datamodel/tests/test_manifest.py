@@ -118,6 +118,43 @@ class TestGetManifest:
         col = next(c for c in users["columns"] if c["name"] == "id")
         assert col.get("description") == "Primary key"
 
+    def test_catalog_columns_normalized_to_lowercase_with_manifest_descriptions(
+        self, test_client, temp_dir, mock_manifest_data, monkeypatch
+    ):
+        """When a catalog is present, column names are lowercased (Snowflake returns
+        uppercase names) and descriptions come from the manifest, not the empty catalog."""
+        import json, os
+        from trellis_datamodel import config as cfg
+
+        # Write a catalog with UPPERCASE column names and no descriptions
+        catalog_data = {
+            "nodes": {
+                "model.project.users": {
+                    "unique_id": "model.project.users",
+                    "columns": {
+                        "ID": {"name": "ID", "type": "NUMBER", "comment": None},
+                        "NAME": {"name": "NAME", "type": "TEXT", "comment": None},
+                    },
+                }
+            }
+        }
+        catalog_path = os.path.join(temp_dir, "catalog.json")
+        with open(catalog_path, "w") as f:
+            json.dump(catalog_data, f)
+        monkeypatch.setattr(cfg, "CATALOG_PATH", catalog_path)
+
+        response = test_client.get("/api/manifest")
+        assert response.status_code == 200
+        users = next(m for m in response.json()["models"] if m["name"] == "users")
+
+        cols = {c["name"]: c for c in users["columns"]}
+        # Names must be lowercase even though catalog had uppercase
+        assert "id" in cols, f"Expected lowercase 'id', got: {list(cols.keys())}"
+        assert "name" in cols
+        # Descriptions come from the manifest, not the empty catalog
+        assert cols["id"]["description"] == "Primary key"
+        assert cols["name"]["description"] == "Full name"
+
     def test_column_type_from_data_type_key(self, test_client):
         """Manifest columns using data_type (not type) must have their type passed through.
         Real dbt manifests use data_type; type is often absent or null."""

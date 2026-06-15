@@ -494,12 +494,24 @@ class DbtCoreAdapter:
             catalog_node = catalog_nodes.get(unique_id)
 
             if catalog_node:
+                # Catalog has accurate DB types but uppercase names (Snowflake/DW convention)
+                # and no YAML descriptions. Normalize names to lowercase and pull
+                # descriptions from the manifest, which holds the documented descriptions.
+                manifest_col_desc: dict[str, str] = {
+                    col_name.lower(): (col_data.get("description") or "")
+                    for col_name, col_data in node.get("columns", {}).items()
+                }
                 for col in catalog_node.get("columns", {}).values():
+                    col_name_lower = (col.get("name") or "").lower()
                     columns.append(
                         {
-                            "name": col.get("name"),
+                            "name": col_name_lower,
                             "type": col.get("type") or col.get("data_type"),
-                            "description": col.get("comment") or col.get("description"),
+                            "description": (
+                                manifest_col_desc.get(col_name_lower)
+                                or col.get("comment")
+                                or col.get("description")
+                            ),
                         }
                     )
             else:
