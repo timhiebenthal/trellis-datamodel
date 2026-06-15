@@ -43,6 +43,23 @@ Trellis: **visual data model editor** that:
 4. **Visual Clarity**: Complex models → intuitive visual repr.
 5. **Bidirectional Sync**: Changes flow both ways — code↔visualization.
 
+### Design Principles
+
+**dbt is the source of truth for column metadata.**
+When Trellis and dbt disagree — on column existence, data types, or descriptions — dbt is right.
+
+`data_model.yml` is the single source of truth for the *model*, holding both materialized and not-yet-materialized fields. Each field carries a `source` tag:
+- `source: dbt` — mirrored from the dbt manifest on reconciliation. Read-only in Trellis (except description). Overwritten on next reconcile — dbt wins.
+- `source: draft` — authored in Trellis, not yet materialized in dbt.
+
+**Reconciliation rules:**
+- Manifest columns → `source: dbt` fields in `data_model.yml`. dbt wins on name, type, description.
+- Draft fields with no matching manifest column → preserved unchanged.
+- A model absent from the manifest (e.g. partial `dbt compile --select`) → existing fields untouched. Absence is never treated as deletion.
+- Reconciliation is one-way (manifest → `data_model.yml`) and idempotent.
+
+**Description is the one two-way attribute** of a materialized column. Users may edit it in Trellis; it writes back to `schema.yml` directly (the live source for descriptions). All other materialized column attributes are read-only.
+
 ### Differentiation
 
 Trellis unique:

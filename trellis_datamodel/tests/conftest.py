@@ -113,8 +113,8 @@ def mock_manifest_data():
                 "alias": "users",
                 "original_file_path": "models/3_core/users.sql",
                 "columns": {
-                    "id": {"name": "id", "type": "integer"},
-                    "name": {"name": "name", "type": "text"},
+                    "id": {"name": "id", "data_type": "integer", "description": "Primary key"},
+                    "name": {"name": "name", "data_type": "varchar", "description": "Full name"},
                 },
                 "description": "User table",
                 "config": {"materialized": "table"},

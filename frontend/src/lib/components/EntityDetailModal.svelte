@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
-	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest } from '$lib/api';
+	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
 	import type { MergedField } from '$lib/utils/merged-fields';
@@ -157,6 +157,10 @@
 	// Pending description edits for materialized (dbt) columns — written to schema.yml on save
 	let materializedDescriptionEdits = $state<Map<string, string>>(new Map());
 
+	// Live descriptions read directly from schema.yml (lag-free, not from manifest).
+	// Loaded on modal open for bound entities; used as baseline when displaying and saving.
+	let liveSchemaDescriptions = $state<Map<string, string>>(new Map());
+
 	// Feedback banners for materialize action
 	let materializeWarnings = $state<string[]>([]);
 	let materializeError = $state('');
@@ -170,7 +174,10 @@
 			name: f.name,
 			type: f.datatype || 'unknown',
 			description: f.origin === 'dbt'
-				? (materializedDescriptionEdits.get(f.name) ?? f.description ?? '')
+				? (materializedDescriptionEdits.get(f.name)
+					?? liveSchemaDescriptions.get(f.name)
+					?? f.description
+					?? '')
 				: (f.description ?? ''),
 			origin: f.origin === 'dbt' ? undefined : (editableDraftedFields[f.draftIndex]?.origin),
 		})),
@@ -299,6 +306,7 @@
 		showDeleteConfirm = false;
 		isDirty = false;
 		materializedDescriptionEdits = new Map();
+		liveSchemaDescriptions = new Map();
 		materializeWarnings = [];
 		materializeError = '';
 	});
@@ -310,6 +318,31 @@
 			loadProcesses();
 		}
 	});
+
+	// Load live descriptions from schema.yml when a bound entity modal opens.
+	// The manifest lags behind schema.yml by a dbt compile; reading directly gives
+	// the user the current description without requiring a recompile.
+	$effect(() => {
+		if ($entityDetailModal.open && isBoundEntity && boundModel) {
+			loadLiveSchemaDescriptions(boundModel.name, boundModel.version ?? undefined);
+		}
+	});
+
+	async function loadLiveSchemaDescriptions(modelName: string, version: number | undefined) {
+		try {
+			const schema = await getModelSchema(modelName, version);
+			if (!schema) return;
+			const map = new Map<string, string>();
+			for (const col of schema.columns ?? []) {
+				if (col.name && col.description != null) {
+					map.set(col.name, col.description);
+				}
+			}
+			liveSchemaDescriptions = map;
+		} catch {
+			// Non-fatal: fall back to manifest descriptions already in editableDraftedFields
+		}
+	}
 
 	async function loadSourceSuggestions() {
 		try {
@@ -645,17 +678,23 @@
 			});
 		});
 
-		// If any materialized description edits, write them to schema.yml
+		// If any materialized description edits, write them to schema.yml.
+		// Baseline is the live schema.yml content (lag-free); user edits overlay on top.
 		if (isBoundEntity && boundModel && materializedDescriptionEdits.size > 0) {
 			try {
-				const columns: ModelSchemaColumn[] = (boundModel.columns ?? []).map((c) => ({
+				// Collect all materialized column names from either the live schema or the bound model
+				const allCols: ModelSchemaColumn[] = (boundModel.columns ?? []).map((c) => ({
 					name: c.name,
 					data_type: c.type,
-					description: materializedDescriptionEdits.get(c.name) ?? (c as any).description ?? '',
+					// Priority: user's staged edit > live schema.yml value > manifest value
+					description: materializedDescriptionEdits.get(c.name)
+						?? liveSchemaDescriptions.get(c.name)
+						?? (c as any).description
+						?? '',
 				}));
-				await updateModelSchema(boundModel.name, boundModel.version ?? undefined, columns);
-				const models = await getManifest();
-				dbtModels.set(models);
+				await updateModelSchema(boundModel.name, boundModel.version ?? undefined, allCols);
+				// Re-read schema.yml so liveSchemaDescriptions reflects the saved state
+				await loadLiveSchemaDescriptions(boundModel.name, boundModel.version ?? undefined);
 				materializedDescriptionEdits = new Map();
 			} catch (e: unknown) {
 				const msg = e instanceof Error ? e.message : 'Failed to save descriptions to schema.yml';
@@ -1436,7 +1475,7 @@
 												{#if field.origin === 'dbt'}
 													<input
 														type="text"
-														value={materializedDescriptionEdits.get(field.name) ?? field.description ?? ''}
+														value={materializedDescriptionEdits.get(field.name) ?? liveSchemaDescriptions.get(field.name) ?? field.description ?? ''}
 														oninput={(e) => {
 															const map = new Map(materializedDescriptionEdits);
 															map.set(field.name, (e.target as HTMLInputElement).value);
