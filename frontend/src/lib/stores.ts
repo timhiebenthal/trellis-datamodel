@@ -71,6 +71,9 @@ export const entityListCollapseState = writable<Record<string, boolean>>({});
 // Drag-and-drop state for field linking
 export const draggingField = writable<FieldDragState | null>(null);
 
+// Sidebar search term — synced to canvas for entity filtering
+export const sidebarSearchTerm = writable<string>('');
+
 // Global modals (rendered outside SvelteFlow to avoid viewport transform affecting position:fixed)
 export const lineageModal = writable<{ open: boolean; modelId: string | null }>({
     open: false,
