@@ -230,6 +230,57 @@ class TestYamlHandlerColumnOperations:
         assert len(cols) == 2
         assert cols[0]["name"] == "id"
         assert cols[0]["description"] == "Primary key"
+        assert "origin" not in cols[0]
+
+    def test_get_columns_parses_origin_from_description(self):
+        handler = YamlHandler()
+        model = CommentedMap(
+            {
+                "name": "test",
+                "columns": [
+                    {
+                        "name": "revenue",
+                        "data_type": "float",
+                        "description": "Total revenue | Origin: DH1: SCHEMA.TABLE.COL",
+                    },
+                ],
+            }
+        )
+        cols = handler.get_columns(model)
+        assert cols[0]["description"] == "Total revenue"
+        assert cols[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+
+    def test_get_columns_parses_origin_only_description(self):
+        handler = YamlHandler()
+        model = CommentedMap(
+            {
+                "name": "test",
+                "columns": [
+                    {
+                        "name": "revenue",
+                        "data_type": "float",
+                        "description": "Origin: DH1: SCHEMA.TABLE.COL",
+                    },
+                ],
+            }
+        )
+        cols = handler.get_columns(model)
+        assert cols[0]["description"] is None
+        assert cols[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+
+    def test_get_columns_no_origin_when_none_description(self):
+        handler = YamlHandler()
+        model = CommentedMap(
+            {
+                "name": "test",
+                "columns": [
+                    {"name": "id", "data_type": "int"},
+                ],
+            }
+        )
+        cols = handler.get_columns(model)
+        assert cols[0]["description"] is None
+        assert "origin" not in cols[0]
 
 
 class TestYamlHandlerRelationshipTests:

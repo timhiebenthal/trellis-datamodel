@@ -138,6 +138,41 @@ class TestReconcileEntityFields:
         )
         assert result[0].get("origin") == "DH1: SCHEMA.TABLE.COL"
 
+    def test_origin_parsed_from_manifest_description(self):
+        """Origin embedded in manifest description is parsed into separate field."""
+        result = reconcile_entity_fields(
+            existing_fields=[],
+            manifest_columns=[
+                {"name": "revenue", "type": "numeric", "description": "Total revenue | Origin: DH1: SCHEMA.TABLE.COL"},
+            ],
+        )
+        assert result[0]["description"] == "Total revenue"
+        assert result[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+
+    def test_origin_only_parsed_from_manifest_description(self):
+        """Origin-only description (no preceding text) is parsed correctly."""
+        result = reconcile_entity_fields(
+            existing_fields=[],
+            manifest_columns=[
+                {"name": "revenue", "type": "numeric", "description": "Origin: DH1: SCHEMA.TABLE.COL"},
+            ],
+        )
+        assert result[0]["description"] is None
+        assert result[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+
+    def test_stale_origin_removed_when_description_changes(self):
+        """If manifest description no longer contains origin, stale origin is removed."""
+        result = reconcile_entity_fields(
+            existing_fields=[
+                {"name": "revenue", "datatype": "float", "description": "Old desc", "origin": "OLD_ORIGIN"},
+            ],
+            manifest_columns=[
+                {"name": "revenue", "type": "numeric", "description": "New desc without origin"},
+            ],
+        )
+        assert result[0]["description"] == "New desc without origin"
+        assert "origin" not in result[0]
+
 
 class TestReconcileDataModel:
     """Unit tests for the reconcile_data_model function."""
