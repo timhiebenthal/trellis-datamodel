@@ -28,6 +28,37 @@ _DATE_EXACT = {"date"}
 _TIMESTAMP_PREFIXES = ("timestamp", "datetime")
 _TEXT_PREFIXES = ("varchar", "char", "text", "string", "nvarchar", "nchar", "clob")
 
+_ORIGIN_SEPARATOR = " | Origin: "
+_ORIGIN_PREFIX = "Origin: "
+
+
+def _parse_description_with_origin(
+    raw_description: str | None,
+) -> tuple[str | None, str | None]:
+    """Split a description into (description, origin).
+
+    The write paths embed origin into the description as:
+      - "desc | Origin: value"  (both present)
+      - "Origin: value"         (only origin, no description)
+
+    This reverses that encoding so origin round-trips through a
+    dedicated field.
+    """
+    if not raw_description:
+        return raw_description, None
+
+    sep_idx = raw_description.find(_ORIGIN_SEPARATOR)
+    if sep_idx != -1:
+        desc = raw_description[:sep_idx]
+        origin = raw_description[sep_idx + len(_ORIGIN_SEPARATOR) :]
+        return (desc or None), (origin or None)
+
+    if raw_description.startswith(_ORIGIN_PREFIX):
+        origin = raw_description[len(_ORIGIN_PREFIX) :]
+        return None, (origin or None)
+
+    return raw_description, None
+
 
 def _map_dbt_type(dbt_type: str | None) -> str:
     """Map a dbt/warehouse column type string to a DraftedField datatype enum value."""
@@ -104,7 +135,14 @@ def reconcile_entity_fields(
         field["source"] = "dbt"
         desc = col.get("description")
         if desc is not None:
-            field["description"] = desc
+            # Parse origin from description if embedded
+            parsed_desc, parsed_origin = _parse_description_with_origin(desc)
+            field["description"] = parsed_desc
+            if parsed_origin is not None:
+                field["origin"] = parsed_origin
+            elif "origin" in field:
+                # Remove stale origin if description no longer contains it
+                del field["origin"]
         elif "description" not in field:
             pass  # keep absent rather than writing None
 
