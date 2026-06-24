@@ -1408,8 +1408,7 @@
 									<div class="col-span-2">Name</div>
 									<div class="col-span-1">Type</div>
 									<div class="col-span-6">Description</div>
-									<div class="col-span-2">Origin</div>
-									<div class="col-span-1"></div>
+									<div class="col-span-3">Origin</div>
 								</div>
 								<div class="divide-y divide-gray-200">
 								{#each mergedFields as field (field.origin === 'draft' ? `draft-${field.draftIndex}` : `dbt-${field.name}`)}
@@ -1492,7 +1491,7 @@
 													{/if}
 												</div>
 												<!-- Origin (read-only) -->
-												<div class="col-span-2 text-xs text-gray-600 font-mono space-y-0.5">
+												<div class={field.origin === 'dbt' ? "col-span-3 text-xs text-gray-600 font-mono space-y-0.5" : "col-span-2 text-xs text-gray-600 font-mono space-y-0.5"}>
 													{#if field.origin === 'dbt'}
 														<span
 															class="inline-flex items-center text-gray-400"
@@ -1517,8 +1516,8 @@
 													{/if}
 												</div>
 										<!-- Actions -->
-										<div class="col-span-1 flex justify-end gap-1 items-center">
-											{#if field.origin === 'draft'}
+										{#if field.origin === 'draft'}
+											<div class="col-span-1 flex justify-end gap-1 items-center">
 												{#if isBoundEntity && boundModel}
 														<button
 															type="button"
@@ -1538,8 +1537,8 @@
 													>
 														<Icon icon="lucide:trash-2" class="w-4 h-4" />
 													</button>
-												{/if}
 											</div>
+										{/if}
 										</div>
 										{#if field.origin === 'draft' && dropIndex === field.draftIndex && dropPosition !== null}
 											<DropIndicator position={dropPosition} />
