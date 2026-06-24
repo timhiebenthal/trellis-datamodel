@@ -1,4 +1,4 @@
-.PHONY: setup backend frontend dev prod help build-package
+.PHONY: setup backend frontend dev prod help build-package sync-cursor-commands
 
 help:
 	@echo "Trellis Data Makefile"
@@ -16,29 +16,21 @@ help:
 	@echo "  make test-e2e      - Run E2E tests (auto-starts backend with test data)"
 	@echo "  make test-all      - Run all tests (check + smoke + unit + e2e)"
 	@echo "  make test-check    - Run TypeScript/compilation check"
+	@echo "  make sync-cursor-commands - Copy .ai_agent/commands into .cursor/commands for Cursor"
 	@echo "  make help          - Show this help message"
 
 install-uv:
 	@echo "Installing uv..."
 	pip install uv
 
-setup: install-uv setup-cursor-symlink
+setup: install-uv sync-cursor-commands
 	@echo "Installing backend dependencies..."
 	uv sync
 	@echo "Installing frontend dependencies..."
 	cd frontend && npm install
 
-setup-cursor-symlink:
-	@echo "Setting up .cursor directory with symlinks to .ai_agent commands..."
-	@if [ -L .cursor ]; then \
-		echo "Warning: .cursor is a symlink, converting to directory..."; \
-		rm .cursor; \
-	fi
-	@mkdir -p .cursor
-	@if [ ! -L .cursor/commands ]; then \
-		ln -sf ../.ai_agent/commands .cursor/commands && echo "Created .cursor/commands symlink"; \
-	fi
-	@echo ".cursor directory setup complete (mcp.json can be created here)"
+sync-cursor-commands:
+	@bash scripts/sync_cursor_commands.sh
 
 backend:
 	@echo "Starting backend server..."
