@@ -111,6 +111,117 @@ def test_sync_dbt_tests_writes_meta_origin(
     assert "| Origin:" not in (col.get("description") or "")
 
 
+def test_round_trip_demo_origin(monkeypatch, temp_dir):
+    """Demo-style project: materialize structured origin to schema.yml and read back via get_models."""
+    from trellis_datamodel import config as cfg
+    from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
+
+    model_name = "fact__campaign_management"
+    model_uid = "model.demo.fact__campaign_management"
+    entity_id = "fact__campaign_management"
+    origin_list = [
+        {"DH1": "CORE.T_SALES.AMOUNT"},
+        {"DH2": "CBUS.AMOUNT"},
+    ]
+
+    models_dir = os.path.join(temp_dir, "models", "3-entity")
+    os.makedirs(models_dir, exist_ok=True)
+    with open(os.path.join(models_dir, f"{model_name}.sql"), "w") as f:
+        f.write("select 1 as sales_amount_dc")
+
+    manifest_path = os.path.join(temp_dir, "manifest.json")
+    manifest_data = {
+        "nodes": {
+            model_uid: {
+                "unique_id": model_uid,
+                "resource_type": "model",
+                "name": model_name,
+                "schema": "main",
+                "alias": model_name,
+                "original_file_path": f"models/3-entity/{model_name}.sql",
+                "columns": {},
+                "description": "Campaign management fact",
+                "config": {"materialized": "table"},
+                "tags": [],
+            }
+        }
+    }
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_data, f)
+
+    data_model_path = os.path.join(temp_dir, "data_model.yml")
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": entity_id,
+                "label": "Campaign Management",
+                "dbt_model": model_uid,
+                "drafted_fields": [
+                    {
+                        "name": "sales_amount_dc",
+                        "datatype": "numeric",
+                        "description": "Net sales",
+                        "origin": origin_list,
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    monkeypatch.setattr(cfg, "DBT_PROJECT_PATH", temp_dir)
+    monkeypatch.setattr(cfg, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(cfg, "CATALOG_PATH", "")
+    monkeypatch.setattr(cfg, "DATA_MODEL_PATH", data_model_path)
+    monkeypatch.setattr(cfg, "DBT_MODEL_PATHS", ["3-entity"])
+
+    adapter = DbtCoreAdapter(
+        manifest_path=manifest_path,
+        catalog_path="",
+        project_path=temp_dir,
+        data_model_path=data_model_path,
+        model_paths=["3-entity"],
+    )
+
+    yml_path = adapter.save_dbt_schema(
+        entity_id=entity_id,
+        model_name=model_name,
+        fields=[
+            {
+                "name": "sales_amount_dc",
+                "datatype": "numeric",
+                "description": "Net sales",
+                "origin": origin_list,
+            }
+        ],
+    )
+
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = schema["models"][0]["columns"][0]
+    assert col["meta"]["origin"] == origin_list
+    assert col["description"] == "Net sales"
+    assert "| Origin:" not in (col.get("description") or "")
+
+    manifest_data["nodes"][model_uid]["columns"]["sales_amount_dc"] = {
+        "name": "sales_amount_dc",
+        "data_type": "numeric",
+        "description": "Net sales",
+        "meta": {"origin": origin_list},
+    }
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_data, f)
+
+    models = adapter.get_models()
+    model = next(m for m in models if m["name"] == model_name)
+    read_col = next(c for c in model["columns"] if c["name"] == "sales_amount_dc")
+    assert read_col["origin"] == origin_list
+    assert read_col.get("description") == "Net sales"
+
+
 class TestSaveDbtSchema:
     """Tests for POST /api/dbt-schema endpoint."""
 
