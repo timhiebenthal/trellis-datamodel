@@ -1493,6 +1493,15 @@
 												</div>
 												<!-- Origin (read-only) -->
 												<div class="col-span-2 text-xs text-gray-600 font-mono space-y-0.5">
+													{#if field.origin === 'dbt'}
+														<span
+															class="inline-flex items-center text-gray-400"
+															aria-label={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+															title={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+														>
+															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+														</span>
+													{/if}
 													{#if field.originRefs?.length}
 														{#each field.originRefs as entry (JSON.stringify(entry))}
 															{#each Object.entries(entry) as [originKey, originValue]}

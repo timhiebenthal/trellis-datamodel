@@ -145,6 +145,13 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     expect(materializeButtons).toHaveLength(1);
   });
 
+  it('shows dbt icon on materialized rows in the origin column', async () => {
+    setupBoundEntityWithDraft();
+    await renderModal();
+    const materializedIndicators = screen.getAllByLabelText(/Materialized in dbt model/i);
+    expect(materializedIndicators).toHaveLength(2);
+  });
+
   it('shows read-only origin lines for draft rows without an origin input', async () => {
     setupBoundEntityWithDraftOrigin();
     await renderModal();
