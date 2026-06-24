@@ -1,7 +1,10 @@
+export type OriginEntry = Record<string, string>;
+
 export interface DbtColumn {
     name: string;
     type: string;
     description?: string;
+    origin?: OriginEntry[];
 }
 
 export interface DbtModel {
@@ -41,7 +44,7 @@ export interface DraftedField {
     name: string;
     datatype: 'text' | 'int' | 'float' | 'bool' | 'date' | 'timestamp' | 'unknown';
     description?: string;
-    origin?: string;
+    origin?: OriginEntry[];
     source?: 'dbt' | 'draft';
 }
 
