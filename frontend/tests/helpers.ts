@@ -2,8 +2,8 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-// Playwright pages use the frontend baseURL (localhost:5173). Point API calls to the backend.
-const API_URL = process.env.VITE_PUBLIC_API_URL || 'http://localhost:8000/api';
+// Hit the Playwright test backend directly (same port as webServer below).
+const API_URL = 'http://127.0.0.1:8000/api';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..', '..');

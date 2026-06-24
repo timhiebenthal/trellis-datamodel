@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { applyConfigOverrides, getCompanyDummyConfigOverrides, resetDataModel, restoreConfig, type DataModelPayload } from './helpers';
 
-const API_URL = process.env.VITE_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_URL = 'http://127.0.0.1:8000/api';
 
 test.describe.configure({ mode: 'serial' });
 

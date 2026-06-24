@@ -82,7 +82,7 @@ test.describe('Merged dbt + drafted fields', () => {
 		await resetDataModel(request, payload);
 
 		await page.goto('/entity-list');
-		await page.waitForLoadState('networkidle');
+		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
 		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
@@ -127,9 +127,8 @@ test.describe('Merged dbt + drafted fields', () => {
 		const yml = fs.readFileSync(CLEAN_CUSTOMER_SCHEMA_YML, 'utf8');
 		expect(yml).toContain('pending_col');
 
-		const pendingRow = dialog2.getByTestId('merged-field-row-pending_col');
-		await expect(pendingRow).toBeVisible();
-		await expect(pendingRow.getByPlaceholder('attribute_name')).toHaveAttribute('readonly', '');
+		// Written to schema.yml but not in manifest until dbt compile — draft row is removed.
+		await expect(dialog2.getByTestId('merged-field-row-pending_col')).toHaveCount(0);
 	});
 
 	test('modal: editing a materialized column description persists to schema.yml', async ({ page, request }) => {
@@ -166,7 +165,7 @@ models:
 		await resetDataModel(request, payload);
 
 		await page.goto('/entity-list');
-		await page.waitForLoadState('networkidle');
+		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
 		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
