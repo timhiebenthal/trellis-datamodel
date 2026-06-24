@@ -6,6 +6,18 @@ import yaml
 import json
 import pytest
 
+from trellis_datamodel.adapters.base import ColumnInfo
+
+
+def test_columninfo_allows_origin_key():
+    """ColumnInfo accepts structured origin metadata."""
+    column: ColumnInfo = {
+        "name": "sales_amount",
+        "type": "numeric",
+        "origin": [{"DH1": "CORE.A"}],
+    }
+    assert column["origin"] == [{"DH1": "CORE.A"}]
+
 
 class TestSaveDbtSchema:
     """Tests for POST /api/dbt-schema endpoint."""
