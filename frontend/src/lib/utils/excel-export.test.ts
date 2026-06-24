@@ -220,7 +220,7 @@ describe('Sheet Generators', () => {
 
     it('should include origin value when populated', () => {
       const attributes = [
-        { name: 'campaign_id', type: 'text', description: 'Unique identifier', origin: 'DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID' }
+        { name: 'campaign_id', type: 'text', description: 'Unique identifier', origin: [{ DH1: 'CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID' }] }
       ];
       const sheet = generateAttributesSheet(attributes);
       expect(sheet.data[1][3]).toBe('DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID');
@@ -232,6 +232,19 @@ describe('Sheet Generators', () => {
       ];
       const sheet = generateAttributesSheet(attributes);
       expect(sheet.data[1][3]).toBe('');
+    });
+
+    it('should stringify structured origin entries for the origin cell', () => {
+      const attributes = [
+        {
+          name: 'amount',
+          type: 'numeric',
+          description: 'Net sales',
+          origin: [{ DH1: 'CORE.A' }, { DH2: 'CBUS.B' }],
+        },
+      ];
+      const sheet = generateAttributesSheet(attributes);
+      expect(sheet.data[1][3]).toBe('DH1: CORE.A | DH2: CBUS.B');
     });
   });
 

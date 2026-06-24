@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { formatEntityAsMarkdown } from './markdown-export';
-import type { EntityData } from '$lib/types';
+import type { EntityData, OriginEntry } from '$lib/types';
 import type { Node } from '@xyflow/svelte';
 
 describe('markdown-export utilities', () => {
 	let mockEntity: EntityData;
-	let mockAttributes: Array<{ name: string; type: string; description?: string; origin?: string }>;
+	let mockAttributes: Array<{ name: string; type: string; description?: string; origin?: OriginEntry[] }>;
 	let mockEdges: any[];
 	let mockNodes: Node[];
 
@@ -210,21 +210,26 @@ describe('markdown-export utilities', () => {
 			{
 				label: 'NIP status (DH1 | DH2 / alt)',
 				name: 'refund_status_code',
-				origin:
-					'DH1: DATA_MART_MAIN.T_DIM_NIP_STATUS.REFUND_STATUS | DH2: CBUS_CUSTOMER_REFUND_MASTER.REFUND_STATUS / CBUS_REFUND.REFUND_STATUS',
+				origin: [
+					{ DH1: 'DATA_MART_MAIN.T_DIM_NIP_STATUS.REFUND_STATUS' },
+					{ DH2: 'CBUS_CUSTOMER_REFUND_MASTER.REFUND_STATUS / CBUS_REFUND.REFUND_STATUS' },
+				],
 				expectEncoded: 'DH1: DATA_MART_MAIN.T_DIM_NIP_STATUS.REFUND_STATUS &#124; DH2:',
 			},
 			{
 				label: 'appointment (DH1 | DH2)',
 				name: 'activity_id',
-				origin: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID | DH2: CBUS_APPOINTMENT.APPOINTMENT_AID',
+				origin: [
+					{ DH1: 'CORE.T_DYN_APPOINTMENT.ACTIVITYID' },
+					{ DH2: 'CBUS_APPOINTMENT.APPOINTMENT_AID' },
+				],
 				expectEncoded: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID &#124; DH2: CBUS_APPOINTMENT.APPOINTMENT_AID',
 			},
 			{
 				label: 'minimal split',
 				name: 'x',
-				origin: 'A | B',
-				expectEncoded: 'A &#124; B',
+				origin: [{ A: 'B' }, { C: 'D' }],
+				expectEncoded: 'A: B &#124; C: D',
 			},
 		])(
 			'should encode pipes in origin without extra table columns ($label)',
@@ -244,7 +249,7 @@ describe('markdown-export utilities', () => {
 					name: 'x',
 					type: 'text',
 					description: 'Line1\nLine2',
-					origin: 'a\nb'
+					origin: [{ '': 'a\nb' }],
 				}
 			];
 			const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
@@ -564,10 +569,25 @@ describe('markdown-export utilities', () => {
 
 		it('should render origin value in 4th column', () => {
 			const attributes = [
-				{ name: 'campaign_id', type: 'text', description: 'Unique ID', origin: 'DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID' }
+				{ name: 'campaign_id', type: 'text', description: 'Unique ID', origin: [{ DH1: 'CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID' }] }
 			];
 			const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
 			expect(result).toContain('| campaign_id | text | Unique ID | DH1: CORE.V_DYN_CAMPAIGN_CUR.CAMPAIGNID |');
+		});
+
+		it('should stringify structured origin entries with pipe escaping', () => {
+			const attributes = [
+				{
+					name: 'amount',
+					type: 'numeric',
+					description: 'Net sales',
+					origin: [{ DH1: 'CORE.A' }, { DH2: 'CBUS.B' }],
+				},
+			];
+			const result = formatEntityAsMarkdown(mockEntity, attributes, [], mockNodes, 'customer');
+			const row = result.split('\n').find((line) => line.startsWith('| amount |'));
+			expect(row).toBeDefined();
+			expect(row).toContain('DH1: CORE.A &#124; DH2: CBUS.B');
 		});
 
 		it('should render empty string for undefined origin in 4th column', () => {

@@ -1,6 +1,14 @@
 import * as XLSX from 'xlsx';
 import type { Node } from '@xyflow/svelte';
-import type { AnnotationType, EntityData } from '$lib/types';
+import type { AnnotationType, EntityData, OriginEntry } from '$lib/types';
+import { stringifyOrigin } from './origin';
+
+type ExportAttribute = {
+	name: string;
+	type: string;
+	description?: string;
+	origin?: OriginEntry[];
+};
 
 /**
  * Sanitizes a filename by removing or replacing special characters.
@@ -262,7 +270,7 @@ export function generateRelationshipsSheet(
  * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
 export function generateAttributesSheet(
-	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>
+	attributes: ExportAttribute[]
 ): XLSX.WorkSheet {
 	// Create 4-column array: Name | Type | Description | Origin
 	const attributesData = [
@@ -271,7 +279,7 @@ export function generateAttributesSheet(
 			attr.name,
 			attr.type,
 			attr.description || '',
-			attr.origin || ''
+			stringifyOrigin(attr.origin)
 		])
 	];
 
@@ -309,7 +317,7 @@ export function generateAttributesSheet(
  */
 export function exportEntityToExcel(
 	entity: EntityData,
-	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>,
+	attributes: ExportAttribute[],
 	edges: any[],
 	allNodes: Node[],
 	entityId: string,
@@ -435,7 +443,7 @@ export function generateDataModelOverviewSheet(
 
 function draftedFieldsToAttributes(
 	entity: EntityData
-): Array<{ name: string; type: string; description?: string; origin?: string }> {
+): ExportAttribute[] {
 	const fields = entity.drafted_fields ?? [];
 	return fields.map((f) => ({
 		name: f.name,

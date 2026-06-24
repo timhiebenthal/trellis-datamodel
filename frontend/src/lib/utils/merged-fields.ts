@@ -1,12 +1,13 @@
-import type { DbtColumn, DraftedField } from '$lib/types';
+import type { DbtColumn, DraftedField, OriginEntry } from '$lib/types';
 
 export type MergedField =
-  | { origin: 'dbt'; name: string; datatype?: string; description?: string }
+  | { origin: 'dbt'; name: string; datatype?: string; description?: string; originRefs?: OriginEntry[] }
   | {
       origin: 'draft';
       name: string;
       datatype?: string;
       description?: string;
+      originRefs?: OriginEntry[];
       draftIndex: number;
     };
 
@@ -26,6 +27,7 @@ export function mergeFields(
     name: c.name,
     datatype: c.type,
     description: c.description,
+    originRefs: c.origin,
   }));
   const draftRows: MergedField[] = [];
   draftedList.forEach((d, i) => {
@@ -35,6 +37,7 @@ export function mergeFields(
       name: d.name,
       datatype: d.datatype,
       description: d.description,
+      originRefs: d.origin,
       draftIndex: i,
     });
   });

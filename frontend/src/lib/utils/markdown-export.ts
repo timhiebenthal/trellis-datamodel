@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/svelte';
-import type { EntityData } from '$lib/types';
+import type { EntityData, OriginEntry } from '$lib/types';
 import { formatEntityType, formatAnnotationType, formatRelationshipType, formatRelationshipKeys } from './excel-export';
+import { stringifyOrigin } from './origin';
 
 /**
  * Prepares a value for a GFM pipe table cell: single-line text and no raw `|` characters.
@@ -27,7 +28,7 @@ function markdownTableCell(value: unknown): string {
  */
 export function formatEntityAsMarkdown(
 	entity: EntityData,
-	attributes: Array<{ name: string; type: string; description?: string; origin?: string }>,
+	attributes: Array<{ name: string; type: string; description?: string; origin?: OriginEntry[] }>,
 	edges: any[],
 	allNodes: Node[],
 	entityId: string,
@@ -66,7 +67,7 @@ export function formatEntityAsMarkdown(
 			const name = markdownTableCell(attr.name);
 			const type = markdownTableCell(attr.type);
 			const description = markdownTableCell(attr.description ?? '');
-			const origin = markdownTableCell(attr.origin ?? '');
+			const origin = markdownTableCell(stringifyOrigin(attr.origin));
 			lines.push(`| ${name} | ${type} | ${description} | ${origin} |`);
 		}
 	}

@@ -52,7 +52,10 @@ function setupUnboundEntityWithDraftOrigin() {
         name: 'appointment_id',
         datatype: 'text',
         description: 'Unique identifier',
-        origin: 'DH1: CORE.T_DYN_APPOINTMENT.ACTIVITYID | DH2: CBUS_APPOINTMENT.APPOINTMENT_AID',
+        origin: [
+          { DH1: 'CORE.T_DYN_APPOINTMENT.ACTIVITYID' },
+          { DH2: 'CBUS_APPOINTMENT.APPOINTMENT_AID' },
+        ],
       }],
     } as any,
   }] as any);
@@ -73,7 +76,7 @@ function setupBoundEntityWithDraftOrigin() {
         name: 'extra_col',
         datatype: 'text',
         description: 'Draft column',
-        origin: 'LINEAGE:user_defined',
+        origin: [{ LINEAGE: 'user_defined' }],
       }],
     } as any,
   }] as any);
@@ -110,10 +113,10 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
   it('renders 3 rows for 2 dbt columns + 1 draft on a bound entity', async () => {
     setupBoundEntityWithDraft();
     await renderModal();
-    const materializedIndicators = screen.getAllByLabelText(/Materialized in dbt model/i);
-    expect(materializedIndicators).toHaveLength(2);
-    const draftIndicators = screen.getAllByLabelText(/Drafted in Trellis/i);
-    expect(draftIndicators).toHaveLength(1);
+    expect(screen.getAllByPlaceholderText('attribute_name')).toHaveLength(3);
+    expect(screen.getByTestId('merged-field-row-id')).toBeInTheDocument();
+    expect(screen.getByTestId('merged-field-row-created_at')).toBeInTheDocument();
+    expect(screen.getByTestId('merged-field-row-pending_col')).toBeInTheDocument();
   });
 
   it('shows Add Attribute button for bound entities', async () => {
@@ -142,10 +145,11 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     expect(materializeButtons).toHaveLength(1);
   });
 
-  it('shows editable origin input for draft rows', async () => {
-    setupBoundEntityWithDraft();
+  it('shows read-only origin lines for draft rows without an origin input', async () => {
+    setupBoundEntityWithDraftOrigin();
     await renderModal();
-    expect(screen.getByPlaceholderText('Origin')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Origin')).not.toBeInTheDocument();
+    expect(screen.getByText('LINEAGE: user_defined')).toBeInTheDocument();
   });
 
   it('Copy as Markdown: unbound entity copies title, drafted origins, and relationships placeholder', async () => {
@@ -180,9 +184,9 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
       expect(navigator.clipboard.writeText).toHaveBeenCalled();
       const markdown = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(markdown).toContain('# Mixed Entity');
-      expect(markdown).toContain('| id | int |  | model.proj.entity_x |');
-      expect(markdown).toContain('| created_at | timestamp |  | model.proj.entity_x |');
-      expect(markdown).toContain('| extra_col | text | Draft column | LINEAGE:user_defined |');
+      expect(markdown).toContain('| id | int |  |  |');
+      expect(markdown).toContain('| created_at | timestamp |  |  |');
+      expect(markdown).toContain('| extra_col | text | Draft column | LINEAGE: user_defined |');
     });
   });
 
