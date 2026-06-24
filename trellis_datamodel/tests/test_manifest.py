@@ -166,6 +166,62 @@ class TestGetManifest:
             f"Expected 'integer' from data_type key, got: {col.get('type')}"
         )
 
+    def test_get_models_reads_meta_origin(
+        self, test_client, temp_dir, mock_manifest_data, monkeypatch
+    ):
+        """Columns with meta.origin return structured origin on manifest read-back."""
+        from trellis_datamodel import config as cfg
+
+        mock_manifest_data["nodes"]["model.project.users"]["columns"]["revenue"] = {
+            "name": "revenue",
+            "data_type": "numeric",
+            "description": "Net sales",
+            "meta": {"origin": [{"DH1": "CORE.A"}]},
+        }
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        with open(manifest_path, "w") as f:
+            json.dump(mock_manifest_data, f)
+        monkeypatch.setattr(cfg, "MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr(cfg, "CATALOG_PATH", "")
+
+        response = test_client.get("/api/manifest")
+        users = next(m for m in response.json()["models"] if m["name"] == "users")
+        col = next(c for c in users["columns"] if c["name"] == "revenue")
+        assert col["origin"] == [{"DH1": "CORE.A"}]
+        assert col["description"] == "Net sales"
+
+    def test_get_models_origin_description_fallback(
+        self, test_client, temp_dir, mock_manifest_data, monkeypatch
+    ):
+        """Legacy | Origin: description suffix is parsed into structured origin."""
+        from trellis_datamodel import config as cfg
+
+        mock_manifest_data["nodes"]["model.project.users"]["columns"]["revenue"] = {
+            "name": "revenue",
+            "data_type": "numeric",
+            "description": "Net sales | Origin: DH1: CORE.A",
+        }
+        mock_manifest_data["nodes"]["model.project.users"]["columns"]["cost"] = {
+            "name": "cost",
+            "data_type": "numeric",
+            "description": "Operating cost",
+        }
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        with open(manifest_path, "w") as f:
+            json.dump(mock_manifest_data, f)
+        monkeypatch.setattr(cfg, "MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr(cfg, "CATALOG_PATH", "")
+
+        response = test_client.get("/api/manifest")
+        users = next(m for m in response.json()["models"] if m["name"] == "users")
+        revenue = next(c for c in users["columns"] if c["name"] == "revenue")
+        cost = next(c for c in users["columns"] if c["name"] == "cost")
+
+        assert revenue["origin"] == [{"DH1": "CORE.A"}]
+        assert revenue["description"] == "Net sales"
+        assert cost["origin"] == []
+        assert cost["description"] == "Operating cost"
+
     def test_filters_by_model_path(self, test_client, temp_dir, mock_manifest):
         # Update manifest to have models in different paths
         with open(mock_manifest, "r") as f:

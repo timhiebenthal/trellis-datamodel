@@ -288,3 +288,85 @@ class TestSaveDataModel:
 
         assert saved["entities"][0]["id"] == "dim_employee"
         assert saved["entities"][0]["roles"] == ["Sales Agent"]
+
+
+def test_get_data_model_normalizes_origin(test_client, temp_data_model_path):
+    """Legacy string origin in data_model.yml is returned as a structured list."""
+    model_data = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "sales",
+                "label": "Sales",
+                "drafted_fields": [
+                    {
+                        "name": "amount",
+                        "datatype": "numeric",
+                        "origin": "DH1: CORE.A | DH2: CBUS.B",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(model_data, f)
+
+    response = test_client.get("/api/data-model")
+    assert response.status_code == 200
+    field = response.json()["entities"][0]["drafted_fields"][0]
+    assert field["origin"] == [{"DH1": "CORE.A"}, {"DH2": "CBUS.B"}]
+
+
+def test_save_data_model_writes_origin_list(test_client, temp_data_model_path):
+    """Saved data_model.yml persists structured origin lists; legacy strings migrate."""
+    legacy_payload = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "sales",
+                "label": "Sales",
+                "drafted_fields": [
+                    {
+                        "name": "amount",
+                        "datatype": "numeric",
+                        "origin": "DH1: CORE.A",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    response = test_client.post("/api/data-model", json=legacy_payload)
+    assert response.status_code == 200
+
+    with open(temp_data_model_path, "r") as f:
+        saved = yaml.safe_load(f)
+    assert saved["entities"][0]["drafted_fields"][0]["origin"] == [{"DH1": "CORE.A"}]
+
+    structured_payload = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "sales",
+                "label": "Sales",
+                "drafted_fields": [
+                    {
+                        "name": "amount",
+                        "datatype": "numeric",
+                        "origin": [{"DH1": "CORE.A"}, {"DH2": "CBUS.B"}],
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    response = test_client.post("/api/data-model", json=structured_payload)
+    assert response.status_code == 200
+
+    with open(temp_data_model_path, "r") as f:
+        saved = yaml.safe_load(f)
+    assert saved["entities"][0]["drafted_fields"][0]["origin"] == [
+        {"DH1": "CORE.A"},
+        {"DH2": "CBUS.B"},
+    ]

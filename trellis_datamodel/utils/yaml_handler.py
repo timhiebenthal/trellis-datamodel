@@ -451,6 +451,8 @@ class YamlHandler:
                 data_type=col_data.get("data_type"),
                 description=col_data.get("description"),
             )
+            if "meta" in col_data:
+                col["meta"] = col_data["meta"]
             new_columns.append(col)
 
         model["columns"] = new_columns
@@ -496,6 +498,8 @@ class YamlHandler:
                 data_type=col_data.get("data_type"),
                 description=col_data.get("description"),
             )
+            if "meta" in col_data:
+                col["meta"] = col_data["meta"]
             new_columns.append(col)
 
         incoming_set = set(incoming_names)

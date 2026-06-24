@@ -19,6 +19,98 @@ def test_columninfo_allows_origin_key():
     assert column["origin"] == [{"DH1": "CORE.A"}]
 
 
+@pytest.mark.parametrize(
+    "origin_input",
+    [
+        [{"DH1": "CORE.T_SALES.AMOUNT"}, {"DH2": "CBUS.AMOUNT"}],
+        "DH1: CORE.T_SALES.AMOUNT | DH2: CBUS.AMOUNT",
+    ],
+)
+def test_materialize_writes_meta_origin(test_client, temp_dir, mock_manifest, origin_input):
+    """Materialization writes meta.origin and keeps description free of | Origin: suffix."""
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "sales.yml"), "w") as f:
+        yaml.dump({"version": 2, "models": [{"name": "sales", "columns": []}]}, f)
+
+    expected_origin = [
+        {"DH1": "CORE.T_SALES.AMOUNT"},
+        {"DH2": "CBUS.AMOUNT"},
+    ]
+
+    # Site 2: POST /api/dbt-schema
+    response = test_client.post(
+        "/api/dbt-schema",
+        json={
+            "entity_id": "sales",
+            "model_name": "sales",
+            "fields": [
+                {
+                    "name": "amount",
+                    "datatype": "numeric",
+                    "description": "Net sales",
+                    "origin": origin_input,
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    with open(response.json()["file_path"], "r") as f:
+        schema = yaml.safe_load(f)
+    col = schema["models"][0]["columns"][0]
+    assert col["meta"]["origin"] == expected_origin
+    assert col["description"] == "Net sales"
+    assert "| Origin:" not in (col.get("description") or "")
+
+
+def test_sync_dbt_tests_writes_meta_origin(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """Batch sync writes meta.origin for drafted fields (site 1)."""
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump({"version": 2, "models": [{"name": "users", "columns": []}]}, f)
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "amount",
+                        "datatype": "numeric",
+                        "description": "Net sales",
+                        "origin": "DH1: CORE.T_SALES.AMOUNT | DH2: CBUS.AMOUNT",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "amount")
+    assert col["meta"]["origin"] == [
+        {"DH1": "CORE.T_SALES.AMOUNT"},
+        {"DH2": "CBUS.AMOUNT"},
+    ]
+    assert col["description"] == "Net sales"
+    assert "| Origin:" not in (col.get("description") or "")
+
+
 class TestSaveDbtSchema:
     """Tests for POST /api/dbt-schema endpoint."""
 

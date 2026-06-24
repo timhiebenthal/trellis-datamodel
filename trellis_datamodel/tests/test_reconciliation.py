@@ -136,7 +136,18 @@ class TestReconcileEntityFields:
                 {"name": "revenue", "type": "numeric"},
             ],
         )
-        assert result[0].get("origin") == "DH1: SCHEMA.TABLE.COL"
+        assert result[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+
+    def test_reconcile_preserves_list_origin(self):
+        """Structured list origin on a draft field passes through unchanged."""
+        origin_list = [{"DH1": "CORE.A"}, {"DH2": "CBUS.B"}]
+        result = reconcile_entity_fields(
+            existing_fields=[
+                {"name": "revenue", "datatype": "float", "origin": origin_list},
+            ],
+            manifest_columns=[],
+        )
+        assert result[0]["origin"] == origin_list
 
     def test_origin_parsed_from_manifest_description(self):
         """Origin embedded in manifest description is parsed into separate field."""

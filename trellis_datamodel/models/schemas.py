@@ -102,7 +102,7 @@ class DbtSchemaRequest(BaseModel):
     """Schema for creating a new dbt schema file."""
     entity_id: str
     model_name: str
-    fields: List[Dict[str, str]]
+    fields: List[Dict[str, Any]]
     description: Optional[str] = None
     tags: Optional[List[str]] = None
 
