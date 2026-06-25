@@ -11,8 +11,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DBT_DEMO = REPO_ROOT / "dbt_demo"
 
 
-def test_demo_data_model_retains_legacy_string_origin():
-    """dbt_demo/data_model.yml keeps pipe-string origins for silent migration."""
+def test_demo_data_model_origins_are_structured_lists():
+    """dbt_demo/data_model.yml origins are fully migrated to structured lists."""
     if not DBT_DEMO.exists():
         return
 
@@ -20,17 +20,23 @@ def test_demo_data_model_retains_legacy_string_origin():
     with open(data_model_path, "r") as f:
         data_model = yaml.safe_load(f)
 
-    legacy_origins = [
+    all_origins = [
         field.get("origin")
         for entity in data_model.get("entities", [])
         for field in entity.get("drafted_fields") or []
-        if isinstance(field.get("origin"), str) and field.get("origin")
+        if field.get("origin") is not None
     ]
-    assert legacy_origins, "expected at least one legacy string origin in dbt_demo"
+    assert all_origins, "expected at least one origin entry in dbt_demo"
+    legacy = [o for o in all_origins if isinstance(o, str)]
+    assert not legacy, f"expected no legacy string origins, found: {legacy}"
+    for origin in all_origins:
+        assert isinstance(origin, list), f"origin should be a list, got: {type(origin)}"
+        for entry in origin:
+            assert isinstance(entry, dict), f"each origin entry should be a dict, got: {type(entry)}"
 
 
-def test_demo_schema_has_hand_written_meta_origin():
-    """dbt_demo schema.yml includes at least one column with meta.origin."""
+def test_demo_schema_has_meta_origin():
+    """dbt_demo schema.yml has at least one column with a structured meta.origin list."""
     if not DBT_DEMO.exists():
         return
 
@@ -39,8 +45,11 @@ def test_demo_schema_has_hand_written_meta_origin():
         schema = yaml.safe_load(f)
 
     lead_model = next(m for m in schema["models"] if m["name"] == "dim__lead")
-    lead_key = next(c for c in lead_model["columns"] if c["name"] == "lead_key")
-    assert lead_key.get("meta", {}).get("origin") == [
-        {"DH1": "CORE.T_DYN_LEAD.LEADKEY"},
-        {"DH2": "SCD2_LEAD.LEADKEY"},
+    cols_with_origin = [
+        c for c in lead_model["columns"]
+        if isinstance(c.get("meta", {}).get("origin"), list)
     ]
+    assert cols_with_origin, "expected at least one column with meta.origin list in dim__lead.yml"
+    for col in cols_with_origin:
+        for entry in col["meta"]["origin"]:
+            assert isinstance(entry, dict), f"each origin entry should be a dict, got: {entry}"

@@ -40,6 +40,7 @@ class ColumnSchema(TypedDict, total=False):
     data_type: Optional[str]
     description: Optional[str]
     data_tests: Optional[list[dict[str, Any]]]
+    origin: Optional[list[dict[str, str]]]
 
 
 class ModelSchema(TypedDict, total=False):
