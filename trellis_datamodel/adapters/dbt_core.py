@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.utils.yaml_handler import YamlHandler
+from trellis_datamodel.utils.origin import parse_origin
 from .base import (
     ColumnInfo,
     ColumnSchema,
@@ -22,6 +23,24 @@ from .base import (
     ModelSchema,
     Relationship,
 )
+
+
+def _origin_meta(raw_origin: object) -> dict[str, Any] | None:
+    parsed = parse_origin(raw_origin)
+    return {"origin": parsed} if parsed else None
+
+
+def _resolve_origin_from_column(
+    col_data: dict[str, Any], description: str | None
+) -> tuple[str | None, list[dict[str, str]]]:
+    meta = col_data.get("meta") or {}
+    origin = parse_origin(meta.get("origin"))
+    desc = description
+    if not origin and desc and " | Origin: " in desc:
+        prefix, suffix = desc.split(" | Origin: ", 1)
+        origin = parse_origin(suffix)
+        desc = prefix or None
+    return desc, origin
 
 
 class DbtCoreAdapter:
@@ -501,25 +520,39 @@ class DbtCoreAdapter:
                     col_name.lower(): (col_data.get("description") or "")
                     for col_name, col_data in node.get("columns", {}).items()
                 }
+                manifest_col_by_lower: dict[str, dict[str, Any]] = {
+                    col_name.lower(): col_data
+                    for col_name, col_data in node.get("columns", {}).items()
+                }
                 for col in catalog_node.get("columns", {}).values():
                     col_name_lower = (col.get("name") or "").lower()
+                    manifest_col = manifest_col_by_lower.get(col_name_lower, {})
+                    description = (
+                        manifest_col_desc.get(col_name_lower)
+                        or col.get("comment")
+                        or col.get("description")
+                    )
+                    description, origin = _resolve_origin_from_column(
+                        manifest_col, description
+                    )
                     columns.append(
                         {
                             "name": col_name_lower,
                             "type": col.get("type") or col.get("data_type"),
-                            "description": (
-                                manifest_col_desc.get(col_name_lower)
-                                or col.get("comment")
-                                or col.get("description")
-                            ),
+                            "description": description,
+                            "origin": origin,
                         }
                     )
             else:
                 for col_name, col_data in node.get("columns", {}).items():
+                    description, origin = _resolve_origin_from_column(
+                        col_data, col_data.get("description")
+                    )
                     columns.append({
                         "name": col_name,
                         "type": col_data.get("type") or col_data.get("data_type"),
-                        "description": col_data.get("description"),
+                        "description": description,
+                        "origin": origin,
                     })
 
             # Extract materialization
@@ -1036,17 +1069,15 @@ class DbtCoreAdapter:
                         continue
                     f_desc = field.get("description")
                     f_origin = field.get("origin")
-                    if f_desc and f_origin:
-                        f_desc = f"{f_desc} | Origin: {f_origin}"
-                    elif f_origin:
-                        f_desc = f"Origin: {f_origin}"
-                    columns_payload.append(
-                        {
-                            "name": f_name,
-                            "data_type": field.get("datatype"),
-                            "description": f_desc,
-                        }
-                    )
+                    col_payload: dict[str, Any] = {
+                        "name": f_name,
+                        "data_type": field.get("datatype"),
+                        "description": f_desc,
+                    }
+                    origin_meta = _origin_meta(f_origin)
+                    if origin_meta:
+                        col_payload["meta"] = origin_meta
+                    columns_payload.append(col_payload)
 
                 self.yaml_handler.update_columns_batch(model_entry, columns_payload)
 
@@ -1200,15 +1231,12 @@ class DbtCoreAdapter:
         for field in fields:
             desc = field.get("description")
             origin = field.get("origin")
-            if desc and origin:
-                combined_desc = f"{desc} | Origin: {origin}"
-            elif origin:
-                combined_desc = f"Origin: {origin}"
-            else:
-                combined_desc = desc
             col: dict = {"name": field["name"], "data_type": field["datatype"]}
-            if combined_desc:
-                col["description"] = combined_desc
+            if desc:
+                col["description"] = desc
+            origin_meta = _origin_meta(origin)
+            if origin_meta:
+                col["meta"] = origin_meta
             columns.append(col)
 
         target_version = self._resolve_model_version(

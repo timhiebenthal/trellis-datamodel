@@ -29,8 +29,8 @@ export default defineConfig({
     reporter: 'html',
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
     use: {
-        /* Base URL to use in actions like `await page.goto('')`. */
-        baseURL: 'http://localhost:5173',
+        /* Dedicated dev port so E2E does not collide with a running `make frontend` on 5173. */
+        baseURL: 'http://localhost:5174',
 
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
@@ -62,14 +62,13 @@ export default defineConfig({
             timeout: 30000,
         },
         {
-            // Frontend dev server
-            command: 'npm run dev',
+            // Frontend dev server on 5174 — avoids colliding with `make frontend` on 5173.
+            command: 'npm run dev -- --port 5174',
             env: {
-                // Point frontend Vite proxy to test backend API
                 VITE_DEV_API_TARGET: 'http://localhost:8000',
             },
-            url: 'http://localhost:5173',
-            reuseExistingServer: !process.env.CI,
+            url: 'http://localhost:5174',
+            reuseExistingServer: false,
         },
     ],
 });

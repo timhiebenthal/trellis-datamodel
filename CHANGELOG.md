@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-07-24
+
+### Added
+- **Structured origin metadata**: Entity attribute `origin` is now a list of `{source_id: path}` objects in `data_model.yml`, written as `meta.origin` in dbt `schema.yml` on materialization, read back from manifest/meta (with `| Origin:` description fallback), and shown read-only in the EntityDetailModal. Legacy pipe-separated strings still load via silent migration.
+- **dbt origin icon in EntityDetailModal**: Rows whose origin comes from a materialized dbt model now show a dbt icon in the origin column, distinguishing them from manually entered origin values.
+
+### Changed
+- **Origin exports**: Excel and Markdown exports stringify structured origin lists back to the legacy `KEY: VALUE | KEY: VALUE` format.
+
 ## [0.16.2] - 2026-06-24
 - Add parsing of "Origin" values from the dbt column description
 

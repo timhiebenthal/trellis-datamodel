@@ -6,7 +6,7 @@ enabling support for dbt-core, SQLMesh, Bruin, etc.
 """
 
 from pathlib import Path
-from typing import Protocol, TypedDict, Optional, Any
+from typing import Protocol, TypedDict, Optional, Any, NotRequired
 
 
 class ColumnInfo(TypedDict):
@@ -14,6 +14,8 @@ class ColumnInfo(TypedDict):
 
     name: str
     type: Optional[str]
+    description: NotRequired[Optional[str]]
+    origin: NotRequired[list[dict[str, str]]]
 
 
 class ModelInfo(TypedDict):
@@ -38,6 +40,7 @@ class ColumnSchema(TypedDict, total=False):
     data_type: Optional[str]
     description: Optional[str]
     data_tests: Optional[list[dict[str, Any]]]
+    origin: Optional[list[dict[str, str]]]
 
 
 class ModelSchema(TypedDict, total=False):

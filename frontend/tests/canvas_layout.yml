@@ -1,4 +1,11 @@
 version: 0.1
-entities: {}
+entities:
+  clean_customer_e2e:
+    position:
+      x: 50
+      y: 50
+    width: 280
+    panel_height: 200
+    collapsed: false
 relationships: {}
 source_colors: {}

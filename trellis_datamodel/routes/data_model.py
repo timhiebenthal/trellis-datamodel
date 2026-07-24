@@ -10,8 +10,23 @@ from trellis_datamodel.models.schemas import DataModelUpdate
 from trellis_datamodel.services.lineage import extract_source_systems_for_model
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.utils.yaml_handler import YamlHandler
+from trellis_datamodel.utils.origin import parse_origin
 
 router = APIRouter(prefix="/api", tags=["data-model"])
+
+
+def _normalize_field_origin(field: Dict[str, Any]) -> None:
+    origin = parse_origin(field.get("origin"))
+    if origin:
+        field["origin"] = origin
+    elif "origin" in field:
+        del field["origin"]
+
+
+def _normalize_model_origins(model_data: Dict[str, Any]) -> None:
+    for entity in model_data.get("entities", []):
+        for field in entity.get("drafted_fields") or []:
+            _normalize_field_origin(field)
 
 
 def load_data_model_raw() -> Dict[str, Any]:
@@ -217,6 +232,8 @@ async def get_data_model():
         if not model_data.get("relationships"):
             model_data["relationships"] = []
 
+        _normalize_model_origins(model_data)
+
         # Apply entity type inference when dimensional modeling is enabled
         if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             model_data = _apply_entity_type_inference(model_data)
@@ -341,7 +358,12 @@ def _split_model_and_layout(
         if "additional_models" in entity:
             model_entity["additional_models"] = entity["additional_models"]
         if "drafted_fields" in entity:
-            model_entity["drafted_fields"] = entity["drafted_fields"]
+            drafted_fields = []
+            for field in entity["drafted_fields"]:
+                normalized = dict(field)
+                _normalize_field_origin(normalized)
+                drafted_fields.append(normalized)
+            model_entity["drafted_fields"] = drafted_fields
         if "tags" in entity:
             model_entity["tags"] = entity["tags"]
         if "domain" in entity:

@@ -2,7 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
-	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn } from '$lib/types';
+	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
 	import type { MergedField } from '$lib/utils/merged-fields';
 	import type { Node } from '@xyflow/svelte';
@@ -179,7 +179,7 @@
 					?? f.description
 					?? '')
 				: (f.description ?? ''),
-			origin: f.origin === 'dbt' ? undefined : (editableDraftedFields[f.draftIndex]?.origin),
+			origin: f.originRefs,
 		})),
 	);
 
@@ -784,15 +784,12 @@
 	}
 
 
-	// Build legacy attributes shape from mergedFields for export helpers
-	function buildExportAttributes(): Array<{ name: string; type: string; description?: string; origin?: string }> {
+	function buildExportAttributes(): Array<{ name: string; type: string; description?: string; origin?: OriginEntry[] }> {
 		const attributes = mergedFields.map((f) => ({
 			name: f.name,
 			type: f.datatype ?? '',
 			description: f.description ?? '',
-			origin: f.origin === 'dbt'
-				? (boundModel?.unique_id ?? 'dbt')
-				: (editableDraftedFields[f.draftIndex]?.origin ?? ''),
+			origin: f.originRefs,
 		}));
 		return attributes;
 	}
@@ -1411,8 +1408,7 @@
 									<div class="col-span-2">Name</div>
 									<div class="col-span-1">Type</div>
 									<div class="col-span-6">Description</div>
-									<div class="col-span-2">Origin</div>
-									<div class="col-span-1"></div>
+									<div class="col-span-3">Origin</div>
 								</div>
 								<div class="divide-y divide-gray-200">
 								{#each mergedFields as field (field.origin === 'draft' ? `draft-${field.draftIndex}` : `dbt-${field.name}`)}
@@ -1494,31 +1490,34 @@
 													/>
 													{/if}
 												</div>
-												<!-- Origin label -->
-												<div class="col-span-2 text-xs text-gray-400 font-mono truncate" title={field.origin === 'dbt' ? 'dbt model' : 'drafted'}>
+												<!-- Origin (read-only) -->
+												<div class={field.origin === 'dbt' ? "col-span-3 text-xs text-gray-600 font-mono space-y-0.5" : "col-span-2 text-xs text-gray-600 font-mono space-y-0.5"}>
 													{#if field.origin === 'dbt'}
 														<span
-															class="inline-flex items-center"
+															class="inline-flex items-center text-gray-400"
 															aria-label={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
 															title={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
 														>
-															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 text-gray-400 opacity-70" aria-hidden="true" />
+															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
 														</span>
-													{:else}
-													<input
-														type="text"
-														value={editableDraftedFields[field.draftIndex]?.origin ?? ''}
-														oninput={(e) => updateDraftedField(field.draftIndex, { origin: (e.target as HTMLInputElement).value })}
-														class="w-full px-2 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-														placeholder="Origin"
-															aria-label={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
-															title={`Drafted in Trellis — not yet materialized in dbt. Use the materialize button in this row's Actions column to write into ${boundModel?.name ?? ''}'s schema.yml.`}
-														/>
+													{/if}
+													{#if field.originRefs?.length}
+														{#each field.originRefs as entry (JSON.stringify(entry))}
+															{#each Object.entries(entry) as [originKey, originValue]}
+																<div
+																	class="truncate"
+																	data-testid="origin-entry"
+																	title={originKey ? `${originKey}: ${originValue}` : originValue}
+																>
+																	{originKey ? `${originKey}: ${originValue}` : originValue}
+																</div>
+															{/each}
+														{/each}
 													{/if}
 												</div>
 										<!-- Actions -->
-										<div class="col-span-1 flex justify-end gap-1 items-center">
-											{#if field.origin === 'draft'}
+										{#if field.origin === 'draft'}
+											<div class="col-span-1 flex justify-end gap-1 items-center">
 												{#if isBoundEntity && boundModel}
 														<button
 															type="button"
@@ -1538,8 +1537,8 @@
 													>
 														<Icon icon="lucide:trash-2" class="w-4 h-4" />
 													</button>
-												{/if}
 											</div>
+										{/if}
 										</div>
 										{#if field.origin === 'draft' && dropIndex === field.draftIndex && dropPosition !== null}
 											<DropIndicator position={dropPosition} />

@@ -92,4 +92,34 @@ describe('mergeFields', () => {
 		const result = mergeFields(undefined, drafted);
 		expect(result[0]).toMatchObject({ description: 'some field' });
 	});
+
+	it('passes originRefs from dbt columns with origin discriminant dbt', () => {
+		const dbtCols: DbtColumn[] = [
+			{ name: 'amount', type: 'numeric', origin: [{ DH1: 'CORE.A' }] },
+		];
+		const result = mergeFields(dbtCols, undefined);
+		expect(result[0]).toMatchObject({
+			origin: 'dbt',
+			originRefs: [{ DH1: 'CORE.A' }],
+		});
+	});
+
+	it('passes originRefs from drafted fields with origin discriminant draft', () => {
+		const drafted: DraftedField[] = [
+			{ name: 'amount', datatype: 'float', origin: [{ DH2: 'CBUS.B' }] },
+		];
+		const result = mergeFields(undefined, drafted);
+		expect(result[0]).toMatchObject({
+			origin: 'draft',
+			originRefs: [{ DH2: 'CBUS.B' }],
+		});
+	});
+
+	it('leaves originRefs undefined when no origin is present', () => {
+		const dbtCols: DbtColumn[] = [{ name: 'id', type: 'int' }];
+		const drafted: DraftedField[] = [{ name: 'extra', datatype: 'text' }];
+		const result = mergeFields(dbtCols, drafted);
+		expect(result[0].originRefs).toBeUndefined();
+		expect(result[1].originRefs).toBeUndefined();
+	});
 });

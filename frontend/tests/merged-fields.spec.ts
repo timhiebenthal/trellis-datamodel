@@ -82,7 +82,7 @@ test.describe('Merged dbt + drafted fields', () => {
 		await resetDataModel(request, payload);
 
 		await page.goto('/entity-list');
-		await page.waitForLoadState('networkidle');
+		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
 		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
@@ -93,9 +93,8 @@ test.describe('Merged dbt + drafted fields', () => {
 			has: page.getByRole('heading', { name: /Clean Customer E2E Details/i }),
 		});
 
-		const matBefore = dialog.locator('[aria-label*="Materialized in dbt model"]');
-		await expect(matBefore.first()).toBeVisible({ timeout: 15000 });
-		await expect(matBefore).toHaveCount(7);
+		await expect(dialog.getByPlaceholder('attribute_name')).toHaveCount(7);
+		await expect(dialog.locator('input[placeholder="attribute_name"][readonly]')).toHaveCount(7);
 
 		await dialog.getByRole('button', { name: /Add Attribute/i }).click();
 
@@ -117,7 +116,7 @@ test.describe('Merged dbt + drafted fields', () => {
 		const dialog2 = page.getByRole('dialog').filter({
 			has: page.getByRole('heading', { name: /Clean Customer E2E Details/i }),
 		});
-		await expect(dialog2.locator('[aria-label*="Drafted in Trellis"]')).toHaveCount(1);
+		await expect(dialog2.getByTestId('merged-field-row-pending_col')).toBeVisible();
 
 		await dialog2.getByTitle(/Write to clean_customer's schema\.yml/i).click();
 
@@ -128,7 +127,8 @@ test.describe('Merged dbt + drafted fields', () => {
 		const yml = fs.readFileSync(CLEAN_CUSTOMER_SCHEMA_YML, 'utf8');
 		expect(yml).toContain('pending_col');
 
-		await expect(dialog2.locator('[aria-label*="Drafted in Trellis"]')).toHaveCount(0);
+		// Written to schema.yml but not in manifest until dbt compile — draft row is removed.
+		await expect(dialog2.getByTestId('merged-field-row-pending_col')).toHaveCount(0);
 	});
 
 	test('modal: editing a materialized column description persists to schema.yml', async ({ page, request }) => {
@@ -165,7 +165,7 @@ models:
 		await resetDataModel(request, payload);
 
 		await page.goto('/entity-list');
-		await page.waitForLoadState('networkidle');
+		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
 		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
