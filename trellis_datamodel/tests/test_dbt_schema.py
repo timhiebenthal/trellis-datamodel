@@ -111,6 +111,79 @@ def test_sync_dbt_tests_writes_meta_origin(
     assert "| Origin:" not in (col.get("description") or "")
 
 
+def test_push_to_dbt_preserves_native_column_type(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """Push to dbt must keep the dbt-native column type (e.g. varchar) instead of
+    overwriting it with Trellis's internal UI bucket type (e.g. text).
+
+    Regression test for GitHub issue #111: a bound entity's field type is
+    "varchar" in the compiled dbt project, but Trellis's data model only
+    tracks the coarse UI bucket ("text") for that field. Triggering
+    "Push to dbt" must not clobber the more precise, existing schema.yml
+    data_type with that bucket value.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump(
+            {
+                "version": 2,
+                "models": [
+                    {
+                        "name": "users",
+                        "columns": [
+                            {
+                                "name": "name",
+                                "data_type": "varchar",
+                                "description": "Full name",
+                            }
+                        ],
+                    }
+                ],
+            },
+            f,
+        )
+
+    # Mirrors what reconciliation currently writes to data_model.yml: the
+    # bucketed UI datatype ("text"), not the native dbt type ("varchar").
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "name",
+                        "datatype": "text",
+                        "description": "Full name",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
+    assert col["data_type"] == "varchar", (
+        "Push to dbt overwrote the native dbt column type with the internal "
+        f"UI bucket type: {col['data_type']!r} (expected 'varchar')"
+    )
+
+
 def test_round_trip_demo_origin(monkeypatch, temp_dir):
     """Demo-style project: materialize structured origin to schema.yml and read back via get_models."""
     from trellis_datamodel import config as cfg
