@@ -56,8 +56,20 @@ class TestReconcileDbtEndpoint:
                     "label": "Users",
                     "dbt_model": "model.project.users",
                     "drafted_fields": [
-                        {"name": "id", "datatype": "int", "description": "Primary key", "source": "dbt"},
-                        {"name": "name", "datatype": "text", "description": "Full name", "source": "dbt"},
+                        {
+                            "name": "id",
+                            "datatype": "int",
+                            "dbt_data_type": "integer",
+                            "description": "Primary key",
+                            "source": "dbt",
+                        },
+                        {
+                            "name": "name",
+                            "datatype": "text",
+                            "dbt_data_type": "varchar",
+                            "description": "Full name",
+                            "source": "dbt",
+                        },
                     ],
                 }
             ],

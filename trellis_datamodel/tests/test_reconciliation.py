@@ -49,6 +49,18 @@ class TestReconcileEntityFields:
         assert result[5]["datatype"] == "text"
         assert result[6]["datatype"] == "unknown"
 
+    def test_preserves_native_dbt_type_alongside_bucket(self):
+        """The raw dbt/warehouse type is preserved in dbt_data_type, not just
+        collapsed into the coarse datatype bucket (#111)."""
+        result = reconcile_entity_fields(
+            existing_fields=[],
+            manifest_columns=[
+                {"name": "label", "type": "varchar"},
+            ],
+        )
+        assert result[0]["datatype"] == "text"
+        assert result[0]["dbt_data_type"] == "varchar"
+
     def test_promotes_matching_draft(self):
         """A draft whose name matches a manifest column is promoted to source=dbt,
         with manifest metadata overwriting the draft's values."""
@@ -260,7 +272,13 @@ class TestReconcileDataModel:
                     "id": "users",
                     "dbt_model": "model.project.users",
                     "drafted_fields": [
-                        {"name": "id", "datatype": "int", "description": "PK", "source": "dbt"}
+                        {
+                            "name": "id",
+                            "datatype": "int",
+                            "dbt_data_type": "integer",
+                            "description": "PK",
+                            "source": "dbt",
+                        }
                     ],
                 }
             ]

@@ -46,6 +46,7 @@ export interface DraftedField {
     description?: string;
     origin?: OriginEntry[];
     source?: 'dbt' | 'draft';
+    dbt_data_type?: string; // exact warehouse type, preserved so push doesn't downgrade to the `datatype` bucket
 }
 
 export interface EntityData {

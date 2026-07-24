@@ -1071,7 +1071,7 @@ class DbtCoreAdapter:
                     f_origin = field.get("origin")
                     col_payload: dict[str, Any] = {
                         "name": f_name,
-                        "data_type": field.get("datatype"),
+                        "data_type": field.get("dbt_data_type") or field.get("datatype"),
                         "description": f_desc,
                     }
                     origin_meta = _origin_meta(f_origin)
@@ -1231,7 +1231,10 @@ class DbtCoreAdapter:
         for field in fields:
             desc = field.get("description")
             origin = field.get("origin")
-            col: dict = {"name": field["name"], "data_type": field["datatype"]}
+            col: dict = {
+                "name": field["name"],
+                "data_type": field.get("dbt_data_type") or field["datatype"],
+            }
             if desc:
                 col["description"] = desc
             origin_meta = _origin_meta(origin)

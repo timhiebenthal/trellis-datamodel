@@ -147,8 +147,8 @@ def test_push_to_dbt_preserves_native_column_type(
             f,
         )
 
-    # Mirrors what reconciliation currently writes to data_model.yml: the
-    # bucketed UI datatype ("text"), not the native dbt type ("varchar").
+    # Mirrors what reconciliation writes to data_model.yml: the bucketed UI
+    # datatype ("text") alongside the preserved native dbt type ("varchar").
     data_model = {
         "version": 0.1,
         "entities": [
@@ -160,6 +160,7 @@ def test_push_to_dbt_preserves_native_column_type(
                     {
                         "name": "name",
                         "datatype": "text",
+                        "dbt_data_type": "varchar",
                         "description": "Full name",
                         "source": "dbt",
                     }
