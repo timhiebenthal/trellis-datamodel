@@ -111,6 +111,246 @@ def test_sync_dbt_tests_writes_meta_origin(
     assert "| Origin:" not in (col.get("description") or "")
 
 
+def test_push_to_dbt_preserves_native_column_type(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """Push to dbt must keep the dbt-native column type (e.g. varchar) instead of
+    overwriting it with Trellis's internal UI bucket type (e.g. text).
+
+    Regression test for GitHub issue #111: a bound entity's field type is
+    "varchar" in the compiled dbt project, but Trellis's data model only
+    tracks the coarse UI bucket ("text") for that field. Triggering
+    "Push to dbt" must not clobber the more precise, existing schema.yml
+    data_type with that bucket value.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump(
+            {
+                "version": 2,
+                "models": [
+                    {
+                        "name": "users",
+                        "columns": [
+                            {
+                                "name": "name",
+                                "data_type": "varchar",
+                                "description": "Full name",
+                            }
+                        ],
+                    }
+                ],
+            },
+            f,
+        )
+
+    # Mirrors what reconciliation writes to data_model.yml: the bucketed UI
+    # datatype ("text") alongside the preserved native dbt type ("varchar").
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "name",
+                        "datatype": "text",
+                        "dbt_data_type": "varchar",
+                        "description": "Full name",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
+    assert col["data_type"] == "varchar", (
+        "Push to dbt overwrote the native dbt column type with the internal "
+        f"UI bucket type: {col['data_type']!r} (expected 'varchar')"
+    )
+
+
+def test_push_to_dbt_does_not_overwrite_with_catalog_normalized_type(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """dbt/the warehouse can normalize a declared type to a synonym (e.g.
+    Snowflake reports a "varchar" column as "TEXT" in the catalog). Push to
+    dbt must not use that normalized value to clobber the type already
+    declared in schema.yml, even though it now differs from the field's
+    reconciled dbt_data_type.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump(
+            {
+                "version": 2,
+                "models": [
+                    {
+                        "name": "users",
+                        "columns": [
+                            {
+                                "name": "name",
+                                "data_type": "varchar",
+                                "description": "Full name",
+                            }
+                        ],
+                    }
+                ],
+            },
+            f,
+        )
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "name",
+                        "datatype": "text",
+                        "dbt_data_type": "TEXT",
+                        "description": "Full name",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
+    assert col["data_type"] == "varchar", (
+        "Push to dbt overwrote the declared type with the catalog-normalized "
+        f"type: {col['data_type']!r} (expected 'varchar')"
+    )
+
+
+def test_push_to_dbt_backfills_missing_type_for_new_dbt_column(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """A dbt-sourced column synced for the first time (no prior schema.yml
+    entry) has no existing value to preserve, so it should be backfilled
+    with the native dbt_data_type rather than left blank or set to the
+    coarse UI bucket. The catalog's "TEXT" spelling is canonicalized to
+    "varchar" so freshly-backfilled columns don't mix spellings with
+    hand-declared ones across schema.yml files.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump({"version": 2, "models": [{"name": "users", "columns": []}]}, f)
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "name",
+                        "datatype": "text",
+                        "dbt_data_type": "TEXT",
+                        "description": "Full name",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
+    assert col["data_type"] == "varchar"
+
+
+def test_push_to_dbt_does_not_canonicalize_ambiguous_number_type(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """NUMBER collapses int/integer/decimal/numeric and the catalog doesn't
+    expose precision/scale, so backfilling must not guess a declared
+    spelling for it — the raw catalog value is written as-is.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump({"version": 2, "models": [{"name": "users", "columns": []}]}, f)
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "age",
+                        "datatype": "number",
+                        "dbt_data_type": "NUMBER",
+                        "description": "Age",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "age")
+    assert col["data_type"] == "NUMBER"
+
+
 def test_round_trip_demo_origin(monkeypatch, temp_dir):
     """Demo-style project: materialize structured origin to schema.yml and read back via get_models."""
     from trellis_datamodel import config as cfg

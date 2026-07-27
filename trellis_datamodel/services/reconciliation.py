@@ -133,6 +133,14 @@ def reconcile_entity_fields(
         field["name"] = col_name
         field["datatype"] = _map_dbt_type(col.get("type"))
         field["source"] = "dbt"
+        raw_type = col.get("type")
+        if raw_type:
+            # Preserve the exact warehouse/dbt type (e.g. "varchar") alongside
+            # the coarse UI bucket above, so pushing back to dbt doesn't
+            # downgrade a precise type to the bucket's generic default (#111).
+            field["dbt_data_type"] = raw_type
+        elif "dbt_data_type" in field:
+            del field["dbt_data_type"]
         desc = col.get("description")
         if desc is not None:
             # Parse origin from description if embedded

@@ -30,6 +30,26 @@ def _origin_meta(raw_origin: object) -> dict[str, Any] | None:
     return {"origin": parsed} if parsed else None
 
 
+# Catalog-reported type spellings that are unambiguous synonyms of a more
+# common declared-schema spelling (e.g. Snowflake's catalog reports a
+# declared "varchar" column as "TEXT"). Backfilling a new column straight
+# from the catalog value would otherwise leave schema.yml files with a mix
+# of spellings for the same type depending on sync history. NUMBER is
+# deliberately excluded: it collapses int/integer/decimal/numeric and the
+# catalog doesn't expose precision/scale to tell them apart, so canonicalizing
+# it would risk guessing the wrong declared type.
+_CATALOG_TYPE_ALIASES = {
+    "text": "varchar",
+    "timestamp_ntz": "timestamp",
+}
+
+
+def _canonicalize_catalog_type(raw_type: str | None) -> str | None:
+    if not raw_type:
+        return raw_type
+    return _CATALOG_TYPE_ALIASES.get(raw_type.lower(), raw_type)
+
+
 def _resolve_origin_from_column(
     col_data: dict[str, Any], description: str | None
 ) -> tuple[str | None, list[dict[str, str]]]:
@@ -1071,9 +1091,18 @@ class DbtCoreAdapter:
                     f_origin = field.get("origin")
                     col_payload: dict[str, Any] = {
                         "name": f_name,
-                        "data_type": field.get("datatype"),
                         "description": f_desc,
                     }
+                    if field.get("source") == "dbt":
+                        # dbt/the warehouse owns the declared type once it
+                        # exists in schema.yml — only backfill it the first
+                        # time this column is synced, never overwrite an
+                        # existing value (#111).
+                        col_payload["data_type_fallback"] = _canonicalize_catalog_type(
+                            field.get("dbt_data_type")
+                        ) or field.get("datatype")
+                    else:
+                        col_payload["data_type"] = field.get("datatype")
                     origin_meta = _origin_meta(f_origin)
                     if origin_meta:
                         col_payload["meta"] = origin_meta
@@ -1231,7 +1260,13 @@ class DbtCoreAdapter:
         for field in fields:
             desc = field.get("description")
             origin = field.get("origin")
-            col: dict = {"name": field["name"], "data_type": field["datatype"]}
+            col: dict = {"name": field["name"]}
+            if field.get("source") == "dbt":
+                col["data_type_fallback"] = _canonicalize_catalog_type(
+                    field.get("dbt_data_type")
+                ) or field["datatype"]
+            else:
+                col["data_type"] = field["datatype"]
             if desc:
                 col["description"] = desc
             origin_meta = _origin_meta(origin)

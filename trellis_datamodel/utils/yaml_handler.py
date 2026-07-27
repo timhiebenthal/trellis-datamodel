@@ -428,6 +428,11 @@ class YamlHandler:
         ``columns_data``. Columns missing from the incoming list are dropped,
         so renames/deletions in the data model propagate to schema.yml.
         Final order follows ``columns_data``.
+
+        ``data_type`` is applied as a hard override; ``data_type_fallback``
+        only fills in a column that doesn't already declare a data_type
+        (used for dbt-sourced fields, where dbt/the warehouse — not
+        Trellis — owns the declared type once it exists, see #111).
         """
         existing_by_name: Dict[str, CommentedMap] = {}
         for col in model.get("columns", []) or []:
@@ -448,7 +453,7 @@ class YamlHandler:
 
             self.update_column(
                 col,
-                data_type=col_data.get("data_type"),
+                data_type=self._resolve_data_type(col, col_data),
                 description=col_data.get("description"),
             )
             if "meta" in col_data:
@@ -456,6 +461,21 @@ class YamlHandler:
             new_columns.append(col)
 
         model["columns"] = new_columns
+
+    @staticmethod
+    def _resolve_data_type(
+        col: CommentedMap, col_data: Dict[str, Any]
+    ) -> Optional[str]:
+        """Decide the data_type to write for a column update.
+
+        ``data_type`` always wins when present. Otherwise ``data_type_fallback``
+        is applied only if the column doesn't already declare one.
+        """
+        if "data_type" in col_data:
+            return col_data.get("data_type")
+        if not col.get("data_type"):
+            return col_data.get("data_type_fallback")
+        return None
 
     def merge_columns_non_destructive(
         self,
@@ -495,7 +515,7 @@ class YamlHandler:
                 col["name"] = col_name
             self.update_column(
                 col,
-                data_type=col_data.get("data_type"),
+                data_type=self._resolve_data_type(col, col_data),
                 description=col_data.get("description"),
             )
             if "meta" in col_data:
