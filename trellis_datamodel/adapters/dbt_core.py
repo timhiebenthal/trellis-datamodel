@@ -30,6 +30,26 @@ def _origin_meta(raw_origin: object) -> dict[str, Any] | None:
     return {"origin": parsed} if parsed else None
 
 
+# Catalog-reported type spellings that are unambiguous synonyms of a more
+# common declared-schema spelling (e.g. Snowflake's catalog reports a
+# declared "varchar" column as "TEXT"). Backfilling a new column straight
+# from the catalog value would otherwise leave schema.yml files with a mix
+# of spellings for the same type depending on sync history. NUMBER is
+# deliberately excluded: it collapses int/integer/decimal/numeric and the
+# catalog doesn't expose precision/scale to tell them apart, so canonicalizing
+# it would risk guessing the wrong declared type.
+_CATALOG_TYPE_ALIASES = {
+    "text": "varchar",
+    "timestamp_ntz": "timestamp",
+}
+
+
+def _canonicalize_catalog_type(raw_type: str | None) -> str | None:
+    if not raw_type:
+        return raw_type
+    return _CATALOG_TYPE_ALIASES.get(raw_type.lower(), raw_type)
+
+
 def _resolve_origin_from_column(
     col_data: dict[str, Any], description: str | None
 ) -> tuple[str | None, list[dict[str, str]]]:
@@ -1078,8 +1098,8 @@ class DbtCoreAdapter:
                         # exists in schema.yml — only backfill it the first
                         # time this column is synced, never overwrite an
                         # existing value (#111).
-                        col_payload["data_type_fallback"] = field.get(
-                            "dbt_data_type"
+                        col_payload["data_type_fallback"] = _canonicalize_catalog_type(
+                            field.get("dbt_data_type")
                         ) or field.get("datatype")
                     else:
                         col_payload["data_type"] = field.get("datatype")
@@ -1242,7 +1262,9 @@ class DbtCoreAdapter:
             origin = field.get("origin")
             col: dict = {"name": field["name"]}
             if field.get("source") == "dbt":
-                col["data_type_fallback"] = field.get("dbt_data_type") or field["datatype"]
+                col["data_type_fallback"] = _canonicalize_catalog_type(
+                    field.get("dbt_data_type")
+                ) or field["datatype"]
             else:
                 col["data_type"] = field["datatype"]
             if desc:

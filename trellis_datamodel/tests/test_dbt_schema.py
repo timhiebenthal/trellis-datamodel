@@ -260,7 +260,9 @@ def test_push_to_dbt_backfills_missing_type_for_new_dbt_column(
     """A dbt-sourced column synced for the first time (no prior schema.yml
     entry) has no existing value to preserve, so it should be backfilled
     with the native dbt_data_type rather than left blank or set to the
-    coarse UI bucket.
+    coarse UI bucket. The catalog's "TEXT" spelling is canonicalized to
+    "varchar" so freshly-backfilled columns don't mix spellings with
+    hand-declared ones across schema.yml files.
     """
     sql_dir = os.path.join(temp_dir, "models", "3_core")
     os.makedirs(sql_dir, exist_ok=True)
@@ -299,7 +301,54 @@ def test_push_to_dbt_backfills_missing_type_for_new_dbt_column(
     with open(yml_path, "r") as f:
         schema = yaml.safe_load(f)
     col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
-    assert col["data_type"] == "TEXT"
+    assert col["data_type"] == "varchar"
+
+
+def test_push_to_dbt_does_not_canonicalize_ambiguous_number_type(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """NUMBER collapses int/integer/decimal/numeric and the catalog doesn't
+    expose precision/scale, so backfilling must not guess a declared
+    spelling for it — the raw catalog value is written as-is.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump({"version": 2, "models": [{"name": "users", "columns": []}]}, f)
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "age",
+                        "datatype": "number",
+                        "dbt_data_type": "NUMBER",
+                        "description": "Age",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "age")
+    assert col["data_type"] == "NUMBER"
 
 
 def test_round_trip_demo_origin(monkeypatch, temp_dir):
