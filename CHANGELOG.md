@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] - 2026-07-27
+
+### Fixed
+- **Native dbt column types preserved on push (#111)**: `POST /api/dbt-schema` and `POST /api/sync-dbt-tests` previously wrote the drafted field's coarse UI type bucket (e.g. `text`) to `schema.yml` for dbt-sourced columns, downgrading precise declared types like `varchar(50)` to the generic bucket on every push.
+- **Declared `data_type` no longer clobbered by catalog-normalized types (#111)**: warehouses often report a declared type under a different spelling than it was written (e.g. Snowflake's catalog reports a declared `varchar` column as `TEXT`), so trusting the catalog value unconditionally still overwrote a divergent `schema.yml` value, just with a different value. `data_type` is now only backfilled when a column has no existing declared type; an existing value is never touched.
+- **Catalog type spellings canonicalized on backfill (#111)**: a dbt-sourced column synced for the first time (no prior `schema.yml` entry) is now backfilled with a canonical spelling (`TEXT` → `varchar`, `TIMESTAMP_NTZ` → `timestamp`) instead of the raw catalog value, so freshly-backfilled columns don't mix spellings with hand-declared ones across `schema.yml` files. Ambiguous types (`NUMBER`, which spans int/decimal/numeric without exposing precision/scale) are left as-is rather than guessed.
+
 ## [0.17.0] - 2026-07-24
 
 ### Added
