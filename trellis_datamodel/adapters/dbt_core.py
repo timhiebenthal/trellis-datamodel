@@ -1071,9 +1071,18 @@ class DbtCoreAdapter:
                     f_origin = field.get("origin")
                     col_payload: dict[str, Any] = {
                         "name": f_name,
-                        "data_type": field.get("dbt_data_type") or field.get("datatype"),
                         "description": f_desc,
                     }
+                    if field.get("source") == "dbt":
+                        # dbt/the warehouse owns the declared type once it
+                        # exists in schema.yml — only backfill it the first
+                        # time this column is synced, never overwrite an
+                        # existing value (#111).
+                        col_payload["data_type_fallback"] = field.get(
+                            "dbt_data_type"
+                        ) or field.get("datatype")
+                    else:
+                        col_payload["data_type"] = field.get("datatype")
                     origin_meta = _origin_meta(f_origin)
                     if origin_meta:
                         col_payload["meta"] = origin_meta
@@ -1231,10 +1240,11 @@ class DbtCoreAdapter:
         for field in fields:
             desc = field.get("description")
             origin = field.get("origin")
-            col: dict = {
-                "name": field["name"],
-                "data_type": field.get("dbt_data_type") or field["datatype"],
-            }
+            col: dict = {"name": field["name"]}
+            if field.get("source") == "dbt":
+                col["data_type_fallback"] = field.get("dbt_data_type") or field["datatype"]
+            else:
+                col["data_type"] = field["datatype"]
             if desc:
                 col["description"] = desc
             origin_meta = _origin_meta(origin)

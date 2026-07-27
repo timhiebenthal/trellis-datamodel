@@ -185,6 +185,123 @@ def test_push_to_dbt_preserves_native_column_type(
     )
 
 
+def test_push_to_dbt_does_not_overwrite_with_catalog_normalized_type(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """dbt/the warehouse can normalize a declared type to a synonym (e.g.
+    Snowflake reports a "varchar" column as "TEXT" in the catalog). Push to
+    dbt must not use that normalized value to clobber the type already
+    declared in schema.yml, even though it now differs from the field's
+    reconciled dbt_data_type.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump(
+            {
+                "version": 2,
+                "models": [
+                    {
+                        "name": "users",
+                        "columns": [
+                            {
+                                "name": "name",
+                                "data_type": "varchar",
+                                "description": "Full name",
+                            }
+                        ],
+                    }
+                ],
+            },
+            f,
+        )
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "name",
+                        "datatype": "text",
+                        "dbt_data_type": "TEXT",
+                        "description": "Full name",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
+    assert col["data_type"] == "varchar", (
+        "Push to dbt overwrote the declared type with the catalog-normalized "
+        f"type: {col['data_type']!r} (expected 'varchar')"
+    )
+
+
+def test_push_to_dbt_backfills_missing_type_for_new_dbt_column(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """A dbt-sourced column synced for the first time (no prior schema.yml
+    entry) has no existing value to preserve, so it should be backfilled
+    with the native dbt_data_type rather than left blank or set to the
+    coarse UI bucket.
+    """
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+        yaml.dump({"version": 2, "models": [{"name": "users", "columns": []}]}, f)
+
+    data_model = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.project.users",
+                "drafted_fields": [
+                    {
+                        "name": "name",
+                        "datatype": "text",
+                        "dbt_data_type": "TEXT",
+                        "description": "Full name",
+                        "source": "dbt",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data_model, f)
+
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "r") as f:
+        schema = yaml.safe_load(f)
+    col = next(c for c in schema["models"][0]["columns"] if c["name"] == "name")
+    assert col["data_type"] == "TEXT"
+
+
 def test_round_trip_demo_origin(monkeypatch, temp_dir):
     """Demo-style project: materialize structured origin to schema.yml and read back via get_models."""
     from trellis_datamodel import config as cfg
