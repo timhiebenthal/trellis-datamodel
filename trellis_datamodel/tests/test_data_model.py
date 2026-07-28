@@ -370,3 +370,45 @@ def test_save_data_model_writes_origin_list(test_client, temp_data_model_path):
         {"DH1": "CORE.A"},
         {"DH2": "CBUS.B"},
     ]
+
+
+def test_split_preserves_trellis_tags_key():
+    """trellis_tags round-trips through the model/layout split the same way
+    `tags` already does: present in the split-out model entity when the
+    incoming entity carries the key, and simply absent (not raising, not
+    defaulted) when the incoming entity omits it — mirroring the existing
+    `if "tags" in entity: model_entity["tags"] = entity["tags"]` pattern.
+    """
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    content = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.proj.users",
+                "tags": ["nightly"],
+                "trellis_tags": ["pii"],
+                "position": {"x": 0, "y": 0},
+            },
+            {
+                "id": "orders",
+                "label": "Orders",
+                "dbt_model": "model.proj.orders",
+                "tags": ["nightly"],
+                # trellis_tags intentionally omitted
+            },
+        ],
+        "relationships": [],
+    }
+
+    model_data, _layout_data = _split_model_and_layout(content)
+
+    users_entity = next(e for e in model_data["entities"] if e["id"] == "users")
+    assert users_entity["tags"] == ["nightly"]
+    assert users_entity["trellis_tags"] == ["pii"]
+
+    orders_entity = next(e for e in model_data["entities"] if e["id"] == "orders")
+    assert orders_entity["tags"] == ["nightly"]
+    assert "trellis_tags" not in orders_entity
