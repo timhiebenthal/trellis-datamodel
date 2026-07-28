@@ -366,6 +366,8 @@ def _split_model_and_layout(
             model_entity["drafted_fields"] = drafted_fields
         if "tags" in entity:
             model_entity["tags"] = entity["tags"]
+        if "trellis_tags" in entity:
+            model_entity["trellis_tags"] = entity["trellis_tags"]
         if "domain" in entity:
             model_entity["domain"] = entity["domain"]
         if "domains" in entity:
