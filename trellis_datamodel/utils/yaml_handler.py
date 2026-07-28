@@ -265,6 +265,62 @@ class YamlHandler:
                 config = model["config"]
             config["tags"] = tags
 
+    def merge_model_tags(
+        self,
+        model: CommentedMap,
+        trellis_tags: Optional[List[str]],
+        previously_pushed: Optional[List[str]] = None,
+    ) -> None:
+        """Additively union `trellis_tags` into a model's existing tags, dropping only
+        tags in `previously_pushed` that are no longer present in `trellis_tags`.
+
+        No-op when `trellis_tags is None` (Trellis has no opinion on tags this push).
+        Tags outside `previously_pushed` (e.g. added directly in schema.yml by dbt) are
+        never touched, since dbt owns tags it did not receive from Trellis.
+        """
+        if trellis_tags is None:
+            return
+
+        current_tags = self.get_model_tags(model)
+        dropped = set(previously_pushed or []) - set(trellis_tags)
+        merged = [tag for tag in current_tags if tag not in dropped]
+
+        seen = set(merged)
+        for tag in trellis_tags:
+            if tag not in seen:
+                seen.add(tag)
+                merged.append(tag)
+
+        self.update_model_tags(model, merged)
+
+    def merge_version_tags(
+        self,
+        version: CommentedMap,
+        trellis_tags: Optional[List[str]],
+        previously_pushed: Optional[List[str]] = None,
+    ) -> None:
+        """Additively union `trellis_tags` into a version's existing tags, dropping only
+        tags in `previously_pushed` that are no longer present in `trellis_tags`.
+
+        No-op when `trellis_tags is None` (Trellis has no opinion on tags this push).
+        Tags outside `previously_pushed` (e.g. added directly in schema.yml by dbt) are
+        never touched, since dbt owns tags it did not receive from Trellis.
+        """
+        if trellis_tags is None:
+            return
+
+        current_tags = list(version.get("config", {}).get("tags", []))
+        dropped = set(previously_pushed or []) - set(trellis_tags)
+        merged = [tag for tag in current_tags if tag not in dropped]
+
+        seen = set(merged)
+        for tag in trellis_tags:
+            if tag not in seen:
+                seen.add(tag)
+                merged.append(tag)
+
+        self.update_version_tags(version, merged)
+
     def find_column(
         self, model: CommentedMap, column_name: str
     ) -> Optional[CommentedMap]:

@@ -546,3 +546,25 @@ class TestTagHandling:
         assert (
             config_line > desc_line
         ), "Config should appear after description in version block"
+
+    def test_merge_model_tags_unions_and_preserves_dbt_only_tags(self):
+        """A tag already in schema.yml (e.g. added directly by a dbt dev) survives
+        a merge that adds a Trellis-authored tag — no full replace."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test", "tags": ["nightly"]})
+        handler.merge_model_tags(model, ["pii"])
+        assert set(model["tags"]) == {"nightly", "pii"}
+
+    def test_merge_model_tags_removes_only_dropped_trellis_tag(self):
+        """Dropping a previously-pushed Trellis tag from trellis_tags removes only
+        that tag; a dbt-only tag already in schema.yml is untouched."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test", "tags": ["nightly", "pii"]})
+        handler.merge_model_tags(model, [], previously_pushed=["pii"])
+        assert model["tags"] == ["nightly"]
+
+    def test_merge_model_tags_noop_when_trellis_tags_none(self):
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test", "tags": ["nightly"]})
+        handler.merge_model_tags(model, None)
+        assert model["tags"] == ["nightly"]
