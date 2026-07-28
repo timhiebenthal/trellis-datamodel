@@ -165,6 +165,19 @@ def reconcile_entity_fields(
     return result
 
 
+def reconcile_entity_tags(
+    existing_tags: list[str],
+    manifest_tags: list[str] | None,
+) -> list[str]:
+    """dbt is authoritative for the mirrored `tags` field.
+    manifest_tags=None -> model absent from manifest, non-destructive (unchanged).
+    manifest_tags=[] (present, no tags) -> mirrored tags cleared.
+    """
+    if manifest_tags is None:
+        return existing_tags
+    return list(manifest_tags)
+
+
 def reconcile_data_model(
     data_model: dict[str, Any],
     manifest_models: list[dict[str, Any]],
@@ -183,10 +196,12 @@ def reconcile_data_model(
     """
     # Index manifest by unique_id for O(1) lookup
     manifest_by_id: dict[str, list[dict[str, Any]]] = {}
+    manifest_tags_by_id: dict[str, list[str]] = {}
     for model in manifest_models:
         uid = model.get("unique_id")
         if uid:
             manifest_by_id[uid] = model.get("columns") or []
+            manifest_tags_by_id[uid] = model.get("tags") or []
 
     result = copy.deepcopy(data_model)
     changed = False
@@ -206,6 +221,13 @@ def reconcile_data_model(
 
         if reconciled != existing:
             entity["drafted_fields"] = reconciled
+            changed = True
+
+        manifest_tags = manifest_tags_by_id.get(dbt_model) if dbt_model in manifest_by_id else None
+        existing_tags = entity.get("tags") or []
+        reconciled_tags = reconcile_entity_tags(existing_tags, manifest_tags)
+        if reconciled_tags != existing_tags:
+            entity["tags"] = reconciled_tags
             changed = True
 
     return result, changed

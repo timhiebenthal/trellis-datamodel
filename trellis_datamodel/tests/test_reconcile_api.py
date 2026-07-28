@@ -55,6 +55,7 @@ class TestReconcileDbtEndpoint:
                     "id": "users",
                     "label": "Users",
                     "dbt_model": "model.project.users",
+                    "tags": ["core"],  # matches mock_manifest's model.project.users tags
                     "drafted_fields": [
                         {
                             "name": "id",

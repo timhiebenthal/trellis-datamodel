@@ -3,6 +3,7 @@
 import pytest
 from trellis_datamodel.services.reconciliation import (
     reconcile_entity_fields,
+    reconcile_entity_tags,
     reconcile_data_model,
 )
 
@@ -197,6 +198,24 @@ class TestReconcileEntityFields:
         assert "origin" not in result[0]
 
 
+class TestReconcileEntityTags:
+    def test_dbt_tags_overwrite_existing_tags_field(self):
+        """dbt is authoritative for the mirrored `tags` field — always overwritten."""
+        result = reconcile_entity_tags(existing_tags=["stale"], manifest_tags=["nightly", "core"])
+        assert result == ["nightly", "core"]
+
+    def test_absent_from_manifest_is_non_destructive(self):
+        """Model absent from manifest (partial compile) — existing tags untouched."""
+        result = reconcile_entity_tags(existing_tags=["nightly"], manifest_tags=None)
+        assert result == ["nightly"]
+
+    def test_empty_manifest_tags_clears_mirrored_tags(self):
+        """Model present in manifest with no tags — mirrored tags become empty,
+        distinct from 'absent from manifest' (None)."""
+        result = reconcile_entity_tags(existing_tags=["stale"], manifest_tags=[])
+        assert result == []
+
+
 class TestReconcileDataModel:
     """Unit tests for the reconcile_data_model function."""
 
@@ -314,3 +333,33 @@ class TestReconcileDataModel:
         sketch = next(e for e in result["entities"] if e["id"] == "sketch")
         assert users["drafted_fields"][0]["source"] == "dbt"
         assert sketch["drafted_fields"] == [{"name": "future_col", "datatype": "text"}]
+
+    def test_reconcile_data_model_refreshes_entity_tags_from_manifest(self):
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "tags": ["old"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly", "core"]},
+        ]
+        result, changed = reconcile_data_model(data_model, manifest_models)
+        assert result["entities"][0]["tags"] == ["nightly", "core"]
+        assert changed is True
+
+    def test_reconcile_data_model_leaves_trellis_tags_untouched(self):
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "dbt_model": "model.proj.users",
+                    "tags": ["old"],
+                    "trellis_tags": ["pii"],
+                },
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        assert result["entities"][0]["trellis_tags"] == ["pii"]
