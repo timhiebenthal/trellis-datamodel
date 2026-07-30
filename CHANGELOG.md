@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0b2] - 2026-07-30
+
+### Fixed
+- **Bound-entity `tags` silently wiped on every autosave**: `_split_model_and_layout` built each entity fresh from the incoming save payload with no fallback to the on-disk value for `tags`. Since autosave correctly omits `tags` for bound entities (it's reconcile-owned; only `trellis_tags` is sent), any autosave — not just a tag edit — erased the reconciled tags. Found during real-world validation against a live dbt project. Fixed by extending the existing `roles`-preservation mechanism to `tags`, scoped to bound entities only; an unbound entity's intentional "clear all tags" via omission still works as before.
+
 ## [0.18.0b1] - 2026-07-30
 
 ### Added
