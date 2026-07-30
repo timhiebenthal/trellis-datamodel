@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0b4] - 2026-07-30
+
+### Fixed
+- **Tag edits from the entity detail modal silently lost for bound entities**: `handleSave` wrote the edited tag list straight to `tags` unconditionally — a fourth write path with the same category of bug as the autosave fix in `0.18.0b2`, since `tags` is no longer persisted for bound entities at all. Reported: adding a tag via the entity detail modal and clicking "Save Changes" never showed up in `data_model.yml`. Fixed to diff the edit against `dbt_tags` and write only `ui_tags` for bound entities, matching every other tag-editing surface.
+- **CLA allowlist**: added `tim.hiebenthal@a11.com`.
+
 ## [0.18.0b3] - 2026-07-30
 
 ### Fixed
