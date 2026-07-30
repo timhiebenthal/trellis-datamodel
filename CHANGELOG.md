@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-07-30
+
+### Added
+- **`dbt_tags`/`ui_tags` on bound entities**: `dbt_tags` mirrors `schema.yml`/the manifest, refreshed on every reconcile and never hand-edited — the same authority model already applied to `source: dbt` columns. `ui_tags` holds only tags a user explicitly adds via the Trellis tag editor. `tags` itself is no longer a persisted field on a bound entity; it's computed at read time as the union of the two (new `compute_display_tags` helper, wired into `GET /api/data-model` and the Bus Matrix endpoint). Unbound entities are unaffected — `tags` remains their single, persisted, freely-editable field.
+- **`YamlHandler.merge_model_tags`/`merge_version_tags`**: additive-union tag writers that read the live `schema.yml` fresh immediately before writing, used everywhere Trellis pushes tags to dbt.
+
+### Fixed
+- **Tags added directly to `schema.yml` no longer silently deleted by Trellis pushes**: pushing tags previously did a full replace using a cached, potentially stale list. A tag added outside Trellis (e.g. `nightly`, added directly to `schema.yml` by a dbt developer) was wiped the next time Trellis pushed an unrelated tag change. Push now additively unions `ui_tags` onto the current file content instead.
+- **Bound-entity tags silently wiped on any autosave, and on saving from the entity detail modal**: two separate write paths sent an edit without a way for the backend to tell "no change" apart from "clear it," erasing reconciled tags on routine, unrelated saves. Both fixed to only ever write `ui_tags`, never the reconcile-owned `dbt_tags`/`tags`.
+- **Migration seed copying dbt's entire tag list into `ui_tags` on a second reconcile**: the one-time legacy-tag migration couldn't tell pre-fix user data apart from tags the manifest had already mirrored in an earlier run. Now only seeds when the existing value genuinely differs from what reconciliation would produce right now.
+
+### Changed
+- **Tag removal is additive-only in this release**: removing a tag from `ui_tags` in the Trellis UI does not remove it from `schema.yml` on push. Durable removal tracking would require a second, push-time-only field distinct from the continuously-autosaved `ui_tags` — judged too invasive for this iteration. To remove a Trellis-added tag, edit `schema.yml` directly; dbt then owns it going forward.
+- Entities with a pre-existing `tags` value from before this change are seeded into `ui_tags` once on first reconcile (if it represents real legacy data, not tags already mirrored from dbt), so nothing is lost under the new logic; the legacy key is retired afterward.
+- Bulk tag add/remove and the "Generate Entities" dialog's save path are updated to the same `dbt_tags`/`ui_tags` split, closing two write paths that would otherwise have hit the same tag-loss bug.
+
 ## [0.18.0b4] - 2026-07-30
 
 ### Fixed
