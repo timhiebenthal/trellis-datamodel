@@ -211,6 +211,83 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
   });
 });
 
+describe('EntityDetailModal — tag save behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    nodes.set([]);
+    dbtModels.set([]);
+    entityDetailModal.set({ open: false, entityId: null });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  function setupBoundEntityWithTags() {
+    nodes.set([{
+      id: 'node-1',
+      type: 'entity',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Entity X',
+        dbt_model: 'model.proj.entity_x',
+        tags: ['nightly'],
+        dbt_tags: ['nightly'],
+        ui_tags: [],
+      } as any,
+    }] as any);
+    dbtModels.set([mockDbtModel]);
+    entityDetailModal.set({ open: true, entityId: 'node-1' });
+  }
+
+  it('adding a tag and clicking Save writes it to ui_tags, not the reconcile-owned tags field', async () => {
+    setupBoundEntityWithTags();
+    await renderModal();
+
+    // Domains / Tags / Source Systems inputs all share this placeholder — Tags is index 1.
+    const tagInput = screen.getAllByPlaceholderText('Type and press Enter')[1];
+    await fireEvent.input(tagInput, { target: { value: 'pii' } });
+    await fireEvent.keyDown(tagInput, { key: 'Enter' });
+
+    const saveButton = screen.getByText('Save Changes').closest('button') as HTMLButtonElement;
+    await waitFor(() => expect(saveButton).not.toBeDisabled());
+    await fireEvent.click(saveButton);
+
+    const savedNode = get(nodes).find((n) => n.id === 'node-1');
+    expect((savedNode?.data as any).ui_tags).toEqual(['pii']);
+    expect((savedNode?.data as any).dbt_tags).toEqual(['nightly']);
+    // `tags` is a display-only union refreshed by the next reconcile/reload —
+    // handleSave doesn't need to touch it. What matters is that autosave never
+    // sends it for bound entities regardless of its (possibly stale) local
+    // value; that's proven separately in auto-save.test.ts.
+  });
+
+  it('unbound entity still saves tags directly', async () => {
+    nodes.set([{
+      id: 'node-1',
+      type: 'entity',
+      position: { x: 0, y: 0 },
+      data: { label: 'Draft Entity', tags: ['draft-tag'] } as any,
+    }] as any);
+    dbtModels.set([]);
+    entityDetailModal.set({ open: true, entityId: 'node-1' });
+    await renderModal();
+
+    const tagInput = screen.getAllByPlaceholderText('Type and press Enter')[1];
+    await fireEvent.input(tagInput, { target: { value: 'new-tag' } });
+    await fireEvent.keyDown(tagInput, { key: 'Enter' });
+
+    const saveButton = screen.getByText('Save Changes').closest('button') as HTMLButtonElement;
+    await waitFor(() => expect(saveButton).not.toBeDisabled());
+    await fireEvent.click(saveButton);
+
+    const savedNode = get(nodes).find((n) => n.id === 'node-1');
+    expect((savedNode?.data as any).tags).toEqual(['draft-tag', 'new-tag']);
+  });
+});
+
 describe('EntityDetailModal — Relationships section', () => {
   beforeEach(() => {
     vi.clearAllMocks();
