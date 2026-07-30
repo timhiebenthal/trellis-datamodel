@@ -8,6 +8,7 @@ from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.schemas import DataModelUpdate
 from trellis_datamodel.services.lineage import extract_source_systems_for_model
+from trellis_datamodel.services.reconciliation import compute_display_tags
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
@@ -252,6 +253,11 @@ async def get_data_model():
             dbt_model = entity.get("dbt_model")
             additional_models = entity.get("additional_models", [])
 
+            # `tags` for display/export is computed here, never persisted:
+            # the union of dbt_tags + ui_tags for bound entities, or the
+            # entity's own `tags` field for unbound entities.
+            entity["tags"] = compute_display_tags(entity)
+
             if dbt_model:
                 # Bound entity: extract source systems from lineage
                 # Extract for primary model
@@ -334,6 +340,18 @@ def _split_model_and_layout(
             if existing_entity_id and "roles" in existing_entity:
                 existing_roles_by_id[existing_entity_id] = existing_entity.get("roles")
 
+    # Preserve a bound entity's reconcile-owned `dbt_tags` when auto-save
+    # omits it. `dbt_tags` mirrors schema.yml and is never intentionally
+    # sent by auto-save.ts for bound entities (only ui_tags is) — omission
+    # here must not be read as "clear it", unlike unbound entities where
+    # `tags` is freely editable and an omission does mean the user cleared it.
+    existing_dbt_tags_by_id: Dict[str, Any] = {}
+    if existing_model_data:
+        for existing_entity in existing_model_data.get("entities", []):
+            existing_entity_id = existing_entity.get("id")
+            if existing_entity_id and "dbt_tags" in existing_entity:
+                existing_dbt_tags_by_id[existing_entity_id] = existing_entity.get("dbt_tags")
+
     # Split entities
     entities = content.get("entities", [])
     seen_entity_ids: set = set()
@@ -364,8 +382,17 @@ def _split_model_and_layout(
                 _normalize_field_origin(normalized)
                 drafted_fields.append(normalized)
             model_entity["drafted_fields"] = drafted_fields
-        if "tags" in entity:
+        # `tags` is only a persisted field for unbound entities (their single,
+        # freely-editable tag list). Bound entities never persist `tags` —
+        # only `dbt_tags` (reconcile-owned) and `ui_tags` (user-added).
+        if "tags" in entity and not entity.get("dbt_model"):
             model_entity["tags"] = entity["tags"]
+        if "dbt_tags" in entity:
+            model_entity["dbt_tags"] = entity["dbt_tags"]
+        elif entity.get("dbt_model") and entity_id in existing_dbt_tags_by_id:
+            model_entity["dbt_tags"] = existing_dbt_tags_by_id[entity_id]
+        if "ui_tags" in entity:
+            model_entity["ui_tags"] = entity["ui_tags"]
         if "domain" in entity:
             model_entity["domain"] = entity["domain"]
         if "domains" in entity:

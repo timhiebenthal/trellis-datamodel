@@ -292,6 +292,49 @@ describe('bulk-operations', () => {
 			const updatedNodes = get(nodesStore);
 			expect(updatedNodes[0].data.tags).toEqual(['pii']); // Replaces invalid value
 		});
+
+		it('writes to ui_tags for a bound entity, never the reconcile-owned tags field', () => {
+			const nodes: Node[] = [
+				{
+					...createEntityNode('1', 'Customer'),
+					data: {
+						label: 'Customer',
+						dbt_model: 'model.proj.customer',
+						tags: ['nightly'],
+						dbt_tags: ['nightly'],
+						ui_tags: [],
+					},
+				},
+			];
+			nodesStore.set(nodes);
+
+			bulkAddTags(['1'], ['pii']);
+
+			const updatedNodes = get(nodesStore);
+			expect(updatedNodes[0].data.ui_tags).toEqual(['pii']);
+			expect(updatedNodes[0].data.tags).toEqual(['nightly']);
+			expect((updatedNodes[0].data as any).dbt_tags).toEqual(['nightly']);
+		});
+
+		it('adding a tag already owned by dbt is a no-op on ui_tags for a bound entity', () => {
+			const nodes: Node[] = [
+				{
+					...createEntityNode('1', 'Customer'),
+					data: {
+						label: 'Customer',
+						dbt_model: 'model.proj.customer',
+						dbt_tags: ['nightly'],
+						ui_tags: [],
+					},
+				},
+			];
+			nodesStore.set(nodes);
+
+			bulkAddTags(['1'], ['nightly']);
+
+			const updatedNodes = get(nodesStore);
+			expect(updatedNodes[0].data.ui_tags).toEqual([]);
+		});
 	});
 
 	describe('bulkRemoveTags', () => {
@@ -429,6 +472,50 @@ describe('bulk-operations', () => {
 			const updatedNodes = get(nodesStore);
 			// Should not crash, tags remain unchanged (not an array)
 			expect(updatedNodes[0].data.tags).toBe('not-an-array');
+		});
+
+		it('removes from ui_tags for a bound entity, never touching dbt_tags/tags', () => {
+			const nodes: Node[] = [
+				{
+					...createEntityNode('1', 'Customer'),
+					data: {
+						label: 'Customer',
+						dbt_model: 'model.proj.customer',
+						tags: ['nightly', 'pii'],
+						dbt_tags: ['nightly'],
+						ui_tags: ['pii'],
+					},
+				},
+			];
+			nodesStore.set(nodes);
+
+			bulkRemoveTags(['1'], ['pii']);
+
+			const updatedNodes = get(nodesStore);
+			expect(updatedNodes[0].data.ui_tags).toBeUndefined();
+			expect((updatedNodes[0].data as any).dbt_tags).toEqual(['nightly']);
+			expect(updatedNodes[0].data.tags).toEqual(['nightly', 'pii']);
+		});
+
+		it('removing a dbt-owned tag from a bound entity is a no-op — it was never in ui_tags', () => {
+			const nodes: Node[] = [
+				{
+					...createEntityNode('1', 'Customer'),
+					data: {
+						label: 'Customer',
+						dbt_model: 'model.proj.customer',
+						dbt_tags: ['nightly'],
+						ui_tags: ['pii'],
+					},
+				},
+			];
+			nodesStore.set(nodes);
+
+			bulkRemoveTags(['1'], ['nightly']);
+
+			const updatedNodes = get(nodesStore);
+			expect(updatedNodes[0].data.ui_tags).toEqual(['pii']);
+			expect((updatedNodes[0].data as any).dbt_tags).toEqual(['nightly']);
 		});
 	});
 

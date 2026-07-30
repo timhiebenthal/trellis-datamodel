@@ -671,7 +671,12 @@ class DbtCoreAdapter:
         tags: Optional[list[str]] = None,
         version: Optional[int] = None,
     ) -> Path:
-        """Save/update the schema definition for a model."""
+        """Save/update the schema definition for a model.
+
+        `tags`, when provided, are Trellis-authored tags to additively union
+        onto whatever is already in schema.yml — never a full replacement of
+        the live tag list.
+        """
         if not os.path.exists(self.manifest_path):
             raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
 
@@ -711,7 +716,7 @@ class DbtCoreAdapter:
             self.yaml_handler.update_columns_batch(version_entry, columns)
 
             if tags is not None:
-                self.yaml_handler.update_version_tags(version_entry, tags)
+                self.yaml_handler.merge_version_tags(version_entry, tags)
         else:
             # Non-versioned model
             if description is not None:
@@ -720,7 +725,7 @@ class DbtCoreAdapter:
             self.yaml_handler.update_columns_batch(model_entry, columns)
 
             if tags is not None:
-                self.yaml_handler.update_model_tags(model_entry, tags)
+                self.yaml_handler.merge_model_tags(model_entry, tags)
 
         self.yaml_handler.save_file(yml_path, data)
         return Path(yml_path)
@@ -1072,9 +1077,9 @@ class DbtCoreAdapter:
                 )
 
             # Sync Tags
-            entity_tags = entity.get("tags")
-            if entity_tags is not None:
-                self.yaml_handler.update_model_tags(model_entry, entity_tags)
+            ui_tags = entity.get("ui_tags")
+            if ui_tags is not None:
+                self.yaml_handler.merge_model_tags(model_entry, ui_tags)
 
             # Sync Drafted Fields. When drafted_fields is provided we treat it as
             # the authoritative column list — fields removed/renamed in the data
@@ -1170,6 +1175,10 @@ class DbtCoreAdapter:
         Generate and save a dbt schema YAML file for drafted fields.
 
         This is used for creating new schema files from the data model editor.
+
+        `tags`, when provided, are Trellis-authored tags to additively union
+        onto whatever is already in schema.yml — never a full replacement of
+        the live tag list.
         """
         data_model = self._load_data_model()
 
@@ -1309,7 +1318,7 @@ class DbtCoreAdapter:
                     version_entry, entity_description
                 )
             if tags is not None:
-                self.yaml_handler.update_version_tags(version_entry, tags)
+                self.yaml_handler.merge_version_tags(version_entry, tags)
 
             schema_entry = version_entry
         else:
@@ -1322,7 +1331,7 @@ class DbtCoreAdapter:
             self.yaml_handler.merge_columns_non_destructive(model_entry, columns)
 
             if tags is not None:
-                self.yaml_handler.update_model_tags(model_entry, tags)
+                self.yaml_handler.merge_model_tags(model_entry, tags)
 
             schema_entry = model_entry
 

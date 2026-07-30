@@ -59,15 +59,17 @@ export interface EntityData {
     panelHeight?: number;
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
+    // For a bound entity, `tags` is a computed display union (dbt_tags + ui_tags)
+    // sent by the backend — never persisted, never hand-edited. Unbound entities
+    // persist `tags` directly as their single, freely-editable field.
     tags?: string[];
+    dbt_tags?: string[]; // Bound entities only: dbt-mirrored, reconcile-owned, read-only
+    ui_tags?: string[]; // Bound entities only: tags explicitly added via the Trellis tag editor
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     domain?: string; // Optional business domain (supports entities created outside business events)
     domains?: string[]; // Optional multi-domain assignment (dimension can belong to many)
-    // Internal tracking for tag sources (not persisted to YAML)
-    _schemaTags?: string[]; // Tags explicitly defined in schema.yml
-    _manifestTags?: string[]; // Tags from manifest (may include inherited tags)
 }
 
 /**
@@ -85,7 +87,9 @@ export interface Entity {
     width?: number;
     panel_height?: number;
     collapsed?: boolean;
-    tags?: string[];
+    tags?: string[]; // Unbound entities only: single, freely-editable field
+    dbt_tags?: string[]; // Bound entities only: dbt-mirrored, reconcile-owned
+    ui_tags?: string[]; // Bound entities only: tags explicitly added via the Trellis tag editor
     entity_type?: "fact" | "dimension" | "unclassified";
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Only for unbound entities (mock sources)

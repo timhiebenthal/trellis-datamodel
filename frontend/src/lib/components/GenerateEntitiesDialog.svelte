@@ -965,16 +965,8 @@
                 .filter((n) => n.type === 'entity')
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const schemaTags = normalizeTags((n.data as any)?._schemaTags);
+                    const uiTags = normalizeTags((n.data as any)?.ui_tags);
                     const isBound = Boolean(n.data?.dbt_model);
-
-                    const tagsToPersist = isBound
-                        ? schemaTags.length > 0
-                            ? schemaTags
-                            : undefined
-                        : displayTags.length > 0
-                            ? displayTags
-                            : undefined;
 
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const domain = ((n.data as any)?.domain) as string | undefined;
@@ -993,7 +985,12 @@
                         width: n.data?.width as number | undefined,
                         panel_height: n.data?.panelHeight as number | undefined,
                         collapsed: (n.data?.collapsed as boolean) ?? false,
-                        tags: tagsToPersist,
+                        // Bound entities: `dbt_tags`/`tags` mirror schema.yml and are
+                        // reconcile-owned; never hand-written here, only `ui_tags`.
+                        // Unbound entities: `tags` remains the single freely-editable field.
+                        ...(isBound
+                            ? { ui_tags: uiTags.length > 0 ? uiTags : undefined }
+                            : { tags: displayTags.length > 0 ? displayTags : undefined }),
                     };
                     // Only include entity_type for dimensional modeling
                     if (isDimensional) {

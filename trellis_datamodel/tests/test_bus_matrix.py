@@ -157,6 +157,39 @@ class TestBusMatrixEndpoint:
         for fact in result["facts"]:
             assert "core" in fact.get("tags", [])
 
+    def test_tag_filtering_uses_computed_union_for_bound_entities(
+        self, temp_data_model_path, enable_bus_matrix
+    ):
+        """A bound dimension's tags for filtering/display are the union of
+        dbt_tags and ui_tags — never a persisted `tags` field."""
+        data = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim_bound",
+                    "entity_type": "dimension",
+                    "dbt_model": "model.proj.dim_bound",
+                    "dbt_tags": ["nightly"],
+                    "ui_tags": ["pii"],
+                },
+                {
+                    "id": "fct_unrelated",
+                    "entity_type": "fact",
+                    "tags": ["other"],
+                },
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data, f)
+
+        result = get_bus_matrix(tag="pii")
+        assert [d["id"] for d in result["dimensions"]] == ["dim_bound"]
+        assert result["dimensions"][0]["tags"] == ["nightly", "pii"]
+
+        result_nightly = get_bus_matrix(tag="nightly")
+        assert [d["id"] for d in result_nightly["dimensions"]] == ["dim_bound"]
+
     def test_multiple_connections(self, sample_data_model, enable_bus_matrix):
         """Test handling of multiple connections between same dimension and fact."""
         # Add duplicate relationship to data model

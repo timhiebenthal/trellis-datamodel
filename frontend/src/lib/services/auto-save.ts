@@ -243,18 +243,8 @@ export class AutoSaveService {
                 .filter((n) => n.type === 'entity')
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const schemaTags = normalizeTags((n.data as any)?._schemaTags);
                     const isBound = Boolean(n.data?.dbt_model);
-
-                    // For bound models, persist only explicit schema tags (user-defined).
-                    // Inherited/manifest tags live in _manifestTags and should not be written back.
-                    const tagsToPersist = isBound
-                        ? schemaTags.length > 0
-                            ? schemaTags
-                            : undefined
-                        : displayTags.length > 0
-                            ? displayTags
-                            : undefined;
+                    const uiTags = normalizeTags((n.data as any)?.ui_tags);
 
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
@@ -273,8 +263,13 @@ export class AutoSaveService {
                         width: n.data?.width as number | undefined,
                         panel_height: n.data?.panelHeight as number | undefined,
                         collapsed: (n.data?.collapsed as boolean) ?? false,
-                        // Persist display tags only; schema writes rely on _schemaTags.
-                        tags: tagsToPersist,
+                        // Bound entities: `dbt_tags`/`tags` mirror schema.yml and are
+                        // reconcile-owned; autosave must never write them, only
+                        // `ui_tags` (user-added). Unbound entities: `tags` remains
+                        // the single freely-editable field.
+                        ...(isBound
+                            ? { ui_tags: uiTags.length > 0 ? uiTags : undefined }
+                            : { tags: displayTags.length > 0 ? displayTags : undefined }),
                     };
                     // Only include entity_type for dimensional modeling
                     if (isDimensional) {

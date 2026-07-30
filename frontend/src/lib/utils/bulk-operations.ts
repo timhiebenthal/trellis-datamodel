@@ -46,6 +46,12 @@ export function bulkAssignDomain(entityIds: string[], domain: string): void {
  * Bulk add tags to multiple entities
  * Avoids duplicates within each entity's tag list
  * Updates nodes store in-place, calls pushHistory() once for undo/redo
+ *
+ * Bound entities have no `tags` field to write — it's a reconcile-owned,
+ * computed display union. Additions there go to `ui_tags` instead (skipping
+ * any tag already dbt-owned, since that's not the user's to track). Unbound
+ * entities keep using plain `tags`, their single freely-editable field.
+ *
  * @param entityIds - Array of entity IDs to update
  * @param tagsToAdd - Array of tags to add
  */
@@ -57,12 +63,15 @@ export function bulkAddTags(entityIds: string[], tagsToAdd: string[]): void {
 
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
-			const currentTags = node.data?.tags || [];
+			const isBound = Boolean(node.data?.dbt_model);
+			const tagField = isBound ? 'ui_tags' : 'tags';
+			const dbtTags: string[] = isBound ? ((node.data as any)?.dbt_tags || []) : [];
+			const currentTags = (node.data as any)?.[tagField] || [];
 			const newTags = Array.isArray(currentTags) ? [...currentTags] : [];
 
-			// Add tags, avoiding duplicates
+			// Add tags, avoiding duplicates and tags already dbt-owned
 			for (const tag of tagsToAdd) {
-				if (!newTags.includes(tag)) {
+				if (!newTags.includes(tag) && !dbtTags.includes(tag)) {
 					newTags.push(tag);
 					modified = true;
 				}
@@ -72,7 +81,7 @@ export function bulkAddTags(entityIds: string[], tagsToAdd: string[]): void {
 				...node,
 				data: {
 					...node.data,
-					tags: newTags.length > 0 ? newTags : undefined,
+					[tagField]: newTags.length > 0 ? newTags : undefined,
 				},
 			};
 		}
@@ -88,6 +97,12 @@ export function bulkAddTags(entityIds: string[], tagsToAdd: string[]): void {
 /**
  * Bulk remove tags from multiple entities
  * Updates nodes store in-place, calls pushHistory() once for undo/redo
+ *
+ * Bound entities: removal only ever affects `ui_tags` — a dbt-owned tag in
+ * `tagsToRemove` naturally has no effect, since it was never in `ui_tags` to
+ * begin with (dbt wins; removing it is a schema.yml-side operation).
+ * Unbound entities keep using plain `tags`.
+ *
  * @param entityIds - Array of entity IDs to update
  * @param tagsToRemove - Array of tags to remove
  */
@@ -99,19 +114,21 @@ export function bulkRemoveTags(entityIds: string[], tagsToRemove: string[]): voi
 
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
-			const currentTags = node.data?.tags;
+			const isBound = Boolean(node.data?.dbt_model);
+			const tagField = isBound ? 'ui_tags' : 'tags';
+			const currentTags = (node.data as any)?.[tagField];
 			if (!Array.isArray(currentTags)) return node;
 
 			// If current tags array is empty, set to undefined
 			if (currentTags.length === 0) {
-				if (node.data?.tags !== undefined) {
+				if ((node.data as any)?.[tagField] !== undefined) {
 					modified = true;
 				}
 				return {
 					...node,
 					data: {
 						...node.data,
-						tags: undefined,
+						[tagField]: undefined,
 					},
 				};
 			}
@@ -128,7 +145,7 @@ export function bulkRemoveTags(entityIds: string[], tagsToRemove: string[]): voi
 				...node,
 				data: {
 					...node.data,
-					tags: newTags.length > 0 ? newTags : undefined,
+					[tagField]: newTags.length > 0 ? newTags : undefined,
 				},
 			};
 		}

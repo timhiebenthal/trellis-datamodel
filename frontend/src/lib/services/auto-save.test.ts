@@ -465,7 +465,7 @@ describe('AutoSaveService', () => {
             expect(dataModelArg.entities[0].id).toBe('entity1');
         });
 
-        it('should handle bound model entities', () => {
+        it('persists ui_tags for a bound entity, never the reconcile-owned tags field', () => {
             const nodes: Node[] = [
                 {
                     id: 'entity1',
@@ -474,8 +474,9 @@ describe('AutoSaveService', () => {
                     data: {
                         label: 'Entity 1',
                         dbt_model: 'model1',
-                        tags: ['tag1'],
-                        _schemaTags: ['schema-tag'],
+                        tags: ['nightly', 'pii'],
+                        dbt_tags: ['nightly'],
+                        ui_tags: ['pii'],
                     },
                 },
             ];
@@ -487,8 +488,34 @@ describe('AutoSaveService', () => {
             const dataModelArg = vi.mocked(apiSaveDataModel).mock.calls[0][0];
             const entity = dataModelArg.entities[0];
 
-            // Bound entities should persist only schema tags
-            expect(entity.tags).toEqual(['schema-tag']);
+            // Bound entities persist ui_tags; the mirrored `tags`/`dbt_tags` fields
+            // are reconcile-owned and must never be hand-written by autosave.
+            expect(entity.ui_tags).toEqual(['pii']);
+            expect(entity.tags).toBeUndefined();
+            expect(entity.dbt_tags).toBeUndefined();
+        });
+
+        it('unbound entity still persists tags as the single freely-editable field', () => {
+            const nodes: Node[] = [
+                {
+                    id: 'entity1',
+                    type: 'entity',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        label: 'Entity 1',
+                        tags: ['draft-tag'],
+                    },
+                },
+            ];
+            const edges: Edge[] = [];
+
+            service.save(nodes, edges);
+            vi.advanceTimersByTime(400);
+
+            const dataModelArg = vi.mocked(apiSaveDataModel).mock.calls[0][0];
+            const entity = dataModelArg.entities[0];
+
+            expect(entity.tags).toEqual(['draft-tag']);
         });
 
         it('should handle unbound model entities', () => {

@@ -5,6 +5,7 @@
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
 	import type { MergedField } from '$lib/utils/merged-fields';
+	import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
@@ -653,6 +654,16 @@
 		nodes.update((n) => {
 			return n.map((node) => {
 				if (node.id === currentEntity.id) {
+					const isBound = Boolean(node.data?.dbt_model);
+					// Bound entities: `tags` is a computed display union and reconcile-owned
+					// `dbt_tags` is read-only — an edit here only ever changes `ui_tags`.
+					// Unbound entities: `tags` remains the single freely-editable field.
+					const tagFields = isBound
+						? { ui_tags: (() => {
+								const uiTags = computeUiTagsAfterEdit((node.data as any)?.dbt_tags, entityTags);
+								return uiTags.length > 0 ? uiTags : undefined;
+							})() }
+						: { tags: entityTags.length > 0 ? entityTags : undefined };
 					return {
 						...node,
 						data: {
@@ -661,7 +672,7 @@
 							description: entityDescription.trim() || undefined,
 							domains: normalizedDomains.length > 0 ? normalizedDomains : undefined,
 							domain: primaryDomain || undefined,
-							tags: entityTags.length > 0 ? entityTags : undefined,
+							...tagFields,
 							source_system:
 								entitySourceSystems.length > 0 ? entitySourceSystems : undefined,
 							entity_type: entityType,

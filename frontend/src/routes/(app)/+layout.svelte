@@ -45,6 +45,7 @@ import {
     formatModelNameForLabel,
     getLabelPrefixesFromConfig,
 } from "$lib/utils";
+import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
@@ -601,8 +602,7 @@ import {
                 // Map data model to Svelte Flow format with metadata
                 const entityNodes = (dataModel.entities || []).map((e: any) => {
                     const metadata = getEntityMetadata(e);
-                    const entityTags = normalizeTags(e.tags);
-                    const hasDbtBinding = Boolean(e.dbt_model);
+                    const { tags, dbt_tags, ui_tags } = mapEntityTagsToNodeData(e);
                     const modelName = metadata.model ? metadata.model.name : e.id;
                     return {
                         id: e.id,
@@ -619,9 +619,9 @@ import {
                             panelHeight: e.panel_height ?? e.panelHeight ?? 200,
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
-                            tags: entityTags,
-                            _schemaTags: hasDbtBinding ? [] : entityTags,
-                            _manifestTags: hasDbtBinding ? entityTags : [],
+                            tags,
+                            dbt_tags,
+                            ui_tags,
                             entity_type: e.entity_type,
                             source_system: e.source_system,
                             annotation_type: e.annotation_type,

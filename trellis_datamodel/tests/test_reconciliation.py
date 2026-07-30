@@ -3,7 +3,9 @@
 import pytest
 from trellis_datamodel.services.reconciliation import (
     reconcile_entity_fields,
+    reconcile_entity_tags,
     reconcile_data_model,
+    compute_display_tags,
 )
 
 
@@ -197,6 +199,24 @@ class TestReconcileEntityFields:
         assert "origin" not in result[0]
 
 
+class TestReconcileEntityTags:
+    def test_dbt_tags_overwrite_existing_tags_field(self):
+        """dbt is authoritative for the mirrored `tags` field — always overwritten."""
+        result = reconcile_entity_tags(existing_tags=["stale"], manifest_tags=["nightly", "core"])
+        assert result == ["nightly", "core"]
+
+    def test_absent_from_manifest_is_non_destructive(self):
+        """Model absent from manifest (partial compile) — existing tags untouched."""
+        result = reconcile_entity_tags(existing_tags=["nightly"], manifest_tags=None)
+        assert result == ["nightly"]
+
+    def test_empty_manifest_tags_clears_mirrored_tags(self):
+        """Model present in manifest with no tags — mirrored tags become empty,
+        distinct from 'absent from manifest' (None)."""
+        result = reconcile_entity_tags(existing_tags=["stale"], manifest_tags=[])
+        assert result == []
+
+
 class TestReconcileDataModel:
     """Unit tests for the reconcile_data_model function."""
 
@@ -314,3 +334,133 @@ class TestReconcileDataModel:
         sketch = next(e for e in result["entities"] if e["id"] == "sketch")
         assert users["drafted_fields"][0]["source"] == "dbt"
         assert sketch["drafted_fields"] == [{"name": "future_col", "datatype": "text"}]
+
+    def test_reconcile_data_model_refreshes_entity_dbt_tags_from_manifest(self):
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "dbt_tags": ["old"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly", "core"]},
+        ]
+        result, changed = reconcile_data_model(data_model, manifest_models)
+        assert result["entities"][0]["dbt_tags"] == ["nightly", "core"]
+        assert changed is True
+
+    def test_reconcile_data_model_leaves_ui_tags_untouched(self):
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "dbt_model": "model.proj.users",
+                    "dbt_tags": ["old"],
+                    "ui_tags": ["pii"],
+                },
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        assert result["entities"][0]["ui_tags"] == ["pii"]
+
+
+class TestTagMigrationSeed:
+    def test_legacy_tags_seed_ui_tags_once_and_retire_legacy_key(self):
+        """An entity with a pre-existing legacy `tags` value (from before the
+        dbt_tags/ui_tags split existed) and no `ui_tags` key is seeded once so
+        its tags aren't lost, and the legacy `tags` key is retired — bound
+        entities never persist `tags` going forward."""
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "tags": ["pii"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        entity = result["entities"][0]
+        assert entity["ui_tags"] == ["pii"]
+        assert entity["dbt_tags"] == ["nightly"]
+        assert "tags" not in entity
+
+    def test_seed_does_not_reapply_once_ui_tags_exists(self):
+        """The one-time seed never runs again once ui_tags is present,
+        even if it's empty (explicit user removal must stick), but the
+        legacy tags key is still retired."""
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "dbt_model": "model.proj.users",
+                    "tags": ["pii"],
+                    "ui_tags": [],
+                },
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        entity = result["entities"][0]
+        assert entity["ui_tags"] == []
+        assert "tags" not in entity
+
+    def test_does_not_seed_already_dbt_reconciled_tags_into_ui_tags(self):
+        """If legacy `tags` already exactly matches what the manifest says
+        (i.e. it was already mirrored by the old pre-rename code, not legacy
+        pre-fix data), a later reconcile must NOT seed the entire dbt tag list
+        into ui_tags — that would wrongly treat dbt's own tags as
+        user-added, and defeat the read-only/removable distinction in the UI.
+        The legacy key is still retired either way."""
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "tags": ["sdh", "entity", "customer_360"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["sdh", "entity", "customer_360"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        entity = result["entities"][0]
+        assert "ui_tags" not in entity, (
+            f"dbt-mirrored tags were wrongly seeded into ui_tags; got: {entity.get('ui_tags')}"
+        )
+        assert entity["dbt_tags"] == ["sdh", "entity", "customer_360"]
+        assert "tags" not in entity
+
+
+class TestComputeDisplayTags:
+    def test_bound_entity_unions_dbt_and_ui_tags(self):
+        entity = {"dbt_model": "model.proj.users", "dbt_tags": ["nightly"], "ui_tags": ["pii"]}
+        assert compute_display_tags(entity) == ["nightly", "pii"]
+
+    def test_bound_entity_dedupes_overlap(self):
+        entity = {"dbt_model": "model.proj.users", "dbt_tags": ["nightly", "core"], "ui_tags": ["core", "pii"]}
+        assert compute_display_tags(entity) == ["nightly", "core", "pii"]
+
+    def test_unbound_entity_uses_plain_tags(self):
+        entity = {"tags": ["draft-tag"]}
+        assert compute_display_tags(entity) == ["draft-tag"]
+
+    def test_bound_entity_with_no_tags_at_all(self):
+        entity = {"dbt_model": "model.proj.users"}
+        assert compute_display_tags(entity) == []
+
+
+class TestReconcileIdempotency:
+    def test_repeated_reconcile_produces_no_further_change(self):
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "dbt_tags": ["nightly"], "ui_tags": ["pii"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        once, changed_once = reconcile_data_model(data_model, manifest_models)
+        twice, changed_twice = reconcile_data_model(once, manifest_models)
+        assert changed_twice is False
+        assert twice == once

@@ -41,6 +41,7 @@
     } from "$lib/utils";
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
+    import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
     import TagEditor from "./TagEditor.svelte";
@@ -630,8 +631,20 @@
     }
 
     // Tag editing functionality
-    let entityTags = $derived(normalizeTags(data.tags));
-    
+    // For bound entities, the editor displays the union of the dbt-mirrored
+    // `dbt_tags` and the Trellis-authored `ui_tags`. Unbound entities have no
+    // schema.yml to mirror, so `tags` remains the single freely-editable field.
+    let entityTags = $derived(
+        isBound
+            ? normalizeTags([...(data.dbt_tags || []), ...((data.ui_tags || []) as string[])])
+            : normalizeTags(data.tags),
+    );
+
+    // dbt_tags are always dbt-owned: they render read-only in the tag editor
+    // (no remove affordance) because a Trellis push never removes a tag it
+    // doesn't own. Only meaningful for bound entities.
+    let readOnlyTags = $derived(isBound ? normalizeTags(data.dbt_tags) : []);
+
     // Roles display (for dimensions)
     // EntityRole is an object with { role, label, source } — extract the role string
     // Deduplicate case-insensitively (e.g., "Creation Date" and "creation date" should be one)
@@ -652,22 +665,20 @@
 
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
-            const currentTags = normalizeTags(node?.data?.tags);
-            const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
+            const nodeIsBound = !!node?.data?.dbt_model;
 
-            // For the current node and bound models, use SchemaManager
-            if (nodeId === id && isBound && schemaManager) {
-                schemaManager.updateSchemaTags(newTags);
-                updateNodeData(nodeId, {
-                    tags: newTags,
-                    _schemaTags: newTags
-                });
+            if (nodeIsBound) {
+                // `dbt_tags` is a dbt-mirrored, reconcile-owned field for bound
+                // entities (schema.yml is authoritative) — never hand-written here.
+                // An edit in the tag editor only ever changes `ui_tags`; a
+                // dbt-mirrored tag missing from `newTags` (e.g. the user tried to
+                // remove a read-only chip) is not treated as a removal, since dbt wins.
+                const uiTags = computeUiTagsAfterEdit(node?.data?.dbt_tags, newTags);
+                updateNodeData(nodeId, { ui_tags: uiTags });
             } else {
-                // For unbound nodes or batch editing, just update node data directly
-                updateNodeData(nodeId, {
-                    tags: newTags,
-                    _schemaTags: newTags
-                });
+                // Unbound entities have no schema.yml to mirror; `tags` is the
+                // single freely-editable field.
+                updateNodeData(nodeId, { tags: newTags });
             }
         });
     }
@@ -1295,6 +1306,7 @@
                             >Tags</span>
                             <TagEditor
                                 tags={entityTags}
+                                readOnlyTags={readOnlyTags}
                                 canEdit={true}
                                 isBatchMode={isBatchEditing}
                                 onUpdate={(newTags) => handleTagsUpdate(newTags)}
@@ -1754,6 +1766,7 @@
                                 >Tags</span>
                             <TagEditor
                                 tags={entityTags}
+                                readOnlyTags={readOnlyTags}
                                 canEdit={true}
                                 isBatchMode={isBatchEditing}
                                 onUpdate={(newTags) => handleTagsUpdate(newTags)}
