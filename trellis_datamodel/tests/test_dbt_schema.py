@@ -1356,6 +1356,66 @@ def test_sync_relationships_preserves_dbt_only_tag_when_pushing_trellis_tag(
     assert "pii" in tags
 
 
+def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """End-to-end: schema.yml has 'nightly' (dbt-only). User adds 'pii' via
+    trellis_tags. Push adds 'pii' without touching 'nightly'. Push is
+    additive-only for v1: removing 'pii' from trellis_tags and pushing again
+    does NOT remove it from schema.yml (documented v1 limitation)."""
+    sql_dir = os.path.join(temp_dir, "models", "3_core")
+    os.makedirs(sql_dir, exist_ok=True)
+    with open(os.path.join(sql_dir, "users.sql"), "w") as f:
+        f.write("SELECT 1")
+    yml_path = os.path.join(sql_dir, "users.yml")
+    with open(yml_path, "w") as f:
+        yaml.dump(
+            {
+                "version": 2,
+                "models": [
+                    {"name": "users", "tags": ["nightly"], "columns": [{"name": "id", "data_type": "int"}]}
+                ],
+            },
+            f,
+        )
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(
+            {
+                "entities": [
+                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "trellis_tags": ["pii"]}
+                ],
+                "relationships": [],
+            },
+            f,
+        )
+
+    # Push: pii added, nightly must survive
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+    with open(yml_path, "r") as f:
+        after_add = yaml.safe_load(f)["models"][0]["tags"]
+    assert set(after_add) == {"nightly", "pii"}
+
+    # Simulate the user removing 'pii' from trellis_tags and pushing again —
+    # additive-only means this is a documented no-op for schema.yml removal.
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(
+            {
+                "entities": [
+                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "trellis_tags": []}
+                ],
+                "relationships": [],
+            },
+            f,
+        )
+    response = test_client.post("/api/sync-dbt-tests")
+    assert response.status_code == 200
+    with open(yml_path, "r") as f:
+        after_second_push = yaml.safe_load(f)["models"][0]["tags"]
+    assert "nightly" in after_second_push, "nightly is dbt-owned and must survive"
+    assert "pii" in after_second_push, "v1 is additive-only: pushing trellis_tags=[] never removes a tag already in schema.yml"
+
+
 class TestGetModelSchema:
     """Tests for GET /api/models/{model_name}/schema endpoint."""
 
