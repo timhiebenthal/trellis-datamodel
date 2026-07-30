@@ -401,6 +401,29 @@ class TestTagMigrationSeed:
         result, _ = reconcile_data_model(data_model, manifest_models)
         assert result["entities"][0]["trellis_tags"] == []
 
+    def test_does_not_seed_already_dbt_reconciled_tags_into_trellis_tags(self):
+        """If `tags` already exactly matches what the manifest says (i.e. it was
+        already reconciled by this same logic in an earlier run, not legacy
+        pre-fix data), a later reconcile must NOT seed the entire dbt tag list
+        into trellis_tags — that would wrongly treat dbt's own tags as
+        user-added, and defeat the read-only/removable distinction in the UI."""
+        data_model = {
+            "entities": [
+                # tags already equals the manifest's tags — this is what a
+                # second reconcile call sees after a first call already
+                # mirrored the manifest into `tags`.
+                {"id": "users", "dbt_model": "model.proj.users", "tags": ["sdh", "entity", "customer_360"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["sdh", "entity", "customer_360"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        assert "trellis_tags" not in result["entities"][0], (
+            f"dbt-mirrored tags were wrongly seeded into trellis_tags; got: {result['entities'][0].get('trellis_tags')}"
+        )
+        assert result["entities"][0]["tags"] == ["sdh", "entity", "customer_360"]
+
 
 class TestReconcileIdempotency:
     def test_repeated_reconcile_produces_no_further_change(self):
