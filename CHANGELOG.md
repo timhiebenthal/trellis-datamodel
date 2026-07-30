@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0-beta.1] - 2026-07-30
+
+### Added
+- **`trellis_tags` on bound entities**: tags a user explicitly adds via the Trellis tag editor are now tracked separately from `tags`, which becomes a dbt-mirrored, reconcile-owned field (refreshed from `schema.yml`/the manifest on every reconcile, never hand-edited) — the same authority model already applied to `source: dbt` columns. The tag editor renders dbt-mirrored tags read-only and `trellis_tags` as removable.
+- **`YamlHandler.merge_model_tags`/`merge_version_tags`**: additive-union tag writers that read the live file fresh immediately before writing, used everywhere Trellis pushes tags to `schema.yml`.
+
+### Fixed
+- **Tags added directly to `schema.yml` no longer silently deleted by Trellis pushes**: `sync_relationships`, `save_model_schema`, and `save_dbt_schema` previously called `update_model_tags`/`update_version_tags` with a cached, potentially stale tag list, doing a full replace on every push. A tag added outside Trellis (e.g. `nightly`, added directly to `schema.yml` by a dbt developer) was wiped the next time Trellis pushed an unrelated tag change. Push now additively unions `trellis_tags` onto the current file content instead.
+
+### Changed
+- **Tag removal is additive-only in this release**: removing a tag from `trellis_tags` in the Trellis UI does not remove it from `schema.yml` on push (documented v1 scope decision — durable removal tracking would require a second, push-time-only field written back to `data_model.yml`, judged too invasive for this iteration). To remove a Trellis-added tag, edit `schema.yml` directly; dbt then owns it going forward.
+- Entities with a pre-existing `tags` value from before this change are seeded into `trellis_tags` once on first reconcile, so those tags aren't lost under the new merge logic.
+
 ## [0.17.1] - 2026-07-27
 
 ### Fixed
