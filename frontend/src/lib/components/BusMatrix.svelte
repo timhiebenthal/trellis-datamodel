@@ -8,12 +8,14 @@
         id: string;
         label: string;
         tags?: string[];
+        dbt_model?: string;
     }
 
     interface Fact {
         id: string;
         label: string;
         tags?: string[];
+        dbt_model?: string;
     }
 
     interface Connection {
@@ -32,6 +34,7 @@
     let dimensionFilter = $state<string[]>([]);
     let factFilter = $state<string[]>([]);
     let tagFilter = $state<string[]>([]);
+    let buildStatusFilter = $state<string[]>([]);
 
     // Sort options: 'label-asc' | 'count-desc'
     let dimensionSort = $state<string>('label-asc');
@@ -45,6 +48,12 @@
         return connectionLookup.has(`${dimensionId}-${factId}`);
     }
 
+    function matchesBuildStatus(entity: Dimension | Fact): boolean {
+        if (buildStatusFilter.length === 0) return true;
+        const status = entity.dbt_model ? 'bound' : 'unbound';
+        return buildStatusFilter.includes(status);
+    }
+
     // Filtered (unsorted) collections — counts depend on these
     let filteredDimensions = $derived(
         dimensions.filter(dimension => {
@@ -53,6 +62,7 @@
                 const tags = dimension.tags || [];
                 if (!tagFilter.some(tag => tags.includes(tag))) return false;
             }
+            if (!matchesBuildStatus(dimension)) return false;
             return true;
         })
     );
@@ -64,6 +74,7 @@
                 const tags = fact.tags || [];
                 if (!tagFilter.some(tag => tags.includes(tag))) return false;
             }
+            if (!matchesBuildStatus(fact)) return false;
             return true;
         })
     );
@@ -361,13 +372,53 @@
                         {/each}
                     </div>
 
+                    <!-- Build Status Filter -->
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <label for="build-status-filter" class="text-xs text-gray-600">Built:</label>
+                        <select
+                            id="build-status-filter"
+                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 w-28"
+                            onchange={(e) => {
+                                const value = (e.target as HTMLSelectElement).value;
+                                if (value) {
+                                    if (!buildStatusFilter.includes(value)) {
+                                        buildStatusFilter = [...buildStatusFilter, value];
+                                    }
+                                    (e.target as HTMLSelectElement).value = '';
+                                }
+                            }}
+                        >
+                            <option value="">Add...</option>
+                            {#if !buildStatusFilter.includes('bound')}
+                                <option value="bound">Bound</option>
+                            {/if}
+                            {#if !buildStatusFilter.includes('unbound')}
+                                <option value="unbound">Unbound</option>
+                            {/if}
+                        </select>
+                        {#each buildStatusFilter as status}
+                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs shrink-0">
+                                {status === 'bound' ? 'Bound' : 'Unbound'}
+                                <button
+                                    onclick={() => {
+                                        buildStatusFilter = buildStatusFilter.filter(s => s !== status);
+                                    }}
+                                    class="hover:text-primary-900"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    </div>
+
                     <!-- Clear All Filters -->
-                    {#if dimensionFilter.length > 0 || factFilter.length > 0 || tagFilter.length > 0}
+                    {#if dimensionFilter.length > 0 || factFilter.length > 0 || tagFilter.length > 0 || buildStatusFilter.length > 0}
                         <button
                             onclick={() => {
                                 dimensionFilter = [];
                                 factFilter = [];
                                 tagFilter = [];
+                                buildStatusFilter = [];
                             }}
                             class="text-xs text-gray-600 hover:text-gray-800 underline shrink-0"
                         >
@@ -426,6 +477,14 @@
                                         <div class="flex items-center gap-2">
                                             <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
                                             <span class="truncate">{fact.label}</span>
+                                            {#if fact.dbt_model}
+                                                <span
+                                                    class="flex-shrink-0 inline-flex items-center text-gray-400"
+                                                    title={`Built with dbt: ${fact.dbt_model.split('.').pop()}`}
+                                                >
+                                                    <Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+                                                </span>
+                                            {/if}
                                             {#if factVisibleDimensionCounts.get(fact.id) !== undefined}
                                                 <span
                                                     aria-label="{factVisibleDimensionCounts.get(fact.id)} connected dimensions"
@@ -459,6 +518,14 @@
                                             <div class="flex items-center gap-2" title={dimension.label}>
                                                 <Icon icon="lucide:list" class="w-4 h-4 text-green-600 flex-shrink-0" />
                                                 <span class="truncate">{dimension.label}</span>
+                                                {#if dimension.dbt_model}
+                                                    <span
+                                                        class="flex-shrink-0 inline-flex items-center text-gray-400"
+                                                        title={`Built with dbt: ${dimension.dbt_model.split('.').pop()}`}
+                                                    >
+                                                        <Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+                                                    </span>
+                                                {/if}
                                                 <span
                                                     aria-label="{dimensionVisibleFactCounts.get(dimension.id) ?? 0} connected facts"
                                                     class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 flex-shrink-0"
