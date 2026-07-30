@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.18.0-beta.1] - 2026-07-30
+## [0.18.0b1] - 2026-07-30
 
 ### Added
 - **`trellis_tags` on bound entities**: tags a user explicitly adds via the Trellis tag editor are now tracked separately from `tags`, which becomes a dbt-mirrored, reconcile-owned field (refreshed from `schema.yml`/the manifest on every reconcile, never hand-edited) — the same authority model already applied to `source: dbt` columns. The tag editor renders dbt-mirrored tags read-only and `trellis_tags` as removable.
