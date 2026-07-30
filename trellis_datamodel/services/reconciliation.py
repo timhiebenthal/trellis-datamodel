@@ -223,6 +223,16 @@ def reconcile_data_model(
             entity["drafted_fields"] = reconciled
             changed = True
 
+        # One-time migration seed: an entity with a pre-existing `tags` value
+        # and no `trellis_tags` key (populated by the old, pre-fix UI path)
+        # is seeded once so its tags aren't lost on the first push under the
+        # new merge logic. Checks genuine key absence, not falsiness — an
+        # entity with `trellis_tags: []` must NOT be re-seeded (explicit user
+        # removal must stick).
+        if "trellis_tags" not in entity and entity.get("tags"):
+            entity["trellis_tags"] = list(entity["tags"])
+            changed = True
+
         manifest_tags = manifest_tags_by_id.get(dbt_model) if dbt_model in manifest_by_id else None
         existing_tags = entity.get("tags") or []
         reconciled_tags = reconcile_entity_tags(existing_tags, manifest_tags)

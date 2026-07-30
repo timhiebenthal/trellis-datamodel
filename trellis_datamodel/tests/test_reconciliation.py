@@ -363,3 +363,56 @@ class TestReconcileDataModel:
         ]
         result, _ = reconcile_data_model(data_model, manifest_models)
         assert result["entities"][0]["trellis_tags"] == ["pii"]
+
+
+class TestTagMigrationSeed:
+    def test_legacy_tags_seed_trellis_tags_once_when_trellis_tags_absent(self):
+        """An entity with a pre-existing `tags` value and no `trellis_tags` key
+        (populated by the old, pre-fix UI path) is seeded once so its tags
+        aren't lost on the first push under the new merge logic."""
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "tags": ["pii"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        assert result["entities"][0]["trellis_tags"] == ["pii"]
+        assert result["entities"][0]["tags"] == ["nightly"]
+
+    def test_seed_does_not_reapply_once_trellis_tags_exists(self):
+        """The one-time seed never runs again once trellis_tags is present,
+        even if it's empty (explicit user removal must stick)."""
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "dbt_model": "model.proj.users",
+                    "tags": ["pii"],
+                    "trellis_tags": [],
+                },
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        assert result["entities"][0]["trellis_tags"] == []
+
+
+class TestReconcileIdempotency:
+    def test_repeated_reconcile_produces_no_further_change(self):
+        data_model = {
+            "entities": [
+                {"id": "users", "dbt_model": "model.proj.users", "tags": ["nightly"], "trellis_tags": ["pii"]},
+            ]
+        }
+        manifest_models = [
+            {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly"]},
+        ]
+        once, changed_once = reconcile_data_model(data_model, manifest_models)
+        twice, changed_twice = reconcile_data_model(once, manifest_models)
+        assert changed_twice is False
+        assert twice == once
