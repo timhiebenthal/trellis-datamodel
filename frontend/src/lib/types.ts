@@ -60,6 +60,7 @@ export interface EntityData {
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
     tags?: string[];
+    trellis_tags?: string[]; // Tags explicitly added by the user via the Trellis tag editor (separate from dbt-mirrored `tags`)
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
