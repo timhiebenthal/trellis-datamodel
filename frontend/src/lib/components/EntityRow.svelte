@@ -155,6 +155,16 @@
 		<Icon icon={typeIcon()} class="w-5 h-5" />
 	</div>
 
+	<!-- dbt build status badge (only when entity is bound to a dbt model) -->
+	{#if entity.dbt_model}
+		<span
+			class="flex-shrink-0 inline-flex items-center text-gray-400"
+			title={`Built with dbt: ${entity.dbt_model.split('.').pop()}`}
+		>
+			<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+		</span>
+	{/if}
+
 	<!-- Entity Info (name, type, domain, tags) - Horizontal Layout -->
 	<div class="flex-1 min-w-0 flex items-center gap-3">
 		<!-- Entity name -->

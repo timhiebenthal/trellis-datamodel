@@ -140,6 +140,24 @@
 		}));
 	}
 
+	function toggleBuildStatus(status: 'bound' | 'unbound') {
+		entityListFilters.update((filters) => {
+			const statuses = [...filters.selectedBuildStatus];
+			if (statuses.includes(status)) {
+				return { ...filters, selectedBuildStatus: statuses.filter((s) => s !== status) };
+			} else {
+				return { ...filters, selectedBuildStatus: [...statuses, status] };
+			}
+		});
+	}
+
+	function removeBuildStatus(status: 'bound' | 'unbound') {
+		entityListFilters.update((filters) => ({
+			...filters,
+			selectedBuildStatus: filters.selectedBuildStatus.filter((s) => s !== status),
+		}));
+	}
+
 	function toggleSortDirection() {
 		entityListFilters.update((filters) => ({
 			...filters,
@@ -159,6 +177,7 @@
 			selectedDomains: [],
 			selectedTags: [],
 			selectedEntityTypes: [],
+			selectedBuildStatus: [],
 			sortDirection: filters.sortDirection,
 			groupByEntityType: filters.groupByEntityType,
 		}));
@@ -214,7 +233,7 @@
 			</button>
 
 			<!-- Clear Filters Button -->
-			{#if $entityListFilters.searchTerm || $entityListFilters.selectedDomains.length > 0 || $entityListFilters.selectedTags.length > 0 || $entityListFilters.selectedEntityTypes.length > 0}
+			{#if $entityListFilters.searchTerm || $entityListFilters.selectedDomains.length > 0 || $entityListFilters.selectedTags.length > 0 || $entityListFilters.selectedEntityTypes.length > 0 || $entityListFilters.selectedBuildStatus.length > 0}
 				<button
 					type="button"
 					onclick={clearAllFilters}
@@ -389,6 +408,57 @@
 						<option value="dimension" disabled={$entityListFilters.selectedEntityTypes.includes('dimension')}>Dimension</option>
 						<option value="fact" disabled={$entityListFilters.selectedEntityTypes.includes('fact')}>Fact</option>
 						<option value="unclassified" disabled={$entityListFilters.selectedEntityTypes.includes('unclassified')}>Unclassified</option>
+					</select>
+					<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+						<Icon icon="lucide:chevron-down" class="w-3 h-3" />
+					</div>
+				</div>
+			</div>
+
+			<!-- Built Filter -->
+			<div class="flex items-center gap-2">
+				<span class="text-xs text-gray-600">Built:</span>
+
+				<!-- Selected build statuses as chips -->
+				{#if $entityListFilters.selectedBuildStatus.length > 0}
+					<div class="flex flex-wrap gap-1">
+						{#each $entityListFilters.selectedBuildStatus as status}
+							{@const statusLabel = status === 'bound' ? 'Bound' : 'Unbound'}
+							<span
+								class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium border border-gray-300"
+							>
+								{statusLabel}
+								<button
+									onclick={() => removeBuildStatus(status)}
+									class="text-gray-600 hover:text-gray-900 transition-colors"
+									title="Remove {statusLabel}"
+								>
+									<Icon icon="lucide:x" class="w-3 h-3" />
+								</button>
+							</span>
+						{/each}
+					</div>
+				{/if}
+
+				<!-- Built dropdown -->
+				<div class="relative">
+					<select
+						value=""
+						data-testid="build-status-select"
+						onchange={(e) => {
+							const val = e.currentTarget.value as 'bound' | 'unbound';
+							if (val) {
+								toggleBuildStatus(val);
+								e.currentTarget.value = '';
+							}
+						}}
+						class="pl-2 pr-7 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 appearance-none cursor-pointer"
+					>
+						<option value="" disabled selected>
+							{$entityListFilters.selectedBuildStatus.length > 0 ? 'Add status...' : 'All'}
+						</option>
+						<option value="bound" disabled={$entityListFilters.selectedBuildStatus.includes('bound')}>Bound</option>
+						<option value="unbound" disabled={$entityListFilters.selectedBuildStatus.includes('unbound')}>Unbound</option>
 					</select>
 					<div class="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
 						<Icon icon="lucide:chevron-down" class="w-3 h-3" />

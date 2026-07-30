@@ -10,7 +10,8 @@ describe('entity-filtering', () => {
 		domain?: string,
 		tags?: string[],
 		domains?: string[],
-		entity_type?: 'dimension' | 'fact' | 'unclassified'
+		entity_type?: 'dimension' | 'fact' | 'unclassified',
+		dbt_model?: string
 	): Entity => ({
 		id,
 		label,
@@ -20,6 +21,7 @@ describe('entity-filtering', () => {
 		description: '',
 		entity_type: entity_type ?? 'dimension',
 		attributes: [],
+		dbt_model,
 	});
 
 	describe('filterEntities', () => {
@@ -641,6 +643,109 @@ describe('entity-filtering', () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0].label).toBe('Customer Master');
+		});
+	});
+
+	describe('Build status filtering', () => {
+		it('should return all entities when selectedBuildStatus is empty array', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension', 'dim_customer'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedBuildStatus: [],
+			});
+
+			expect(result).toHaveLength(2);
+		});
+
+		it('should return all entities when selectedBuildStatus is undefined', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension', 'dim_customer'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+			});
+
+			expect(result).toHaveLength(2);
+		});
+
+		it('should filter to only bound entities when selectedBuildStatus is ["bound"]', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension', 'dim_customer'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Product', 'Inventory', [], [], 'dimension', ''),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedBuildStatus: ['bound'],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Customer');
+		});
+
+		it('should filter to only unbound entities when selectedBuildStatus is ["unbound"]', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension', 'dim_customer'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Product', 'Inventory', [], [], 'dimension', ''),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedBuildStatus: ['unbound'],
+			});
+
+			expect(result).toHaveLength(2);
+			expect(result.map((e) => e.label)).toEqual(['Order', 'Product']);
+		});
+
+		it('should return all entities when both bound and unbound are selected', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension', 'dim_customer'),
+				createEntity('2', 'Order', 'Sales', [], [], 'fact'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: '',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedBuildStatus: ['bound', 'unbound'],
+			});
+
+			expect(result).toHaveLength(2);
+		});
+
+		it('should combine correctly with search term filter', () => {
+			const entities = [
+				createEntity('1', 'Customer', 'Sales', [], [], 'dimension', 'dim_customer'),
+				createEntity('2', 'Customer Order', 'Sales', [], [], 'fact'),
+				createEntity('3', 'Product', 'Inventory', [], [], 'dimension'),
+			];
+
+			const result = filterEntities(entities, {
+				searchTerm: 'customer',
+				selectedDomains: [],
+				selectedTags: [],
+				selectedBuildStatus: ['unbound'],
+			});
+
+			expect(result).toHaveLength(1);
+			expect(result[0].label).toBe('Customer Order');
 		});
 	});
 });

@@ -29,6 +29,7 @@ export function filterEntities(
 		selectedDomains: string[];
 		selectedTags: string[];
 		selectedEntityTypes?: Array<'dimension' | 'fact' | 'unclassified'>;
+		selectedBuildStatus?: Array<'bound' | 'unbound'>;
 	}
 ): Entity[] {
 	return entities.filter((entity) => {
@@ -42,6 +43,14 @@ export function filterEntities(
 			const effectiveType: 'dimension' | 'fact' | 'unclassified' =
 				entity.entity_type ?? 'unclassified';
 			if (!filters.selectedEntityTypes.includes(effectiveType)) {
+				return false;
+			}
+		}
+
+		// Filter by build status (OR logic: if empty/undefined, show all)
+		if (filters.selectedBuildStatus && filters.selectedBuildStatus.length > 0) {
+			const isBound = !!entity.dbt_model;
+			if (!filters.selectedBuildStatus.includes(isBound ? 'bound' : 'unbound')) {
 				return false;
 			}
 		}
