@@ -55,8 +55,8 @@ class TestReconcileDbtEndpoint:
                     "id": "users",
                     "label": "Users",
                     "dbt_model": "model.project.users",
-                    "tags": ["core"],  # matches mock_manifest's model.project.users tags
-                    "trellis_tags": [],  # migration seed already ran; nothing Trellis-authored
+                    "dbt_tags": ["core"],  # matches mock_manifest's model.project.users tags
+                    "ui_tags": [],  # migration already ran; nothing Trellis-authored
                     "drafted_fields": [
                         {
                             "name": "id",

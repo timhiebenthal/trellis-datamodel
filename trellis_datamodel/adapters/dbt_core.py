@@ -1077,9 +1077,9 @@ class DbtCoreAdapter:
                 )
 
             # Sync Tags
-            trellis_tags = entity.get("trellis_tags")
-            if trellis_tags is not None:
-                self.yaml_handler.merge_model_tags(model_entry, trellis_tags)
+            ui_tags = entity.get("ui_tags")
+            if ui_tags is not None:
+                self.yaml_handler.merge_model_tags(model_entry, ui_tags)
 
             # Sync Drafted Fields. When drafted_fields is provided we treat it as
             # the authoritative column list — fields removed/renamed in the data

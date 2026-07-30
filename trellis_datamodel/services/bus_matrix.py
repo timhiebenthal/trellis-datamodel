@@ -21,6 +21,7 @@ import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
+from trellis_datamodel.services.reconciliation import compute_display_tags
 
 
 def get_bus_matrix(
@@ -68,6 +69,14 @@ def get_bus_matrix(
 
     dimensions = [e for e in entities if e.get("entity_type") == "dimension"]
     facts = [e for e in entities if e.get("entity_type") == "fact"]
+
+    # `tags` for display/filtering is computed here, never persisted: the
+    # union of dbt_tags + ui_tags for bound entities, or the entity's own
+    # `tags` field for unbound entities.
+    for d in dimensions:
+        d["tags"] = compute_display_tags(d)
+    for f in facts:
+        f["tags"] = compute_display_tags(f)
 
     # Apply tag filter if specified
     if tag:

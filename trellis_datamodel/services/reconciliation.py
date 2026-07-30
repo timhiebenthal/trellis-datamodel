@@ -169,13 +169,34 @@ def reconcile_entity_tags(
     existing_tags: list[str],
     manifest_tags: list[str] | None,
 ) -> list[str]:
-    """dbt is authoritative for the mirrored `tags` field.
+    """dbt is authoritative for the mirrored `dbt_tags` field.
     manifest_tags=None -> model absent from manifest, non-destructive (unchanged).
     manifest_tags=[] (present, no tags) -> mirrored tags cleared.
     """
     if manifest_tags is None:
         return existing_tags
     return list(manifest_tags)
+
+
+def compute_display_tags(entity: dict[str, Any]) -> list[str]:
+    """The tag list to show/export for an entity — never persisted.
+
+    Bound entities: the union of `dbt_tags` (dbt-owned, reconcile-refreshed)
+    and `ui_tags` (user-added via the Trellis tag editor), deduplicated,
+    dbt_tags first. Unbound entities have no schema.yml to mirror — `tags`
+    is their single, freely-editable, already-authoritative field.
+    """
+    if entity.get("dbt_model"):
+        dbt_tags = entity.get("dbt_tags") or []
+        ui_tags = entity.get("ui_tags") or []
+        seen: set[str] = set()
+        result: list[str] = []
+        for tag in [*dbt_tags, *ui_tags]:
+            if tag not in seen:
+                seen.add(tag)
+                result.append(tag)
+        return result
+    return entity.get("tags") or []
 
 
 def reconcile_data_model(
@@ -224,29 +245,32 @@ def reconcile_data_model(
             changed = True
 
         manifest_tags = manifest_tags_by_id.get(dbt_model) if dbt_model in manifest_by_id else None
-        existing_tags = entity.get("tags") or []
-        reconciled_tags = reconcile_entity_tags(existing_tags, manifest_tags)
+        legacy_tags = entity.get("tags") or []
+        existing_dbt_tags = entity.get("dbt_tags") or []
+        reconciled_dbt_tags = reconcile_entity_tags(existing_dbt_tags, manifest_tags)
 
-        # One-time migration seed: an entity's pre-existing `tags` value is
-        # legacy, pre-fix, user-curated data ONLY if it differs from what dbt
-        # reconciliation produces right now. If it already matches, `tags`
-        # was already reconciled by this same logic in an earlier run — it is
-        # dbt's own tag list, not something the user added, and must NOT be
-        # copied into trellis_tags (that would wrongly mark dbt's tags as
+        # One-time migration: a bound entity's legacy `tags` value (from
+        # before the dbt_tags/ui_tags split existed) is folded into ui_tags
+        # ONLY if it represents real legacy/user-curated data — i.e. it
+        # differs from what dbt reconciliation says right now. A value that
+        # already matches is dbt's own tag list from an earlier run under
+        # the old field name, not something the user added, and must NOT be
+        # copied into ui_tags (that would wrongly mark dbt's tags as
         # Trellis-authored and defeat the read-only/removable UI split).
-        # Checks genuine key absence, not falsiness — an entity with
-        # `trellis_tags: []` must NOT be re-seeded (explicit user removal
-        # must stick).
-        if (
-            "trellis_tags" not in entity
-            and existing_tags
-            and existing_tags != reconciled_tags
-        ):
-            entity["trellis_tags"] = list(existing_tags)
+        # The legacy `tags` key itself is always retired afterward — bound
+        # entities never persist `tags` going forward, only dbt_tags/ui_tags.
+        if "tags" in entity:
+            if (
+                "ui_tags" not in entity
+                and legacy_tags
+                and legacy_tags != reconciled_dbt_tags
+            ):
+                entity["ui_tags"] = list(legacy_tags)
+            del entity["tags"]
             changed = True
 
-        if reconciled_tags != existing_tags:
-            entity["tags"] = reconciled_tags
+        if reconciled_dbt_tags != existing_dbt_tags:
+            entity["dbt_tags"] = reconciled_dbt_tags
             changed = True
 
     return result, changed

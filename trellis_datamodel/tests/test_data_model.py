@@ -65,7 +65,56 @@ class TestGetDataModel:
         assert response.status_code == 200
         data = response.json()
         assert data["entities"] == []
-        assert data["relationships"] == []
+
+    def test_computes_display_tags_for_bound_entity(
+        self, test_client, temp_data_model_path
+    ):
+        """GET /api/data-model injects a computed `tags` union (dbt_tags +
+        ui_tags) for bound entities, without persisting it back to disk."""
+        model_data = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.proj.users",
+                    "dbt_tags": ["nightly", "customer_360"],
+                    "ui_tags": ["pii"],
+                },
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(model_data, f)
+
+        response = test_client.get("/api/data-model")
+        assert response.status_code == 200
+        entity = response.json()["entities"][0]
+        assert entity["tags"] == ["nightly", "customer_360", "pii"]
+
+        with open(temp_data_model_path, "r") as f:
+            on_disk = yaml.safe_load(f)
+        assert "tags" not in on_disk["entities"][0], (
+            "computed display tags must never be written back to data_model.yml"
+        )
+
+    def test_unbound_entity_display_tags_are_its_own_tags_field(
+        self, test_client, temp_data_model_path
+    ):
+        model_data = {
+            "version": 0.1,
+            "entities": [
+                {"id": "draft", "label": "Draft", "tags": ["draft-tag"]},
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(model_data, f)
+
+        response = test_client.get("/api/data-model")
+        assert response.status_code == 200
+        entity = response.json()["entities"][0]
+        assert entity["tags"] == ["draft-tag"]
 
 
 class TestSaveDataModel:
@@ -372,12 +421,11 @@ def test_save_data_model_writes_origin_list(test_client, temp_data_model_path):
     ]
 
 
-def test_split_preserves_trellis_tags_key():
-    """trellis_tags round-trips through the model/layout split the same way
-    `tags` already does: present in the split-out model entity when the
+def test_split_preserves_ui_tags_key():
+    """ui_tags round-trips through the model/layout split the same way
+    `dbt_tags` already does: present in the split-out model entity when the
     incoming entity carries the key, and simply absent (not raising, not
-    defaulted) when the incoming entity omits it — mirroring the existing
-    `if "tags" in entity: model_entity["tags"] = entity["tags"]` pattern.
+    defaulted) when the incoming entity omits it.
     """
     from trellis_datamodel.routes.data_model import _split_model_and_layout
 
@@ -388,16 +436,16 @@ def test_split_preserves_trellis_tags_key():
                 "id": "users",
                 "label": "Users",
                 "dbt_model": "model.proj.users",
-                "tags": ["nightly"],
-                "trellis_tags": ["pii"],
+                "dbt_tags": ["nightly"],
+                "ui_tags": ["pii"],
                 "position": {"x": 0, "y": 0},
             },
             {
                 "id": "orders",
                 "label": "Orders",
                 "dbt_model": "model.proj.orders",
-                "tags": ["nightly"],
-                # trellis_tags intentionally omitted
+                "dbt_tags": ["nightly"],
+                # ui_tags intentionally omitted
             },
         ],
         "relationships": [],
@@ -406,18 +454,18 @@ def test_split_preserves_trellis_tags_key():
     model_data, _layout_data = _split_model_and_layout(content)
 
     users_entity = next(e for e in model_data["entities"] if e["id"] == "users")
-    assert users_entity["tags"] == ["nightly"]
-    assert users_entity["trellis_tags"] == ["pii"]
+    assert users_entity["dbt_tags"] == ["nightly"]
+    assert users_entity["ui_tags"] == ["pii"]
 
     orders_entity = next(e for e in model_data["entities"] if e["id"] == "orders")
-    assert orders_entity["tags"] == ["nightly"]
-    assert "trellis_tags" not in orders_entity
+    assert orders_entity["dbt_tags"] == ["nightly"]
+    assert "ui_tags" not in orders_entity
 
 
-def test_split_preserves_bound_entity_tags_when_omitted_by_autosave():
-    """`tags` on a bound entity is reconcile-owned: auto-save.ts deliberately never
-    sends it (it only ever sends trellis_tags for bound entities). Omitting the key
-    must NOT wipe the previously-reconciled tags already on disk — it must be
+def test_split_preserves_bound_entity_dbt_tags_when_omitted_by_autosave():
+    """`dbt_tags` on a bound entity is reconcile-owned: auto-save.ts deliberately
+    never sends it (it only ever sends ui_tags for bound entities). Omitting the
+    key must NOT wipe the previously-reconciled tags already on disk — it must be
     preserved from existing_model_data, mirroring the `roles` preservation pattern.
     """
     from trellis_datamodel.routes.data_model import _split_model_and_layout
@@ -427,13 +475,13 @@ def test_split_preserves_bound_entity_tags_when_omitted_by_autosave():
             {
                 "id": "users",
                 "dbt_model": "model.proj.users",
-                "tags": ["nightly", "customer_360"],
+                "dbt_tags": ["nightly", "customer_360"],
             },
         ]
     }
 
-    # Exactly what auto-save.ts sends today for a bound entity: trellis_tags only,
-    # no "tags" key at all.
+    # Exactly what auto-save.ts sends today for a bound entity: ui_tags only,
+    # no "dbt_tags" key at all.
     incoming_content = {
         "version": 0.1,
         "entities": [
@@ -441,7 +489,7 @@ def test_split_preserves_bound_entity_tags_when_omitted_by_autosave():
                 "id": "users",
                 "label": "Users",
                 "dbt_model": "model.proj.users",
-                "trellis_tags": ["pii"],
+                "ui_tags": ["pii"],
                 "position": {"x": 0, "y": 0},
             },
         ],
@@ -453,10 +501,35 @@ def test_split_preserves_bound_entity_tags_when_omitted_by_autosave():
     )
 
     users_entity = model_data["entities"][0]
-    assert users_entity["tags"] == ["nightly", "customer_360"], (
-        f"bound entity's reconcile-owned tags were wiped on autosave; got: {users_entity.get('tags')}"
+    assert users_entity["dbt_tags"] == ["nightly", "customer_360"], (
+        f"bound entity's reconcile-owned dbt_tags were wiped on autosave; got: {users_entity.get('dbt_tags')}"
     )
-    assert users_entity["trellis_tags"] == ["pii"]
+    assert users_entity["ui_tags"] == ["pii"]
+
+
+def test_split_never_persists_tags_for_bound_entity_even_if_sent():
+    """Bound entities never persist a `tags` key at all, even if a stale
+    client sends one — only unbound entities use plain `tags`."""
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    incoming_content = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.proj.users",
+                "tags": ["legacy-stale-value"],
+                "position": {"x": 0, "y": 0},
+            },
+        ],
+        "relationships": [],
+    }
+
+    model_data, _layout_data = _split_model_and_layout(incoming_content)
+
+    users_entity = model_data["entities"][0]
+    assert "tags" not in users_entity
 
 
 def test_split_does_not_preserve_tags_for_unbound_entity_when_omitted():

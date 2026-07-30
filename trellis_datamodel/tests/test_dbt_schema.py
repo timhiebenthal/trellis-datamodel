@@ -1338,7 +1338,7 @@ def test_sync_relationships_preserves_dbt_only_tag_when_pushing_trellis_tag(
                         "id": "users",
                         "label": "Users",
                         "dbt_model": "model.project.users",
-                        "trellis_tags": ["pii"],
+                        "ui_tags": ["pii"],
                     }
                 ],
                 "relationships": [],
@@ -1360,8 +1360,8 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
     test_client, temp_dir, temp_data_model_path, mock_manifest
 ):
     """End-to-end: schema.yml has 'nightly' (dbt-only). User adds 'pii' via
-    trellis_tags. Push adds 'pii' without touching 'nightly'. Push is
-    additive-only for v1: removing 'pii' from trellis_tags and pushing again
+    ui_tags. Push adds 'pii' without touching 'nightly'. Push is
+    additive-only for v1: removing 'pii' from ui_tags and pushing again
     does NOT remove it from schema.yml (documented v1 limitation)."""
     sql_dir = os.path.join(temp_dir, "models", "3_core")
     os.makedirs(sql_dir, exist_ok=True)
@@ -1382,7 +1382,7 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
         yaml.dump(
             {
                 "entities": [
-                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "trellis_tags": ["pii"]}
+                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "ui_tags": ["pii"]}
                 ],
                 "relationships": [],
             },
@@ -1396,13 +1396,13 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
         after_add = yaml.safe_load(f)["models"][0]["tags"]
     assert set(after_add) == {"nightly", "pii"}
 
-    # Simulate the user removing 'pii' from trellis_tags and pushing again —
+    # Simulate the user removing 'pii' from ui_tags and pushing again —
     # additive-only means this is a documented no-op for schema.yml removal.
     with open(temp_data_model_path, "w") as f:
         yaml.dump(
             {
                 "entities": [
-                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "trellis_tags": []}
+                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "ui_tags": []}
                 ],
                 "relationships": [],
             },
@@ -1413,7 +1413,7 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
     with open(yml_path, "r") as f:
         after_second_push = yaml.safe_load(f)["models"][0]["tags"]
     assert "nightly" in after_second_push, "nightly is dbt-owned and must survive"
-    assert "pii" in after_second_push, "v1 is additive-only: pushing trellis_tags=[] never removes a tag already in schema.yml"
+    assert "pii" in after_second_push, "v1 is additive-only: pushing ui_tags=[] never removes a tag already in schema.yml"
 
 
 class TestGetModelSchema:
