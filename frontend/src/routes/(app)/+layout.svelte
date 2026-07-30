@@ -602,7 +602,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                 // Map data model to Svelte Flow format with metadata
                 const entityNodes = (dataModel.entities || []).map((e: any) => {
                     const metadata = getEntityMetadata(e);
-                    const { tags, trellis_tags } = mapEntityTagsToNodeData(e);
+                    const { tags, dbt_tags, ui_tags } = mapEntityTagsToNodeData(e);
                     const modelName = metadata.model ? metadata.model.name : e.id;
                     return {
                         id: e.id,
@@ -620,7 +620,8 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags,
-                            trellis_tags,
+                            dbt_tags,
+                            ui_tags,
                             entity_type: e.entity_type,
                             source_system: e.source_system,
                             annotation_type: e.annotation_type,

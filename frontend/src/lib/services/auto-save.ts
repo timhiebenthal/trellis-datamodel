@@ -244,7 +244,7 @@ export class AutoSaveService {
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
                     const isBound = Boolean(n.data?.dbt_model);
-                    const trellisTags = normalizeTags((n.data as any)?.trellis_tags);
+                    const uiTags = normalizeTags((n.data as any)?.ui_tags);
 
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
@@ -263,11 +263,12 @@ export class AutoSaveService {
                         width: n.data?.width as number | undefined,
                         panel_height: n.data?.panelHeight as number | undefined,
                         collapsed: (n.data?.collapsed as boolean) ?? false,
-                        // Bound entities: `tags` mirrors schema.yml and is reconcile-owned;
-                        // autosave must never write it, only `trellis_tags` (user-added).
-                        // Unbound entities: `tags` remains the single freely-editable field.
+                        // Bound entities: `dbt_tags`/`tags` mirror schema.yml and are
+                        // reconcile-owned; autosave must never write them, only
+                        // `ui_tags` (user-added). Unbound entities: `tags` remains
+                        // the single freely-editable field.
                         ...(isBound
-                            ? { trellis_tags: trellisTags.length > 0 ? trellisTags : undefined }
+                            ? { ui_tags: uiTags.length > 0 ? uiTags : undefined }
                             : { tags: displayTags.length > 0 ? displayTags : undefined }),
                     };
                     // Only include entity_type for dimensional modeling

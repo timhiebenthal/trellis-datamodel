@@ -465,7 +465,7 @@ describe('AutoSaveService', () => {
             expect(dataModelArg.entities[0].id).toBe('entity1');
         });
 
-        it('persists trellis_tags for a bound entity instead of guessing via _schemaTags', () => {
+        it('persists ui_tags for a bound entity, never the reconcile-owned tags field', () => {
             const nodes: Node[] = [
                 {
                     id: 'entity1',
@@ -474,8 +474,9 @@ describe('AutoSaveService', () => {
                     data: {
                         label: 'Entity 1',
                         dbt_model: 'model1',
-                        tags: ['nightly'],
-                        trellis_tags: ['pii'],
+                        tags: ['nightly', 'pii'],
+                        dbt_tags: ['nightly'],
+                        ui_tags: ['pii'],
                     },
                 },
             ];
@@ -487,10 +488,11 @@ describe('AutoSaveService', () => {
             const dataModelArg = vi.mocked(apiSaveDataModel).mock.calls[0][0];
             const entity = dataModelArg.entities[0];
 
-            // Bound entities persist trellis_tags; the mirrored `tags` field is
-            // reconcile-owned and must never be hand-written by autosave.
-            expect(entity.trellis_tags).toEqual(['pii']);
+            // Bound entities persist ui_tags; the mirrored `tags`/`dbt_tags` fields
+            // are reconcile-owned and must never be hand-written by autosave.
+            expect(entity.ui_tags).toEqual(['pii']);
             expect(entity.tags).toBeUndefined();
+            expect(entity.dbt_tags).toBeUndefined();
         });
 
         it('unbound entity still persists tags as the single freely-editable field', () => {

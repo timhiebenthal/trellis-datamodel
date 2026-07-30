@@ -3,7 +3,7 @@ import { render } from '@testing-library/svelte';
 import { dbtModels, viewMode } from '$lib/stores';
 import EntityNode from './EntityNode.svelte';
 import type { EntityData } from '$lib/types';
-import { computeTrellisTagsAfterEdit } from '$lib/utils/entity-tags';
+import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
 
 // Mock heavy dependencies
 vi.mock('@xyflow/svelte', async () => {
@@ -128,18 +128,20 @@ describe('EntityNode — merged field rendering', () => {
     expect(materializeBtns.length).toBe(0);
   });
 
-  it('accepts trellis_tags on EntityData without a type error', () => {
+  it('accepts dbt_tags/ui_tags on EntityData without a type error', () => {
     const data: EntityData = {
         label: 'Users',
-        tags: ['nightly'],
-        trellis_tags: ['pii'],
+        tags: ['nightly', 'pii'],
+        dbt_tags: ['nightly'],
+        ui_tags: ['pii'],
     } as EntityData;
-    expect(data.trellis_tags).toEqual(['pii']);
+    expect(data.dbt_tags).toEqual(['nightly']);
+    expect(data.ui_tags).toEqual(['pii']);
   });
 });
 
-describe('EntityNode — handleTagsUpdate provenance diff (via computeTrellisTagsAfterEdit)', () => {
-  // handleTagsUpdate delegates its dbt-mirrored-vs-trellis diff to this pure helper
+describe('EntityNode — handleTagsUpdate provenance diff (via computeUiTagsAfterEdit)', () => {
+  // handleTagsUpdate delegates its dbt-mirrored-vs-ui diff to this pure helper
   // (frontend/src/lib/utils/entity-tags.ts). Rendering the full component and asserting on
   // useSvelteFlow()'s updateNodeData isn't viable here: the mock in this file creates a fresh
   // vi.fn() per render with no stable handle to assert against, and — once the read-only
@@ -148,30 +150,30 @@ describe('EntityNode — handleTagsUpdate provenance diff (via computeTrellisTag
   // post-fix. Testing the extracted diff logic directly proves the same behavior handleTagsUpdate
   // relies on.
 
-  it('adding a tag via handleTagsUpdate appends only to trellis_tags, leaving dbt-mirrored tags untouched', () => {
-    // Bound node: data.tags = ['nightly'] (dbt-mirrored), data.trellis_tags = [].
+  it('adding a tag via handleTagsUpdate appends only to ui_tags, leaving dbt_tags untouched', () => {
+    // Bound node: data.dbt_tags = ['nightly'], data.ui_tags = [].
     // Tag editor widget currently shows the union ['nightly'] and the user types 'pii',
     // so onUpdate fires with newTags = ['nightly', 'pii'].
-    const dbtMirroredTags = ['nightly'];
+    const dbtTags = ['nightly'];
     const newTags = ['nightly', 'pii'];
 
-    const trellisTags = computeTrellisTagsAfterEdit(dbtMirroredTags, newTags);
+    const uiTags = computeUiTagsAfterEdit(dbtTags, newTags);
 
-    // dbt-mirrored 'nightly' is not in the result — it's tracked via `tags`, not `trellis_tags`.
-    expect(trellisTags).toEqual(['pii']);
-    expect(dbtMirroredTags).toEqual(['nightly']); // unchanged — not this function's to touch
+    // dbt-mirrored 'nightly' is not in the result — it's tracked via `dbt_tags`, not `ui_tags`.
+    expect(uiTags).toEqual(['pii']);
+    expect(dbtTags).toEqual(['nightly']); // unchanged — not this function's to touch
   });
 
-  it('removing a dbt-mirrored tag from the editor is a no-op on trellis_tags', () => {
-    // Bound node: data.tags = ['nightly'], data.trellis_tags = ['pii'].
+  it('removing a dbt-mirrored tag from the editor is a no-op on ui_tags', () => {
+    // Bound node: data.dbt_tags = ['nightly'], data.ui_tags = ['pii'].
     // User tries to drop the 'nightly' chip from the widget, so onUpdate fires with
     // newTags = ['pii'] (nightly missing) — but nightly was never Trellis's to remove.
-    const dbtMirroredTags = ['nightly'];
+    const dbtTags = ['nightly'];
     const newTags = ['pii'];
 
-    const trellisTags = computeTrellisTagsAfterEdit(dbtMirroredTags, newTags);
+    const uiTags = computeUiTagsAfterEdit(dbtTags, newTags);
 
-    // trellis_tags is still ['pii'] — the attempted removal of the dbt-mirrored tag is a no-op.
-    expect(trellisTags).toEqual(['pii']);
+    // ui_tags is still ['pii'] — the attempted removal of the dbt-mirrored tag is a no-op.
+    expect(uiTags).toEqual(['pii']);
   });
 });
