@@ -334,6 +334,18 @@ def _split_model_and_layout(
             if existing_entity_id and "roles" in existing_entity:
                 existing_roles_by_id[existing_entity_id] = existing_entity.get("roles")
 
+    # Preserve a bound entity's reconcile-owned `tags` when auto-save omits it.
+    # `tags` mirrors schema.yml and is never intentionally sent by auto-save.ts
+    # for bound entities (only trellis_tags is) — omission here must not be
+    # read as "clear it", unlike unbound entities where tags is freely editable
+    # and an omission does mean the user cleared it.
+    existing_tags_by_id: Dict[str, Any] = {}
+    if existing_model_data:
+        for existing_entity in existing_model_data.get("entities", []):
+            existing_entity_id = existing_entity.get("id")
+            if existing_entity_id and "tags" in existing_entity:
+                existing_tags_by_id[existing_entity_id] = existing_entity.get("tags")
+
     # Split entities
     entities = content.get("entities", [])
     seen_entity_ids: set = set()
@@ -366,6 +378,8 @@ def _split_model_and_layout(
             model_entity["drafted_fields"] = drafted_fields
         if "tags" in entity:
             model_entity["tags"] = entity["tags"]
+        elif entity.get("dbt_model") and entity_id in existing_tags_by_id:
+            model_entity["tags"] = existing_tags_by_id[entity_id]
         if "trellis_tags" in entity:
             model_entity["trellis_tags"] = entity["trellis_tags"]
         if "domain" in entity:

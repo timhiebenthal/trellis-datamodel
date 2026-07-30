@@ -412,3 +412,82 @@ def test_split_preserves_trellis_tags_key():
     orders_entity = next(e for e in model_data["entities"] if e["id"] == "orders")
     assert orders_entity["tags"] == ["nightly"]
     assert "trellis_tags" not in orders_entity
+
+
+def test_split_preserves_bound_entity_tags_when_omitted_by_autosave():
+    """`tags` on a bound entity is reconcile-owned: auto-save.ts deliberately never
+    sends it (it only ever sends trellis_tags for bound entities). Omitting the key
+    must NOT wipe the previously-reconciled tags already on disk — it must be
+    preserved from existing_model_data, mirroring the `roles` preservation pattern.
+    """
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    existing_model_data = {
+        "entities": [
+            {
+                "id": "users",
+                "dbt_model": "model.proj.users",
+                "tags": ["nightly", "customer_360"],
+            },
+        ]
+    }
+
+    # Exactly what auto-save.ts sends today for a bound entity: trellis_tags only,
+    # no "tags" key at all.
+    incoming_content = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.proj.users",
+                "trellis_tags": ["pii"],
+                "position": {"x": 0, "y": 0},
+            },
+        ],
+        "relationships": [],
+    }
+
+    model_data, _layout_data = _split_model_and_layout(
+        incoming_content, existing_model_data
+    )
+
+    users_entity = model_data["entities"][0]
+    assert users_entity["tags"] == ["nightly", "customer_360"], (
+        f"bound entity's reconcile-owned tags were wiped on autosave; got: {users_entity.get('tags')}"
+    )
+    assert users_entity["trellis_tags"] == ["pii"]
+
+
+def test_split_does_not_preserve_tags_for_unbound_entity_when_omitted():
+    """Unbound entities have no schema.yml to reconcile against — `tags` is their
+    single freely-editable field. Clearing it to empty is sent as an omitted key
+    (see auto-save.ts's `displayTags.length > 0 ? displayTags : undefined`), and
+    that must genuinely clear it, not resurrect the old value from disk.
+    """
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    existing_model_data = {
+        "entities": [
+            {"id": "draft_entity", "tags": ["old-draft-tag"]},
+        ]
+    }
+
+    # User cleared all tags in the UI for this unbound entity — auto-save.ts omits
+    # the key entirely rather than sending an empty list.
+    incoming_content = {
+        "version": 0.1,
+        "entities": [
+            {"id": "draft_entity", "label": "Draft Entity", "position": {"x": 0, "y": 0}},
+        ],
+        "relationships": [],
+    }
+
+    model_data, _layout_data = _split_model_and_layout(
+        incoming_content, existing_model_data
+    )
+
+    entity = model_data["entities"][0]
+    assert "tags" not in entity, (
+        f"unbound entity's intentionally-cleared tags were resurrected; got: {entity.get('tags')}"
+    )
