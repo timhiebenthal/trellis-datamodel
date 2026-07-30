@@ -60,6 +60,8 @@ When Trellis and dbt disagree — on column existence, data types, or descriptio
 
 **Description is the one two-way attribute** of a materialized column. Users may edit it in Trellis; it writes back to `schema.yml` directly (the live source for descriptions). All other materialized column attributes are read-only.
 
+**Tags follow the same dbt-wins philosophy, with an additive-only exception.** dbt is authoritative for tags already in `schema.yml`; on push, Trellis additively unions `trellis_tags` (tags a user adds via the UI) onto the live tag list rather than replacing it. Push is additive-only in v1 — a tag already in `schema.yml` is never removed, even a Trellis-added tag the user has since removed from `trellis_tags` (to remove it, edit `schema.yml` directly; dbt then owns it going forward). On a bound entity, `tags` is a reconcile-owned mirror of `schema.yml` — refreshed on every reconcile, never hand-edited — the same mirroring principle already applied to `source: dbt` columns.
+
 ### Differentiation
 
 Trellis unique:
