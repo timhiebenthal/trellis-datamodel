@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { dbtModels, viewMode } from '$lib/stores';
 import EntityNode from './EntityNode.svelte';
+import type { EntityData } from '$lib/types';
 
 // Mock heavy dependencies
 vi.mock('@xyflow/svelte', async () => {
@@ -124,5 +125,14 @@ describe('EntityNode — merged field rendering', () => {
       b => b.title?.toLowerCase().includes('materialize') || b.getAttribute('aria-label')?.toLowerCase().includes('materialize')
     );
     expect(materializeBtns.length).toBe(0);
+  });
+
+  it('accepts trellis_tags on EntityData without a type error', () => {
+    const data: EntityData = {
+        label: 'Users',
+        tags: ['nightly'],
+        trellis_tags: ['pii'],
+    } as EntityData;
+    expect(data.trellis_tags).toEqual(['pii']);
   });
 });
