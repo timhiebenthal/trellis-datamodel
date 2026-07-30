@@ -41,6 +41,7 @@
     } from "$lib/utils";
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
+    import { computeTrellisTagsAfterEdit } from "$lib/utils/entity-tags";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
     import TagEditor from "./TagEditor.svelte";
@@ -630,8 +631,24 @@
     }
 
     // Tag editing functionality
-    let entityTags = $derived(normalizeTags(data.tags));
-    
+    // For bound entities, the editor displays the union of the dbt-mirrored `tags`
+    // and the Trellis-authored `trellis_tags` (Requirement 4). Unbound entities have
+    // no schema.yml to mirror, so `tags` remains the single freely-editable field.
+    let entityTags = $derived(
+        isBound
+            ? normalizeTags([...(data.tags || []), ...((data.trellis_tags || []) as string[])])
+            : normalizeTags(data.tags),
+    );
+
+    // Tags present in the dbt-mirrored list but not in trellis_tags are dbt-owned:
+    // they render read-only in the tag editor (no remove affordance) because a Trellis
+    // push never removes a tag it doesn't own. Only meaningful for bound entities.
+    let readOnlyTags = $derived.by(() => {
+        if (!isBound) return [];
+        const trellisSet = new Set(normalizeTags(data.trellis_tags));
+        return normalizeTags(data.tags).filter((t) => !trellisSet.has(t));
+    });
+
     // Roles display (for dimensions)
     // EntityRole is an object with { role, label, source } — extract the role string
     // Deduplicate case-insensitively (e.g., "Creation Date" and "creation date" should be one)
@@ -652,21 +669,23 @@
 
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
-            const currentTags = normalizeTags(node?.data?.tags);
-            const currentSchemaTags = normalizeTags(node?.data?._schemaTags);
+            const nodeIsBound = !!node?.data?.dbt_model;
 
-            // For the current node and bound models, use SchemaManager
-            if (nodeId === id && isBound && schemaManager) {
-                schemaManager.updateSchemaTags(newTags);
-                updateNodeData(nodeId, {
-                    tags: newTags,
-                    _schemaTags: newTags
-                });
+            if (nodeIsBound) {
+                // `tags` is a dbt-mirrored, reconcile-owned field for bound entities
+                // (schema.yml is authoritative) — never hand-written here. An edit in the
+                // tag editor only ever changes `trellis_tags`; a dbt-mirrored tag missing
+                // from `newTags` (e.g. the user tried to remove a read-only chip) is not
+                // treated as a removal, since dbt wins.
+                const trellisTags = computeTrellisTagsAfterEdit(node?.data?.tags, newTags);
+                updateNodeData(nodeId, { trellis_tags: trellisTags });
             } else {
-                // For unbound nodes or batch editing, just update node data directly
+                // Unbound entities have no schema.yml to mirror; `tags` is the single
+                // freely-editable field, and `trellis_tags` mirrors it 1:1 (see
+                // mapEntityTagsToNodeData in entity-tags.ts).
                 updateNodeData(nodeId, {
                     tags: newTags,
-                    _schemaTags: newTags
+                    trellis_tags: newTags,
                 });
             }
         });
@@ -1295,6 +1314,7 @@
                             >Tags</span>
                             <TagEditor
                                 tags={entityTags}
+                                readOnlyTags={readOnlyTags}
                                 canEdit={true}
                                 isBatchMode={isBatchEditing}
                                 onUpdate={(newTags) => handleTagsUpdate(newTags)}
@@ -1754,6 +1774,7 @@
                                 >Tags</span>
                             <TagEditor
                                 tags={entityTags}
+                                readOnlyTags={readOnlyTags}
                                 canEdit={true}
                                 isBatchMode={isBatchEditing}
                                 onUpdate={(newTags) => handleTagsUpdate(newTags)}

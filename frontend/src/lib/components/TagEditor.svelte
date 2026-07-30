@@ -1,8 +1,11 @@
 <script lang="ts">
     import { normalizeTags } from '$lib/utils';
 
-    let { tags = [], canEdit = true, isBatchMode = false, onUpdate }: {
+    let { tags = [], readOnlyTags = [], canEdit = true, isBatchMode = false, onUpdate }: {
         tags?: string[];
+        /** Tags rendered without a remove affordance regardless of `canEdit` (e.g.
+         * dbt-mirrored tags — dbt is authoritative, so Trellis never removes them). */
+        readOnlyTags?: string[];
         canEdit?: boolean;
         isBatchMode?: boolean;
         onUpdate: (newTags: string[]) => void;
@@ -12,6 +15,7 @@
     let showTagInput = $state(false);
 
     let normalizedTags = $derived(normalizeTags(tags));
+    let normalizedReadOnlyTags = $derived(new Set(normalizeTags(readOnlyTags)));
 
     function handleAddTag(tag: string) {
         const trimmed = tag.trim();
@@ -64,11 +68,17 @@
 
 <div class="tag-editor flex flex-wrap gap-1">
     {#each normalizedTags as tag}
+        {@const isReadOnly = normalizedReadOnlyTags.has(tag)}
         <div
-            class="tag flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded group"
+            class="tag flex items-center gap-1 px-2 py-0.5 text-xs rounded group"
+            class:bg-blue-50={!isReadOnly}
+            class:text-blue-700={!isReadOnly}
+            class:bg-gray-100={isReadOnly}
+            class:text-gray-600={isReadOnly}
+            title={isReadOnly ? 'Managed by dbt (schema.yml) — cannot be removed here' : undefined}
         >
             {tag}
-            {#if canEdit}
+            {#if canEdit && !isReadOnly}
                 <button
                     onmousedown={(e) => e.preventDefault()}
                     onclick={() => handleRemoveTag(tag)}
