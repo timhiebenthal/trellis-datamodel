@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0b3] - 2026-07-30
+
+### Fixed
+- **Migration seed wrongly copying dbt's entire tag list into `trellis_tags`**: the one-time seed fired whenever `trellis_tags` was absent and `tags` was non-empty, with no way to tell legacy pre-fix data apart from tags already mirrored from the manifest by an earlier reconcile run. On a second reconcile, that meant copying dbt's full tag list into `trellis_tags`, wrongly marking it as user-added and defeating the read-only/removable tag-editor split. Now only seeds when the existing value genuinely differs from what reconciliation would produce right now.
+
+### Changed
+- **Renamed `tags`/`trellis_tags` to `dbt_tags`/`ui_tags` for clarity, and `tags` is no longer persisted for bound entities at all**: the prior naming — `tags` meaning "dbt-mirrored" for bound entities but "freely editable" for unbound, and `trellis_tags` for user-added tags — caused repeated confusion about which field meant what. `dbt_tags` (dbt-owned, reconcile-refreshed) and `ui_tags` (added via the Trellis UI) are now explicit. `tags` is computed at read time as their union (new `compute_display_tags` helper, wired into `GET /api/data-model` and the Bus Matrix endpoint) and is never written back to `data_model.yml` for a bound entity — a legacy `tags` key is retired on first reconcile after upgrading. Unbound entities are unaffected: `tags` remains their single, persisted, freely-editable field.
+- Two additional write paths that duplicated the pre-fix tag-persistence logic (and would have hit the same tag-loss bug) are fixed to match: bulk tag add/remove (`bulk-operations.ts`) and the "Generate Entities" dialog's save path.
+
 ## [0.18.0b2] - 2026-07-30
 
 ### Fixed
