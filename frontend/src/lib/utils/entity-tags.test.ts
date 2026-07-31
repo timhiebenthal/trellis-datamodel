@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mapEntityTagsToNodeData, computeUiTagsAfterEdit } from './entity-tags';
+import { readFrameworkTags } from './entity-compat';
 
 describe('mapEntityTagsToNodeData', () => {
     it('splits dbt_tags and ui_tags for a bound entity, plus the display tags union', () => {
@@ -23,6 +24,25 @@ describe('mapEntityTagsToNodeData', () => {
         expect(result.tags).toEqual(['draft-tag']);
         expect(result.dbt_tags).toEqual([]);
         expect(result.ui_tags).toEqual([]);
+    });
+
+    it('returns empty mirrored/ui tags for an unbound entity', () => {
+        const entity = { tags: ['draft-tag'] };
+        const result = mapEntityTagsToNodeData(entity);
+        expect(result.dbt_tags).toEqual(readFrameworkTags({}));
+        expect(result.ui_tags).toEqual(readFrameworkTags({}));
+    });
+
+    it('returns mirrored+ui split for a bound entity', () => {
+        const entity = {
+            dbt_model: 'model.proj.users',
+            tags: ['nightly', 'pii'],
+            dbt_tags: ['nightly'],
+            ui_tags: ['pii']
+        };
+        const result = mapEntityTagsToNodeData(entity);
+        expect(result.dbt_tags).toEqual(readFrameworkTags({ dbt_tags: entity.dbt_tags }));
+        expect(result.ui_tags).toEqual(readFrameworkTags({ dbt_tags: entity.ui_tags }));
     });
 });
 
