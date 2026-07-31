@@ -218,6 +218,30 @@ class FakeAdapter:
     def reset_inference_cache(self):
         return None
 
+    def get_lineage(self, unique_id):
+        raise NotImplementedError(
+            "get_lineage is not yet part of TransformationAdapter; deferred to the "
+            "BruinAdapter spec (services/lineage.py still parses dbt manifest/catalog directly)."
+        )
+
+    def get_exposures(self):
+        raise NotImplementedError(
+            "get_exposures is not yet part of TransformationAdapter; deferred to the "
+            "BruinAdapter spec (services/exposures.py still reads manifest.json/exposures.yml directly)."
+        )
+
+    def get_source_systems_for_model(self, unique_id):
+        raise NotImplementedError(
+            "get_source_systems_for_model is not yet part of TransformationAdapter; deferred to "
+            "the BruinAdapter spec (routes/data_model.py still reads manifest/catalog directly)."
+        )
+
+    def get_project_status(self):
+        raise NotImplementedError(
+            "get_project_status is not yet part of TransformationAdapter; deferred to the "
+            "BruinAdapter spec (routes/manifest.py still reports dbt paths directly)."
+        )
+
 
 @pytest.fixture
 def fake_adapter():
