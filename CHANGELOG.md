@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-07-31
+
+### Added
+- **`FrameworkEnum.BRUIN` and Bruin config scaffolding**: `trellis.yml` accepts `framework: bruin` with `bruin_pipeline_path`/`bruin_asset_paths`, resolved the same way as the existing dbt config fields. Setting `framework: bruin` today raises a clear "Bruin adapter not yet implemented" error from the adapter factory instead of silently running dbt behavior. Building the actual `BruinAdapter` is left to a follow-up.
+- **Framework-neutral endpoint paths**: `/api/reconcile`, `/api/schema`, and `/api/sync-tests` are now the primary API surface. The legacy `/api/reconcile-dbt`, `/api/dbt-schema`, `/api/sync-dbt-tests` paths have been retired now that the frontend is fully migrated.
+- **Framework-driven Sidebar icon/label**: the sidebar's model icon and label now switch on the configured `framework` (dbt-core vs. bruin) instead of assuming dbt. A placeholder Bruin icon is bundled ahead of the adapter itself.
+
+### Changed
+- **`data_model.yml` entity fields generalized**: `dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`, `dbt_data_type` → `native_data_type`. Existing files using the old field names continue to load transparently (read-compat is permanent); only the new names are written back on save. No manual migration needed.
+- **Reconciliation "wins" semantics reworded as framework-neutral**: `services/reconciliation.py`'s dbt-wins rule is now described as "the active framework's materialized model wins over a drafted concept." The underlying algorithm (one-way, idempotent, absence-is-never-deletion) is unchanged.
+- **Adapter protocol closed up**: `save_schema_file`, `infer_entity_types`, `get_model_dirs`, and `reset_inference_cache` are now declared on `TransformationAdapter` instead of being called on `DbtCoreAdapter` without a protocol contract. No module outside `adapters/` imports `DbtCoreAdapter` directly anymore. A new `FakeAdapter` test double proves reconciliation and schema services work against a non-dbt adapter.
+- **Internal dbt-named functions renamed**: `reconcile_dbt()` → `reconcile_framework()`, `sync_dbt_tests()` → `sync_framework_tests()`, `_map_dbt_type()` → `_map_column_type()`, `save_dbt_schema()` → `save_model_schema_from_request()`/`save_schema_file()`. Purely internal — no API impact.
+
+### Notes
+- This is a behavior-preserving structural refactor: existing dbt-core projects see no functional change beyond internal field renames, which are transparently read-compatible.
+- Some subsystems (`services/lineage.py`, `services/exposures.py`, `services/manifest.py`, and related routes) still read dbt artifacts directly instead of going through the adapter protocol. This is deliberately deferred to the upcoming BruinAdapter work and pinned by strict-xfail contract tests so it can't be silently forgotten.
+
 ## [0.19.1] - 2026-07-31
 
 ### Fixed
