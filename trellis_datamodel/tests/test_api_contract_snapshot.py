@@ -45,7 +45,12 @@ def test_get_data_model_response_shape(test_client, temp_data_model_path):
 
 def test_post_data_model_accepts_legacy_payload(test_client, temp_data_model_path):
     """POST /api/data-model accepts a payload keyed by `dbt_model`/`dbt_tags`
-    and a subsequent GET resolves the binding from what was persisted."""
+    and a subsequent GET resolves the binding from what was persisted.
+
+    Post-rename (Sprint 2 Stream C): the internal read/write path now
+    persists the generic `model_ref`/`framework_tags` keys to disk, never the
+    legacy spelling — this is the tripwire firing as documented above.
+    """
     payload = {
         "version": 0.1,
         "entities": [
@@ -66,15 +71,20 @@ def test_post_data_model_accepts_legacy_payload(test_client, temp_data_model_pat
         saved = yaml.safe_load(f)
     saved_entity = saved["entities"][0]
     for key in LEGACY_KEYS:
-        assert key in saved_entity or key == "dbt_tags"
-    assert saved_entity["dbt_model"] == "model.proj.orders"
-    assert saved_entity["dbt_tags"] == ["nightly"]
+        assert key not in saved_entity, (
+            f"legacy key '{key}' must not be persisted to disk"
+        )
+    assert saved_entity["model_ref"] == "model.proj.orders"
+    assert saved_entity["framework_tags"] == ["nightly"]
 
     response = test_client.get("/api/data-model")
     assert response.status_code == 200
     entity = response.json()["entities"][0]
+    # GET still emits both spellings via the response-only alias shim.
     assert entity["dbt_model"] == "model.proj.orders"
     assert entity["dbt_tags"] == ["nightly"]
+    assert entity["model_ref"] == "model.proj.orders"
+    assert entity["framework_tags"] == ["nightly"]
 
 
 def test_get_data_model_emits_both_legacy_and_new_keys(test_client, temp_data_model_path):

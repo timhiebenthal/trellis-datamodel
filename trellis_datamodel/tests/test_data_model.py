@@ -298,6 +298,86 @@ class TestSaveDataModel:
         # The other unique entity is unaffected
         assert "users" in entity_ids
 
+    def test_save_writes_generic_keys_to_disk(self, test_client, temp_data_model_path):
+        """POST persists model_ref/framework_tags to disk; no legacy dbt_* keys,
+        even when the incoming payload uses the legacy dbt_model/dbt_tags names."""
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.proj.users",
+                    "dbt_tags": ["nightly", "customer_360"],
+                }
+            ],
+            "relationships": [],
+        }
+        response = test_client.post("/api/data-model", json=payload)
+        assert response.status_code == 200
+
+        with open(temp_data_model_path, "r") as f:
+            saved = yaml.safe_load(f)
+
+        entity = saved["entities"][0]
+        assert entity["model_ref"] == "model.proj.users"
+        assert entity["framework_tags"] == ["nightly", "customer_360"]
+        assert "dbt_model" not in entity, "legacy key must not be written to disk"
+        assert "dbt_tags" not in entity, "legacy key must not be written to disk"
+
+    def test_save_preserves_mirrored_tags_when_autosave_omits_them_legacy_payload(
+        self, test_client, temp_data_model_path
+    ):
+        """A bound entity's reconcile-owned framework tags must survive an
+        autosave that uses the legacy dbt_model/ui_tags payload shape (today's
+        live frontend), even though the file on disk now stores
+        model_ref/framework_tags."""
+        with open(temp_data_model_path, "w") as f:
+            yaml.safe_dump(
+                {
+                    "version": 0.1,
+                    "entities": [
+                        {
+                            "id": "users",
+                            "label": "Users",
+                            "model_ref": "model.proj.users",
+                            "framework_tags": ["nightly", "customer_360"],
+                        }
+                    ],
+                    "relationships": [],
+                },
+                f,
+            )
+
+        # Legacy-shaped autosave payload: dbt_model + ui_tags only, no
+        # dbt_tags/framework_tags key at all — exactly what auto-save.ts sends
+        # today for a bound entity.
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.proj.users",
+                    "ui_tags": ["pii"],
+                }
+            ],
+            "relationships": [],
+        }
+        response = test_client.post("/api/data-model", json=payload)
+        assert response.status_code == 200
+
+        with open(temp_data_model_path, "r") as f:
+            saved = yaml.safe_load(f)
+
+        entity = saved["entities"][0]
+        assert get_model_ref(entity) == "model.proj.users"
+        assert get_framework_tags(entity) == ["nightly", "customer_360"], (
+            "bound entity's reconcile-owned framework tags were wiped by a "
+            f"legacy-shaped autosave payload; got: {get_framework_tags(entity)}"
+        )
+        assert entity["ui_tags"] == ["pii"]
+
     def test_preserves_existing_roles_when_omitted_from_payload(
         self, test_client, temp_data_model_path
     ):
@@ -456,11 +536,11 @@ def test_split_preserves_ui_tags_key():
     model_data, _layout_data = _split_model_and_layout(content)
 
     users_entity = next(e for e in model_data["entities"] if e["id"] == "users")
-    assert users_entity["dbt_tags"] == ["nightly"]
+    assert get_framework_tags(users_entity) == ["nightly"]
     assert users_entity["ui_tags"] == ["pii"]
 
     orders_entity = next(e for e in model_data["entities"] if e["id"] == "orders")
-    assert orders_entity["dbt_tags"] == ["nightly"]
+    assert get_framework_tags(orders_entity) == ["nightly"]
     assert "ui_tags" not in orders_entity
 
 
@@ -503,8 +583,8 @@ def test_split_preserves_bound_entity_dbt_tags_when_omitted_by_autosave():
     )
 
     users_entity = model_data["entities"][0]
-    assert users_entity["dbt_tags"] == ["nightly", "customer_360"], (
-        f"bound entity's reconcile-owned dbt_tags were wiped on autosave; got: {users_entity.get('dbt_tags')}"
+    assert get_framework_tags(users_entity) == ["nightly", "customer_360"], (
+        f"bound entity's reconcile-owned dbt_tags were wiped on autosave; got: {get_framework_tags(users_entity)}"
     )
     assert users_entity["ui_tags"] == ["pii"]
 

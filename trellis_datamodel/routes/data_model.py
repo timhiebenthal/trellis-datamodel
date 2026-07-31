@@ -18,7 +18,9 @@ from trellis_datamodel.models.entity_keys import (
     FRAMEWORK_TAGS_KEY,
     LEGACY_FRAMEWORK_TAGS_KEY,
     get_model_ref,
+    set_model_ref,
     get_framework_tags,
+    set_framework_tags,
 )
 
 router = APIRouter(prefix="/api", tags=["data-model"])
@@ -293,15 +295,15 @@ async def get_data_model():
         # For unbound entities: read from persisted YAML
         entities = merged_data.get("entities", [])
         for entity in entities:
-            dbt_model = entity.get("dbt_model")
+            model_ref = get_model_ref(entity)
             additional_models = entity.get("additional_models", [])
 
             # `tags` for display/export is computed here, never persisted:
-            # the union of dbt_tags + ui_tags for bound entities, or the
+            # the union of framework_tags + ui_tags for bound entities, or the
             # entity's own `tags` field for unbound entities.
             entity["tags"] = compute_display_tags(entity)
 
-            if dbt_model:
+            if model_ref:
                 # Bound entity: extract source systems from lineage
                 # Extract for primary model
                 source_systems = set()
@@ -314,7 +316,7 @@ async def get_data_model():
                                 if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH)
                                 else None
                             ),
-                            dbt_model,
+                            model_ref,
                         )
                         source_systems.update(primary_sources)
                 except Exception:
@@ -383,17 +385,22 @@ def _split_model_and_layout(
             if existing_entity_id and "roles" in existing_entity:
                 existing_roles_by_id[existing_entity_id] = existing_entity.get("roles")
 
-    # Preserve a bound entity's reconcile-owned `dbt_tags` when auto-save
-    # omits it. `dbt_tags` mirrors schema.yml and is never intentionally
+    # Preserve a bound entity's reconcile-owned `framework_tags` when auto-save
+    # omits it. `framework_tags` mirrors schema.yml and is never intentionally
     # sent by auto-save.ts for bound entities (only ui_tags is) — omission
     # here must not be read as "clear it", unlike unbound entities where
     # `tags` is freely editable and an omission does mean the user cleared it.
-    existing_dbt_tags_by_id: Dict[str, Any] = {}
+    existing_framework_tags_by_id: Dict[str, Any] = {}
     if existing_model_data:
         for existing_entity in existing_model_data.get("entities", []):
             existing_entity_id = existing_entity.get("id")
-            if existing_entity_id and "dbt_tags" in existing_entity:
-                existing_dbt_tags_by_id[existing_entity_id] = existing_entity.get("dbt_tags")
+            if existing_entity_id and (
+                FRAMEWORK_TAGS_KEY in existing_entity
+                or LEGACY_FRAMEWORK_TAGS_KEY in existing_entity
+            ):
+                existing_framework_tags_by_id[existing_entity_id] = get_framework_tags(
+                    existing_entity
+                )
 
     # Split entities
     entities = content.get("entities", [])
@@ -414,8 +421,8 @@ def _split_model_and_layout(
         }
         if "description" in entity:
             model_entity["description"] = entity["description"]
-        if "dbt_model" in entity:
-            model_entity["dbt_model"] = entity["dbt_model"]
+        if MODEL_REF_KEY in entity or LEGACY_MODEL_REF_KEY in entity:
+            set_model_ref(model_entity, get_model_ref(entity))
         if "additional_models" in entity:
             model_entity["additional_models"] = entity["additional_models"]
         if "drafted_fields" in entity:
@@ -427,13 +434,13 @@ def _split_model_and_layout(
             model_entity["drafted_fields"] = drafted_fields
         # `tags` is only a persisted field for unbound entities (their single,
         # freely-editable tag list). Bound entities never persist `tags` —
-        # only `dbt_tags` (reconcile-owned) and `ui_tags` (user-added).
-        if "tags" in entity and not entity.get("dbt_model"):
+        # only `framework_tags` (reconcile-owned) and `ui_tags` (user-added).
+        if "tags" in entity and not get_model_ref(entity):
             model_entity["tags"] = entity["tags"]
-        if "dbt_tags" in entity:
-            model_entity["dbt_tags"] = entity["dbt_tags"]
-        elif entity.get("dbt_model") and entity_id in existing_dbt_tags_by_id:
-            model_entity["dbt_tags"] = existing_dbt_tags_by_id[entity_id]
+        if FRAMEWORK_TAGS_KEY in entity or LEGACY_FRAMEWORK_TAGS_KEY in entity:
+            set_framework_tags(model_entity, get_framework_tags(entity))
+        elif get_model_ref(entity) and entity_id in existing_framework_tags_by_id:
+            set_framework_tags(model_entity, existing_framework_tags_by_id[entity_id])
         if "ui_tags" in entity:
             model_entity["ui_tags"] = entity["ui_tags"]
         if "domain" in entity:
@@ -460,7 +467,7 @@ def _split_model_and_layout(
             # Incoming payload omitted the roles field entirely — preserve existing
             model_entity["roles"] = existing_roles_by_id[entity_id]
         # Only persist source_system for unbound entities (not for bound entities)
-        if "source_system" in entity and not entity.get("dbt_model"):
+        if "source_system" in entity and not get_model_ref(entity):
             model_entity["source_system"] = entity["source_system"]
 
         model_data["entities"].append(model_entity)
@@ -543,7 +550,7 @@ async def get_source_system_suggestions():
             entities = model_data.get("entities", [])
             for entity in entities:
                 # Only collect from unbound entities (mock sources)
-                if not entity.get("dbt_model") and entity.get("source_system"):
+                if not get_model_ref(entity) and entity.get("source_system"):
                     source_systems = entity.get("source_system", [])
                     if isinstance(source_systems, list):
                         for source in source_systems:
@@ -561,10 +568,10 @@ async def get_source_system_suggestions():
 
             entities = model_data.get("entities", [])
             for entity in entities:
-                dbt_model = entity.get("dbt_model")
+                model_ref = get_model_ref(entity)
                 additional_models = entity.get("additional_models", [])
 
-                if dbt_model:
+                if model_ref:
                     # Extract from primary model
                     try:
                         sources = extract_source_systems_for_model(
@@ -574,7 +581,7 @@ async def get_source_system_suggestions():
                                 if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH)
                                 else None
                             ),
-                            dbt_model,
+                            model_ref,
                         )
                         suggestions.update(sources)
                     except Exception:
