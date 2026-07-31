@@ -2,6 +2,7 @@ import type { Node } from '@xyflow/svelte';
 import type { EntityData, OriginEntry } from '$lib/types';
 import { formatEntityType, formatAnnotationType, formatRelationshipType, formatRelationshipKeys } from './excel-export';
 import { stringifyOrigin } from './origin';
+import { readModelRef } from '$lib/utils/entity-compat';
 
 /**
  * Prepares a value for a GFM pipe table cell: single-line text and no raw `|` characters.
@@ -49,7 +50,7 @@ export function formatEntityAsMarkdown(
 	lines.push(`**Tags:** ${entity.tags?.join(', ') || '-'}`);
 	lines.push(`**Source Systems:** ${entity.source_system?.join(', ') || '-'}`);
 	lines.push(`**Description:** ${entity.description || '-'}`);
-	lines.push(`**dbt Model:** ${entity.dbt_model || '-'}`);
+	lines.push(`**dbt Model:** ${readModelRef(entity) || '-'}`);
 	lines.push(`**Additional Models:** ${entity.additional_models?.join(', ') || '-'}`);
 	lines.push('');
 
