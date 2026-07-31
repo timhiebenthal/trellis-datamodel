@@ -3,7 +3,6 @@
 from fastapi import APIRouter
 
 from trellis_datamodel.models.schemas import (
-    DbtSchemaRequest,
     FileOperationResponse,
     ModelSchemaRequest,
     ModelSchemaResponse,
@@ -22,7 +21,7 @@ router = APIRouter(prefix="/api", tags=["schema"])
 
 
 @router.post("/schema", response_model=FileOperationResponse)
-async def save_dbt_schema_endpoint(request: DbtSchemaRequest):
+async def save_model_schema_endpoint(request: ModelSchemaRequest):
     """Generate and save a schema YAML file for the drafted fields."""
     output_path = save_model_schema_from_request(
         entity_id=request.entity_id,
@@ -39,7 +38,7 @@ async def save_dbt_schema_endpoint(request: DbtSchemaRequest):
 
 
 @router.post("/sync-tests", response_model=SyncTestsResponse)
-async def sync_dbt_tests_endpoint():
+async def sync_framework_tests_endpoint():
     """Sync relationship tests from data model to schema files."""
     updated_files = sync_framework_tests()
 
