@@ -1,5 +1,6 @@
 """Tests for configuration loading."""
 
+import os
 import textwrap
 from pathlib import Path
 
@@ -430,3 +431,46 @@ def test_framework_enum_supports_bruin():
 
     assert FrameworkEnum.BRUIN == "bruin"
     assert FrameworkEnum("bruin") is FrameworkEnum.BRUIN
+
+
+# ===== Bruin Config Scaffolding Tests (Sprint 4 Stream B) =====
+
+
+def test_load_config_resolves_bruin_pipeline_path(monkeypatch, tmp_path):
+    """Bruin framework config resolves pipeline path and asset paths."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: bruin
+        bruin_pipeline_path: ./pipeline
+        bruin_asset_paths:
+          - assets
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.FRAMEWORK == "bruin"
+    assert os.path.isabs(cfg.BRUIN_PIPELINE_PATH)
+    assert cfg.BRUIN_PIPELINE_PATH == os.path.abspath(tmp_path / "pipeline")
+    assert cfg.BRUIN_ASSET_PATHS == ["assets"]
+
+
+def test_existing_dbt_config_unaffected_by_bruin_fields(monkeypatch):
+    """Loading this repo's real trellis.yml (dbt-based) is unaffected by bruin fields."""
+    _prepare_config(monkeypatch)
+    repo_root = Path(__file__).resolve().parents[2]
+    config_path = repo_root / "trellis.yml"
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.FRAMEWORK == "dbt-core"
+    assert cfg.DBT_PROJECT_PATH == os.path.abspath(repo_root / "dbt_demo")
+    assert cfg.MODELING_STYLE == "dimensional_model"
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim__"]
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fact__"]
+    assert cfg.EXPOSURES_ENABLED is True
+    assert cfg.BUSINESS_EVENTS_ENABLED is True
+    assert cfg.BRUIN_PIPELINE_PATH is None
+    assert cfg.BRUIN_ASSET_PATHS is None
