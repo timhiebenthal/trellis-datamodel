@@ -6,7 +6,8 @@ import textwrap
 from pathlib import Path
 
 import trellis_datamodel.config as cfg
-from trellis_datamodel.services.exposures import get_exposures
+from trellis_datamodel.services.exposures import get_exposures, _find_entities_for_model
+from trellis_datamodel.tests._entity_compat import get_model_ref
 
 
 def _prepare_config(monkeypatch):
@@ -108,3 +109,29 @@ def test_exposures_api_returns_200_when_enabled(monkeypatch, tmp_path, test_clie
     data = response.json()
     assert "exposures" in data
     assert "entityUsage" in data
+
+
+def test_entity_ids_for_model_matches_primary_binding_and_additional_models():
+    """_find_entities_for_model matches entities bound via their primary
+    model reference as well as entities that merely list the model under
+    additional_models, and does not match unrelated entities."""
+    data_model = {
+        "entities": [
+            {"id": "orders", "dbt_model": "model.project.orders"},
+            {
+                "id": "sales_summary",
+                "dbt_model": "model.project.sales_summary",
+                "additional_models": ["model.project.orders"],
+            },
+            {"id": "customers", "dbt_model": "model.project.customers"},
+        ]
+    }
+
+    # Sanity check the fixture itself resolves through the compat helper.
+    orders_entity = data_model["entities"][0]
+    assert get_model_ref(orders_entity) == "model.project.orders"
+
+    entity_ids = _find_entities_for_model("model.project.orders", data_model)
+
+    assert set(entity_ids) == {"orders", "sales_summary"}
+    assert "customers" not in entity_ids

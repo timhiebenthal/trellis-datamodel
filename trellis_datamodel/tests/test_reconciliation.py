@@ -1,12 +1,15 @@
 """Tests for the dbt reconciliation service."""
 
+import yaml
 import pytest
 from trellis_datamodel.services.reconciliation import (
     reconcile_entity_fields,
     reconcile_entity_tags,
     reconcile_data_model,
+    reconcile_dbt,
     compute_display_tags,
 )
+from trellis_datamodel.tests._entity_compat import get_model_ref, get_framework_tags
 
 
 class TestReconcileEntityFields:
@@ -464,3 +467,91 @@ class TestReconcileIdempotency:
         twice, changed_twice = reconcile_data_model(once, manifest_models)
         assert changed_twice is False
         assert twice == once
+
+
+class TestReconcileDbtIOWrapper:
+    """Characterization tests for the reconcile_dbt() IO wrapper (load manifest
+    + data_model.yml, reconcile, write back if changed). These exercise the
+    full on-disk round trip via the real adapter, not just the pure function.
+    """
+
+    def test_reconcile_is_idempotent(
+        self, test_client, mock_manifest, temp_data_model_path
+    ):
+        """Running reconcile_dbt() twice against the mock manifest reports
+        changed=False on the second run and produces a byte-identical
+        data_model.yml file on disk."""
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.project.users",
+                    "drafted_fields": [],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        first_result, first_changed = reconcile_dbt()
+        assert first_changed is True
+
+        with open(temp_data_model_path, "r") as f:
+            file_contents_after_first = f.read()
+
+        second_result, second_changed = reconcile_dbt()
+        assert second_changed is False
+
+        with open(temp_data_model_path, "r") as f:
+            file_contents_after_second = f.read()
+
+        assert file_contents_after_second == file_contents_after_first
+        assert second_result == first_result
+
+    def test_reconcile_never_deletes_binding_for_model_absent_from_manifest(
+        self, test_client, mock_manifest, temp_data_model_path
+    ):
+        """An entity bound to a model id not present in the manifest survives
+        reconcile with its binding and its previously-mirrored tags intact."""
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "products",
+                    "label": "Products",
+                    "dbt_model": "model.project.products",  # not in mock_manifest
+                    "dbt_tags": ["legacy_mirrored_tag"],
+                    "drafted_fields": [
+                        {"name": "sku", "datatype": "text", "source": "dbt"}
+                    ],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        result, changed = reconcile_dbt()
+        assert changed is False
+
+        entity = result["entities"][0]
+        assert get_model_ref(entity) == "model.project.products"
+        assert get_framework_tags(entity) == ["legacy_mirrored_tag"]
+        assert entity["drafted_fields"] == [
+            {"name": "sku", "datatype": "text", "source": "dbt"}
+        ]
+
+
+class TestComputeDisplayTagsUnionOrder:
+    def test_compute_display_tags_union_order_is_framework_then_ui_deduped(self):
+        """Display tags are the union of framework-mirrored tags then
+        user-added ui_tags, in that order, deduplicated."""
+        entity = {
+            "dbt_model": "model.proj.users",
+            "dbt_tags": ["nightly", "core"],
+            "ui_tags": ["core", "pii"],
+        }
+        assert compute_display_tags(entity) == ["nightly", "core", "pii"]

@@ -4,6 +4,8 @@ import os
 import yaml
 import pytest
 
+from trellis_datamodel.tests._entity_compat import get_model_ref, get_framework_tags
+
 
 class TestGetDataModel:
     """Tests for GET /api/data-model endpoint."""
@@ -564,3 +566,126 @@ def test_split_does_not_preserve_tags_for_unbound_entity_when_omitted():
     assert "tags" not in entity, (
         f"unbound entity's intentionally-cleared tags were resurrected; got: {entity.get('tags')}"
     )
+
+
+def test_autosave_omitting_mirrored_tags_does_not_clear_them():
+    """A bound entity's framework-mirrored tags are reconcile-owned: auto-save
+    never sends them (only ui_tags). Omitting the key on save must not clear
+    the previously-reconciled tags already on disk."""
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    existing_model_data = {
+        "entities": [
+            {
+                "id": "users",
+                "dbt_model": "model.proj.users",
+                "dbt_tags": ["nightly", "customer_360"],
+            },
+        ]
+    }
+
+    # Exactly what auto-save.ts sends for a bound entity: ui_tags only, no
+    # mirrored-tags key at all.
+    incoming_content = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.proj.users",
+                "ui_tags": ["pii"],
+                "position": {"x": 0, "y": 0},
+            },
+        ],
+        "relationships": [],
+    }
+
+    model_data, _layout_data = _split_model_and_layout(
+        incoming_content, existing_model_data
+    )
+
+    entity = model_data["entities"][0]
+    assert get_model_ref(entity) == "model.proj.users"
+    assert get_framework_tags(entity) == ["nightly", "customer_360"], (
+        "bound entity's reconcile-owned mirrored tags were wiped on autosave; "
+        f"got: {get_framework_tags(entity)}"
+    )
+    assert entity["ui_tags"] == ["pii"]
+
+
+def test_autosave_omitting_tags_does_clear_them():
+    """An unbound entity's `tags` field is freely editable — there is no
+    schema.yml to reconcile against. Omitting the key on save (how auto-save.ts
+    signals the user cleared all tags) must genuinely clear it, not resurrect
+    the previous value from disk."""
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    existing_model_data = {
+        "entities": [
+            {"id": "draft_entity", "tags": ["old-draft-tag"]},
+        ]
+    }
+
+    incoming_content = {
+        "version": 0.1,
+        "entities": [
+            {"id": "draft_entity", "label": "Draft Entity", "position": {"x": 0, "y": 0}},
+        ],
+        "relationships": [],
+    }
+
+    model_data, _layout_data = _split_model_and_layout(
+        incoming_content, existing_model_data
+    )
+
+    entity = model_data["entities"][0]
+    assert get_model_ref(entity) is None
+    assert "tags" not in entity, (
+        f"unbound entity's intentionally-cleared tags were resurrected; got: {entity.get('tags')}"
+    )
+
+
+def test_get_data_model_computes_display_tags_for_bound_and_unbound(
+    test_client, temp_data_model_path
+):
+    """GET /api/data-model computes display tags as the union of
+    framework-mirrored tags + ui_tags for bound entities, and passes through
+    the entity's own `tags` field unchanged for unbound entities — without
+    persisting the computed value back to disk."""
+    model_data = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "users",
+                "label": "Users",
+                "dbt_model": "model.proj.users",
+                "dbt_tags": ["nightly", "customer_360"],
+                "ui_tags": ["pii"],
+            },
+            {"id": "draft", "label": "Draft", "tags": ["draft-tag"]},
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(model_data, f)
+
+    response = test_client.get("/api/data-model")
+    assert response.status_code == 200
+    entities = response.json()["entities"]
+
+    users = next(e for e in entities if e["id"] == "users")
+    assert get_model_ref(users) == "model.proj.users"
+    assert users["tags"] == ["nightly", "customer_360", "pii"]
+
+    draft = next(e for e in entities if e["id"] == "draft")
+    assert get_model_ref(draft) is None
+    assert draft["tags"] == ["draft-tag"]
+
+    with open(temp_data_model_path, "r") as f:
+        on_disk = yaml.safe_load(f)
+    on_disk_users = next(e for e in on_disk["entities"] if e["id"] == "users")
+    on_disk_draft = next(e for e in on_disk["entities"] if e["id"] == "draft")
+    assert "tags" not in on_disk_users, (
+        "computed display tags must never be written back to data_model.yml"
+    )
+    assert on_disk_draft["tags"] == ["draft-tag"]
