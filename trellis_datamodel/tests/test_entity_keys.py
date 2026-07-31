@@ -1,5 +1,6 @@
 from trellis_datamodel.models.entity_keys import (
     get_model_ref, set_model_ref, get_framework_tags, set_framework_tags, has_legacy_keys,
+    get_native_data_type, set_native_data_type,
 )
 
 def test_get_model_ref_reads_new_key():
@@ -47,3 +48,25 @@ def test_set_framework_tags_writes_only_new_key_and_drops_legacy():
 def test_has_legacy_keys_detects_migration_need():
     assert has_legacy_keys({"dbt_model": "x"}) is True
     assert has_legacy_keys({"model_ref": "x"}) is False
+
+def test_get_native_data_type_reads_new_key():
+    assert get_native_data_type({"native_data_type": "varchar"}) == "varchar"
+
+def test_get_native_data_type_reads_legacy_dbt_data_type_key():
+    assert get_native_data_type({"dbt_data_type": "varchar"}) == "varchar"
+
+def test_get_native_data_type_prefers_new_key_even_when_new_key_is_none():
+    assert get_native_data_type({"native_data_type": None, "dbt_data_type": "stale"}) is None
+
+def test_get_native_data_type_none_when_absent():
+    assert get_native_data_type({}) is None
+
+def test_set_native_data_type_writes_only_new_key_and_drops_legacy():
+    field = {"dbt_data_type": "old", "name": "keep me"}
+    set_native_data_type(field, "varchar")
+    assert field == {"native_data_type": "varchar", "name": "keep me"}
+
+def test_set_native_data_type_none_clears_both_keys():
+    field = {"dbt_data_type": "old", "native_data_type": "newer"}
+    set_native_data_type(field, None)
+    assert field == {}

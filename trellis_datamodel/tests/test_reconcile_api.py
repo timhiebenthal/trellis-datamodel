@@ -70,14 +70,14 @@ class TestReconcileDbtEndpoint:
                         {
                             "name": "id",
                             "datatype": "int",
-                            "dbt_data_type": "integer",
+                            "native_data_type": "integer",
                             "description": "Primary key",
                             "source": "dbt",
                         },
                         {
                             "name": "name",
                             "datatype": "text",
-                            "dbt_data_type": "varchar",
+                            "native_data_type": "varchar",
                             "description": "Full name",
                             "source": "dbt",
                         },

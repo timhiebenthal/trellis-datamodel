@@ -14,6 +14,8 @@ MODEL_REF_KEY = "model_ref"
 LEGACY_MODEL_REF_KEY = "dbt_model"
 FRAMEWORK_TAGS_KEY = "framework_tags"
 LEGACY_FRAMEWORK_TAGS_KEY = "dbt_tags"
+NATIVE_DATA_TYPE_KEY = "native_data_type"
+LEGACY_NATIVE_DATA_TYPE_KEY = "dbt_data_type"
 
 
 def get_model_ref(entity: dict[str, Any]) -> Optional[str]:
@@ -42,3 +44,17 @@ def set_framework_tags(entity: dict[str, Any], tags: list[str]) -> None:
 
 def has_legacy_keys(entity: dict[str, Any]) -> bool:
     return LEGACY_MODEL_REF_KEY in entity or LEGACY_FRAMEWORK_TAGS_KEY in entity
+
+
+def get_native_data_type(field: dict[str, Any]) -> Optional[str]:
+    """Read a drafted field's raw adapter/warehouse type, new key first."""
+    if NATIVE_DATA_TYPE_KEY in field:
+        return field[NATIVE_DATA_TYPE_KEY] or None
+    return field.get(LEGACY_NATIVE_DATA_TYPE_KEY) or None
+
+
+def set_native_data_type(field: dict[str, Any], value: Optional[str]) -> None:
+    field.pop(LEGACY_NATIVE_DATA_TYPE_KEY, None)
+    field.pop(NATIVE_DATA_TYPE_KEY, None)
+    if value:
+        field[NATIVE_DATA_TYPE_KEY] = value

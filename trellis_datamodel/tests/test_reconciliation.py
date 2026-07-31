@@ -55,8 +55,8 @@ class TestReconcileEntityFields:
         assert result[6]["datatype"] == "unknown"
 
     def test_preserves_native_dbt_type_alongside_bucket(self):
-        """The raw dbt/warehouse type is preserved in dbt_data_type, not just
-        collapsed into the coarse datatype bucket (#111)."""
+        """The raw dbt/warehouse type is preserved in native_data_type, not
+        just collapsed into the coarse datatype bucket (#111)."""
         result = reconcile_entity_fields(
             existing_fields=[],
             manifest_columns=[
@@ -64,7 +64,7 @@ class TestReconcileEntityFields:
             ],
         )
         assert result[0]["datatype"] == "text"
-        assert result[0]["dbt_data_type"] == "varchar"
+        assert result[0]["native_data_type"] == "varchar"
 
     def test_promotes_matching_draft(self):
         """A draft whose name matches a manifest column is promoted to source=dbt,
@@ -298,7 +298,7 @@ class TestReconcileDataModel:
                         {
                             "name": "id",
                             "datatype": "int",
-                            "dbt_data_type": "integer",
+                            "native_data_type": "integer",
                             "description": "PK",
                             "source": "dbt",
                         }
@@ -477,7 +477,8 @@ class TestReconcileKeyGeneralization:
     def test_reconcile_migrates_legacy_keys_to_generic_names(self):
         """An entity built with legacy dbt_model/dbt_tags keys is migrated
         to model_ref/framework_tags, with values unchanged (manifest agrees
-        with the existing data, isolating the key rename)."""
+        with the existing data, isolating the key rename). The field-level
+        legacy dbt_data_type key is likewise migrated to native_data_type."""
         data_model = {
             "entities": [
                 {
@@ -512,7 +513,15 @@ class TestReconcileKeyGeneralization:
         assert "framework_tags" in entity
         assert "dbt_model" not in entity
         assert "dbt_tags" not in entity
-        assert entity["drafted_fields"] == data_model["entities"][0]["drafted_fields"]
+        assert entity["drafted_fields"] == [
+            {
+                "name": "id",
+                "datatype": "int",
+                "native_data_type": "integer",
+                "description": "PK",
+                "source": "dbt",
+            }
+        ]
 
     def test_reconcile_on_already_migrated_entity_is_a_noop(self):
         """An entity already using the generic key names reconciles to
@@ -527,7 +536,7 @@ class TestReconcileKeyGeneralization:
                         {
                             "name": "id",
                             "datatype": "int",
-                            "dbt_data_type": "integer",
+                            "native_data_type": "integer",
                             "description": "PK",
                             "source": "dbt",
                         }
