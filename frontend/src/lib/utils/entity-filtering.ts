@@ -1,4 +1,5 @@
 import type { Entity } from '$lib/types';
+import { readModelRef } from './entity-compat';
 
 /**
  * Simple fuzzy/substring match for search term
@@ -49,7 +50,7 @@ export function filterEntities(
 
 		// Filter by build status (OR logic: if empty/undefined, show all)
 		if (filters.selectedBuildStatus && filters.selectedBuildStatus.length > 0) {
-			const isBound = !!entity.dbt_model;
+			const isBound = !!readModelRef(entity);
 			if (!filters.selectedBuildStatus.includes(isBound ? 'bound' : 'unbound')) {
 				return false;
 			}

@@ -1,4 +1,5 @@
 import { normalizeTags } from '$lib/utils';
+import { readModelRef, readFrameworkTags } from './entity-compat';
 
 /**
  * Split an entity's tag fields into node data. `tags` is the backend-computed
@@ -7,16 +8,16 @@ import { normalizeTags } from '$lib/utils';
  * unbound entities have no schema.yml to mirror and use plain `tags` as their
  * single, freely-editable field instead.
  */
-export function mapEntityTagsToNodeData(entity: { dbt_model?: string; tags?: unknown; dbt_tags?: unknown; ui_tags?: unknown }): {
+export function mapEntityTagsToNodeData(entity: { model_ref?: string; dbt_model?: string; tags?: unknown; framework_tags?: string[]; dbt_tags?: string[]; ui_tags?: unknown }): {
     tags: string[];
     dbt_tags: string[];
     ui_tags: string[];
 } {
     const tags = normalizeTags(entity.tags);
-    if (!entity.dbt_model) {
+    if (!readModelRef(entity)) {
         return { tags, dbt_tags: [], ui_tags: [] };
     }
-    return { tags, dbt_tags: normalizeTags(entity.dbt_tags), ui_tags: normalizeTags(entity.ui_tags) };
+    return { tags, dbt_tags: normalizeTags(readFrameworkTags(entity)), ui_tags: normalizeTags(entity.ui_tags) };
 }
 
 /**

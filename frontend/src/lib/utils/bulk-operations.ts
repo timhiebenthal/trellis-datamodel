@@ -1,6 +1,7 @@
 import type { Node, Edge } from '@xyflow/svelte';
 import { nodes as nodesStore, edges as edgesStore, entitySelection, pushHistory } from '$lib/stores';
 import { get } from 'svelte/store';
+import { readModelRef, readFrameworkTags } from './entity-compat';
 
 /**
  * Bulk add domain to multiple entities
@@ -63,9 +64,9 @@ export function bulkAddTags(entityIds: string[], tagsToAdd: string[]): void {
 
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
-			const isBound = Boolean(node.data?.dbt_model);
+			const isBound = Boolean(node.data && readModelRef(node.data as any));
 			const tagField = isBound ? 'ui_tags' : 'tags';
-			const dbtTags: string[] = isBound ? ((node.data as any)?.dbt_tags || []) : [];
+			const dbtTags: string[] = isBound ? readFrameworkTags((node.data as any) || {}) : [];
 			const currentTags = (node.data as any)?.[tagField] || [];
 			const newTags = Array.isArray(currentTags) ? [...currentTags] : [];
 
@@ -114,7 +115,7 @@ export function bulkRemoveTags(entityIds: string[], tagsToRemove: string[]): voi
 
 	const updatedNodes = currentNodes.map((node) => {
 		if (entityIds.includes(node.id) && node.type === 'entity') {
-			const isBound = Boolean(node.data?.dbt_model);
+			const isBound = Boolean(node.data && readModelRef(node.data as any));
 			const tagField = isBound ? 'ui_tags' : 'tags';
 			const currentTags = (node.data as any)?.[tagField];
 			if (!Array.isArray(currentTags)) return node;
