@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
+from trellis_datamodel.models.entity_keys import get_model_ref
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
 from .base import (
@@ -156,7 +157,7 @@ class DbtCoreAdapter:
         Prefers the bound dbt_model (strips project prefix), otherwise applies
         inference patterns to generate an appropriate model name with prefix.
         """
-        dbt_model = entity.get("dbt_model")
+        dbt_model = get_model_ref(entity)
         if dbt_model:
             # Respect existing bound dbt_model values (don't re-prefix bound entities)
             # dbt unique_id for versioned models looks like model.<project>.<name>.v2
@@ -257,7 +258,7 @@ class DbtCoreAdapter:
 
         for entity in entities:
             entity_id = entity.get("id")
-            dbt_model = entity.get("dbt_model")
+            dbt_model = get_model_ref(entity)
             if dbt_model:
                 parts = dbt_model.split(".")
                 version_part = None
@@ -452,7 +453,7 @@ class DbtCoreAdapter:
         for entity in data_model.get("entities", []):
             if entity.get("id") != entity_id:
                 continue
-            dbt_model = entity.get("dbt_model") or ""
+            dbt_model = get_model_ref(entity) or ""
             # Check last token after split to support fully-qualified model IDs
             last_token = dbt_model.split(".")[-1] if dbt_model else ""
             version = self._extract_version_from_string(last_token)
@@ -784,7 +785,7 @@ class DbtCoreAdapter:
             bound_entities = {
                 e.get("id")
                 for e in data_model.get("entities", [])
-                if e.get("id") and (e.get("dbt_model") or e.get("additional_models"))
+                if e.get("id") and (get_model_ref(e) or e.get("additional_models"))
             }
         relationships: list[Relationship] = []
         yml_found = False
@@ -1060,7 +1061,7 @@ class DbtCoreAdapter:
             # For bound entities, use the correct path from manifest
             # For unbound entities, use model_name (with prefix applied) for yml file
             yml_path = None
-            if entity.get("dbt_model"):
+            if get_model_ref(entity):
                 yml_path = self._get_model_yml_path(model_name)
             if not yml_path:
                 yml_path = os.path.join(models_dir, f"{model_name}.yml")
@@ -1198,7 +1199,7 @@ class DbtCoreAdapter:
         )
         if entity:
             # If entity is bound, use the bound model name from _entity_to_model_name
-            if entity.get("dbt_model"):
+            if get_model_ref(entity):
                 model_name = self._entity_to_model_name(entity)
             # If entity is unbound and entity modeling is enabled, apply prefix
             elif cfg.ENTITY_MODELING_CONFIG.enabled:

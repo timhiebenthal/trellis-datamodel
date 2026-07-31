@@ -493,6 +493,44 @@ class TestSaveDbtSchema:
         assert model["description"] == "User entity"
         assert len(model["columns"]) == 2
 
+    def test_save_model_schema_path_for_entity_using_generic_model_ref(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        """When an entity is bound using ONLY the generic `model_ref` key (no
+        legacy `dbt_model`), save_dbt_schema must still recognize the binding
+        and resolve the schema file name/path from the bound model, not from
+        whatever (possibly stale) model_name the caller passed in."""
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "model_ref": "model.project.users_v2",
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        request_data = {
+            "entity_id": "users",
+            "model_name": "stale_wrong_name",
+            "fields": [{"name": "id", "datatype": "int"}],
+        }
+        response = test_client.post("/api/dbt-schema", json=request_data)
+        assert response.status_code == 200
+
+        result = response.json()
+        # The bound model name (derived from model_ref, project-prefix
+        # stripped) must win over the caller-supplied model_name.
+        assert os.path.basename(result["file_path"]) == "users_v2.yml"
+
+        with open(result["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+        assert schema["models"][0]["name"] == "users_v2"
+
     def test_push_is_non_destructive_for_unlisted_columns(
         self, test_client, temp_dir, mock_manifest
     ):
@@ -1308,6 +1346,102 @@ class TestSyncDbtTests:
         assert len(rel_tests) == 1
         assert "relationships" in rel_tests[0]
         assert rel_tests[0]["relationships"]["arguments"]["to"] == "ref('cool_stuff')"
+
+    def test_sync_relationships_resolves_entity_bound_via_generic_model_ref(
+        self, test_client, temp_dir, temp_data_model_path, mock_manifest
+    ):
+        """Entities bound using ONLY the generic `model_ref` key (no legacy
+        `dbt_model`) must still resolve correctly: the FK column's relationship
+        test must reference the bound dbt model name (derived from model_ref),
+        and the schema file must be written to the manifest-derived nested
+        path for the FK-holding entity, not a fallback top-level file."""
+        manifest_data = {
+            "nodes": {
+                "model.project.dim_customers": {
+                    "unique_id": "model.project.dim_customers",
+                    "resource_type": "model",
+                    "name": "dim_customers",
+                    "original_file_path": "models/3_core/dim_customers.sql",
+                    "columns": {},
+                    "config": {},
+                    "tags": [],
+                },
+                "model.project.orders": {
+                    "unique_id": "model.project.orders",
+                    "resource_type": "model",
+                    "name": "orders",
+                    "original_file_path": "models/3_core/orders.sql",
+                    "columns": {},
+                    "config": {},
+                    "tags": [],
+                },
+            }
+        }
+        with open(mock_manifest, "w") as f:
+            json.dump(manifest_data, f)
+
+        sql_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(sql_dir, exist_ok=True)
+        for name in ("dim_customers", "orders"):
+            with open(os.path.join(sql_dir, f"{name}.sql"), "w") as f:
+                f.write("SELECT 1")
+
+        orders_yml = os.path.join(sql_dir, "orders.yml")
+        with open(orders_yml, "w") as f:
+            yaml.dump({"version": 2, "models": [{"name": "orders", "columns": []}]}, f)
+
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "cust",
+                    "label": "Customers",
+                    "model_ref": "model.project.dim_customers",
+                },
+                {
+                    "id": "orders",
+                    "label": "Orders",
+                    "model_ref": "model.project.orders",
+                    "drafted_fields": [{"name": "customer_id", "datatype": "int"}],
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "cust",
+                    "target": "orders",
+                    "type": "one_to_many",
+                    "source_field": "id",
+                    "target_field": "customer_id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        response = test_client.post("/api/sync-dbt-tests")
+        assert response.status_code == 200
+
+        # The FK-holding entity ("orders") is bound via model_ref only, so the
+        # nested manifest-derived yml path must be updated in place.
+        with open(orders_yml, "r") as f:
+            saved = yaml.safe_load(f)
+        col = next(
+            c for c in saved["models"][0]["columns"] if c["name"] == "customer_id"
+        )
+        rel_tests = col["data_tests"]
+        assert len(rel_tests) == 1
+        # The ref entity ("cust") is bound via model_ref to "dim_customers",
+        # which differs from its entity id — proving model_ref (not just the
+        # entity id) was used to resolve the dbt model name.
+        assert (
+            rel_tests[0]["relationships"]["arguments"]["to"]
+            == "ref('dim_customers')"
+        )
+
+        # A stray top-level fallback file must NOT have been created, which
+        # would indicate the model_ref-only binding wasn't recognized.
+        fallback_path = os.path.join(temp_dir, "models", "orders.yml")
+        assert not os.path.exists(fallback_path)
 
 
 def test_sync_relationships_preserves_dbt_only_tag_when_pushing_trellis_tag(
