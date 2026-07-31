@@ -322,7 +322,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
                         data: {
                             label: formatModelNameForLabel((model?.name ?? id).trim(), $labelPrefixes),
                             description: model?.description ?? "",
-                            dbt_model: model?.unique_id ?? null,
+                            model_ref: model?.unique_id ?? null,
                             additional_models: [],
                             drafted_fields: [],
                             width: 280,
@@ -615,7 +615,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
                         data: {
                             label: e.label?.trim() || formatModelNameForLabel(modelName.trim(), $labelPrefixes),
                             description: e.description,
-                            dbt_model: readModelRef(e),
+                            model_ref: readModelRef(e),
                             additional_models: e.additional_models,
                             drafted_fields: e.drafted_fields,
                             width: e.width ?? 280,

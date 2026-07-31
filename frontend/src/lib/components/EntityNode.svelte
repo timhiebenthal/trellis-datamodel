@@ -326,7 +326,7 @@
             activeModelIndex = currentAdditional.length + 1;
         } else {
             // Store the full unique_id (e.g. "model.elmo.entity_booking")
-            const updates: Record<string, unknown> = { dbt_model: model.unique_id };
+            const updates: Record<string, unknown> = { model_ref: model.unique_id };
             const hasDescription = (data.description || "").trim().length > 0;
             if (!hasDescription && (model.description || "").trim().length > 0) {
                 updates.description = model.description;
@@ -367,13 +367,13 @@
                             return updatedEdge;
                         });
                         
-                        // Update the node itself with new ID - include ALL updates (dbt_model, description, label)
+                        // Update the node itself with new ID - include ALL updates (model_ref, description, label)
                         $nodes = $nodes.map((node) => {
                             if (node.id === id) {
-                                const updatedData = { 
-                                    ...node.data, 
+                                const updatedData = {
+                                    ...node.data,
                                     label: formattedLabel,
-                                    ...updates // Include dbt_model and description from updates
+                                    ...updates // Include model_ref and description from updates
                                 };
                                 return {
                                     ...node,
@@ -550,7 +550,7 @@
     }
 
     function unbind() {
-        updateNodeData(id, { dbt_model: null });
+        updateNodeData(id, { model_ref: null });
 
         // Clear field mappings on edges connected to this entity
         edges.update((list) =>
