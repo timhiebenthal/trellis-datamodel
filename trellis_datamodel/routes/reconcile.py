@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from trellis_datamodel.services.reconciliation import reconcile_dbt
+from trellis_datamodel.routes.data_model import _add_legacy_key_aliases
 
 router = APIRouter(prefix="/api", tags=["reconciliation"])
 
@@ -17,4 +18,8 @@ async def reconcile_dbt_endpoint():
     left untouched (handles partial dbt compiles).
     """
     data_model, changed = reconcile_dbt()
-    return {"status": "success", "changed": changed, "data_model": data_model}
+    return {
+        "status": "success",
+        "changed": changed,
+        "data_model": _add_legacy_key_aliases(data_model),
+    }

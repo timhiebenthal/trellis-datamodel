@@ -12,8 +12,51 @@ from trellis_datamodel.services.reconciliation import compute_display_tags
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
+from trellis_datamodel.models.entity_keys import (
+    MODEL_REF_KEY,
+    LEGACY_MODEL_REF_KEY,
+    FRAMEWORK_TAGS_KEY,
+    LEGACY_FRAMEWORK_TAGS_KEY,
+    get_model_ref,
+    get_framework_tags,
+)
 
 router = APIRouter(prefix="/api", tags=["data-model"])
+
+
+# TODO(sprint-6): remove once frontend reads model_ref
+def _add_legacy_key_aliases(data_model: Dict[str, Any]) -> Dict[str, Any]:
+    """Decorate outgoing entity dicts with legacy dbt_model/dbt_tags aliases.
+
+    This is a serialization-only shim: it operates on copies of the entity
+    dicts and must never mutate (or cause persistence of) the dicts that get
+    saved to disk. It exists so the frontend, which still reads
+    `dbt_model`/`dbt_tags`, keeps resolving bindings while backend code
+    migrates to the generic `model_ref`/`framework_tags` keys.
+    """
+    entities = data_model.get("entities")
+    if not entities:
+        return data_model
+
+    aliased_entities = []
+    for entity in entities:
+        aliased_entity = dict(entity)
+
+        model_ref = get_model_ref(aliased_entity)
+        if model_ref is not None:
+            aliased_entity[MODEL_REF_KEY] = model_ref
+            aliased_entity[LEGACY_MODEL_REF_KEY] = model_ref
+
+        if FRAMEWORK_TAGS_KEY in aliased_entity or LEGACY_FRAMEWORK_TAGS_KEY in aliased_entity:
+            framework_tags = get_framework_tags(aliased_entity)
+            aliased_entity[FRAMEWORK_TAGS_KEY] = framework_tags
+            aliased_entity[LEGACY_FRAMEWORK_TAGS_KEY] = framework_tags
+
+        aliased_entities.append(aliased_entity)
+
+    result = dict(data_model)
+    result["entities"] = aliased_entities
+    return result
 
 
 def _normalize_field_origin(field: Dict[str, Any]) -> None:
@@ -307,7 +350,7 @@ async def get_data_model():
                     pass
                 # If not present, entity won't have source_system field (optional)
 
-        return merged_data
+        return _add_legacy_key_aliases(merged_data)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error reading data model: {str(e)}"
