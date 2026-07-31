@@ -417,7 +417,12 @@
 
 			<!-- Built Filter -->
 			<div class="flex items-center gap-2">
-				<span class="text-xs text-gray-600">Built:</span>
+				<span class="text-xs text-gray-600 inline-flex items-center gap-1">
+					Built:
+					<span class="inline-flex items-center gap-0.5 text-gray-400" title="Entities with this mark are already built with dbt">
+						(<Icon icon="lucide:check" class="w-3 h-3 text-primary-600" /> = built with dbt)
+					</span>
+				</span>
 
 				<!-- Selected build statuses as chips -->
 				{#if $entityListFilters.selectedBuildStatus.length > 0}
