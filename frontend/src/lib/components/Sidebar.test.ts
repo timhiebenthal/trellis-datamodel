@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { dbtModels, folderFilter, tagFilter, nodes } from '$lib/stores';
+import { frameworkModels, folderFilter, tagFilter, nodes } from '$lib/stores';
 import { getModelFolder } from '$lib/utils';
 
 // Mock DbtModel data
@@ -78,14 +78,14 @@ const mockNodes = [
 
 describe('Sidebar Filtering Logic', () => {
     beforeEach(() => {
-        dbtModels.set(mockModels);
+        frameworkModels.set(mockModels);
         folderFilter.set([]);
         tagFilter.set([]);
         nodes.set(mockNodes);
     });
 
     it('initializes with correct mock data', () => {
-        expect(get(dbtModels)).toHaveLength(3);
+        expect(get(frameworkModels)).toHaveLength(3);
         expect(get(nodes)).toHaveLength(4);
         expect(get(folderFilter)).toEqual([]);
         expect(get(tagFilter)).toEqual([]);

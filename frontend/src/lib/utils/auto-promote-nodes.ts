@@ -5,10 +5,10 @@ import { readModelRef } from './entity-compat';
 
 export function autoPromoteAllNodes(
 	nodes: Node[],
-	dbtModels: DbtModel[],
+	frameworkModels: DbtModel[],
 ): { nodes: Node[]; changed: boolean } {
 	let changed = false;
-	const byUniqueId = new Map(dbtModels.map((m) => [m.unique_id, m]));
+	const byUniqueId = new Map(frameworkModels.map((m) => [m.unique_id, m]));
 	const next = nodes.map((node) => {
 		if (node.type !== 'entity') return node;
 		const data = node.data as unknown as EntityData;

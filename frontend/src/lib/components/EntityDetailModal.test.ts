@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
-import { nodes, edges, dbtModels, entityDetailModal } from '$lib/stores';
+import { nodes, edges, frameworkModels, entityDetailModal } from '$lib/stores';
 import type { DbtModel } from '$lib/types';
 import { updateModelSchema } from '$lib/api';
 
@@ -36,7 +36,7 @@ function setupBoundEntityWithDraft() {
       drafted_fields: [{ name: 'pending_col', datatype: 'text' }],
     } as any,
   }] as any);
-  dbtModels.set([mockDbtModel]);
+  frameworkModels.set([mockDbtModel]);
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
@@ -59,7 +59,7 @@ function setupUnboundEntityWithDraftOrigin() {
       }],
     } as any,
   }] as any);
-  dbtModels.set([]);
+  frameworkModels.set([]);
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
@@ -80,7 +80,7 @@ function setupBoundEntityWithDraftOrigin() {
       }],
     } as any,
   }] as any);
-  dbtModels.set([mockDbtModel]);
+  frameworkModels.set([mockDbtModel]);
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
@@ -101,7 +101,7 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
     nodes.set([]);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
   });
 
@@ -216,7 +216,7 @@ describe('EntityDetailModal — tag save behavior', () => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
     nodes.set([]);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
   });
 
@@ -238,7 +238,7 @@ describe('EntityDetailModal — tag save behavior', () => {
         ui_tags: [],
       } as any,
     }] as any);
-    dbtModels.set([mockDbtModel]);
+    frameworkModels.set([mockDbtModel]);
     entityDetailModal.set({ open: true, entityId: 'node-1' });
   }
 
@@ -271,7 +271,7 @@ describe('EntityDetailModal — tag save behavior', () => {
       position: { x: 0, y: 0 },
       data: { label: 'Draft Entity', tags: ['draft-tag'] } as any,
     }] as any);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: true, entityId: 'node-1' });
     await renderModal();
 
@@ -294,7 +294,7 @@ describe('EntityDetailModal — Relationships section', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
     nodes.set([]);
     edges.set([]);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
   });
 

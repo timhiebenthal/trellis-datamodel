@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Writable } from 'svelte/store';
 import { get } from 'svelte/store';
-import { nodes, edges, canUndo, canRedo, pushHistory, initHistory, undo, redo, entityListFilters } from './stores';
+import { nodes, edges, canUndo, canRedo, pushHistory, initHistory, undo, redo, entityListFilters, frameworkModels } from './stores';
+import type { ModelInfo } from './types';
 
 describe('Undo/Redo History', () => {
     beforeEach(() => {
@@ -160,6 +162,32 @@ describe('Undo/Redo History', () => {
 describe('entityListFilters', () => {
     it('initializes with selectedBuildStatus as an empty array', () => {
         expect(get(entityListFilters).selectedBuildStatus).toEqual([]);
+    });
+});
+
+describe('frameworkModels', () => {
+    it('is exported as a writable store of ModelInfo[]', () => {
+        // Type-level assertion: frameworkModels must be Writable<ModelInfo[]>
+        const typed: Writable<ModelInfo[]> = frameworkModels;
+        expect(typed).toBe(frameworkModels);
+
+        // Runtime behavior: default value is an empty array, and it's settable
+        expect(get(frameworkModels)).toEqual([]);
+
+        const sample: ModelInfo[] = [
+            {
+                unique_id: 'model.elmo.stg_customers',
+                name: 'stg_customers',
+                schema: 'main',
+                table: 'stg_customers',
+                columns: [],
+            },
+        ];
+        frameworkModels.set(sample);
+        expect(get(frameworkModels)).toEqual(sample);
+
+        // Reset for other tests
+        frameworkModels.set([]);
     });
 });
 

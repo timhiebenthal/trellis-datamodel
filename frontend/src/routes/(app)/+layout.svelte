@@ -8,7 +8,7 @@
     import {
     nodes,
     edges,
-    dbtModels,
+    frameworkModels,
     viewMode,
     configStatus,
     initHistory,
@@ -308,7 +308,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
                     if (existingEntityIds.has(id)) return;
 
                     const model =
-                        $dbtModels.find(
+                        $frameworkModels.find(
                             (m) => m.unique_id === id || m.name === id,
                         ) ?? null;
                     const folder = model ? getModelFolder(model) : null;
@@ -558,7 +558,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
 
                 // Load Manifest
                 const models = await getManifest();
-                $dbtModels = models;
+                $frameworkModels = models;
 
                 // Reconcile manifest columns into data_model.yml (provenance-aware, non-destructive).
                 // This writes source='dbt' fields into each bound entity before we load the data model,
@@ -788,7 +788,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
 
         const activeFolder = $folderFilter;
         const activeTags = $tagFilter;
-        const models = $dbtModels;
+        const models = $frameworkModels;
 
         const currentNodes = untrack(() => $nodes);
         const currentEdges = untrack(() => $edges);

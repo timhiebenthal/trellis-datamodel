@@ -7,7 +7,7 @@
     } from "@xyflow/svelte";
     import {
         viewMode,
-        dbtModels,
+        frameworkModels,
         nodes,
         edges,
         draggingField,
@@ -115,7 +115,7 @@
 
     // Find model details by unique_id (e.g. "model.elmo.entity_booking")
     let modelDetails = $derived(
-        activeModelId ? $dbtModels.find((m) => m.unique_id === activeModelId) : null,
+        activeModelId ? $frameworkModels.find((m) => m.unique_id === activeModelId) : null,
     );
 
     // Reset active index when models change
@@ -849,11 +849,11 @@
                 };
             }
             if (readModelRef(sourceNodeData ?? {})) {
-                return $dbtModels.find(m => m.unique_id === readModelRef(sourceNodeData)) || null;
+                return $frameworkModels.find(m => m.unique_id === readModelRef(sourceNodeData)) || null;
             }
             const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
-                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+                return $frameworkModels.find(m => m.unique_id === firstAdditional) || null;
             }
             return null;
         })();
@@ -866,11 +866,11 @@
                 };
             }
             if (readModelRef(targetNodeData ?? {})) {
-                return $dbtModels.find(m => m.unique_id === readModelRef(targetNodeData)) || null;
+                return $frameworkModels.find(m => m.unique_id === readModelRef(targetNodeData)) || null;
             }
             const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
-                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+                return $frameworkModels.find(m => m.unique_id === firstAdditional) || null;
             }
             return null;
         })();

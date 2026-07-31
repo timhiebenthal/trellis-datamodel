@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
-	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
+	import { nodes, edges, entityDetailModal, pushHistory, frameworkModels, modelingStyle } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
@@ -149,7 +149,7 @@
 	// Look up the bound dbt model
 	let boundModel = $derived(
 		currentEntity
-			? $dbtModels.find((m) => m.unique_id === readModelRef((currentEntity?.data as unknown as EntityData) ?? {})) ?? null
+			? $frameworkModels.find((m) => m.unique_id === readModelRef((currentEntity?.data as unknown as EntityData) ?? {})) ?? null
 			: null,
 	);
 
@@ -756,7 +756,7 @@
 			editableDraftedFields = editableDraftedFields.filter((_, i) => i !== draftIndex);
 			// Refresh manifest so auto-promotion runs
 			const models = await getManifest();
-			dbtModels.set(models);
+			frameworkModels.set(models);
 		} catch (e: unknown) {
 			materializeError = e instanceof Error ? e.message : 'Failed to materialize field';
 		}

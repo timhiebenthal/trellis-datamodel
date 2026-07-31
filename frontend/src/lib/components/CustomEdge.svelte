@@ -5,7 +5,7 @@
     type EdgeProps,
     useSvelteFlow
   } from '@xyflow/svelte';
-  import { edges, nodes, viewMode, dbtModels } from '$lib/stores';
+  import { edges, nodes, viewMode, frameworkModels } from '$lib/stores';
   import Icon from '@iconify/svelte';
   import {
     getNodeDimensions,
@@ -134,7 +134,7 @@
   const resolveActiveModel = (nodeData: any) => {
     // Prefer explicit active model id if present
     if (nodeData?._activeModelId) {
-      const byId = $dbtModels.find((m) => m.unique_id === nodeData._activeModelId);
+      const byId = $frameworkModels.find((m) => m.unique_id === nodeData._activeModelId);
       if (byId) return byId;
     }
     // Next: ephemeral active model name/version
@@ -146,13 +146,13 @@
     }
     // Next: primary bound model
     if (readModelRef(nodeData ?? {})) {
-      const byPrimary = $dbtModels.find((m) => m.unique_id === readModelRef(nodeData));
+      const byPrimary = $frameworkModels.find((m) => m.unique_id === readModelRef(nodeData));
       if (byPrimary) return byPrimary;
     }
     // Next: first additional model
     const firstAdditional = (nodeData?.additional_models as string[] | undefined)?.[0] || null;
     if (firstAdditional) {
-      const byAdditional = $dbtModels.find((m) => m.unique_id === firstAdditional);
+      const byAdditional = $frameworkModels.find((m) => m.unique_id === firstAdditional);
       if (byAdditional) return byAdditional;
     }
     return null;

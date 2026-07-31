@@ -1,6 +1,6 @@
 <script lang="ts">
     import {
-        dbtModels,
+        frameworkModels,
         configStatus,
         folderFilter,
         tagFilter,
@@ -53,7 +53,7 @@
     let allFolders = $derived(
         Array.from(
             new Set(
-                $dbtModels
+                $frameworkModels
                     .map((m) => getModelFolder(m))
                     .filter((f): f is string => f !== null),
             ),
@@ -65,7 +65,7 @@
         Array.from(
             new Set([
                 // Tags from dbt models (manifest.json)
-                ...$dbtModels.flatMap((m) => normalizeTags(m.tags)),
+                ...$frameworkModels.flatMap((m) => normalizeTags(m.tags)),
                 // Tags from entity nodes on canvas (user-added tags)
                 ...$nodes
                     .filter((n) => n.type === "entity")
@@ -76,7 +76,7 @@
 
     // Apply search and filters
     let filteredModels = $derived(
-        $dbtModels.filter((m) => {
+        $frameworkModels.filter((m) => {
             // Search filter
             const label = getModelLabel(m);
             if (!label.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -548,7 +548,7 @@
                             Loading...
                         </div>
                     </div>
-                {:else if $dbtModels.length === 0}
+                {:else if $frameworkModels.length === 0}
                     <div class="text-center mt-10 px-2">
                         <div class="text-gray-500 text-sm mb-4">
                             No models found
