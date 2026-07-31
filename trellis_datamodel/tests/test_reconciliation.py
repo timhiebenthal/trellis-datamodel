@@ -348,7 +348,7 @@ class TestReconcileDataModel:
             {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly", "core"]},
         ]
         result, changed = reconcile_data_model(data_model, manifest_models)
-        assert result["entities"][0]["dbt_tags"] == ["nightly", "core"]
+        assert get_framework_tags(result["entities"][0]) == ["nightly", "core"]
         assert changed is True
 
     def test_reconcile_data_model_leaves_ui_tags_untouched(self):
@@ -386,7 +386,7 @@ class TestTagMigrationSeed:
         result, _ = reconcile_data_model(data_model, manifest_models)
         entity = result["entities"][0]
         assert entity["ui_tags"] == ["pii"]
-        assert entity["dbt_tags"] == ["nightly"]
+        assert get_framework_tags(entity) == ["nightly"]
         assert "tags" not in entity
 
     def test_seed_does_not_reapply_once_ui_tags_exists(self):
@@ -431,7 +431,7 @@ class TestTagMigrationSeed:
         assert "ui_tags" not in entity, (
             f"dbt-mirrored tags were wrongly seeded into ui_tags; got: {entity.get('ui_tags')}"
         )
-        assert entity["dbt_tags"] == ["sdh", "entity", "customer_360"]
+        assert get_framework_tags(entity) == ["sdh", "entity", "customer_360"]
         assert "tags" not in entity
 
 
@@ -467,6 +467,83 @@ class TestReconcileIdempotency:
         twice, changed_twice = reconcile_data_model(once, manifest_models)
         assert changed_twice is False
         assert twice == once
+
+
+class TestReconcileKeyGeneralization:
+    """Reconciliation must read/write the generic model_ref/framework_tags
+    keys via trellis_datamodel.models.entity_keys, migrating any
+    legacy dbt_model/dbt_tags keys it encounters."""
+
+    def test_reconcile_migrates_legacy_keys_to_generic_names(self):
+        """An entity built with legacy dbt_model/dbt_tags keys is migrated
+        to model_ref/framework_tags, with values unchanged (manifest agrees
+        with the existing data, isolating the key rename)."""
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "dbt_model": "model.project.users",
+                    "dbt_tags": ["nightly"],
+                    "drafted_fields": [
+                        {
+                            "name": "id",
+                            "datatype": "int",
+                            "dbt_data_type": "integer",
+                            "description": "PK",
+                            "source": "dbt",
+                        }
+                    ],
+                }
+            ]
+        }
+        manifest_models = [
+            {
+                "unique_id": "model.project.users",
+                "columns": [{"name": "id", "type": "integer", "description": "PK"}],
+                "tags": ["nightly"],
+            }
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        entity = result["entities"][0]
+
+        assert get_model_ref(entity) == "model.project.users"
+        assert get_framework_tags(entity) == ["nightly"]
+        assert "model_ref" in entity
+        assert "framework_tags" in entity
+        assert "dbt_model" not in entity
+        assert "dbt_tags" not in entity
+        assert entity["drafted_fields"] == data_model["entities"][0]["drafted_fields"]
+
+    def test_reconcile_on_already_migrated_entity_is_a_noop(self):
+        """An entity already using the generic key names reconciles to
+        changed=False when the manifest agrees with the existing data."""
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "model_ref": "model.project.users",
+                    "framework_tags": ["nightly"],
+                    "drafted_fields": [
+                        {
+                            "name": "id",
+                            "datatype": "int",
+                            "dbt_data_type": "integer",
+                            "description": "PK",
+                            "source": "dbt",
+                        }
+                    ],
+                }
+            ]
+        }
+        manifest_models = [
+            {
+                "unique_id": "model.project.users",
+                "columns": [{"name": "id", "type": "integer", "description": "PK"}],
+                "tags": ["nightly"],
+            }
+        ]
+        result, changed = reconcile_data_model(data_model, manifest_models)
+        assert changed is False
 
 
 class TestReconcileDbtIOWrapper:
