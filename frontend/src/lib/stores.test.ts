@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { get } from 'svelte/store';
-import { nodes, edges, canUndo, canRedo, pushHistory, initHistory, undo, redo } from './stores';
+import { nodes, edges, canUndo, canRedo, pushHistory, initHistory, undo, redo, entityListFilters } from './stores';
 
 describe('Undo/Redo History', () => {
     beforeEach(() => {
@@ -154,6 +154,12 @@ describe('Undo/Redo History', () => {
         // Undo should go back to initial empty state, not intermediate states
         undo();
         expect(get(nodes)).toEqual([]);
+    });
+});
+
+describe('entityListFilters', () => {
+    it('initializes with selectedBuildStatus as an empty array', () => {
+        expect(get(entityListFilters).selectedBuildStatus).toEqual([]);
     });
 });
 

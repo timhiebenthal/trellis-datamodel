@@ -8,12 +8,14 @@
         id: string;
         label: string;
         tags?: string[];
+        dbt_model?: string;
     }
 
     interface Fact {
         id: string;
         label: string;
         tags?: string[];
+        dbt_model?: string;
     }
 
     interface Connection {
@@ -32,6 +34,7 @@
     let dimensionFilter = $state<string[]>([]);
     let factFilter = $state<string[]>([]);
     let tagFilter = $state<string[]>([]);
+    let buildStatusFilter = $state<string[]>([]);
 
     // Sort options: 'label-asc' | 'count-desc'
     let dimensionSort = $state<string>('label-asc');
@@ -45,6 +48,12 @@
         return connectionLookup.has(`${dimensionId}-${factId}`);
     }
 
+    function matchesBuildStatus(entity: Dimension | Fact): boolean {
+        if (buildStatusFilter.length === 0) return true;
+        const status = entity.dbt_model ? 'bound' : 'unbound';
+        return buildStatusFilter.includes(status);
+    }
+
     // Filtered (unsorted) collections — counts depend on these
     let filteredDimensions = $derived(
         dimensions.filter(dimension => {
@@ -53,6 +62,7 @@
                 const tags = dimension.tags || [];
                 if (!tagFilter.some(tag => tags.includes(tag))) return false;
             }
+            if (!matchesBuildStatus(dimension)) return false;
             return true;
         })
     );
@@ -64,6 +74,7 @@
                 const tags = fact.tags || [];
                 if (!tagFilter.some(tag => tags.includes(tag))) return false;
             }
+            if (!matchesBuildStatus(fact)) return false;
             return true;
         })
     );
@@ -361,13 +372,53 @@
                         {/each}
                     </div>
 
+                    <!-- Build Status Filter -->
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <label for="build-status-filter" class="text-xs text-gray-600">Built:</label>
+                        <select
+                            id="build-status-filter"
+                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 w-28"
+                            onchange={(e) => {
+                                const value = (e.target as HTMLSelectElement).value;
+                                if (value) {
+                                    if (!buildStatusFilter.includes(value)) {
+                                        buildStatusFilter = [...buildStatusFilter, value];
+                                    }
+                                    (e.target as HTMLSelectElement).value = '';
+                                }
+                            }}
+                        >
+                            <option value="">Add...</option>
+                            {#if !buildStatusFilter.includes('bound')}
+                                <option value="bound">Bound</option>
+                            {/if}
+                            {#if !buildStatusFilter.includes('unbound')}
+                                <option value="unbound">Unbound</option>
+                            {/if}
+                        </select>
+                        {#each buildStatusFilter as status}
+                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs shrink-0">
+                                {status === 'bound' ? 'Bound' : 'Unbound'}
+                                <button
+                                    onclick={() => {
+                                        buildStatusFilter = buildStatusFilter.filter(s => s !== status);
+                                    }}
+                                    class="hover:text-primary-900"
+                                >
+                                    <Icon icon="lucide:x" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        {/each}
+                    </div>
+
                     <!-- Clear All Filters -->
-                    {#if dimensionFilter.length > 0 || factFilter.length > 0 || tagFilter.length > 0}
+                    {#if dimensionFilter.length > 0 || factFilter.length > 0 || tagFilter.length > 0 || buildStatusFilter.length > 0}
                         <button
                             onclick={() => {
                                 dimensionFilter = [];
                                 factFilter = [];
                                 tagFilter = [];
+                                buildStatusFilter = [];
                             }}
                             class="text-xs text-gray-600 hover:text-gray-800 underline shrink-0"
                         >
@@ -425,6 +476,10 @@
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]">
                                         <div class="flex items-center gap-2">
                                             <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
+                                            <span
+                                                class="flex-shrink-0 inline-block w-2 h-2 rounded-full {fact.dbt_model ? 'bg-primary-600' : 'border border-gray-300'}"
+                                                title={fact.dbt_model ? `Built with dbt: ${fact.dbt_model.split('.').pop()}` : 'Not yet built with dbt'}
+                                            ></span>
                                             <span class="truncate">{fact.label}</span>
                                             {#if factVisibleDimensionCounts.get(fact.id) !== undefined}
                                                 <span
@@ -458,6 +513,10 @@
                                         <td class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200 w-[200px] min-w-[200px]">
                                             <div class="flex items-center gap-2" title={dimension.label}>
                                                 <Icon icon="lucide:list" class="w-4 h-4 text-green-600 flex-shrink-0" />
+                                                <span
+                                                    class="flex-shrink-0 inline-block w-2 h-2 rounded-full {dimension.dbt_model ? 'bg-primary-600' : 'border border-gray-300'}"
+                                                    title={dimension.dbt_model ? `Built with dbt: ${dimension.dbt_model.split('.').pop()}` : 'Not yet built with dbt'}
+                                                ></span>
                                                 <span class="truncate">{dimension.label}</span>
                                                 <span
                                                     aria-label="{dimensionVisibleFactCounts.get(dimension.id) ?? 0} connected facts"

@@ -58,6 +58,7 @@ export const entityListFilters = writable<EntityListFilters>({
 	selectedDomains: [],
 	selectedTags: [],
 	selectedEntityTypes: [],
+	selectedBuildStatus: [],
 	sortDirection: 'asc',
 	groupByEntityType: false,
 });

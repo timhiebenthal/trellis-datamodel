@@ -472,6 +472,7 @@ export interface EntityListFilters {
     selectedDomains: string[];
     selectedTags: string[];
     selectedEntityTypes: Array<'dimension' | 'fact' | 'unclassified'>;
+    selectedBuildStatus: Array<'bound' | 'unbound'>;
     sortDirection: 'asc' | 'desc';
     groupByEntityType: boolean;
 }

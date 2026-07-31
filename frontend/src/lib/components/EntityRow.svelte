@@ -162,6 +162,16 @@
 			{entity.label}
 		</span>
 
+		<!-- dbt build status badge — reserved slot so later badges stay aligned whether or not the entity is bound. Uses the same check icon/color as the "Bound" filter in the sidebar for consistency. -->
+		<span
+			class="flex-shrink-0 inline-flex items-center justify-center w-4 text-primary-600"
+			title={entity.dbt_model ? `Built with dbt: ${entity.dbt_model.split('.').pop()}` : undefined}
+		>
+			{#if entity.dbt_model}
+				<Icon icon="lucide:check" class="h-3.5 w-3.5" aria-hidden="true" />
+			{/if}
+		</span>
+
 		<!-- Type badge (only visible in dimensional modeling) -->
 		{#if $modelingStyle === 'dimensional_model'}
 			<span
