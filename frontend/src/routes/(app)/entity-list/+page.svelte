@@ -2,6 +2,7 @@
 	import { nodes, entityListFilters, bulkEditModal } from '$lib/stores';
 	import type { EntityData } from '$lib/types';
 	import { filterEntities } from '$lib/utils/entity-filtering';
+	import { readModelRef } from '$lib/utils/entity-compat';
 	import EntityList from '$lib/components/EntityList.svelte';
 	import EntityListFilters from '$lib/components/EntityListFilters.svelte';
 	import BulkEditModal from '$lib/components/BulkEditModal.svelte';
@@ -17,7 +18,7 @@
 					id: node.id,
 					label: data.label,
 					description: data.description,
-					dbt_model: data.dbt_model,
+					dbt_model: readModelRef(data),
 					additional_models: data.additional_models,
 					drafted_fields: data.drafted_fields,
 					position: node.position,

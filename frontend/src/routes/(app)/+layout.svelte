@@ -46,6 +46,7 @@ import {
     getLabelPrefixesFromConfig,
 } from "$lib/utils";
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
+import { readModelRef } from "$lib/utils/entity-compat";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
@@ -589,10 +590,10 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 
                 // Helper to get folder and tags from dbt model
                 function getEntityMetadata(entity: any) {
-                    if (!entity.dbt_model) return { folder: null, model: null };
+                    if (!readModelRef(entity)) return { folder: null, model: null };
 
                     const model = models.find(
-                        (m: any) => m.unique_id === entity.dbt_model,
+                        (m: any) => m.unique_id === readModelRef(entity),
                     );
                     if (!model) return { folder: null, model: null };
 
@@ -612,7 +613,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                         data: {
                             label: e.label?.trim() || formatModelNameForLabel(modelName.trim(), $labelPrefixes),
                             description: e.description,
-                            dbt_model: e.dbt_model,
+                            dbt_model: readModelRef(e),
                             additional_models: e.additional_models,
                             drafted_fields: e.drafted_fields,
                             width: e.width ?? 280,
@@ -797,7 +798,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                 return node;
             }
 
-            const primaryModel = models.find((m) => m.unique_id === node.data.dbt_model);
+            const primaryModel = models.find((m) => m.unique_id === readModelRef(node.data as any));
             const additionalModelIds = (node.data?.additional_models as string[]) || [];
             const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is DbtModel => m !== undefined);
             const allBoundModels = primaryModel ? [primaryModel, ...additionalModels] : additionalModels;
