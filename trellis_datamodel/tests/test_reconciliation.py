@@ -6,7 +6,7 @@ from trellis_datamodel.services.reconciliation import (
     reconcile_entity_fields,
     reconcile_entity_tags,
     reconcile_data_model,
-    reconcile_dbt,
+    reconcile_framework,
     compute_display_tags,
 )
 from trellis_datamodel.tests._entity_compat import get_model_ref, get_framework_tags
@@ -547,7 +547,7 @@ class TestReconcileKeyGeneralization:
 
 
 class TestReconcileDbtIOWrapper:
-    """Characterization tests for the reconcile_dbt() IO wrapper (load manifest
+    """Characterization tests for the reconcile_framework() IO wrapper (load manifest
     + data_model.yml, reconcile, write back if changed). These exercise the
     full on-disk round trip via the real adapter, not just the pure function.
     """
@@ -555,7 +555,7 @@ class TestReconcileDbtIOWrapper:
     def test_reconcile_is_idempotent(
         self, test_client, mock_manifest, temp_data_model_path
     ):
-        """Running reconcile_dbt() twice against the mock manifest reports
+        """Running reconcile_framework() twice against the mock manifest reports
         changed=False on the second run and produces a byte-identical
         data_model.yml file on disk."""
         data_model = {
@@ -573,13 +573,13 @@ class TestReconcileDbtIOWrapper:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        first_result, first_changed = reconcile_dbt()
+        first_result, first_changed = reconcile_framework()
         assert first_changed is True
 
         with open(temp_data_model_path, "r") as f:
             file_contents_after_first = f.read()
 
-        second_result, second_changed = reconcile_dbt()
+        second_result, second_changed = reconcile_framework()
         assert second_changed is False
 
         with open(temp_data_model_path, "r") as f:
@@ -611,7 +611,7 @@ class TestReconcileDbtIOWrapper:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        result, changed = reconcile_dbt()
+        result, changed = reconcile_framework()
         assert changed is False
 
         entity = result["entities"][0]

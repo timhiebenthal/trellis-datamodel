@@ -32,7 +32,7 @@ from trellis_datamodel.utils.path_validation import (
 )
 
 
-def save_dbt_schema(
+def save_model_schema_from_request(
     entity_id: str,
     model_name: str,
     fields: list[dict[str, str]],
@@ -72,7 +72,7 @@ def save_dbt_schema(
         raise FileOperationError(f"Error saving schema: {str(e)}") from e
 
 
-def sync_dbt_tests() -> list[Path]:
+def sync_framework_tests() -> list[Path]:
     """
     Sync relationship tests from data model to schema files.
 

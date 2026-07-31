@@ -6,6 +6,15 @@ import yaml
 import pytest
 
 
+def test_map_column_type_renamed_from_map_dbt_type():
+    """_map_dbt_type was renamed to the framework-neutral _map_column_type."""
+    from trellis_datamodel.services.reconciliation import _map_column_type
+
+    assert _map_column_type("bigint") == "int"
+    assert _map_column_type("varchar") == "text"
+    assert _map_column_type(None) == "unknown"
+
+
 class TestReconcileDbtEndpoint:
     """Tests for POST /api/reconcile-dbt."""
 
@@ -90,6 +99,41 @@ class TestReconcileDbtEndpoint:
         response = test_client.post("/api/reconcile-dbt")
         assert response.status_code == 200
         assert response.json()["changed"] is False
+
+    def test_reconcile_framework_function_matches_endpoint_behavior(
+        self, test_client, temp_dir, mock_manifest, temp_data_model_path
+    ):
+        """The framework-neutral `reconcile_framework()` service function
+        (renamed from `reconcile_dbt()`) is callable directly and produces
+        the same result as the /api/reconcile-dbt endpoint."""
+        from trellis_datamodel.services.reconciliation import reconcile_framework
+
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.project.users",
+                    "drafted_fields": [],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        result, changed = reconcile_framework()
+        assert changed is True
+
+        entities = result["entities"]
+        users = next(e for e in entities if e["id"] == "users")
+        fields = users["drafted_fields"]
+        assert len(fields) == 2
+        assert all(f["source"] == "dbt" for f in fields)
+        names = [f["name"] for f in fields]
+        assert "id" in names
+        assert "name" in names
 
     def test_absent_model_non_destructive(
         self, test_client, temp_dir, mock_manifest, temp_data_model_path

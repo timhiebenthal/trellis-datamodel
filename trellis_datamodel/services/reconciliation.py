@@ -68,11 +68,11 @@ def _parse_description_with_origin(
     return raw_description, None
 
 
-def _map_dbt_type(dbt_type: str | None) -> str:
-    """Map a dbt/warehouse column type string to a DraftedField datatype enum value."""
-    if not dbt_type:
+def _map_column_type(column_type: str | None) -> str:
+    """Map a framework/warehouse column type string to a DraftedField datatype enum value."""
+    if not column_type:
         return "unknown"
-    t = dbt_type.lower().strip()
+    t = column_type.lower().strip()
     if t in _DATE_EXACT:
         return "date"
     for prefix in _TIMESTAMP_PREFIXES:
@@ -139,7 +139,7 @@ def reconcile_entity_fields(
 
         # dbt is authoritative for these attributes
         field["name"] = col_name
-        field["datatype"] = _map_dbt_type(col.get("type"))
+        field["datatype"] = _map_column_type(col.get("type"))
         field["source"] = "dbt"
         raw_type = col.get("type")
         if raw_type:
@@ -294,7 +294,7 @@ def reconcile_data_model(
 # IO wrapper
 # ---------------------------------------------------------------------------
 
-def reconcile_dbt() -> tuple[dict[str, Any], bool]:
+def reconcile_framework() -> tuple[dict[str, Any], bool]:
     """
     Load manifest + data_model.yml, reconcile, write back if changed.
 

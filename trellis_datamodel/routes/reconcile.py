@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from trellis_datamodel.services.reconciliation import reconcile_dbt
+from trellis_datamodel.services.reconciliation import reconcile_framework
 from trellis_datamodel.routes.data_model import _add_legacy_key_aliases
 
 router = APIRouter(prefix="/api", tags=["reconciliation"])
@@ -17,7 +17,7 @@ async def reconcile_dbt_endpoint():
     Non-destructive: entities whose model is absent from the manifest are
     left untouched (handles partial dbt compiles).
     """
-    data_model, changed = reconcile_dbt()
+    data_model, changed = reconcile_framework()
     return {
         "status": "success",
         "changed": changed,

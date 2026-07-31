@@ -462,6 +462,70 @@ def test_round_trip_demo_origin(monkeypatch, temp_dir):
     assert read_col.get("description") == "Net sales"
 
 
+class TestFrameworkNeutralServiceFunctionNames:
+    """save_dbt_schema/sync_dbt_tests were renamed to framework-neutral names
+    (save_model_schema_from_request/sync_framework_tests). These tests call
+    the new names directly and assert they produce the same results as the
+    equivalent HTTP-level tests below."""
+
+    def test_save_model_schema_from_request_creates_schema_file(
+        self, test_client, temp_dir
+    ):
+        from trellis_datamodel.services.schema import save_model_schema_from_request
+
+        output_path = save_model_schema_from_request(
+            entity_id="users",
+            model_name="users",
+            fields=[
+                {"name": "id", "datatype": "int"},
+                {"name": "email", "datatype": "text", "description": "User email"},
+            ],
+            description="User entity",
+        )
+
+        with open(output_path, "r") as f:
+            schema = yaml.safe_load(f)
+
+        assert schema["version"] == 2
+        assert len(schema["models"]) == 1
+        model = schema["models"][0]
+        assert model["name"] == "users"
+        assert model["description"] == "User entity"
+        assert len(model["columns"]) == 2
+
+    def test_sync_framework_tests_syncs_relationship_tests(
+        self, test_client, temp_dir, temp_data_model_path
+    ):
+        from trellis_datamodel.services.schema import sync_framework_tests
+
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "users", "label": "Users", "position": {"x": 0, "y": 0}},
+                {
+                    "id": "orders",
+                    "label": "Orders",
+                    "position": {"x": 100, "y": 0},
+                    "drafted_fields": [{"name": "user_id", "datatype": "int"}],
+                },
+            ],
+            "relationships": [
+                {
+                    "source": "users",
+                    "target": "orders",
+                    "type": "one_to_many",
+                    "source_field": "id",
+                    "target_field": "user_id",
+                }
+            ],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        updated_files = sync_framework_tests()
+        assert len(updated_files) == 2  # One for each entity
+
+
 class TestSaveDbtSchema:
     """Tests for POST /api/dbt-schema endpoint."""
 
