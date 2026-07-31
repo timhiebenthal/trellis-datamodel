@@ -24,6 +24,7 @@
         dimensionPrefixes,
         factPrefixes,
         sourceColors,
+        activeFramework,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -541,6 +542,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
                 busMatrixEnabled = info?.bus_matrix_enabled ?? false;
                 businessEventsEnabled = info?.business_events_enabled ?? false;
                 $modelingStyle = info?.modeling_style ?? 'entity_model';
+                $activeFramework = info?.framework ?? 'dbt-core';
                 $labelPrefixes = getLabelPrefixesFromConfig(info ?? null);
                 dimensionPrefixes.set(info?.dimension_prefix ?? []);
                 factPrefixes.set(info?.fact_prefix ?? []);

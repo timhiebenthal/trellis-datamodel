@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render } from '@testing-library/svelte';
 import { get } from 'svelte/store';
-import { frameworkModels, folderFilter, tagFilter, nodes } from '$lib/stores';
+import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
 import { getModelFolder } from '$lib/utils';
+import Sidebar from './Sidebar.svelte';
 
 // Mock DbtModel data
 const mockModels = [
@@ -160,5 +162,36 @@ describe('Filter Helper Functions', () => {
 
         const noMatch = ['staging'].some(tag => modelTags.includes(tag));
         expect(noMatch).toBe(false);
+    });
+});
+
+describe('Sidebar — framework-driven header', () => {
+    beforeEach(() => {
+        frameworkModels.set([]);
+        folderFilter.set([]);
+        tagFilter.set([]);
+        nodes.set([]);
+    });
+
+    it('renders the Bruin icon and label when framework is "bruin"', () => {
+        activeFramework.set('bruin');
+        render(Sidebar, { props: {} });
+
+        expect(document.body.textContent).not.toContain('dbt Models');
+
+        const icon = document.querySelector('img[alt="dbt icon"], img[alt="Bruin icon"]') as HTMLImageElement | null;
+        expect(icon).toBeTruthy();
+        expect(icon?.getAttribute('src')).toContain('/icons/bruin.svg');
+    });
+
+    it('renders the dbt icon and "dbt Models" label unchanged when framework is "dbt-core"', () => {
+        activeFramework.set('dbt-core');
+        render(Sidebar, { props: {} });
+
+        expect(document.body.textContent).toContain('dbt Models');
+
+        const icon = document.querySelector('img[alt="dbt icon"]') as HTMLImageElement | null;
+        expect(icon).toBeTruthy();
+        expect(icon?.getAttribute('src')).toBe('https://www.getdbt.com/favicon.ico');
     });
 });

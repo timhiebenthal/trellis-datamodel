@@ -11,6 +11,7 @@
         entityTypeFilter,
         modelBoundFilter,
         sidebarSearchTerm,
+        activeFramework,
     } from "$lib/stores";
     import type { DbtModel, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
@@ -139,6 +140,15 @@
 
     let treeNodes = $derived(buildTree(filteredModels));
 
+    const frameworkDisplay: Record<string, { icon: string; label: string }> = {
+        "dbt-core": { icon: "https://www.getdbt.com/favicon.ico", label: "dbt Models" },
+        bruin: { icon: "/icons/bruin.svg", label: "Bruin Assets" },
+    };
+
+    let currentFrameworkDisplay = $derived(
+        frameworkDisplay[$activeFramework] ?? frameworkDisplay["dbt-core"],
+    );
+
     function toggleFolder(folder: string) {
         if ($folderFilter.includes(folder)) {
             $folderFilter = $folderFilter.filter((f) => f !== folder);
@@ -229,7 +239,7 @@
         if (!event.dataTransfer) return;
         // Set data to identify the drag source and payload
         event.dataTransfer.setData(
-            "application/dbt-model",
+            "application/model-ref",
             JSON.stringify(model),
         );
         event.dataTransfer.effectAllowed = "all";
@@ -524,14 +534,14 @@
             <!-- Separator -->
         <div class="border-t border-gray-200 mb-3"></div>
 
-        <!-- dbt Models Header -->
-        <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of dbt">
+        <!-- Framework Models Header -->
+        <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of the configured framework">
             <img
-                src="https://www.getdbt.com/favicon.ico"
-                alt="dbt icon"
+                src={currentFrameworkDisplay.icon}
+                alt={$activeFramework === "dbt-core" ? "dbt icon" : "Bruin icon"}
                 class="w-4 h-4 flex-shrink-0"
             />
-            <span class="text-xs font-semibold text-gray-600">dbt Models</span>
+            <span class="text-xs font-semibold text-gray-600">{currentFrameworkDisplay.label}</span>
         </div>
 
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">

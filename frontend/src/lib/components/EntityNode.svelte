@@ -309,7 +309,7 @@
         event.stopImmediatePropagation();
         isDragOver = false;
 
-        const json = event.dataTransfer?.getData("application/dbt-model");
+        const json = event.dataTransfer?.getData("application/model-ref");
         if (!json) return;
         const model: DbtModel = JSON.parse(json);
 
