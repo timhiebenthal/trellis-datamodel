@@ -135,3 +135,19 @@ def test_entity_ids_for_model_matches_primary_binding_and_additional_models():
 
     assert set(entity_ids) == {"orders", "sales_summary"}
     assert "customers" not in entity_ids
+
+
+def test_entity_ids_for_model_matches_entity_using_generic_model_ref():
+    """_find_entities_for_model must resolve the model binding via the
+    generic `model_ref` key, not just the legacy `dbt_model` key."""
+    data_model = {
+        "entities": [
+            {"id": "orders", "model_ref": "model.project.orders"},
+            {"id": "customers", "model_ref": "model.project.customers"},
+        ]
+    }
+
+    entity_ids = _find_entities_for_model("model.project.orders", data_model)
+
+    assert set(entity_ids) == {"orders"}
+    assert "customers" not in entity_ids
