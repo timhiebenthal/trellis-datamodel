@@ -162,3 +162,64 @@ class TestReconcileDbtEndpoint:
         assert data["changed"] is False
         fields = data["data_model"]["entities"][0]["drafted_fields"]
         assert fields == [{"name": "sku", "datatype": "text", "source": "dbt"}]
+
+
+class TestFrameworkNeutralReconcileEndpoint:
+    """POST /api/reconcile (framework-neutral) must behave identically to
+    the legacy POST /api/reconcile-dbt. Both must keep working (frontend
+    still calls the legacy path until Sprint 5)."""
+
+    @staticmethod
+    def _write_data_model(temp_data_model_path):
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.project.users",
+                    "drafted_fields": [],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+    def test_new_framework_endpoints_respond(
+        self, test_client, temp_dir, mock_manifest, temp_data_model_path
+    ):
+        self._write_data_model(temp_data_model_path)
+
+        response = test_client.post("/api/reconcile")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["changed"] is True
+
+        entities = data["data_model"]["entities"]
+        users = next(e for e in entities if e["id"] == "users")
+        fields = users["drafted_fields"]
+        assert len(fields) == 2
+        names = [f["name"] for f in fields]
+        assert "id" in names
+        assert "name" in names
+
+    def test_legacy_dbt_endpoints_still_respond(
+        self, test_client, temp_dir, mock_manifest, temp_data_model_path
+    ):
+        self._write_data_model(temp_data_model_path)
+
+        response = test_client.post("/api/reconcile-dbt")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["changed"] is True
+
+        entities = data["data_model"]["entities"]
+        users = next(e for e in entities if e["id"] == "users")
+        fields = users["drafted_fields"]
+        assert len(fields) == 2
+        names = [f["name"] for f in fields]
+        assert "id" in names
+        assert "name" in names

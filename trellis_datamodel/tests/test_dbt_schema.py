@@ -2585,3 +2585,83 @@ class TestModelSchemaVersionHandling:
         assert v2_cols[0]["description"] == "Updated PK"
         assert versions[2].get("config", {}).get("tags") == ["core"]
         assert updated["models"][0]["latest_version"] == 2
+
+
+class TestFrameworkNeutralSchemaEndpoints:
+    """Framework-neutral /api/schema and /api/sync-tests must behave
+    identically to their legacy /api/dbt-schema and /api/sync-dbt-tests
+    counterparts. Both path sets must keep working (frontend still calls
+    the legacy paths until Sprint 5)."""
+
+    def _write_users_model(self, temp_dir):
+        sql_dir = os.path.join(temp_dir, "models", "3_core")
+        os.makedirs(sql_dir, exist_ok=True)
+        with open(os.path.join(sql_dir, "users.yml"), "w") as f:
+            yaml.dump({"version": 2, "models": [{"name": "users", "columns": []}]}, f)
+        return sql_dir
+
+    @staticmethod
+    def _write_data_model(temp_data_model_path):
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {"id": "users", "label": "Users", "position": {"x": 0, "y": 0}},
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+    def test_new_framework_endpoints_respond(
+        self, test_client, temp_dir, mock_manifest, temp_data_model_path
+    ):
+        self._write_users_model(temp_dir)
+        self._write_data_model(temp_data_model_path)
+
+        response = test_client.post(
+            "/api/schema",
+            json={
+                "entity_id": "users",
+                "model_name": "users",
+                "fields": [
+                    {"name": "id", "datatype": "int", "description": "Primary key"}
+                ],
+            },
+        )
+        assert response.status_code == 200
+        with open(response.json()["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+        col = schema["models"][0]["columns"][0]
+        assert col["name"] == "id"
+        assert col["description"] == "Primary key"
+
+        sync_response = test_client.post("/api/sync-tests")
+        assert sync_response.status_code == 200
+        assert sync_response.json()["status"] == "success"
+
+    def test_legacy_dbt_endpoints_still_respond(
+        self, test_client, temp_dir, mock_manifest, temp_data_model_path
+    ):
+        self._write_users_model(temp_dir)
+        self._write_data_model(temp_data_model_path)
+
+        response = test_client.post(
+            "/api/dbt-schema",
+            json={
+                "entity_id": "users",
+                "model_name": "users",
+                "fields": [
+                    {"name": "id", "datatype": "int", "description": "Primary key"}
+                ],
+            },
+        )
+        assert response.status_code == 200
+        with open(response.json()["file_path"], "r") as f:
+            schema = yaml.safe_load(f)
+        col = schema["models"][0]["columns"][0]
+        assert col["name"] == "id"
+        assert col["description"] == "Primary key"
+
+        sync_response = test_client.post("/api/sync-dbt-tests")
+        assert sync_response.status_code == 200
+        assert sync_response.json()["status"] == "success"

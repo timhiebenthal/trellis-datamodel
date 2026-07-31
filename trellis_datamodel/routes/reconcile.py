@@ -8,7 +8,8 @@ from trellis_datamodel.routes.data_model import _add_legacy_key_aliases
 router = APIRouter(prefix="/api", tags=["reconciliation"])
 
 
-@router.post("/reconcile-dbt")
+@router.post("/reconcile")
+@router.post("/reconcile-dbt", include_in_schema=False)  # TODO(sprint-6): remove after frontend migration
 async def reconcile_dbt_endpoint():
     """Reconcile dbt manifest columns into data_model.yml with provenance tags.
 
