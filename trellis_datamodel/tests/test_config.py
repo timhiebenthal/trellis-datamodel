@@ -423,3 +423,10 @@ def test_entity_modeling_disabled_when_dimensional_model(monkeypatch, tmp_path):
     assert cfg.MODELING_STYLE == "dimensional_model"
     assert cfg.ENTITY_MODELING_CONFIG.enabled is False
     assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == []
+
+
+def test_framework_enum_supports_bruin():
+    from trellis_datamodel.models.schemas import FrameworkEnum
+
+    assert FrameworkEnum.BRUIN == "bruin"
+    assert FrameworkEnum("bruin") is FrameworkEnum.BRUIN

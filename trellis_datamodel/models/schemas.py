@@ -8,6 +8,7 @@ from enum import Enum
 class FrameworkEnum(str, Enum):
     """Framework options."""
     DBT_CORE = "dbt-core"
+    BRUIN = "bruin"
 
 
 class ModelingStyleEnum(str, Enum):
