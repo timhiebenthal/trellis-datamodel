@@ -23,35 +23,37 @@ describe('BusMatrix — dbt build status badges', () => {
 		cleanup();
 	});
 
-	it('renders a simple-icons:dbt badge for bound dimension and bound fact, but not for unbound ones', async () => {
+	it('renders a filled build-status dot for bound dimension/fact and a hollow one for unbound', async () => {
 		render(BusMatrix);
 
 		await waitFor(() => {
 			expect(document.querySelector('table')).toBeTruthy();
 		});
 
-		const dbtBadges = Array.from(document.querySelectorAll('[title*="Built with dbt"]'));
-		expect(dbtBadges.length).toBe(2);
+		const filledDots = Array.from(document.querySelectorAll('.bg-primary-600'));
+		expect(filledDots.length).toBe(2);
 
 		const boundDimRow = Array.from(document.querySelectorAll('td')).find((td) =>
 			td.textContent?.includes('Bound Dimension')
 		) as HTMLElement;
-		expect(boundDimRow?.querySelector('[title*="Built with dbt"]')).toBeTruthy();
+		expect(boundDimRow?.querySelector('.bg-primary-600')).toBeTruthy();
 
 		const unboundDimRow = Array.from(document.querySelectorAll('td')).find((td) =>
 			td.textContent?.includes('Unbound Dimension')
 		) as HTMLElement;
-		expect(unboundDimRow?.querySelector('[title*="Built with dbt"]')).toBeFalsy();
+		expect(unboundDimRow?.querySelector('.bg-primary-600')).toBeFalsy();
+		expect(unboundDimRow?.querySelector('[title="Not yet built with dbt"]')).toBeTruthy();
 
 		const boundFactHeader = Array.from(document.querySelectorAll('th')).find((th) =>
 			th.textContent?.includes('Bound Fact')
 		) as HTMLElement;
-		expect(boundFactHeader?.querySelector('[title*="Built with dbt"]')).toBeTruthy();
+		expect(boundFactHeader?.querySelector('.bg-primary-600')).toBeTruthy();
 
 		const unboundFactHeader = Array.from(document.querySelectorAll('th')).find((th) =>
 			th.textContent?.includes('Unbound Fact')
 		) as HTMLElement;
-		expect(unboundFactHeader?.querySelector('[title*="Built with dbt"]')).toBeFalsy();
+		expect(unboundFactHeader?.querySelector('.bg-primary-600')).toBeFalsy();
+		expect(unboundFactHeader?.querySelector('[title="Not yet built with dbt"]')).toBeTruthy();
 	});
 
 	it('filtering to "Bound" only shows the bound dimension row and bound fact column', async () => {

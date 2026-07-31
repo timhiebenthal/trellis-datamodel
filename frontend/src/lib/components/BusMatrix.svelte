@@ -476,15 +476,11 @@
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 min-w-[150px]">
                                         <div class="flex items-center gap-2">
                                             <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
+                                            <span
+                                                class="flex-shrink-0 inline-block w-2 h-2 rounded-full {fact.dbt_model ? 'bg-primary-600' : 'border border-gray-300'}"
+                                                title={fact.dbt_model ? `Built with dbt: ${fact.dbt_model.split('.').pop()}` : 'Not yet built with dbt'}
+                                            ></span>
                                             <span class="truncate">{fact.label}</span>
-                                            {#if fact.dbt_model}
-                                                <span
-                                                    class="flex-shrink-0 inline-flex items-center text-gray-400"
-                                                    title={`Built with dbt: ${fact.dbt_model.split('.').pop()}`}
-                                                >
-                                                    <Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
-                                                </span>
-                                            {/if}
                                             {#if factVisibleDimensionCounts.get(fact.id) !== undefined}
                                                 <span
                                                     aria-label="{factVisibleDimensionCounts.get(fact.id)} connected dimensions"
@@ -517,15 +513,11 @@
                                         <td class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200 w-[200px] min-w-[200px]">
                                             <div class="flex items-center gap-2" title={dimension.label}>
                                                 <Icon icon="lucide:list" class="w-4 h-4 text-green-600 flex-shrink-0" />
+                                                <span
+                                                    class="flex-shrink-0 inline-block w-2 h-2 rounded-full {dimension.dbt_model ? 'bg-primary-600' : 'border border-gray-300'}"
+                                                    title={dimension.dbt_model ? `Built with dbt: ${dimension.dbt_model.split('.').pop()}` : 'Not yet built with dbt'}
+                                                ></span>
                                                 <span class="truncate">{dimension.label}</span>
-                                                {#if dimension.dbt_model}
-                                                    <span
-                                                        class="flex-shrink-0 inline-flex items-center text-gray-400"
-                                                        title={`Built with dbt: ${dimension.dbt_model.split('.').pop()}`}
-                                                    >
-                                                        <Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
-                                                    </span>
-                                                {/if}
                                                 <span
                                                     aria-label="{dimensionVisibleFactCounts.get(dimension.id) ?? 0} connected facts"
                                                     class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 flex-shrink-0"
