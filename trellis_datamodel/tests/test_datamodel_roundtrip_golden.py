@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
+import pytest
+
 from trellis_datamodel import config as cfg
 from trellis_datamodel.routes.data_model import load_data_model_raw, save_data_model_raw
 
@@ -39,7 +41,11 @@ def _normalize_entity(entity: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def test_dbt_demo_data_model_loads_and_roundtrips_semantically(monkeypatch, tmp_path):
-    assert DBT_DEMO_DATA_MODEL.exists(), f"expected fixture at {DBT_DEMO_DATA_MODEL}"
+    # dbt_demo/ is gitignored (local-only sample project) and is not present
+    # in a fresh CI checkout; skip rather than fail when it's absent, matching
+    # the convention in test_demo_origin_fixtures.py.
+    if not DBT_DEMO_DATA_MODEL.exists():
+        pytest.skip(f"dbt_demo fixture not present at {DBT_DEMO_DATA_MODEL}")
 
     # Load the original fixture through the real load path.
     monkeypatch.setattr(cfg, "DATA_MODEL_PATH", str(DBT_DEMO_DATA_MODEL))
