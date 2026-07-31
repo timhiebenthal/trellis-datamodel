@@ -156,6 +156,59 @@ class _PatchedASGITransport(httpx.ASGITransport):
         return False
 
 
+class FakeAdapter:
+    """In-memory TransformationAdapter test double.
+
+    Backed by a plain list[ModelInfo] (`self.models`) that tests mutate
+    directly. Proves reconciliation and other adapter consumers depend only
+    on the TransformationAdapter protocol, not on dbt specifics.
+    """
+
+    def __init__(self, models=None):
+        self.models = models if models is not None else []
+
+    def get_models(self):
+        return self.models
+
+    def get_model_schema(self, model_name, version=None):
+        for model in self.models:
+            if model.get("name") == model_name and (
+                version is None or model.get("version") == version
+            ):
+                return {
+                    "model_name": model_name,
+                    "description": model.get("description") or "",
+                    "columns": [
+                        {
+                            "name": col.get("name"),
+                            "data_type": col.get("type"),
+                            "description": col.get("description"),
+                        }
+                        for col in model.get("columns", [])
+                    ],
+                    "tags": model.get("tags") or [],
+                    "file_path": model.get("file_path") or "",
+                }
+        return {"model_name": model_name, "description": "", "columns": [], "tags": []}
+
+    def save_model_schema(self, model_name, columns, description=None, tags=None, version=None):
+        from pathlib import Path
+
+        return Path(f"{model_name}.yml")
+
+    def infer_relationships(self, include_unbound=False):
+        return []
+
+    def sync_relationships(self, entities, relationships):
+        return []
+
+
+@pytest.fixture
+def fake_adapter():
+    """Construct a fresh FakeAdapter with no models; tests set `.models`."""
+    return FakeAdapter()
+
+
 @pytest.fixture
 def test_client(mock_manifest):
     """Create a synchronous test client against the ASGI app.
