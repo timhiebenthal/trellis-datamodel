@@ -38,9 +38,9 @@ def test_materialize_writes_meta_origin(test_client, temp_dir, mock_manifest, or
         {"DH2": "CBUS.AMOUNT"},
     ]
 
-    # Site 2: POST /api/dbt-schema
+    # Site 2: POST /api/schema
     response = test_client.post(
-        "/api/dbt-schema",
+        "/api/schema",
         json={
             "entity_id": "sales",
             "model_name": "sales",
@@ -96,7 +96,7 @@ def test_sync_dbt_tests_writes_meta_origin(
     with open(temp_data_model_path, "w") as f:
         yaml.dump(data_model, f)
 
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
 
     yml_path = os.path.join(sql_dir, "users.yml")
@@ -172,7 +172,7 @@ def test_push_to_dbt_preserves_native_column_type(
     with open(temp_data_model_path, "w") as f:
         yaml.dump(data_model, f)
 
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
 
     yml_path = os.path.join(sql_dir, "users.yml")
@@ -241,7 +241,7 @@ def test_push_to_dbt_does_not_overwrite_with_catalog_normalized_type(
     with open(temp_data_model_path, "w") as f:
         yaml.dump(data_model, f)
 
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
 
     yml_path = os.path.join(sql_dir, "users.yml")
@@ -294,7 +294,7 @@ def test_push_to_dbt_backfills_missing_type_for_new_dbt_column(
     with open(temp_data_model_path, "w") as f:
         yaml.dump(data_model, f)
 
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
 
     yml_path = os.path.join(sql_dir, "users.yml")
@@ -341,7 +341,7 @@ def test_push_to_dbt_does_not_canonicalize_ambiguous_number_type(
     with open(temp_data_model_path, "w") as f:
         yaml.dump(data_model, f)
 
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
 
     yml_path = os.path.join(sql_dir, "users.yml")
@@ -527,7 +527,7 @@ class TestFrameworkNeutralServiceFunctionNames:
 
 
 class TestSaveDbtSchema:
-    """Tests for POST /api/dbt-schema endpoint."""
+    """Tests for POST /api/schema endpoint."""
 
     def test_creates_schema_file(self, test_client, temp_dir):
         request_data = {
@@ -539,7 +539,7 @@ class TestSaveDbtSchema:
             ],
             "description": "User entity",
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         result = response.json()
@@ -583,7 +583,7 @@ class TestSaveDbtSchema:
             "model_name": "stale_wrong_name",
             "fields": [{"name": "id", "datatype": "int"}],
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         result = response.json()
@@ -626,7 +626,7 @@ class TestSaveDbtSchema:
 
         # Push only id + name — legacy_col must survive
         response = test_client.post(
-            "/api/dbt-schema",
+            "/api/schema",
             json={
                 "entity_id": "users",
                 "model_name": "users",
@@ -739,7 +739,7 @@ class TestSaveDbtSchema:
             "tags": ["core"],
         }
 
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         with open(yml_path, "r") as f:
@@ -787,7 +787,7 @@ class TestSaveDbtSchema:
             yaml.dump(data_model, f)
 
         response = test_client.post(
-            "/api/dbt-schema",
+            "/api/schema",
             json={
                 "entity_id": "orders",
                 "model_name": "orders",
@@ -835,7 +835,7 @@ class TestSaveDbtSchema:
             yaml.dump(data_model, f)
 
         response = test_client.post(
-            "/api/dbt-schema",
+            "/api/schema",
             json={
                 "entity_id": "passports",
                 "model_name": "passports",
@@ -883,7 +883,7 @@ class TestSaveDbtSchema:
             yaml.dump(data_model_with_rel, f)
 
         response = test_client.post(
-            "/api/dbt-schema",
+            "/api/schema",
             json={
                 "entity_id": "orders",
                 "model_name": "orders",
@@ -911,7 +911,7 @@ class TestSaveDbtSchema:
             yaml.dump(data_model_no_rel, f)
 
         response2 = test_client.post(
-            "/api/dbt-schema",
+            "/api/schema",
             json={
                 "entity_id": "orders",
                 "model_name": "orders",
@@ -930,7 +930,7 @@ class TestSaveDbtSchema:
 
 
 class TestSyncDbtTests:
-    """Tests for POST /api/sync-dbt-tests endpoint."""
+    """Tests for POST /api/sync-tests endpoint."""
 
     def test_syncs_relationship_tests(
         self, test_client, temp_dir, temp_data_model_path
@@ -960,7 +960,7 @@ class TestSyncDbtTests:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         result = response.json()
@@ -1016,7 +1016,7 @@ class TestSyncDbtTests:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         with open(yml_path, "r") as f:
@@ -1072,7 +1072,7 @@ class TestSyncDbtTests:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         # fct_orders.yml should have the relationship test (FK on target)
@@ -1133,7 +1133,7 @@ class TestSyncDbtTests:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         # orders.yml should contain a relationship test pointing to customers (dbt model name)
@@ -1189,7 +1189,7 @@ class TestSyncDbtTests:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         # orders.yml should contain a relationship test (FK is on source/orders)
@@ -1267,7 +1267,7 @@ class TestSyncDbtTests:
             yaml.dump(data_model, f)
 
         # First sync: FK should be on orders
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         orders_yml = os.path.join(temp_dir, "models", "3_core", "orders.yml")
@@ -1294,7 +1294,7 @@ class TestSyncDbtTests:
             yaml.dump(data_model, f)
 
         # Second sync: FK should move to orders, old FK on customers should be removed
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         # Verify orders.yml still has the test (FK is still on orders, just different semantics)
@@ -1363,7 +1363,7 @@ class TestSyncDbtTests:
             yaml.dump(data_model, f)
 
         # Initial sync: FK should be on cool_stuff
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         cool_stuff_yml = os.path.join(temp_dir, "models", "3_core", "cool_stuff.yml")
@@ -1383,7 +1383,7 @@ class TestSyncDbtTests:
             yaml.dump(data_model, f)
 
         # Second sync: FK should move to department, stale test removed from cool_stuff
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         # Verify cool_stuff.yml no longer has the relationship test
@@ -1482,7 +1482,7 @@ class TestSyncDbtTests:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        response = test_client.post("/api/sync-dbt-tests")
+        response = test_client.post("/api/sync-tests")
         assert response.status_code == 200
 
         # The FK-holding entity ("orders") is bound via model_ref only, so the
@@ -1544,7 +1544,7 @@ def test_sync_relationships_preserves_dbt_only_tag_when_pushing_trellis_tag(
             f,
         )
 
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
 
     with open(yml_path, "r") as f:
@@ -1588,7 +1588,7 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
         )
 
     # Push: pii added, nightly must survive
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
     with open(yml_path, "r") as f:
         after_add = yaml.safe_load(f)["models"][0]["tags"]
@@ -1606,7 +1606,7 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
             },
             f,
         )
-    response = test_client.post("/api/sync-dbt-tests")
+    response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
     with open(yml_path, "r") as f:
         after_second_push = yaml.safe_load(f)["models"][0]["tags"]
@@ -2229,7 +2229,7 @@ class TestEntityPrefixApplication:
             "fields": [{"name": "id", "datatype": "int"}],
             "description": "Customer entity",
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         # Verify prefix was applied in saved schema
@@ -2301,7 +2301,7 @@ class TestEntityPrefixApplication:
             "fields": [{"name": "order_id", "datatype": "int"}],
             "description": "Order entity",
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         # Verify no double prefix in saved schema
@@ -2351,7 +2351,7 @@ class TestEntityPrefixApplication:
             "fields": [{"name": "id", "datatype": "int"}],
             "description": "Customer entity",
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         # Verify no double prefix (case-insensitive match)
@@ -2405,7 +2405,7 @@ class TestEntityPrefixApplication:
             "fields": [{"name": "product_id", "datatype": "int"}],
             "description": "Product entity",
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         # Verify first prefix was applied
@@ -2455,7 +2455,7 @@ class TestEntityPrefixApplication:
             "fields": [{"name": "category_id", "datatype": "int"}],
             "description": "Category entity",
         }
-        response = test_client.post("/api/dbt-schema", json=request_data)
+        response = test_client.post("/api/schema", json=request_data)
         assert response.status_code == 200
 
         # Verify no prefix was applied
@@ -2588,10 +2588,9 @@ class TestModelSchemaVersionHandling:
 
 
 class TestFrameworkNeutralSchemaEndpoints:
-    """Framework-neutral /api/schema and /api/sync-tests must behave
-    identically to their legacy /api/dbt-schema and /api/sync-dbt-tests
-    counterparts. Both path sets must keep working (frontend still calls
-    the legacy paths until Sprint 5)."""
+    """Framework-neutral /api/schema and /api/sync-tests endpoints work
+    end-to-end. The legacy /api/dbt-schema and /api/sync-dbt-tests aliases
+    were removed in Sprint 6 once the frontend fully migrated."""
 
     def _write_users_model(self, temp_dir):
         sql_dir = os.path.join(temp_dir, "models", "3_core")
@@ -2636,32 +2635,5 @@ class TestFrameworkNeutralSchemaEndpoints:
         assert col["description"] == "Primary key"
 
         sync_response = test_client.post("/api/sync-tests")
-        assert sync_response.status_code == 200
-        assert sync_response.json()["status"] == "success"
-
-    def test_legacy_dbt_endpoints_still_respond(
-        self, test_client, temp_dir, mock_manifest, temp_data_model_path
-    ):
-        self._write_users_model(temp_dir)
-        self._write_data_model(temp_data_model_path)
-
-        response = test_client.post(
-            "/api/dbt-schema",
-            json={
-                "entity_id": "users",
-                "model_name": "users",
-                "fields": [
-                    {"name": "id", "datatype": "int", "description": "Primary key"}
-                ],
-            },
-        )
-        assert response.status_code == 200
-        with open(response.json()["file_path"], "r") as f:
-            schema = yaml.safe_load(f)
-        col = schema["models"][0]["columns"][0]
-        assert col["name"] == "id"
-        assert col["description"] == "Primary key"
-
-        sync_response = test_client.post("/api/sync-dbt-tests")
         assert sync_response.status_code == 200
         assert sync_response.json()["status"] == "success"

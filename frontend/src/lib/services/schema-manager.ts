@@ -1,4 +1,4 @@
-import type { DbtModel, ModelSchema, ModelSchemaColumn } from '$lib/types';
+import type { ModelInfo, ModelSchema, ModelSchemaColumn } from '$lib/types';
 import { getModelSchema, updateModelSchema } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
 
@@ -133,7 +133,7 @@ export class SchemaManager {
         modelName: string,
         version: number | null | undefined,
         manifestTags: string[] = [],
-        fallbackColumns?: DbtModel['columns'],
+        fallbackColumns?: ModelInfo['columns'],
     ): Promise<void> {
         this.modelName = modelName;
         this.version = version ?? null;

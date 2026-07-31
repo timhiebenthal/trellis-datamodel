@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DbtModel, TreeNode, EntityData } from "$lib/types";
+    import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
     import { folderFilter, nodes, modelingStyle, dimensionPrefixes, factPrefixes } from "$lib/stores";
@@ -9,7 +9,7 @@
 
     let { node, onDragStart, mainFolderPrefix = "" } = $props<{
         node: TreeNode;
-        onDragStart: (event: DragEvent, model: DbtModel) => void;
+        onDragStart: (event: DragEvent, model: ModelInfo) => void;
         mainFolderPrefix?: string;
     }>();
     

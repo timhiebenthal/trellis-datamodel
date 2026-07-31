@@ -54,7 +54,7 @@ def test_configuration_error_maps_to_400(test_client: TestClient, monkeypatch):
 
         # This should trigger ConfigurationError from path validation
         response = test_client.post(
-            "/api/dbt-schema",
+            "/api/schema",
             json={
                 "entity_id": "test",
                 "model_name": "test",

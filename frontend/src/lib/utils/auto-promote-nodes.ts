@@ -1,11 +1,11 @@
 import type { Node } from '@xyflow/svelte';
-import type { DbtModel, EntityData } from '$lib/types';
+import type { ModelInfo, EntityData } from '$lib/types';
 import { promoteDraftsAgainstModel } from './field-promotion';
 import { readModelRef } from './entity-compat';
 
 export function autoPromoteAllNodes(
 	nodes: Node[],
-	frameworkModels: DbtModel[],
+	frameworkModels: ModelInfo[],
 ): { nodes: Node[]; changed: boolean } {
 	let changed = false;
 	const byUniqueId = new Map(frameworkModels.map((m) => [m.unique_id, m]));

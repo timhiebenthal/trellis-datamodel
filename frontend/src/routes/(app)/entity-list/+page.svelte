@@ -18,7 +18,7 @@
 					id: node.id,
 					label: data.label,
 					description: data.description,
-					dbt_model: readModelRef(data),
+					model_ref: readModelRef(data),
 					additional_models: data.additional_models,
 					drafted_fields: data.drafted_fields,
 					position: node.position,

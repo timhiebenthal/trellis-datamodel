@@ -22,7 +22,7 @@
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
     } from "$lib/stores";
-    import type { DbtModel, DraftedField, EntityData, EntityRole } from "$lib/types";
+    import type { ModelInfo, DraftedField, EntityData, EntityRole } from "$lib/types";
     import {
         inferRelationships,
         getLineage,
@@ -311,7 +311,7 @@
 
         const json = event.dataTransfer?.getData("application/model-ref");
         if (!json) return;
-        const model: DbtModel = JSON.parse(json);
+        const model: ModelInfo = JSON.parse(json);
 
         // Track the final ID (may change during auto-naming)
         let finalId = id;

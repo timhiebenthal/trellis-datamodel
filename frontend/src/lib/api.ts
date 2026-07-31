@@ -1,5 +1,5 @@
 import type {
-    DbtModel,
+    ModelInfo,
     DataModel,
     DraftedField,
     ConfigStatus,
@@ -81,7 +81,7 @@ export function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
-export async function getManifest(): Promise<DbtModel[]> {
+export async function getManifest(): Promise<ModelInfo[]> {
     try {
         // Short-circuit in test/smoke environments to avoid console 500s when backend is absent
         const isSmokeMode =

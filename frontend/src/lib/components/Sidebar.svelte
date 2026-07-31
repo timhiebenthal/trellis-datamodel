@@ -13,8 +13,9 @@
         sidebarSearchTerm,
         activeFramework,
     } from "$lib/stores";
-    import type { DbtModel, TreeNode, EntityData } from "$lib/types";
+    import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
+    import { readModelRef } from "$lib/utils/entity-compat";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -28,7 +29,7 @@
 
     $effect(() => { sidebarSearchTerm.set(searchTerm); });
 
-    function inferModelVersion(model: DbtModel): number | null {
+    function inferModelVersion(model: ModelInfo): number | null {
         if (model.version !== undefined && model.version !== null) {
             return model.version;
         }
@@ -45,7 +46,7 @@
         return null;
     }
 
-    function getModelLabel(model: DbtModel): string {
+    function getModelLabel(model: ModelInfo): string {
         const version = inferModelVersion(model);
         return version ? `${model.name}.v${version}` : model.name;
     }
@@ -121,7 +122,7 @@
                 const isBound = currentNodes.some((n) => {
                     if (n.type !== 'entity') return false;
                     const data = n.data as unknown as EntityData;
-                    const primaryMatch = data.dbt_model === m.unique_id;
+                    const primaryMatch = readModelRef(data) === m.unique_id;
                     const additionalMatch = (data.additional_models || []).includes(m.unique_id);
                     return primaryMatch || additionalMatch;
                 });
@@ -180,7 +181,7 @@
         $modelBoundFilter = null;
     }
 
-    function buildTree(models: DbtModel[]): TreeNode[] {
+    function buildTree(models: ModelInfo[]): TreeNode[] {
         const rootObj: any = { _files: [], _folders: {} };
 
         for (const model of models) {
@@ -205,7 +206,7 @@
             const folderNodes = Object.keys(obj._folders).map((key) =>
                 convert(obj._folders[key], key, path ? `${path}/${key}` : key),
             );
-            const fileNodes = obj._files.map((m: DbtModel) => {
+            const fileNodes = obj._files.map((m: ModelInfo) => {
                 const label = getModelLabel(m);
                 const filePath = path ? `${path}/${label}` : label;
                 return {
@@ -235,7 +236,7 @@
         return convert(rootObj, "root", "").children;
     }
 
-    function onDragStart(event: DragEvent, model: DbtModel) {
+    function onDragStart(event: DragEvent, model: ModelInfo) {
         if (!event.dataTransfer) return;
         // Set data to identify the drag source and payload
         event.dataTransfer.setData(

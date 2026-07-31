@@ -20,9 +20,6 @@ export interface ModelInfo {
     tags?: string[];
 }
 
-/** @deprecated Use `ModelInfo` instead. Kept as a transitional alias. */
-export type DbtModel = ModelInfo;
-
 export interface TreeNode {
     name: string;
     path: string;
@@ -56,8 +53,6 @@ export interface EntityData {
     label: string;
     description?: string;
     model_ref?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
-    /** @deprecated Use `model_ref` instead. */
-    dbt_model?: string;
     additional_models?: string[]; // additional models bound to this entity
     drafted_fields?: DraftedField[]; // User-defined fields when no model is bound
     width?: number;
@@ -69,8 +64,6 @@ export interface EntityData {
     // persist `tags` directly as their single, freely-editable field.
     tags?: string[];
     framework_tags?: string[]; // Bound entities only: framework-mirrored, reconcile-owned, read-only
-    /** @deprecated Use `framework_tags` instead. */
-    dbt_tags?: string[];
     ui_tags?: string[]; // Bound entities only: tags explicitly added via the Trellis tag editor
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
@@ -88,8 +81,6 @@ export interface Entity {
     label: string;
     description?: string;
     model_ref?: string;
-    /** @deprecated Use `model_ref` instead. */
-    dbt_model?: string;
     additional_models?: string[];
     drafted_fields?: DraftedField[];
     position: { x: number; y: number };
@@ -98,8 +89,6 @@ export interface Entity {
     collapsed?: boolean;
     tags?: string[]; // Unbound entities only: single, freely-editable field
     framework_tags?: string[]; // Bound entities only: framework-mirrored, reconcile-owned
-    /** @deprecated Use `framework_tags` instead. */
-    dbt_tags?: string[];
     ui_tags?: string[]; // Bound entities only: tags explicitly added via the Trellis tag editor
     entity_type?: "fact" | "dimension" | "unclassified";
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)

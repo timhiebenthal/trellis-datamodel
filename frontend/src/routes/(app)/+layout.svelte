@@ -58,7 +58,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
     import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
     import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { ConfigInfo, DbtModel, GuidanceConfig } from "$lib/types";
+    import type { ConfigInfo, ModelInfo, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
     import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
@@ -802,7 +802,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
 
             const primaryModel = models.find((m) => m.unique_id === readModelRef(node.data as any));
             const additionalModelIds = (node.data?.additional_models as string[]) || [];
-            const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is DbtModel => m !== undefined);
+            const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is ModelInfo => m !== undefined);
             const allBoundModels = primaryModel ? [primaryModel, ...additionalModels] : additionalModels;
 
             let visible = true;

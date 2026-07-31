@@ -1,8 +1,8 @@
-import type { DbtModel, DraftedField } from '$lib/types';
+import type { ModelInfo, DraftedField } from '$lib/types';
 
 export function promoteDraftsAgainstModel(
 	drafted: DraftedField[] | undefined,
-	model: DbtModel | undefined,
+	model: ModelInfo | undefined,
 ): DraftedField[] | undefined {
 	if (drafted === undefined) return undefined;
 	if (!model || !model.columns || model.columns.length === 0) return drafted;

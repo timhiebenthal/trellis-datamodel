@@ -22,7 +22,6 @@ router = APIRouter(prefix="/api", tags=["schema"])
 
 
 @router.post("/schema", response_model=FileOperationResponse)
-@router.post("/dbt-schema", response_model=FileOperationResponse, include_in_schema=False)  # TODO(sprint-6): remove after frontend migration
 async def save_dbt_schema_endpoint(request: DbtSchemaRequest):
     """Generate and save a schema YAML file for the drafted fields."""
     output_path = save_model_schema_from_request(
@@ -40,7 +39,6 @@ async def save_dbt_schema_endpoint(request: DbtSchemaRequest):
 
 
 @router.post("/sync-tests", response_model=SyncTestsResponse)
-@router.post("/sync-dbt-tests", response_model=SyncTestsResponse, include_in_schema=False)  # TODO(sprint-6): remove after frontend migration
 async def sync_dbt_tests_endpoint():
     """Sync relationship tests from data model to schema files."""
     updated_files = sync_framework_tests()
