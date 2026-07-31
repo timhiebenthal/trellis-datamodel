@@ -35,9 +35,16 @@
     <meta name="description" content="Bus matrix view - understand data flow across your data models" />
 </svelte:head>
 
-{#if !loading && busMatrixEnabled}
+{#if loading}
+    <div class="flex-1 h-full relative w-full flex items-center justify-center">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+            <p class="text-sm text-gray-600">Loading bus matrix...</p>
+        </div>
+    </div>
+{:else if busMatrixEnabled}
     <BusMatrix />
-{:else if !loading}
+{:else}
     <div class="flex items-center justify-center h-full text-gray-500">
         <p>Bus matrix view is not available.</p>
     </div>
