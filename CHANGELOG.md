@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.1] - 2026-07-31
+
+### Fixed
+- **Entity List showed "No entities yet" while still loading**: on projects with lots of entities, the list rendered its empty state for a few seconds during the initial data model fetch, indistinguishable from an actually-empty project. Entity List now shows a loading spinner until the fetch completes, matching the pattern already used on Canvas.
+- **Inconsistent loading spinners across views**: Bus Matrix, Exposures, and Business Events each used their own spinner markup (icon-based, different border style/size/color) instead of the shared pattern, and the Bus Matrix/Exposures/Business Events page wrappers showed a blank screen during their initial config-check before rendering. All loading spinners are now visually identical and none of the views have a blank-screen gap.
+- **Entity List loading spinner positioned near the top instead of centered**: the wrapper div around the Entity List component had no height set, so the component's own full-height centering never had space to work with. Fixed by propagating height down through the wrapper.
+
 ## [0.19.0] - 2026-07-31
 
 ### Added
