@@ -59,7 +59,7 @@ class Entity(TypedDict, total=False):
     id: str
     label: str
     description: Optional[str]
-    dbt_model: Optional[str]
+    model_ref: Optional[str]
     additional_models: Optional[list[str]]
     drafted_fields: Optional[list[dict[str, Any]]]
     tags: Optional[list[str]]
@@ -139,7 +139,7 @@ class TransformationAdapter(Protocol):
 
         Args:
             include_unbound: When True, also include relationships for entities
-                that exist in the data model but are not yet bound to a dbt
+                that exist in the data model but are not yet bound to a framework
                 model. Useful for frontends that want immediate inference right
                 after a bind action, before the data model file is persisted.
 
