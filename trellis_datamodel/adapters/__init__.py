@@ -19,7 +19,9 @@ def get_adapter() -> Union[DbtCoreAdapter, TransformationAdapter]:
         An adapter instance implementing TransformationAdapter.
 
     Raises:
-        ValueError: If the configured framework is not supported.
+        ValueError: If the configured framework is not recognized.
+        NotImplementedError: If the configured framework is recognized but not
+            yet implemented (currently: bruin).
     """
     # Always read from the live config module (cfg) to respect load_config()
     if cfg.FRAMEWORK == "dbt-core":
@@ -31,9 +33,15 @@ def get_adapter() -> Union[DbtCoreAdapter, TransformationAdapter]:
             model_paths=cfg.DBT_MODEL_PATHS,
         )
 
+    if cfg.FRAMEWORK == "bruin":
+        raise NotImplementedError(
+            "Bruin adapter not yet implemented — see follow-up spec"
+        )
+
     raise ValueError(
         f"Unknown framework: {cfg.FRAMEWORK}. "
-        f"Supported frameworks: dbt-core"
+        f"Supported frameworks: dbt-core. "
+        f"Planned (not yet implemented): bruin."
     )
 
 
