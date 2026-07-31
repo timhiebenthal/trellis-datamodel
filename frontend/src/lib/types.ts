@@ -7,7 +7,7 @@ export interface DbtColumn {
     origin?: OriginEntry[];
 }
 
-export interface DbtModel {
+export interface ModelInfo {
     unique_id: string; // e.g. "model.elmo.entity_booking"
     name: string;
     version?: number | null;
@@ -20,12 +20,15 @@ export interface DbtModel {
     tags?: string[];
 }
 
+/** @deprecated Use `ModelInfo` instead. Kept as a transitional alias. */
+export type DbtModel = ModelInfo;
+
 export interface TreeNode {
     name: string;
     path: string;
     type: 'folder' | 'file';
-    children: TreeNode[]; 
-    model?: DbtModel; 
+    children: TreeNode[];
+    model?: ModelInfo;
 }
 
 export interface ColumnLink {
@@ -52,18 +55,22 @@ export interface DraftedField {
 export interface EntityData {
     label: string;
     description?: string;
-    dbt_model?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
-    additional_models?: string[]; // additional dbt models bound to this entity
-    drafted_fields?: DraftedField[]; // User-defined fields when no dbt model is bound
+    model_ref?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
+    /** @deprecated Use `model_ref` instead. */
+    dbt_model?: string;
+    additional_models?: string[]; // additional models bound to this entity
+    drafted_fields?: DraftedField[]; // User-defined fields when no model is bound
     width?: number;
     panelHeight?: number;
     collapsed?: boolean;
     folder?: string; // relative folder path (excluding main path)
-    // For a bound entity, `tags` is a computed display union (dbt_tags + ui_tags)
+    // For a bound entity, `tags` is a computed display union (framework_tags + ui_tags)
     // sent by the backend — never persisted, never hand-edited. Unbound entities
     // persist `tags` directly as their single, freely-editable field.
     tags?: string[];
-    dbt_tags?: string[]; // Bound entities only: dbt-mirrored, reconcile-owned, read-only
+    framework_tags?: string[]; // Bound entities only: framework-mirrored, reconcile-owned, read-only
+    /** @deprecated Use `framework_tags` instead. */
+    dbt_tags?: string[];
     ui_tags?: string[]; // Bound entities only: tags explicitly added via the Trellis tag editor
     entity_type?: "fact" | "dimension" | "unclassified"; // Entity type for dimensional modeling
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
@@ -80,6 +87,8 @@ export interface Entity {
     id: string;
     label: string;
     description?: string;
+    model_ref?: string;
+    /** @deprecated Use `model_ref` instead. */
     dbt_model?: string;
     additional_models?: string[];
     drafted_fields?: DraftedField[];
@@ -88,7 +97,9 @@ export interface Entity {
     panel_height?: number;
     collapsed?: boolean;
     tags?: string[]; // Unbound entities only: single, freely-editable field
-    dbt_tags?: string[]; // Bound entities only: dbt-mirrored, reconcile-owned
+    framework_tags?: string[]; // Bound entities only: framework-mirrored, reconcile-owned
+    /** @deprecated Use `framework_tags` instead. */
+    dbt_tags?: string[];
     ui_tags?: string[]; // Bound entities only: tags explicitly added via the Trellis tag editor
     entity_type?: "fact" | "dimension" | "unclassified";
     annotation_type?: AnnotationType; // For dimensions: which 7W category (who/what/when/where/how/why)
