@@ -1,5 +1,6 @@
 import type { Node } from "@xyflow/svelte";
 import type { Position } from "$lib/utils/position-utils";
+import { readModelRef } from "$lib/utils/entity-compat";
 
 /**
  * Configuration for dimensional model positioning
@@ -281,7 +282,7 @@ export class GroupSizeCalculator {
             }
 
             // Add extra height for logical view metadata if bound
-            if (viewMode === "logical" && child.data?.dbt_model) {
+            if (viewMode === "logical" && readModelRef(child.data as any)) {
                 estimatedHeight += this.config.logicalViewAdditionalHeight;
             }
 

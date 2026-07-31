@@ -2,6 +2,7 @@ import type { Node, Edge } from '@xyflow/svelte';
 import type { DataModel, EntityRole } from '$lib/types';
 import { getApiBase, saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
+import { readModelRef } from '$lib/utils/entity-compat';
 import { get } from 'svelte/store';
 import { sourceColors as sourceColorsStore, modelingStyle as modelingStyleStore } from '$lib/stores';
 
@@ -243,7 +244,7 @@ export class AutoSaveService {
                 .filter((n) => n.type === 'entity')
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const isBound = Boolean(n.data?.dbt_model);
+                    const isBound = Boolean(readModelRef(n.data as any));
                     const uiTags = normalizeTags((n.data as any)?.ui_tags);
 
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
