@@ -979,14 +979,14 @@
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
                         description: n.data.description as string | undefined,
-                        dbt_model: readModelRef((n.data ?? {}) as any),
+                        model_ref: readModelRef((n.data ?? {}) as any),
                         additional_models: n.data?.additional_models as string[] | undefined,
                         drafted_fields: n.data?.drafted_fields as any[] | undefined,
                         position: n.position,
                         width: n.data?.width as number | undefined,
                         panel_height: n.data?.panelHeight as number | undefined,
                         collapsed: (n.data?.collapsed as boolean) ?? false,
-                        // Bound entities: `dbt_tags`/`tags` mirror schema.yml and are
+                        // Bound entities: `framework_tags`/`tags` mirror schema.yml and are
                         // reconcile-owned; never hand-written here, only `ui_tags`.
                         // Unbound entities: `tags` remains the single freely-editable field.
                         ...(isBound

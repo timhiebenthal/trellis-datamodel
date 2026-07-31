@@ -32,7 +32,7 @@ function setupBoundEntityWithDraft() {
     position: { x: 0, y: 0 },
     data: {
       label: 'Entity X',
-      dbt_model: 'model.proj.entity_x',
+      model_ref: 'model.proj.entity_x',
       drafted_fields: [{ name: 'pending_col', datatype: 'text' }],
     } as any,
   }] as any);
@@ -71,7 +71,7 @@ function setupBoundEntityWithDraftOrigin() {
     position: { x: 0, y: 0 },
     data: {
       label: 'Mixed Entity',
-      dbt_model: 'model.proj.entity_x',
+      model_ref: 'model.proj.entity_x',
       drafted_fields: [{
         name: 'extra_col',
         datatype: 'text',
@@ -232,9 +232,9 @@ describe('EntityDetailModal — tag save behavior', () => {
       position: { x: 0, y: 0 },
       data: {
         label: 'Entity X',
-        dbt_model: 'model.proj.entity_x',
+        model_ref: 'model.proj.entity_x',
         tags: ['nightly'],
-        dbt_tags: ['nightly'],
+        framework_tags: ['nightly'],
         ui_tags: [],
       } as any,
     }] as any);
@@ -257,7 +257,7 @@ describe('EntityDetailModal — tag save behavior', () => {
 
     const savedNode = get(nodes).find((n) => n.id === 'node-1');
     expect((savedNode?.data as any).ui_tags).toEqual(['pii']);
-    expect((savedNode?.data as any).dbt_tags).toEqual(['nightly']);
+    expect((savedNode?.data as any).framework_tags).toEqual(['nightly']);
     // `tags` is a display-only union refreshed by the next reconcile/reload —
     // handleSave doesn't need to touch it. What matters is that autosave never
     // sends it for bound entities regardless of its (possibly stale) local

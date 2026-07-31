@@ -10,7 +10,7 @@ function makeEntityNode(id: string, dbtModel: string | undefined, draftedFields:
     position: { x: 0, y: 0 },
     data: {
       label: id,
-      dbt_model: dbtModel,
+      model_ref: dbtModel,
       drafted_fields: draftedFields.length > 0 ? draftedFields : undefined,
     } as unknown as EntityData,
   } as Node;

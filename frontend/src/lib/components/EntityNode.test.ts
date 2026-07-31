@@ -48,7 +48,7 @@ const mockProps = {
   id: 'booking',
   data: {
     label: 'Booking',
-    dbt_model: 'model.project.booking',
+    model_ref: 'model.project.booking',
     drafted_fields: [{ name: 'new_col', datatype: 'text', description: '' }],
     width: 280,
     panelHeight: 200,

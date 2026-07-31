@@ -603,7 +603,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
                 // Map data model to Svelte Flow format with metadata
                 const entityNodes = (dataModel.entities || []).map((e: any) => {
                     const metadata = getEntityMetadata(e);
-                    const { tags, dbt_tags, ui_tags } = mapEntityTagsToNodeData(e);
+                    const { tags, framework_tags, ui_tags } = mapEntityTagsToNodeData(e);
                     const modelName = metadata.model ? metadata.model.name : e.id;
                     return {
                         id: e.id,
@@ -621,7 +621,7 @@ import { readModelRef } from "$lib/utils/entity-compat";
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags,
-                            dbt_tags,
+                            framework_tags,
                             ui_tags,
                             entity_type: e.entity_type,
                             source_system: e.source_system,

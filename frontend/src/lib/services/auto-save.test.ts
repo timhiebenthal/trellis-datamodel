@@ -495,6 +495,41 @@ describe('AutoSaveService', () => {
             expect(entity.dbt_tags).toBeUndefined();
         });
 
+        it('sends model_ref (not dbt_model) for a bound entity, keeping tag-omission asymmetry intact', () => {
+            const nodes: Node[] = [
+                {
+                    id: 'entity1',
+                    type: 'entity',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        label: 'Entity 1',
+                        dbt_model: 'model1',
+                        tags: ['nightly', 'pii'],
+                        dbt_tags: ['nightly'],
+                        ui_tags: ['pii'],
+                    },
+                },
+            ];
+            const edges: Edge[] = [];
+
+            service.save(nodes, edges);
+            vi.advanceTimersByTime(400);
+
+            const dataModelArg = vi.mocked(apiSaveDataModel).mock.calls[0][0];
+            const entity = dataModelArg.entities[0] as any;
+
+            // The payload must carry the new key spelling, not the legacy one.
+            expect(entity.model_ref).toBe('model1');
+            expect(entity.dbt_model).toBeUndefined();
+
+            // Untouched from Sprint 0's characterization: bound entities still
+            // omit the mirrored tags fields and only send ui_tags.
+            expect(entity.ui_tags).toEqual(['pii']);
+            expect(entity.tags).toBeUndefined();
+            expect(entity.dbt_tags).toBeUndefined();
+            expect(entity.framework_tags).toBeUndefined();
+        });
+
         it('unbound entity still persists tags as the single freely-editable field', () => {
             const nodes: Node[] = [
                 {

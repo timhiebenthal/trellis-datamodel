@@ -563,7 +563,7 @@ describe("position-calculator", () => {
                         id: "entity1",
                         type: "entity",
                         position: { x: 20, y: 20 },
-                        data: { label: "Entity 1", width: 280, panelHeight: 200, collapsed: false, dbt_model: { name: "model1" } },
+                        data: { label: "Entity 1", width: 280, panelHeight: 200, collapsed: false, model_ref: { name: "model1" } },
                         parentId: "group1",
                     },
                 ];
