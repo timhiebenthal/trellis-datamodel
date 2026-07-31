@@ -817,7 +817,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     {#if loading}
         <div class="flex items-center justify-center h-full">
             <div class="text-center">
-                <div class="w-8 h-8 animate-spin border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
                 <p class="text-sm text-gray-600">Loading business events...</p>
             </div>
         </div>

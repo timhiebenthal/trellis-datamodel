@@ -43,9 +43,9 @@
 </svelte:head>
 
 {#if loading}
-    <div class="flex items-center justify-center h-full">
-        <div class="flex flex-col items-center gap-3">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    <div class="flex-1 h-full relative w-full flex items-center justify-center">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
             <p class="text-sm text-gray-600">Loading business events...</p>
         </div>
     </div>
