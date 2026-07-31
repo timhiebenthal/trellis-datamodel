@@ -202,6 +202,22 @@ class FakeAdapter:
     def sync_relationships(self, entities, relationships):
         return []
 
+    def save_schema_file(
+        self, entity_id, model_name, fields, description=None, tags=None
+    ):
+        from pathlib import Path
+
+        return Path(f"{model_name}.yml")
+
+    def infer_entity_types(self):
+        return {}
+
+    def get_model_dirs(self):
+        return []
+
+    def reset_inference_cache(self):
+        return None
+
 
 @pytest.fixture
 def fake_adapter():

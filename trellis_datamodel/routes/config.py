@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from trellis_datamodel import __version__ as trellis_version
+from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.config import find_config_file, reload_config
 from trellis_datamodel.exceptions import ConfigurationError, ValidationError
 from trellis_datamodel.models.schemas import (
@@ -215,8 +216,7 @@ async def reload_config_endpoint() -> Dict[str, Any]:
         reload_config()
 
         # Clear adapter caches that depend on config
-        from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
-        DbtCoreAdapter.reset_inference_cache()
+        get_adapter().reset_inference_cache()
 
         logger.info("Configuration reloaded successfully via API")
         return {

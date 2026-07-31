@@ -84,7 +84,7 @@ async def get_config_info():
 
     adapter = get_adapter()
     try:
-        model_dirs = adapter.get_model_dirs()  # type: ignore[attr-defined]
+        model_dirs = adapter.get_model_dirs()
     except Exception:
         model_dirs = []
 

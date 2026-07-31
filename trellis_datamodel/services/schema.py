@@ -60,7 +60,7 @@ def save_model_schema_from_request(
 
     try:
         adapter = get_adapter()
-        output_path = adapter.save_dbt_schema(
+        output_path = adapter.save_schema_file(
             entity_id=entity_id,
             model_name=model_name,
             fields=fields,

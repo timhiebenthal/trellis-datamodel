@@ -426,7 +426,7 @@ def test_round_trip_demo_origin(monkeypatch, temp_dir):
         model_paths=["3-entity"],
     )
 
-    yml_path = adapter.save_dbt_schema(
+    yml_path = adapter.save_schema_file(
         entity_id=entity_id,
         model_name=model_name,
         fields=[

@@ -1164,7 +1164,7 @@ class DbtCoreAdapter:
 
         return updated_files
 
-    def save_dbt_schema(
+    def save_schema_file(
         self,
         entity_id: str,
         model_name: str,
