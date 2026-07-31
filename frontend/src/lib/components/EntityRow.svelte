@@ -3,6 +3,7 @@
 	import type { Entity } from "$lib/types";
 	import { entityDetailModal, entitySelection, modelingStyle } from "$lib/stores";
 	import DomainBadge from "./DomainBadge.svelte";
+	import { readModelRef } from "$lib/utils/entity-compat";
 
 	type Props = {
 		entity: Entity;
@@ -125,6 +126,9 @@
 		if (entity.entity_type !== 'dimension') return [];
 		return (entity as any).roles || [];
 	});
+
+	// Bound model reference (prefers new `model_ref`, falls back to legacy `dbt_model`)
+	const boundModelRef = $derived(readModelRef(entity));
 </script>
 
 <div
@@ -165,9 +169,9 @@
 		<!-- dbt build status badge — reserved slot so later badges stay aligned whether or not the entity is bound. Uses the same check icon/color as the "Bound" filter in the sidebar for consistency. -->
 		<span
 			class="flex-shrink-0 inline-flex items-center justify-center w-4 text-primary-600"
-			title={entity.dbt_model ? `Built with dbt: ${entity.dbt_model.split('.').pop()}` : undefined}
+			title={boundModelRef ? `Built with dbt: ${boundModelRef.split('.').pop()}` : undefined}
 		>
-			{#if entity.dbt_model}
+			{#if boundModelRef}
 				<Icon icon="lucide:check" class="h-3.5 w-3.5" aria-hidden="true" />
 			{/if}
 		</span>

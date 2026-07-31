@@ -24,6 +24,7 @@
     MARKER_PADDING,
     type EdgeCalculationContext
   } from '$lib/utils/edge-calculations';
+  import { readModelRef } from '$lib/utils/entity-compat';
 
   let { 
     id,
@@ -144,8 +145,8 @@
       };
     }
     // Next: primary bound model
-    if (nodeData?.dbt_model) {
-      const byPrimary = $dbtModels.find((m) => m.unique_id === nodeData.dbt_model);
+    if (readModelRef(nodeData ?? {})) {
+      const byPrimary = $dbtModels.find((m) => m.unique_id === readModelRef(nodeData));
       if (byPrimary) return byPrimary;
     }
     // Next: first additional model

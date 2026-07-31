@@ -42,6 +42,7 @@
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
     import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
+    import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
     import TagEditor from "./TagEditor.svelte";
@@ -94,7 +95,7 @@
     let hasExposuresData = $derived($hasExposuresDataStore);
 
     // Reactive binding check
-    let boundModelName = $derived(data.dbt_model as string | undefined);
+    let boundModelName = $derived(readModelRef(data));
     let additionalModels = $derived((data.additional_models as string[]) || []);
     let allBoundModels = $derived(
         boundModelName ? [boundModelName, ...additionalModels] : []
@@ -423,7 +424,7 @@
                     }
                 } else {
                     // Other nodes: get all bound models
-                    const primary = node.data?.dbt_model as string | undefined;
+                    const primary = readModelRef((node.data ?? {}) as any);
                     const additional = (node.data?.additional_models as string[]) || [];
                     if (primary) {
                         boundModels = [primary, ...additional];
@@ -636,14 +637,14 @@
     // schema.yml to mirror, so `tags` remains the single freely-editable field.
     let entityTags = $derived(
         isBound
-            ? normalizeTags([...(data.dbt_tags || []), ...((data.ui_tags || []) as string[])])
+            ? normalizeTags([...readFrameworkTags(data), ...((data.ui_tags || []) as string[])])
             : normalizeTags(data.tags),
     );
 
     // dbt_tags are always dbt-owned: they render read-only in the tag editor
     // (no remove affordance) because a Trellis push never removes a tag it
     // doesn't own. Only meaningful for bound entities.
-    let readOnlyTags = $derived(isBound ? normalizeTags(data.dbt_tags) : []);
+    let readOnlyTags = $derived(isBound ? normalizeTags(readFrameworkTags(data)) : []);
 
     // Roles display (for dimensions)
     // EntityRole is an object with { role, label, source } — extract the role string
@@ -665,7 +666,7 @@
 
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
-            const nodeIsBound = !!node?.data?.dbt_model;
+            const nodeIsBound = !!readModelRef((node?.data ?? {}) as any);
 
             if (nodeIsBound) {
                 // `dbt_tags` is a dbt-mirrored, reconcile-owned field for bound
@@ -673,7 +674,7 @@
                 // An edit in the tag editor only ever changes `ui_tags`; a
                 // dbt-mirrored tag missing from `newTags` (e.g. the user tried to
                 // remove a read-only chip) is not treated as a removal, since dbt wins.
-                const uiTags = computeUiTagsAfterEdit(node?.data?.dbt_tags, newTags);
+                const uiTags = computeUiTagsAfterEdit(readFrameworkTags((node?.data ?? {}) as any), newTags);
                 updateNodeData(nodeId, { ui_tags: uiTags });
             } else {
                 // Unbound entities have no schema.yml to mirror; `tags` is the
@@ -847,8 +848,8 @@
                     version: sourceNodeData._activeModelVersion as number | null | undefined,
                 };
             }
-            if (sourceNodeData?.dbt_model) {
-                return $dbtModels.find(m => m.unique_id === sourceNodeData.dbt_model) || null;
+            if (readModelRef(sourceNodeData ?? {})) {
+                return $dbtModels.find(m => m.unique_id === readModelRef(sourceNodeData)) || null;
             }
             const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
@@ -864,8 +865,8 @@
                     version: targetNodeData._activeModelVersion as number | null | undefined,
                 };
             }
-            if (targetNodeData?.dbt_model) {
-                return $dbtModels.find(m => m.unique_id === targetNodeData.dbt_model) || null;
+            if (readModelRef(targetNodeData ?? {})) {
+                return $dbtModels.find(m => m.unique_id === readModelRef(targetNodeData)) || null;
             }
             const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {

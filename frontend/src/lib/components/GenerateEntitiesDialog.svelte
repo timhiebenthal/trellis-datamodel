@@ -9,6 +9,7 @@
     import { nodes, edges, modelingStyle, sourceColors, dimensionPrefixes, factPrefixes } from '$lib/stores';
     import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
+    import { readModelRef } from '$lib/utils/entity-compat';
     import CustomEntitySelect from './CustomEntitySelect.svelte';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
@@ -966,7 +967,7 @@
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
                     const uiTags = normalizeTags((n.data as any)?.ui_tags);
-                    const isBound = Boolean(n.data?.dbt_model);
+                    const isBound = Boolean(readModelRef((n.data ?? {}) as any));
 
                     const source_system = ((n.data as any)?.source_system) as string[] | undefined;
                     const domain = ((n.data as any)?.domain) as string | undefined;
@@ -978,7 +979,7 @@
                         id: n.id,
                         label: ((n.data.label as string) || '').trim() || 'Entity',
                         description: n.data.description as string | undefined,
-                        dbt_model: n.data.dbt_model as string | undefined,
+                        dbt_model: readModelRef((n.data ?? {}) as any),
                         additional_models: n.data?.additional_models as string[] | undefined,
                         drafted_fields: n.data?.drafted_fields as any[] | undefined,
                         position: n.position,

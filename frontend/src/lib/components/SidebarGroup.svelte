@@ -5,6 +5,7 @@
     import { folderFilter, nodes, modelingStyle, dimensionPrefixes, factPrefixes } from "$lib/stores";
     import { extractRelativePath, toggleFolderFilter } from "$lib/utils/folder-utils";
     import { classifyModelTypeFromPrefixes } from "$lib/utils";
+    import { readModelRef } from "$lib/utils/entity-compat";
 
     let { node, onDragStart, mainFolderPrefix = "" } = $props<{
         node: TreeNode;
@@ -24,7 +25,7 @@
             isModelBound = currentNodes.some((n) => {
                 if (n.type !== 'entity') return false;
                 const data = n.data as unknown as EntityData;
-                const primaryMatch = data.dbt_model === node.model!.unique_id;
+                const primaryMatch = readModelRef(data) === node.model!.unique_id;
                 const additionalMatch = (data.additional_models || []).includes(node.model!.unique_id);
                 return primaryMatch || additionalMatch;
             });

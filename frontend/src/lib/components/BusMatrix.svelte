@@ -3,11 +3,13 @@
     import { onMount } from 'svelte';
     import Icon from '@iconify/svelte';
     import * as XLSX from 'xlsx';
+    import { readModelRef } from '$lib/utils/entity-compat';
 
     interface Dimension {
         id: string;
         label: string;
         tags?: string[];
+        model_ref?: string;
         dbt_model?: string;
     }
 
@@ -15,6 +17,7 @@
         id: string;
         label: string;
         tags?: string[];
+        model_ref?: string;
         dbt_model?: string;
     }
 
@@ -50,7 +53,7 @@
 
     function matchesBuildStatus(entity: Dimension | Fact): boolean {
         if (buildStatusFilter.length === 0) return true;
-        const status = entity.dbt_model ? 'bound' : 'unbound';
+        const status = readModelRef(entity) ? 'bound' : 'unbound';
         return buildStatusFilter.includes(status);
     }
 
@@ -477,8 +480,8 @@
                                         <div class="flex items-center gap-2">
                                             <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
                                             <span
-                                                class="flex-shrink-0 inline-block w-2 h-2 rounded-full {fact.dbt_model ? 'bg-primary-600' : 'border border-gray-300'}"
-                                                title={fact.dbt_model ? `Built with dbt: ${fact.dbt_model.split('.').pop()}` : 'Not yet built with dbt'}
+                                                class="flex-shrink-0 inline-block w-2 h-2 rounded-full {readModelRef(fact) ? 'bg-primary-600' : 'border border-gray-300'}"
+                                                title={readModelRef(fact) ? `Built with dbt: ${readModelRef(fact)!.split('.').pop()}` : 'Not yet built with dbt'}
                                             ></span>
                                             <span class="truncate">{fact.label}</span>
                                             {#if factVisibleDimensionCounts.get(fact.id) !== undefined}
@@ -514,8 +517,8 @@
                                             <div class="flex items-center gap-2" title={dimension.label}>
                                                 <Icon icon="lucide:list" class="w-4 h-4 text-green-600 flex-shrink-0" />
                                                 <span
-                                                    class="flex-shrink-0 inline-block w-2 h-2 rounded-full {dimension.dbt_model ? 'bg-primary-600' : 'border border-gray-300'}"
-                                                    title={dimension.dbt_model ? `Built with dbt: ${dimension.dbt_model.split('.').pop()}` : 'Not yet built with dbt'}
+                                                    class="flex-shrink-0 inline-block w-2 h-2 rounded-full {readModelRef(dimension) ? 'bg-primary-600' : 'border border-gray-300'}"
+                                                    title={readModelRef(dimension) ? `Built with dbt: ${readModelRef(dimension)!.split('.').pop()}` : 'Not yet built with dbt'}
                                                 ></span>
                                                 <span class="truncate">{dimension.label}</span>
                                                 <span
