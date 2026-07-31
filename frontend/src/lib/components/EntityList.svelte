@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
+	import { readable, type Readable } from 'svelte/store';
 	import {
 		nodes,
 		entityListFilters,
@@ -14,6 +16,10 @@
 	import EntityRow from './EntityRow.svelte';
 	import CollapseChevron from './CollapseChevron.svelte';
 	import Icon from '@iconify/svelte';
+
+	const loadingStore =
+		getContext<Readable<boolean>>('loading') ?? readable(false);
+	const loading = $derived($loadingStore);
 
 	// Convert nodes to entities for filtering and grouping
 	const entities = $derived.by(() => {
@@ -203,7 +209,15 @@
 		{/if}
 
 		<!-- Hierarchical Entity List -->
-		{#if entities.length === 0}
+		{#if loading}
+			<!-- Loading state: still fetching data model -->
+			<div class="h-full flex items-center justify-center px-4 text-center">
+				<div>
+					<div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+					<p class="text-sm text-gray-600">Loading entities...</p>
+				</div>
+			</div>
+		{:else if entities.length === 0}
 			<!-- Empty state: No entities exist -->
 			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
 				<div class="text-gray-400 mb-4">

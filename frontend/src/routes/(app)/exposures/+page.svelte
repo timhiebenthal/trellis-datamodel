@@ -43,9 +43,16 @@
     <meta name="description" content="Exposures view - visualize your dbt exposures and downstream data products" />
 </svelte:head>
 
-{#if !loading && exposuresEnabled && hasExposuresData}
+{#if loading}
+    <div class="flex-1 h-full relative w-full flex items-center justify-center">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+            <p class="text-sm text-gray-600">Loading exposures...</p>
+        </div>
+    </div>
+{:else if exposuresEnabled && hasExposuresData}
     <ExposuresTable {exposuresEnabled} {exposuresDefaultLayout} />
-{:else if !loading}
+{:else}
     <div class="flex items-center justify-center h-full text-gray-500">
         <p>Exposures view is not available.</p>
     </div>

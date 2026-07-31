@@ -74,7 +74,7 @@
 
 		<!-- List Section -->
 		<div class="flex-1 overflow-auto w-full">
-			<div class="max-w-7xl mx-auto">
+			<div class="max-w-7xl mx-auto h-full">
 				<EntityList />
 			</div>
 		</div>

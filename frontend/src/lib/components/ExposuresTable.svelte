@@ -254,7 +254,7 @@ $effect(() => {
     {#if loading}
         <div class="flex items-center justify-center h-full">
             <div class="text-center">
-                <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin text-primary-600 mx-auto mb-2" />
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
                 <p class="text-sm text-gray-600">Loading exposures...</p>
             </div>
         </div>
