@@ -211,9 +211,11 @@
 		<!-- Hierarchical Entity List -->
 		{#if loading}
 			<!-- Loading state: still fetching data model -->
-			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
-				<div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
-				<p class="text-sm text-gray-600">Loading entities...</p>
+			<div class="h-full flex items-center justify-center px-4 text-center">
+				<div>
+					<div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+					<p class="text-sm text-gray-600">Loading entities...</p>
+				</div>
 			</div>
 		{:else if entities.length === 0}
 			<!-- Empty state: No entities exist -->
