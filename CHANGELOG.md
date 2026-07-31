@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-07-31
+
+### Added
+- **dbt build-status indicator and filter**: entities bound to a dbt model (`dbt_model` truthy) now show a build-status mark in the Entity List (a checkmark matching the sidebar's existing "Bound" filter styling) and in the Bus Matrix (a filled/hollow dot to the left of each dimension and fact label, since a dim-fact pair can have mismatched build status). Both views gained a "Built" filter (Bound/Unbound) alongside their existing filters. The Entity List also shows a small inline legend next to the filter explaining the mark.
+
 ## [0.19.0b1] - 2026-07-30
 
 ### Added
