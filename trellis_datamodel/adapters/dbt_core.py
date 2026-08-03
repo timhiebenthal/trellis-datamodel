@@ -6,27 +6,65 @@ Handles parsing dbt manifest.json/catalog.json and generating dbt schema YAML fi
 
 import copy
 import json
+import logging
 import os
 import re
 import time
 import yaml
+from collections import deque
 from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
+from trellis_datamodel.exceptions import FileOperationError, NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
 from . import entity_type_inference
 from .base import (
+    Capabilities,
     ColumnInfo,
     ColumnSchema,
+    Exposure,
+    LineageGraph,
+    LineageNode,
     ModelInfo,
     ModelSchema,
+    ProjectStatus,
     Relationship,
 )
 
+logger = logging.getLogger(__name__)
+
 FRAMEWORK_NAME = "dbt-core"
+
+
+def _extract_folder_from_path(original_file_path: str) -> Optional[str]:
+    """
+    Extract the first folder after models/ from a dbt original_file_path.
+
+    This is what lets the configured lineage layers apply to a dbt project;
+    Bruin's equivalent convention is the first directory under assets/.
+
+    Examples:
+        models/1_clean/employee.sql -> 1_clean
+        models/3_core/all/employee_history.sql -> 3_core
+        models/employee.sql -> None (no folder)
+    """
+    if not original_file_path:
+        return None
+
+    # Normalize path separators (handle Windows backslashes)
+    normalized_path = original_file_path.replace("\\", "/")
+
+    if not normalized_path.startswith("models/"):
+        return None
+
+    parts = normalized_path[len("models/") :].split("/")
+    if len(parts) > 1 and parts[0]:
+        return parts[0]
+
+    return None
 
 
 def _origin_meta(raw_origin: object) -> dict[str, Any] | None:
@@ -1406,4 +1444,313 @@ class DbtCoreAdapter:
             cache_key=cache_key,
             get_models=self.get_models,
             get_model_to_entity_map=self._get_model_to_entity_map,
+        )
+
+    # ------------------------------------------------------------------
+    # Lineage, exposures, and project status
+    # ------------------------------------------------------------------
+
+    def get_lineage(self, model_unique_id: str) -> LineageGraph:
+        """
+        Build the upstream lineage graph for a model from manifest.json.
+
+        Traverses `depends_on` back from the root, including every model and
+        source reached. No filtering: callers decide how much to display.
+        """
+        if not os.path.exists(self.manifest_path):
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
+
+        manifest = self._load_manifest()
+        nodes = manifest.get("nodes", {})
+        sources = manifest.get("sources", {})
+
+        if model_unique_id not in nodes:
+            raise NotFoundError(self._model_not_found_message(model_unique_id, nodes))
+
+        node_ids: set[str] = {model_unique_id}
+        edges: list[dict[str, str]] = []
+
+        queue = deque([model_unique_id])
+        visited = {model_unique_id}
+
+        while queue:
+            current_id = queue.popleft()
+            current_node = nodes.get(current_id)
+            if not current_node:
+                continue
+
+            depends_on = current_node.get("depends_on")
+            if not depends_on:
+                continue
+
+            if isinstance(depends_on, dict):
+                upstream_ids = depends_on.get("nodes", [])
+            elif isinstance(depends_on, list):
+                upstream_ids = depends_on
+            else:
+                upstream_ids = []
+
+            for upstream_id in upstream_ids:
+                edges.append({"source": upstream_id, "target": current_id})
+                node_ids.add(upstream_id)
+
+                if upstream_id not in visited:
+                    visited.add(upstream_id)
+                    # Sources terminate the walk; only models have upstreams.
+                    if upstream_id.startswith("model."):
+                        queue.append(upstream_id)
+
+        return LineageGraph(
+            nodes=[self._lineage_node(nid, nodes, sources) for nid in node_ids],
+            edges=edges,
+        )
+
+    @staticmethod
+    def _model_not_found_message(model_unique_id: str, nodes: dict) -> str:
+        """Build the not-found message, naming near-misses when there are any."""
+        model_name = (
+            model_unique_id.split(".")[-1]
+            if "." in model_unique_id
+            else model_unique_id
+        )
+        similar = [
+            uid
+            for uid in nodes
+            if uid.endswith(f".{model_name}") or uid.endswith(f".{model_name}.v")
+        ]
+        if similar:
+            return (
+                f"Model '{model_unique_id}' not found in manifest. "
+                f"Found similar models: {', '.join(similar[:3])}"
+            )
+        model_count = len(
+            [n for n in nodes.values() if n.get("resource_type") == "model"]
+        )
+        return (
+            f"Model '{model_unique_id}' not found in manifest. "
+            f"Available models: {model_count} model(s)"
+        )
+
+    def _lineage_node(
+        self, unique_id: str, nodes: dict, sources: dict
+    ) -> LineageNode:
+        """Describe one lineage node from its manifest entry."""
+        is_source = unique_id.startswith("source.") or unique_id in sources
+        source_node = sources.get(unique_id) or {}
+        model_node = nodes.get(unique_id) or {}
+        entry = source_node if is_source else model_node
+
+        original_file_path = entry.get("original_file_path", "")
+
+        node = LineageNode(
+            unique_id=unique_id,
+            name=entry.get("name") or unique_id.split(".")[-1],
+            resource_type="source" if is_source else "model",
+            is_source=is_source,
+            source_name=source_node.get("source_name") if is_source else None,
+            folder=_extract_folder_from_path(original_file_path),
+        )
+        if original_file_path:
+            node["file_path"] = original_file_path
+        return node
+
+    def get_source_systems_for_model(self, model_unique_id: str) -> list[str]:
+        """
+        Return the dbt source names feeding a model.
+
+        Never raises: this backs optional display, so an unreadable manifest or
+        an unknown model yields no source systems rather than an error.
+        """
+        try:
+            graph = self.get_lineage(model_unique_id)
+        except Exception as e:
+            logger.warning(
+                "Failed to extract source systems for model %s: %s",
+                model_unique_id,
+                e,
+            )
+            return []
+
+        return sorted(
+            {
+                node["source_name"]
+                for node in graph["nodes"]
+                if node["is_source"] and node["source_name"]
+            }
+        )
+
+    def get_exposures(self) -> list[Exposure]:
+        """
+        Return dbt exposures with their dependencies resolved to unique_ids.
+
+        manifest.json is canonical once the project has been compiled; a raw
+        exposures.yml is the fallback for projects that have not. In the YAML
+        case `depends_on` holds `ref()` strings, which are resolved here so
+        callers only ever see unique_ids.
+        """
+        manifest = self._load_manifest() if os.path.exists(self.manifest_path) else {}
+
+        raw_exposures = self._manifest_exposures(manifest)
+        if not raw_exposures:
+            raw_exposures = self._exposures_from_yaml()
+
+        exposures: list[Exposure] = []
+        for raw in raw_exposures:
+            if not isinstance(raw, dict):
+                continue
+            name = raw.get("name", "")
+            if not name:
+                continue
+
+            owner = raw.get("owner")
+            if isinstance(owner, dict):
+                owner_meta = {"name": owner.get("name")}
+            elif owner:
+                owner_meta = {"name": str(owner)}
+            else:
+                owner_meta = None
+
+            exposures.append(
+                Exposure(
+                    name=name,
+                    label=raw.get("label"),
+                    type=raw.get("type"),
+                    url=raw.get("url"),
+                    maturity=raw.get("maturity"),
+                    description=raw.get("description"),
+                    owner=owner_meta,
+                    depends_on=self._resolve_exposure_depends_on(raw, manifest),
+                )
+            )
+
+        return exposures
+
+    @staticmethod
+    def _manifest_exposures(manifest: dict) -> list[dict]:
+        """Exposures as compiled into manifest.json, if any."""
+        exposures = manifest.get("exposures", {})
+        if isinstance(exposures, dict):
+            return [e for e in exposures.values() if isinstance(e, dict)]
+        if isinstance(exposures, list):
+            return [e for e in exposures if isinstance(e, dict)]
+        return []
+
+    def _exposures_from_yaml(self) -> list[dict]:
+        """Read exposures.yml from the conventional locations in the project."""
+        if not self.project_path:
+            return []
+
+        candidates = [
+            os.path.join(self.project_path, "exposures.yml"),
+            os.path.join(self.project_path, "models", "exposures.yml"),
+        ]
+        exposures_path = next((p for p in candidates if os.path.exists(p)), None)
+        if not exposures_path:
+            return []
+
+        try:
+            with open(exposures_path, "r") as f:
+                data = yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.warning("Could not read %s: %s", exposures_path, e)
+            return []
+
+        exposures = data.get("exposures", [])
+        return exposures if isinstance(exposures, list) else []
+
+    def _resolve_exposure_depends_on(
+        self, raw_exposure: dict, manifest: dict
+    ) -> list[str]:
+        """Normalize an exposure's dependencies to a list of model unique_ids."""
+        depends_on = raw_exposure.get("depends_on")
+
+        # Manifest format: already unique_ids.
+        if isinstance(depends_on, dict):
+            return [n for n in depends_on.get("nodes", []) if isinstance(n, str)]
+
+        # YAML format: ref() strings needing resolution against the manifest.
+        if isinstance(depends_on, list):
+            resolved = []
+            for ref_string in depends_on:
+                if not isinstance(ref_string, str):
+                    continue
+                unique_id = self._resolve_model_ref(ref_string, manifest)
+                if unique_id:
+                    resolved.append(unique_id)
+                else:
+                    logger.warning("Could not resolve %s to a model", ref_string)
+            return resolved
+
+        return []
+
+    def _resolve_model_ref(self, ref_string: str, manifest: dict) -> Optional[str]:
+        """Resolve a `ref('model')` / `ref('model', v=2)` string to a unique_id."""
+        model_name, version = self._parse_ref(ref_string)
+        if not model_name:
+            return None
+
+        for unique_id, node in manifest.get("nodes", {}).items():
+            if node.get("resource_type") != "model":
+                continue
+            if node.get("name") != model_name:
+                continue
+            if version is None:
+                return unique_id
+            node_version = node.get("version")
+            if node_version is not None and str(node_version) == version:
+                return unique_id
+
+        return None
+
+    def get_project_status(self) -> ProjectStatus:
+        """Report whether the configured dbt project is present and usable."""
+        manifest_exists = bool(
+            self.manifest_path and os.path.exists(self.manifest_path)
+        )
+        catalog_exists = bool(self.catalog_path and os.path.exists(self.catalog_path))
+        project_path_exists = bool(
+            self.project_path and os.path.exists(self.project_path)
+        )
+
+        try:
+            model_dirs = self.get_model_dirs()
+        except Exception:
+            model_dirs = []
+
+        if not self.project_path:
+            error = "dbt_project_path not set in config."
+        elif not manifest_exists:
+            error = f"Manifest not found at {self.manifest_path}"
+        else:
+            error = None
+
+        return ProjectStatus(
+            framework=FRAMEWORK_NAME,
+            artifacts_present=manifest_exists,
+            artifacts={
+                "manifest": {
+                    "label": "manifest.json",
+                    "path": self.manifest_path,
+                    "exists": manifest_exists,
+                    "hint": "Run 'dbt compile' or 'dbt run' to generate manifest.json.",
+                },
+                "catalog": {
+                    "label": "catalog.json",
+                    "path": self.catalog_path,
+                    "exists": catalog_exists,
+                    "hint": "Run 'dbt docs generate' to create catalog.json.",
+                },
+            },
+            project_path=self.project_path,
+            project_path_exists=project_path_exists,
+            model_paths_configured=self.model_paths,
+            model_paths_resolved=model_dirs,
+            capabilities=Capabilities(
+                lineage=True,
+                column_lineage=True,
+                exposures=True,
+                relationships=True,
+                scaffolding=True,
+            ),
+            error=error,
         )
