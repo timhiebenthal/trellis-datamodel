@@ -151,16 +151,43 @@ export interface DataModel {
     source_colors?: Record<string, string>; // Map of source name to color (from canvas_layout.yml)
 }
 
+/** One of the active framework's metadata files, as reported by its adapter. */
+export interface FrameworkArtifact {
+    label: string;
+    path: string;
+    exists: boolean;
+    hint: string;
+}
+
+/**
+ * What the active framework supports. Gate optional UI on these rather than on
+ * `framework`, so adding an adapter never means adding a name check here.
+ */
+export interface FrameworkCapabilities {
+    lineage: boolean;
+    column_lineage: boolean;
+    exposures: boolean;
+    relationships: boolean;
+    scaffolding: boolean;
+}
+
 export interface ConfigStatus {
     config_present: boolean;
     config_filename?: string;
-    dbt_project_path: string;
-    manifest_path: string;
-    catalog_path: string;
-    manifest_exists: boolean;
-    catalog_exists: boolean;
+    framework: string;
+    project_path: string;
+    project_path_exists: boolean;
+    artifacts_present: boolean;
+    artifacts: Record<string, FrameworkArtifact>;
+    capabilities: FrameworkCapabilities;
     data_model_exists: boolean;
-    error?: string;
+    error?: string | null;
+    // Legacy dbt-named keys, absent for frameworks with no manifest/catalog.
+    dbt_project_path?: string;
+    manifest_path?: string;
+    catalog_path?: string;
+    manifest_exists?: boolean;
+    catalog_exists?: boolean;
 }
 
 export interface GuidanceConfig {
@@ -179,11 +206,17 @@ export interface EntityWizardData {
 export interface ConfigInfo {
     config_path?: string | null;
     framework: string;
-    dbt_project_path: string;
-    manifest_path: string;
-    manifest_exists: boolean;
-    catalog_path: string;
-    catalog_exists: boolean;
+    project_path: string;
+    project_path_exists: boolean;
+    artifacts_present: boolean;
+    artifacts: Record<string, FrameworkArtifact>;
+    capabilities: FrameworkCapabilities;
+    // Legacy dbt-named keys, absent for frameworks with no manifest/catalog.
+    dbt_project_path?: string;
+    manifest_path?: string;
+    manifest_exists?: boolean;
+    catalog_path?: string;
+    catalog_exists?: boolean;
     data_model_path: string;
     data_model_exists: boolean;
     canvas_layout_path: string;

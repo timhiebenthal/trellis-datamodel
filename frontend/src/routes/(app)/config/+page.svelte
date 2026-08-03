@@ -41,6 +41,12 @@
     // Reactive lineage layers for UI updates
     $: lineageLayers = config.lineage?.layers || [];
     $: dbtModelPaths = config.dbt_model_paths || [];
+    $: bruinAssetPaths = config.bruin_asset_paths || [];
+
+    // Path fields are framework-specific: a dbt project has no pipeline and a
+    // Bruin pipeline has no manifest, so showing both sets would invite a user
+    // to fill in config nothing reads.
+    $: selectedFramework = config.framework || 'dbt-core';
 
     onMount(async () => {
         await loadConfig();
@@ -67,7 +73,7 @@
                     fields: {
                         framework: {
                             type: 'enum',
-                            enum_values: ['dbt-core'],
+                            enum_values: ['dbt-core', 'bruin'],
                             default: 'dbt-core',
                             required: true,
                             description: 'Transformation framework',
@@ -414,7 +420,7 @@
                                     onchange={(e) => handleFieldChange('framework', e.currentTarget.value)}
                                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
                                 >
-                                    {#each getEnumOptions('framework', ['dbt-core']) as value}
+                                    {#each getEnumOptions('framework', ['dbt-core', 'bruin']) as value}
                                         <option value={value}>{value}</option>
                                     {/each}
                                 </select>
@@ -448,11 +454,12 @@
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
                         <div class="flex items-center gap-2 mb-4">
                             <h2 class="text-lg font-semibold text-gray-900">Paths</h2>
-                            <Tooltip text="Configure file paths to your dbt project artifacts and data model files. These paths tell trellis where to find your transformation metadata.">
+                            <Tooltip text="Configure file paths to your transformation project and data model files. These paths tell trellis where to find your transformation metadata.">
                                 <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
                             </Tooltip>
                         </div>
                         <div class="space-y-4">
+                            {#if selectedFramework === 'dbt-core'}
                             <div>
                                 <label for="dbt-project-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     dbt Project Path
@@ -512,6 +519,92 @@
                                     <p class="mt-1 text-xs text-red-600">{validationErrors['dbt_catalog_path']}</p>
                                 {/if}
                             </div>
+                            {/if}
+
+                            {#if selectedFramework === 'bruin'}
+                            <div>
+                                <label for="bruin-pipeline-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Bruin Pipeline Path
+                                </label>
+                                <input
+                                    id="bruin-pipeline-path-input"
+                                    type="text"
+                                    value={getFieldValue('bruin_pipeline_path')}
+                                    oninput={(e) => handleFieldChange('bruin_pipeline_path', e.currentTarget.value)}
+                                    placeholder="./pipeline"
+                                    class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {validationErrors['bruin_pipeline_path'] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}"
+                                />
+                                <p class="mt-1.5 text-xs text-gray-500">
+                                    {getFieldMetadata('bruin_pipeline_path')?.description || 'Directory holding pipeline.yml and assets/'}
+                                </p>
+                                {#if validationErrors['bruin_pipeline_path']}
+                                    <p class="mt-1 text-xs text-red-600">{validationErrors['bruin_pipeline_path']}</p>
+                                {/if}
+                            </div>
+
+                            <div>
+                                <label for="bruin-default-asset-type-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Default Asset Type
+                                </label>
+                                <input
+                                    id="bruin-default-asset-type-input"
+                                    type="text"
+                                    value={getFieldValue('bruin_default_asset_type')}
+                                    oninput={(e) => handleFieldChange('bruin_default_asset_type', e.currentTarget.value)}
+                                    placeholder="duckdb.sql"
+                                    class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                />
+                                <p class="mt-1.5 text-xs text-gray-500">
+                                    Type used when Trellis creates a new asset for a drafted entity. Platform-specific, e.g. <code>duckdb.sql</code>, <code>bq.sql</code>, <code>sf.sql</code>.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label for="bruin-asset-paths-0" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Bruin Asset Paths
+                                </label>
+                                {#each bruinAssetPaths as path, index (index)}
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <input
+                                            id={`bruin-asset-paths-${index}`}
+                                            type="text"
+                                            value={path}
+                                            oninput={(e) => {
+                                                const newPaths = [...bruinAssetPaths];
+                                                newPaths[index] = e.currentTarget.value;
+                                                handleFieldChange('bruin_asset_paths', newPaths);
+                                            }}
+                                            placeholder="02_core"
+                                            class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            onclick={() => {
+                                                const newPaths = [...bruinAssetPaths];
+                                                newPaths.splice(index, 1);
+                                                handleFieldChange('bruin_asset_paths', newPaths);
+                                            }}
+                                            class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium"
+                                            title="Remove path"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                {/each}
+                                {#if bruinAssetPaths.length === 0}
+                                    <p class="mt-1.5 text-xs text-gray-500">Empty = all assets included</p>
+                                {/if}
+                                <button
+                                    type="button"
+                                    onclick={() => {
+                                        handleFieldChange('bruin_asset_paths', [...bruinAssetPaths, '']);
+                                    }}
+                                    class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
+                                >
+                                    + Add Path
+                                </button>
+                            </div>
+                            {/if}
 
                             <div>
                                 <label for="data-model-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -533,6 +626,7 @@
                                 {/if}
                             </div>
 
+                            {#if selectedFramework === 'dbt-core'}
                             <div>
                                 <label for="dbt-company-dummy-path-input" class="block text-sm font-medium text-gray-700 mb-1.5">
                                     dbt Company Dummy Path
@@ -596,6 +690,7 @@
                                     + Add Path
                                 </button>
                             </div>
+                            {/if}
                         </div>
                     </div>
 

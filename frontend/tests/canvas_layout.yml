@@ -1,6 +1,20 @@
 version: 0.1
 entities:
-  clean_customer_e2e:
+  customer:
+    position:
+      x: 50
+      y: 450
+    width: 280
+    panel_height: 200
+    collapsed: false
+  order:
+    position:
+      x: 50
+      y: 850
+    width: 280
+    panel_height: 200
+    collapsed: false
+  product:
     position:
       x: 50
       y: 50

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
-import { FRAMEWORK_DISPLAY_KEYS } from '$lib/utils/framework-display';
+import { FRAMEWORK_DISPLAY_KEYS, isFeatureAvailable, missingArtifactHints } from '$lib/utils/framework-display';
 import { getModelFolder } from '$lib/utils';
 import Sidebar from './Sidebar.svelte';
 
@@ -199,10 +199,87 @@ describe('Sidebar — framework-driven header', () => {
         expect(icon?.getAttribute('src')).toBe('https://www.getdbt.com/favicon.ico');
     });
 
-    it('does not hardcode any framework beyond the one Trellis implements', () => {
-        // The display map is scaffolding for future adapters; entries may only be
-        // added alongside a working adapter, so it cannot drift into advertising
-        // frameworks that raise "unknown framework" at runtime.
-        expect(FRAMEWORK_DISPLAY_KEYS).toEqual(['dbt-core']);
+    it('does not hardcode any framework beyond the ones Trellis implements', () => {
+        // Entries may only be added alongside a working adapter, so the map
+        // cannot drift into advertising frameworks that raise "unknown
+        // framework" at runtime. Keep this in sync with FrameworkEnum.
+        expect(FRAMEWORK_DISPLAY_KEYS).toEqual(['dbt-core', 'bruin']);
+    });
+
+    it('renders the Bruin icon and label when framework is "bruin"', () => {
+        activeFramework.set('bruin');
+        render(Sidebar, { props: {} });
+
+        expect(document.body.textContent).toContain('Bruin Assets');
+        expect(document.body.textContent).not.toContain('dbt Models');
+
+        const icon = document.querySelector('img[alt="Bruin icon"]') as HTMLImageElement | null;
+        expect(icon).toBeTruthy();
+        expect(icon?.getAttribute('src')).toBe('https://getbruin.com/favicon.ico');
+    });
+});
+
+describe('isFeatureAvailable', () => {
+    const bruinCapabilities = { lineage: true, exposures: false };
+
+    it('requires both the config opt-in and framework support', () => {
+        expect(isFeatureAvailable(true, bruinCapabilities, 'lineage')).toBe(true);
+        expect(isFeatureAvailable(false, bruinCapabilities, 'lineage')).toBe(false);
+    });
+
+    it('hides a feature the framework cannot support even when enabled', () => {
+        // A Bruin user who sets exposures.enabled would otherwise get a nav
+        // entry leading to a permanently empty view.
+        expect(isFeatureAvailable(true, bruinCapabilities, 'exposures')).toBe(false);
+    });
+
+    it('treats an unreported capability as supported', () => {
+        // Keeps an older backend, which sends no capabilities, behaving as before.
+        expect(isFeatureAvailable(true, undefined, 'exposures')).toBe(true);
+        expect(isFeatureAvailable(true, {}, 'exposures')).toBe(true);
+    });
+
+    it('treats a missing config flag as disabled', () => {
+        expect(isFeatureAvailable(undefined, bruinCapabilities, 'lineage')).toBe(false);
+    });
+});
+
+describe('missingArtifactHints', () => {
+    it('returns a hint for each missing artifact', () => {
+        const hints = missingArtifactHints({
+            artifacts: {
+                manifest: { exists: false, hint: 'Run dbt compile.' },
+                catalog: { exists: true, hint: 'Run dbt docs generate.' },
+            },
+        });
+
+        expect(hints).toEqual(['Run dbt compile.']);
+    });
+
+    it('is empty when every artifact is present', () => {
+        expect(
+            missingArtifactHints({
+                artifacts: { pipeline: { exists: true, hint: 'Needs pipeline.yml.' } },
+            }),
+        ).toEqual([]);
+    });
+
+    it('tolerates a status with no artifacts reported', () => {
+        expect(missingArtifactHints({})).toEqual([]);
+    });
+
+    it('surfaces the framework-specific wording rather than dbt advice', () => {
+        // The point of sourcing hints from the adapter: a Bruin project must
+        // never be told to run dbt compile.
+        const hints = missingArtifactHints({
+            artifacts: {
+                assets: {
+                    exists: false,
+                    hint: 'Assets carry their schema in an @bruin comment block.',
+                },
+            },
+        });
+
+        expect(hints[0]).toContain('@bruin');
     });
 });
