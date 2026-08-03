@@ -34,53 +34,6 @@ def validate_dbt_project_path() -> str:
     return cfg.DBT_PROJECT_PATH
 
 
-def validate_manifest_path() -> str:
-    """
-    Validate that manifest_path is configured and exists.
-
-    Returns:
-        The validated manifest_path
-
-    Raises:
-        ConfigurationError: If path is not configured
-        FileOperationError: If path doesn't exist
-    """
-    if not cfg.MANIFEST_PATH or cfg.MANIFEST_PATH == "":
-        raise ConfigurationError(
-            "dbt_manifest_path is not configured. Please set it in trellis.yml"
-        )
-
-    if not os.path.exists(cfg.MANIFEST_PATH):
-        raise FileOperationError(
-            f"Manifest not found at {cfg.MANIFEST_PATH}. "
-            "Please ensure manifest.json exists (run 'dbt compile' or 'dbt run')."
-        )
-
-    return cfg.MANIFEST_PATH
-
-
-def validate_catalog_path() -> str | None:
-    """
-    Validate that catalog_path exists if configured.
-
-    Returns:
-        The validated catalog_path, or None if not configured
-
-    Raises:
-        FileOperationError: If path is configured but doesn't exist
-    """
-    if not cfg.CATALOG_PATH:
-        return None
-
-    if not os.path.exists(cfg.CATALOG_PATH):
-        raise FileOperationError(
-            f"Catalog not found at {cfg.CATALOG_PATH}. "
-            "Please run 'dbt docs generate' to create catalog.json."
-        )
-
-    return cfg.CATALOG_PATH
-
-
 def validate_data_model_path() -> str:
     """
     Validate that data_model_path is configured.

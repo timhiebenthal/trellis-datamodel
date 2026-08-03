@@ -5,7 +5,6 @@ from fastapi import APIRouter
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import FeatureDisabledError
 from trellis_datamodel.services.lineage import extract_upstream_lineage
-from trellis_datamodel.utils.path_validation import validate_manifest_path
 
 
 router = APIRouter(
@@ -36,14 +35,5 @@ async def get_lineage(model_id: str):
             "Lineage is disabled. Set lineage.enabled: true in trellis.yml to enable."
         )
 
-    # Validate manifest path exists
-    manifest_path = validate_manifest_path()
-
-    # Extract lineage
-    lineage_data = extract_upstream_lineage(
-        manifest_path=manifest_path,
-        catalog_path=cfg.CATALOG_PATH,
-        model_unique_id=model_id,
-    )
-
-    return lineage_data
+    # Missing-metadata and unknown-model errors surface from the adapter.
+    return extract_upstream_lineage(model_unique_id=model_id)

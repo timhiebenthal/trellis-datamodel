@@ -9,6 +9,7 @@ without being declared on the protocol, and modules that reach around
 `get_adapter()` to import `DbtCoreAdapter` directly.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -143,3 +144,28 @@ def test_no_service_or_route_imports_dbt_core_adapter_directly():
         and "DbtCoreAdapter" in p.read_text()
     ]
     assert hits == []
+
+
+# Config *declaration* sites legitimately name the artifacts — something has to
+# describe the dbt path fields to the config UI. The contract is about reading
+# artifacts, and a field description is not a read.
+ARTIFACT_PATTERN = re.compile(r"manifest\.json|catalog\.json|MANIFEST_PATH|CATALOG_PATH")
+ARTIFACT_GATE_ALLOWLIST = {"services/config_service.py"}
+
+
+def test_no_route_or_service_reads_framework_artifacts_directly():
+    """Only adapters/ may name manifest.json / catalog.json.
+
+    This is the whole point of the four lineage/exposure/status protocol
+    methods: a second framework cannot work while routes and services reach
+    for dbt's files themselves.
+    """
+    package_root = Path(__file__).resolve().parents[1]
+    offenders = sorted(
+        str(path.relative_to(package_root))
+        for directory in ("routes", "services")
+        for path in package_root.joinpath(directory).rglob("*.py")
+        if ARTIFACT_PATTERN.search(path.read_text())
+    )
+
+    assert [o for o in offenders if o not in ARTIFACT_GATE_ALLOWLIST] == []

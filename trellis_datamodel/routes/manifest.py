@@ -47,32 +47,48 @@ async def get_config_status():
         # Default to trellis.yml (primary config file name)
         config_filename = "trellis.yml"
 
-    manifest_exists = os.path.exists(cfg.MANIFEST_PATH) if cfg.MANIFEST_PATH else False
-    catalog_exists = os.path.exists(cfg.CATALOG_PATH) if cfg.CATALOG_PATH else False
+    status = get_adapter().get_project_status()
     data_model_exists = (
         os.path.exists(cfg.DATA_MODEL_PATH) if cfg.DATA_MODEL_PATH else False
     )
 
-    error = None
-    if not config_present:
-        error = "Config file not found."
-    elif not cfg.DBT_PROJECT_PATH:
-        error = "dbt_project_path not set in config."
-    elif not manifest_exists:
-        error = f"Manifest not found at {cfg.MANIFEST_PATH}"
+    # A missing config file outranks anything the adapter can report: without it
+    # there is nothing configured to be wrong yet.
+    error = "Config file not found." if not config_present else status["error"]
 
     return {
         "config_present": config_present,
         "config_filename": config_filename,
-        "framework": cfg.FRAMEWORK,
-        "dbt_project_path": cfg.DBT_PROJECT_PATH,
-        "manifest_path": cfg.MANIFEST_PATH,
-        "catalog_path": cfg.CATALOG_PATH,
-        "manifest_exists": manifest_exists,
-        "catalog_exists": catalog_exists,
+        "framework": status["framework"],
+        "project_path": status["project_path"],
+        "project_path_exists": status["project_path_exists"],
+        "artifacts_present": status["artifacts_present"],
+        "artifacts": status["artifacts"],
+        "capabilities": status["capabilities"],
         "data_model_exists": data_model_exists,
         "error": error,
+        # Legacy dbt-named keys the frontend still reads. Sourced from the
+        # adapter's artifact report rather than from config, so they are absent
+        # for a framework that has no manifest or catalog.
+        **_legacy_artifact_keys(status),
     }
+
+
+def _legacy_artifact_keys(status: dict) -> dict:
+    """Re-emit dbt's artifact paths under their historical response keys."""
+    artifacts = status["artifacts"]
+    legacy: dict = {}
+
+    if "manifest" in artifacts:
+        legacy["manifest_path"] = artifacts["manifest"]["path"]
+        legacy["manifest_exists"] = artifacts["manifest"]["exists"]
+    if "catalog" in artifacts:
+        legacy["catalog_path"] = artifacts["catalog"]["path"]
+        legacy["catalog_exists"] = artifacts["catalog"]["exists"]
+    if status["framework"] == "dbt-core":
+        legacy["dbt_project_path"] = status["project_path"]
+
+    return legacy
 
 
 @router.get("/config-info")
@@ -82,22 +98,16 @@ async def get_config_info():
     """
     config_path = _resolve_config_path()
 
-    adapter = get_adapter()
-    try:
-        model_dirs = adapter.get_model_dirs()
-    except Exception:
-        model_dirs = []
+    status = get_adapter().get_project_status()
 
     return {
         "config_path": config_path,
-        "framework": cfg.FRAMEWORK,
-        "dbt_project_path": cfg.DBT_PROJECT_PATH,
-        "manifest_path": cfg.MANIFEST_PATH,
-        "manifest_exists": bool(
-            cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH)
-        ),
-        "catalog_path": cfg.CATALOG_PATH,
-        "catalog_exists": bool(cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH)),
+        "framework": status["framework"],
+        "project_path": status["project_path"],
+        "project_path_exists": status["project_path_exists"],
+        "artifacts_present": status["artifacts_present"],
+        "artifacts": status["artifacts"],
+        "capabilities": status["capabilities"],
         "data_model_path": cfg.DATA_MODEL_PATH,
         "data_model_exists": bool(
             cfg.DATA_MODEL_PATH and os.path.exists(cfg.DATA_MODEL_PATH)
@@ -107,8 +117,8 @@ async def get_config_info():
             cfg.CANVAS_LAYOUT_PATH and os.path.exists(cfg.CANVAS_LAYOUT_PATH)
         ),
         "frontend_build_dir": cfg.FRONTEND_BUILD_DIR,
-        "model_paths_configured": cfg.DBT_MODEL_PATHS,
-        "model_paths_resolved": model_dirs,
+        "model_paths_configured": status["model_paths_configured"],
+        "model_paths_resolved": status["model_paths_resolved"],
         "guidance": {
             "entity_wizard_enabled": cfg.GUIDANCE_CONFIG.entity_wizard_enabled,
             "push_warning_enabled": cfg.GUIDANCE_CONFIG.push_warning_enabled,
@@ -144,6 +154,8 @@ async def get_config_info():
             if cfg.DIMENSIONAL_MODELING_CONFIG.enabled
             else []
         ),
+        # Legacy dbt-named keys the frontend still reads.
+        **_legacy_artifact_keys(status),
     }
 
 

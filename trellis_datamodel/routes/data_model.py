@@ -269,42 +269,16 @@ async def get_data_model():
             entity["tags"] = compute_display_tags(entity)
 
             if model_ref:
-                # Bound entity: extract source systems from lineage
-                # Extract for primary model
+                # Bound entity: extract source systems from lineage, for the
+                # primary model and any additional models bound to it.
                 source_systems = set()
-                try:
-                    if cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH):
-                        primary_sources = extract_source_systems_for_model(
-                            cfg.MANIFEST_PATH,
-                            (
-                                cfg.CATALOG_PATH
-                                if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH)
-                                else None
-                            ),
-                            model_ref,
-                        )
-                        source_systems.update(primary_sources)
-                except Exception:
-                    # Gracefully handle errors - log but don't fail
-                    pass
-
-                # Extract for additional models
-                for model_id in additional_models:
+                for model_id in [model_ref, *additional_models]:
                     try:
-                        if cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH):
-                            additional_sources = extract_source_systems_for_model(
-                                cfg.MANIFEST_PATH,
-                                (
-                                    cfg.CATALOG_PATH
-                                    if cfg.CATALOG_PATH
-                                    and os.path.exists(cfg.CATALOG_PATH)
-                                    else None
-                                ),
-                                model_id,
-                            )
-                            source_systems.update(additional_sources)
+                        source_systems.update(
+                            extract_source_systems_for_model(model_id)
+                        )
                     except Exception:
-                        # Gracefully handle errors
+                        # Gracefully handle errors - log but don't fail
                         pass
 
                 # Set source_system if any sources found
@@ -526,51 +500,24 @@ async def get_source_system_suggestions():
             pass
 
     # 2. Collect lineage-derived sources from all bound entities
-    if cfg.MANIFEST_PATH and os.path.exists(cfg.MANIFEST_PATH):
-        try:
-            with open(cfg.DATA_MODEL_PATH, "r") as f:
-                model_data = yaml.safe_load(f) or {}
+    try:
+        with open(cfg.DATA_MODEL_PATH, "r") as f:
+            model_data = yaml.safe_load(f) or {}
 
-            entities = model_data.get("entities", [])
-            for entity in entities:
-                model_ref = get_model_ref(entity)
-                additional_models = entity.get("additional_models", [])
+        for entity in model_data.get("entities", []):
+            model_ref = get_model_ref(entity)
+            if not model_ref:
+                continue
 
-                if model_ref:
-                    # Extract from primary model
-                    try:
-                        sources = extract_source_systems_for_model(
-                            cfg.MANIFEST_PATH,
-                            (
-                                cfg.CATALOG_PATH
-                                if cfg.CATALOG_PATH and os.path.exists(cfg.CATALOG_PATH)
-                                else None
-                            ),
-                            model_ref,
-                        )
-                        suggestions.update(sources)
-                    except Exception:
-                        pass
-
-                    # Extract from additional models
-                    for model_id in additional_models:
-                        try:
-                            sources = extract_source_systems_for_model(
-                                cfg.MANIFEST_PATH,
-                                (
-                                    cfg.CATALOG_PATH
-                                    if cfg.CATALOG_PATH
-                                    and os.path.exists(cfg.CATALOG_PATH)
-                                    else None
-                                ),
-                                model_id,
-                            )
-                            suggestions.update(sources)
-                        except Exception:
-                            pass
-        except Exception:
-            # Gracefully handle errors
-            pass
+            additional_models = entity.get("additional_models", [])
+            for model_id in [model_ref, *additional_models]:
+                try:
+                    suggestions.update(extract_source_systems_for_model(model_id))
+                except Exception:
+                    pass
+    except Exception:
+        # Gracefully handle errors
+        pass
 
     # 3. Collect from dbt sources.yml (if available)
     # Note: This would require parsing sources.yml files, which is out of scope for now
