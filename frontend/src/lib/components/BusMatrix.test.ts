@@ -4,11 +4,11 @@ import BusMatrix from './BusMatrix.svelte';
 
 const mockBusMatrixData = vi.hoisted(() => ({
 	dimensions: [
-		{ id: 'dim_bound', label: 'Bound Dimension', tags: [], dbt_model: 'model.project.dim_bound' },
+		{ id: 'dim_bound', label: 'Bound Dimension', tags: [], model_ref: 'model.project.dim_bound' },
 		{ id: 'dim_unbound', label: 'Unbound Dimension', tags: [] },
 	],
 	facts: [
-		{ id: 'fct_bound', label: 'Bound Fact', tags: [], dbt_model: 'model.project.fct_bound' },
+		{ id: 'fct_bound', label: 'Bound Fact', tags: [], model_ref: 'model.project.fct_bound' },
 		{ id: 'fct_unbound', label: 'Unbound Fact', tags: [] },
 	],
 	connections: [{ dimension_id: 'dim_bound', fact_id: 'fct_bound' }],

@@ -10,7 +10,7 @@ function makeEntityNode(id: string, dbtModel: string | undefined, draftedFields:
     position: { x: 0, y: 0 },
     data: {
       label: id,
-      dbt_model: dbtModel,
+      model_ref: dbtModel,
       drafted_fields: draftedFields.length > 0 ? draftedFields : undefined,
     } as unknown as EntityData,
   } as Node;
@@ -34,8 +34,8 @@ describe('autoPromoteAllNodes', () => {
         { name: 'new_field', datatype: 'text' },
       ]),
     ];
-    const dbtModels: DbtModel[] = [makeDbtModel('model.a.booking', ['id'])];
-    const { nodes: result, changed } = autoPromoteAllNodes(nodes, dbtModels);
+    const frameworkModels: DbtModel[] = [makeDbtModel('model.a.booking', ['id'])];
+    const { nodes: result, changed } = autoPromoteAllNodes(nodes, frameworkModels);
     expect(changed).toBe(true);
     const entityData = result[0].data as unknown as EntityData;
     expect(entityData.drafted_fields).toEqual([{ name: 'new_field', datatype: 'text' }]);
@@ -47,24 +47,24 @@ describe('autoPromoteAllNodes', () => {
         { name: 'custom_field', datatype: 'text' },
       ]),
     ];
-    const dbtModels: DbtModel[] = [makeDbtModel('model.a.booking', ['id'])];
-    const { nodes: result, changed } = autoPromoteAllNodes(nodes, dbtModels);
+    const frameworkModels: DbtModel[] = [makeDbtModel('model.a.booking', ['id'])];
+    const { nodes: result, changed } = autoPromoteAllNodes(nodes, frameworkModels);
     expect(changed).toBe(false);
     expect(result[0]).toBe(nodes[0]); // Same reference
   });
 
   it('leaves unbound nodes untouched', () => {
     const nodes = [makeEntityNode('unbound', undefined, [{ name: 'x', datatype: 'text' }])];
-    const dbtModels: DbtModel[] = [makeDbtModel('model.a.something', ['x'])];
-    const { nodes: result, changed } = autoPromoteAllNodes(nodes, dbtModels);
+    const frameworkModels: DbtModel[] = [makeDbtModel('model.a.something', ['x'])];
+    const { nodes: result, changed } = autoPromoteAllNodes(nodes, frameworkModels);
     expect(changed).toBe(false);
     expect(result[0]).toBe(nodes[0]);
   });
 
   it('handles node with no drafted_fields', () => {
     const nodes = [makeEntityNode('booking', 'model.a.booking', [])];
-    const dbtModels: DbtModel[] = [makeDbtModel('model.a.booking', ['id'])];
-    const { nodes: result, changed } = autoPromoteAllNodes(nodes, dbtModels);
+    const frameworkModels: DbtModel[] = [makeDbtModel('model.a.booking', ['id'])];
+    const { nodes: result, changed } = autoPromoteAllNodes(nodes, frameworkModels);
     expect(changed).toBe(false);
     expect(result[0]).toBe(nodes[0]);
   });
@@ -73,8 +73,8 @@ describe('autoPromoteAllNodes', () => {
     const nodes = [
       makeEntityNode('booking', 'model.a.booking', [{ name: 'X', datatype: 'text' }]),
     ];
-    const dbtModels: DbtModel[] = [makeDbtModel('model.a.booking', ['x'])];
-    const { nodes: result, changed } = autoPromoteAllNodes(nodes, dbtModels);
+    const frameworkModels: DbtModel[] = [makeDbtModel('model.a.booking', ['x'])];
+    const { nodes: result, changed } = autoPromoteAllNodes(nodes, frameworkModels);
     expect(changed).toBe(false);
     const entityData = result[0].data as unknown as EntityData;
     expect(entityData.drafted_fields).toHaveLength(1);
@@ -82,8 +82,8 @@ describe('autoPromoteAllNodes', () => {
 
   it('returns original nodes array reference when nothing changed', () => {
     const nodes = [makeEntityNode('booking', 'model.a.booking', [])];
-    const dbtModels: DbtModel[] = [];
-    const { nodes: result } = autoPromoteAllNodes(nodes, dbtModels);
+    const frameworkModels: DbtModel[] = [];
+    const { nodes: result } = autoPromoteAllNodes(nodes, frameworkModels);
     expect(result).toBe(nodes); // Same array reference
   });
 });

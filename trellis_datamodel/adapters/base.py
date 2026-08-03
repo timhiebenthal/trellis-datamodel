@@ -59,7 +59,7 @@ class Entity(TypedDict, total=False):
     id: str
     label: str
     description: Optional[str]
-    dbt_model: Optional[str]
+    model_ref: Optional[str]
     additional_models: Optional[list[str]]
     drafted_fields: Optional[list[dict[str, Any]]]
     tags: Optional[list[str]]
@@ -139,7 +139,7 @@ class TransformationAdapter(Protocol):
 
         Args:
             include_unbound: When True, also include relationships for entities
-                that exist in the data model but are not yet bound to a dbt
+                that exist in the data model but are not yet bound to a framework
                 model. Useful for frontends that want immediate inference right
                 after a bind action, before the data model file is persisted.
 
@@ -162,6 +162,60 @@ class TransformationAdapter(Protocol):
 
         Returns:
             List of paths to updated schema files.
+        """
+        ...
+
+    def save_schema_file(
+        self,
+        entity_id: str,
+        model_name: str,
+        fields: list[dict[str, str]],
+        description: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+    ) -> Path:
+        """
+        Generate and save a framework schema definition file for drafted fields.
+
+        This is used for creating new schema files from the data model editor.
+
+        Args:
+            entity_id: Entity ID from the data model.
+            model_name: Name of the framework model backing the entity.
+            fields: List of field definitions.
+            description: Optional model description.
+            tags: Optional list of tags to additively union onto whatever is
+                already present in the schema file.
+
+        Returns:
+            Path to the saved schema file.
+        """
+        ...
+
+    def infer_entity_types(self) -> dict[str, str]:
+        """
+        Infer entity types from framework model naming patterns.
+
+        Returns:
+            dict[entity_id, entity_type]: Mapping from entity ID to inferred
+            type ("fact", "dimension", or "unclassified").
+        """
+        ...
+
+    def get_model_dirs(self) -> list[str]:
+        """
+        Return the directories where the active framework's models live.
+
+        Returns:
+            List of absolute directory paths.
+        """
+        ...
+
+    def reset_inference_cache(self) -> None:
+        """
+        Reset any cached entity type inference results.
+
+        Should be called when configuration changes that affect inference
+        (e.g., dimensional modeling config, manifest path changes).
         """
         ...
 

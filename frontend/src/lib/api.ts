@@ -1,5 +1,5 @@
 import type {
-    DbtModel,
+    ModelInfo,
     DataModel,
     DraftedField,
     ConfigStatus,
@@ -81,7 +81,7 @@ export function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
-export async function getManifest(): Promise<DbtModel[]> {
+export async function getManifest(): Promise<ModelInfo[]> {
     try {
         // Short-circuit in test/smoke environments to avoid console 500s when backend is absent
         const isSmokeMode =
@@ -212,7 +212,7 @@ export async function inferRelationships(): Promise<Relationship[]> {
 
 export async function syncDbtTests(): Promise<{ message: string }> {
     try {
-        const res = await fetch(`${API_BASE}/sync-dbt-tests`, {
+        const res = await fetch(`${API_BASE}/sync-tests`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -1135,7 +1135,7 @@ export async function detachEventsFromProcess(
 
 export async function reconcileDbt(): Promise<{ status: string; changed: boolean; data_model: DataModel }> {
     try {
-        const res = await fetch(`${API_BASE}/reconcile-dbt`, { method: 'POST' });
+        const res = await fetch(`${API_BASE}/reconcile`, { method: 'POST' });
         if (!res.ok) {
             if (res.status === 404) return { status: 'success', changed: false, data_model: {} as DataModel };
             throw new Error(`Failed to reconcile dbt: ${res.status}`);

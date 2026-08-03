@@ -98,18 +98,19 @@ class DataModelUpdate(BaseModel):
     source_colors: Optional[Dict[str, str]] = None  # Map of source name to color from canvas_layout.yml
 
 
-class DbtSchemaRequest(BaseModel):
-    """Schema for creating a new dbt schema file."""
-    entity_id: str
-    model_name: str
-    fields: List[Dict[str, Any]]
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
-
-
 class ModelSchemaRequest(BaseModel):
-    """Schema for updating model columns and metadata."""
-    columns: List[Dict[str, Any]]
+    """Schema for creating/updating a model's schema file.
+
+    Supports two call shapes used by the schema routes:
+    - POST /api/schema: entity_id + model_name + fields (resolves the model
+      binding from entity_id and writes the given fields as columns).
+    - POST /api/models/{model_name}/schema: columns (+ optional version),
+      updating an already-identified model's schema in place.
+    """
+    entity_id: Optional[str] = None
+    model_name: Optional[str] = None
+    fields: Optional[List[Dict[str, Any]]] = None
+    columns: Optional[List[Dict[str, Any]]] = None
     description: Optional[str] = None
     tags: Optional[List[str]] = None
     version: Optional[int] = None

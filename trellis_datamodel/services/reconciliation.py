@@ -1,7 +1,8 @@
 """
-Provenance-aware reconciliation of dbt manifest columns into data_model.yml.
+Provenance-aware reconciliation of framework manifest columns into data_model.yml.
 
-Governing rule: when Trellis and dbt disagree, dbt is right.
+Governing rule: the active framework's materialized model wins over a
+drafted concept.
 - manifest_columns=None means the model is absent from a (possibly partial)
   manifest — the non-destructive invariant applies: existing fields untouched.
 - Reconciliation is idempotent: reconciling an already-reconciled model
@@ -15,6 +16,14 @@ import os
 from typing import Any
 
 import yaml
+
+from trellis_datamodel.models.entity_keys import (
+    get_framework_tags,
+    get_model_ref,
+    set_framework_tags,
+    set_model_ref,
+    set_physical_datatype,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -60,11 +69,11 @@ def _parse_description_with_origin(
     return raw_description, None
 
 
-def _map_dbt_type(dbt_type: str | None) -> str:
-    """Map a dbt/warehouse column type string to a DraftedField datatype enum value."""
-    if not dbt_type:
+def _map_column_type(column_type: str | None) -> str:
+    """Map a framework/warehouse column type string to a DraftedField datatype enum value."""
+    if not column_type:
         return "unknown"
-    t = dbt_type.lower().strip()
+    t = column_type.lower().strip()
     if t in _DATE_EXACT:
         return "date"
     for prefix in _TIMESTAMP_PREFIXES:
@@ -131,16 +140,12 @@ def reconcile_entity_fields(
 
         # dbt is authoritative for these attributes
         field["name"] = col_name
-        field["datatype"] = _map_dbt_type(col.get("type"))
+        field["datatype"] = _map_column_type(col.get("type"))
         field["source"] = "dbt"
-        raw_type = col.get("type")
-        if raw_type:
-            # Preserve the exact warehouse/dbt type (e.g. "varchar") alongside
-            # the coarse UI bucket above, so pushing back to dbt doesn't
-            # downgrade a precise type to the bucket's generic default (#111).
-            field["dbt_data_type"] = raw_type
-        elif "dbt_data_type" in field:
-            del field["dbt_data_type"]
+        # Preserve the exact warehouse/adapter type (e.g. "varchar") alongside
+        # the coarse UI bucket above, so pushing back to the adapter doesn't
+        # downgrade a precise type to the bucket's generic default (#111).
+        set_physical_datatype(field, col.get("type"))
         desc = col.get("description")
         if desc is not None:
             # Parse origin from description if embedded
@@ -169,7 +174,7 @@ def reconcile_entity_tags(
     existing_tags: list[str],
     manifest_tags: list[str] | None,
 ) -> list[str]:
-    """dbt is authoritative for the mirrored `dbt_tags` field.
+    """The active framework is authoritative for the mirrored `framework_tags` field.
     manifest_tags=None -> model absent from manifest, non-destructive (unchanged).
     manifest_tags=[] (present, no tags) -> mirrored tags cleared.
     """
@@ -181,17 +186,18 @@ def reconcile_entity_tags(
 def compute_display_tags(entity: dict[str, Any]) -> list[str]:
     """The tag list to show/export for an entity — never persisted.
 
-    Bound entities: the union of `dbt_tags` (dbt-owned, reconcile-refreshed)
-    and `ui_tags` (user-added via the Trellis tag editor), deduplicated,
-    dbt_tags first. Unbound entities have no schema.yml to mirror — `tags`
-    is their single, freely-editable, already-authoritative field.
+    Bound entities: the union of `framework_tags` (framework-owned,
+    reconcile-refreshed) and `ui_tags` (user-added via the Trellis tag
+    editor), deduplicated, framework_tags first. Unbound entities have no
+    schema.yml to mirror — `tags` is their single, freely-editable,
+    already-authoritative field.
     """
-    if entity.get("dbt_model"):
-        dbt_tags = entity.get("dbt_tags") or []
+    if get_model_ref(entity):
+        framework_tags = get_framework_tags(entity)
         ui_tags = entity.get("ui_tags") or []
         seen: set[str] = set()
         result: list[str] = []
-        for tag in [*dbt_tags, *ui_tags]:
+        for tag in [*framework_tags, *ui_tags]:
             if tag not in seen:
                 seen.add(tag)
                 result.append(tag)
@@ -228,13 +234,13 @@ def reconcile_data_model(
     changed = False
 
     for entity in result.get("entities", []):
-        dbt_model = entity.get("dbt_model")
-        if not dbt_model:
+        model_ref = get_model_ref(entity)
+        if not model_ref:
             continue  # unbound — untouched
 
         # None signals model absent from manifest (non-destructive)
-        manifest_columns = manifest_by_id.get(dbt_model, None)
-        if dbt_model not in manifest_by_id:
+        manifest_columns = manifest_by_id.get(model_ref, None)
+        if model_ref not in manifest_by_id:
             manifest_columns = None
 
         existing = entity.get("drafted_fields") or []
@@ -244,34 +250,39 @@ def reconcile_data_model(
             entity["drafted_fields"] = reconciled
             changed = True
 
-        manifest_tags = manifest_tags_by_id.get(dbt_model) if dbt_model in manifest_by_id else None
+        manifest_tags = manifest_tags_by_id.get(model_ref) if model_ref in manifest_by_id else None
         legacy_tags = entity.get("tags") or []
-        existing_dbt_tags = entity.get("dbt_tags") or []
-        reconciled_dbt_tags = reconcile_entity_tags(existing_dbt_tags, manifest_tags)
+        existing_framework_tags = get_framework_tags(entity)
+        reconciled_framework_tags = reconcile_entity_tags(existing_framework_tags, manifest_tags)
 
         # One-time migration: a bound entity's legacy `tags` value (from
-        # before the dbt_tags/ui_tags split existed) is folded into ui_tags
-        # ONLY if it represents real legacy/user-curated data — i.e. it
-        # differs from what dbt reconciliation says right now. A value that
-        # already matches is dbt's own tag list from an earlier run under
-        # the old field name, not something the user added, and must NOT be
-        # copied into ui_tags (that would wrongly mark dbt's tags as
-        # Trellis-authored and defeat the read-only/removable UI split).
-        # The legacy `tags` key itself is always retired afterward — bound
-        # entities never persist `tags` going forward, only dbt_tags/ui_tags.
+        # before the framework_tags/ui_tags split existed) is folded into
+        # ui_tags ONLY if it represents real legacy/user-curated data — i.e.
+        # it differs from what framework reconciliation says right now. A
+        # value that already matches is the framework's own tag list from an
+        # earlier run under the old field name, not something the user
+        # added, and must NOT be copied into ui_tags (that would wrongly
+        # mark the framework's tags as Trellis-authored and defeat the
+        # read-only/removable UI split). The legacy `tags` key itself is
+        # always retired afterward — bound entities never persist `tags`
+        # going forward, only framework_tags/ui_tags.
         if "tags" in entity:
             if (
                 "ui_tags" not in entity
                 and legacy_tags
-                and legacy_tags != reconciled_dbt_tags
+                and legacy_tags != reconciled_framework_tags
             ):
                 entity["ui_tags"] = list(legacy_tags)
             del entity["tags"]
             changed = True
 
-        if reconciled_dbt_tags != existing_dbt_tags:
-            entity["dbt_tags"] = reconciled_dbt_tags
+        if reconciled_framework_tags != existing_framework_tags:
             changed = True
+
+        # Normalize key spellings (migrates any legacy dbt_model/dbt_tags
+        # keys onto model_ref/framework_tags) even when values are unchanged.
+        set_model_ref(entity, model_ref)
+        set_framework_tags(entity, reconciled_framework_tags)
 
     return result, changed
 
@@ -280,7 +291,7 @@ def reconcile_data_model(
 # IO wrapper
 # ---------------------------------------------------------------------------
 
-def reconcile_dbt() -> tuple[dict[str, Any], bool]:
+def reconcile_framework() -> tuple[dict[str, Any], bool]:
     """
     Load manifest + data_model.yml, reconcile, write back if changed.
 

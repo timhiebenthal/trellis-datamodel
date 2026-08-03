@@ -11,7 +11,7 @@ describe('entity-filtering', () => {
 		tags?: string[],
 		domains?: string[],
 		entity_type?: 'dimension' | 'fact' | 'unclassified',
-		dbt_model?: string
+		model_ref?: string
 	): Entity => ({
 		id,
 		label,
@@ -21,7 +21,7 @@ describe('entity-filtering', () => {
 		description: '',
 		entity_type: entity_type ?? 'dimension',
 		attributes: [],
-		dbt_model,
+		model_ref,
 	});
 
 	describe('filterEntities', () => {

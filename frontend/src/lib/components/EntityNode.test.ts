@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
-import { dbtModels, viewMode } from '$lib/stores';
+import { frameworkModels, viewMode } from '$lib/stores';
 import EntityNode from './EntityNode.svelte';
 import type { EntityData } from '$lib/types';
 import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
@@ -48,7 +48,7 @@ const mockProps = {
   id: 'booking',
   data: {
     label: 'Booking',
-    dbt_model: 'model.project.booking',
+    model_ref: 'model.project.booking',
     drafted_fields: [{ name: 'new_col', datatype: 'text', description: '' }],
     width: 280,
     panelHeight: 200,
@@ -74,7 +74,7 @@ const svelteFlowContext = new Map<string, unknown>([
 
 describe('EntityNode — merged field rendering', () => {
   beforeEach(() => {
-    dbtModels.set([mockDbtModel] as any);
+    frameworkModels.set([mockDbtModel] as any);
     viewMode.set('logical');
     vi.clearAllMocks();
   });

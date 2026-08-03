@@ -1,6 +1,6 @@
 <script lang="ts">
     import {
-        dbtModels,
+        frameworkModels,
         configStatus,
         folderFilter,
         tagFilter,
@@ -11,9 +11,12 @@
         entityTypeFilter,
         modelBoundFilter,
         sidebarSearchTerm,
+        activeFramework,
     } from "$lib/stores";
-    import type { DbtModel, TreeNode, EntityData } from "$lib/types";
+    import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
+    import { readModelRef } from "$lib/utils/entity-compat";
+    import { getFrameworkDisplay } from "$lib/utils/framework-display";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -27,7 +30,7 @@
 
     $effect(() => { sidebarSearchTerm.set(searchTerm); });
 
-    function inferModelVersion(model: DbtModel): number | null {
+    function inferModelVersion(model: ModelInfo): number | null {
         if (model.version !== undefined && model.version !== null) {
             return model.version;
         }
@@ -44,7 +47,7 @@
         return null;
     }
 
-    function getModelLabel(model: DbtModel): string {
+    function getModelLabel(model: ModelInfo): string {
         const version = inferModelVersion(model);
         return version ? `${model.name}.v${version}` : model.name;
     }
@@ -53,7 +56,7 @@
     let allFolders = $derived(
         Array.from(
             new Set(
-                $dbtModels
+                $frameworkModels
                     .map((m) => getModelFolder(m))
                     .filter((f): f is string => f !== null),
             ),
@@ -65,7 +68,7 @@
         Array.from(
             new Set([
                 // Tags from dbt models (manifest.json)
-                ...$dbtModels.flatMap((m) => normalizeTags(m.tags)),
+                ...$frameworkModels.flatMap((m) => normalizeTags(m.tags)),
                 // Tags from entity nodes on canvas (user-added tags)
                 ...$nodes
                     .filter((n) => n.type === "entity")
@@ -76,7 +79,7 @@
 
     // Apply search and filters
     let filteredModels = $derived(
-        $dbtModels.filter((m) => {
+        $frameworkModels.filter((m) => {
             // Search filter
             const label = getModelLabel(m);
             if (!label.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -120,7 +123,7 @@
                 const isBound = currentNodes.some((n) => {
                     if (n.type !== 'entity') return false;
                     const data = n.data as unknown as EntityData;
-                    const primaryMatch = data.dbt_model === m.unique_id;
+                    const primaryMatch = readModelRef(data) === m.unique_id;
                     const additionalMatch = (data.additional_models || []).includes(m.unique_id);
                     return primaryMatch || additionalMatch;
                 });
@@ -138,6 +141,8 @@
     );
 
     let treeNodes = $derived(buildTree(filteredModels));
+
+    let currentFrameworkDisplay = $derived(getFrameworkDisplay($activeFramework));
 
     function toggleFolder(folder: string) {
         if ($folderFilter.includes(folder)) {
@@ -170,7 +175,7 @@
         $modelBoundFilter = null;
     }
 
-    function buildTree(models: DbtModel[]): TreeNode[] {
+    function buildTree(models: ModelInfo[]): TreeNode[] {
         const rootObj: any = { _files: [], _folders: {} };
 
         for (const model of models) {
@@ -195,7 +200,7 @@
             const folderNodes = Object.keys(obj._folders).map((key) =>
                 convert(obj._folders[key], key, path ? `${path}/${key}` : key),
             );
-            const fileNodes = obj._files.map((m: DbtModel) => {
+            const fileNodes = obj._files.map((m: ModelInfo) => {
                 const label = getModelLabel(m);
                 const filePath = path ? `${path}/${label}` : label;
                 return {
@@ -225,11 +230,11 @@
         return convert(rootObj, "root", "").children;
     }
 
-    function onDragStart(event: DragEvent, model: DbtModel) {
+    function onDragStart(event: DragEvent, model: ModelInfo) {
         if (!event.dataTransfer) return;
         // Set data to identify the drag source and payload
         event.dataTransfer.setData(
-            "application/dbt-model",
+            "application/model-ref",
             JSON.stringify(model),
         );
         event.dataTransfer.effectAllowed = "all";
@@ -524,14 +529,14 @@
             <!-- Separator -->
         <div class="border-t border-gray-200 mb-3"></div>
 
-        <!-- dbt Models Header -->
-        <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of dbt">
+        <!-- Framework Models Header -->
+        <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of the configured framework">
             <img
-                src="https://www.getdbt.com/favicon.ico"
-                alt="dbt icon"
+                src={currentFrameworkDisplay.icon}
+                alt={currentFrameworkDisplay.alt}
                 class="w-4 h-4 flex-shrink-0"
             />
-            <span class="text-xs font-semibold text-gray-600">dbt Models</span>
+            <span class="text-xs font-semibold text-gray-600">{currentFrameworkDisplay.label}</span>
         </div>
 
         <div class="flex-1 overflow-y-auto pr-1 space-y-0.5">
@@ -548,7 +553,7 @@
                             Loading...
                         </div>
                     </div>
-                {:else if $dbtModels.length === 0}
+                {:else if $frameworkModels.length === 0}
                     <div class="text-center mt-10 px-2">
                         <div class="text-gray-500 text-sm mb-4">
                             No models found

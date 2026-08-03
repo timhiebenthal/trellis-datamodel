@@ -3,7 +3,6 @@
 from fastapi import APIRouter
 
 from trellis_datamodel.models.schemas import (
-    DbtSchemaRequest,
     FileOperationResponse,
     ModelSchemaRequest,
     ModelSchemaResponse,
@@ -13,18 +12,18 @@ from trellis_datamodel.models.schemas import (
 from trellis_datamodel.services.schema import (
     get_model_schema,
     infer_relationships,
-    save_dbt_schema,
-    sync_dbt_tests,
+    save_model_schema_from_request,
+    sync_framework_tests,
     update_model_schema,
 )
 
 router = APIRouter(prefix="/api", tags=["schema"])
 
 
-@router.post("/dbt-schema", response_model=FileOperationResponse)
-async def save_dbt_schema_endpoint(request: DbtSchemaRequest):
+@router.post("/schema", response_model=FileOperationResponse)
+async def save_model_schema_endpoint(request: ModelSchemaRequest):
     """Generate and save a schema YAML file for the drafted fields."""
-    output_path = save_dbt_schema(
+    output_path = save_model_schema_from_request(
         entity_id=request.entity_id,
         model_name=request.model_name,
         fields=request.fields,
@@ -38,10 +37,10 @@ async def save_dbt_schema_endpoint(request: DbtSchemaRequest):
     )
 
 
-@router.post("/sync-dbt-tests", response_model=SyncTestsResponse)
-async def sync_dbt_tests_endpoint():
+@router.post("/sync-tests", response_model=SyncTestsResponse)
+async def sync_framework_tests_endpoint():
     """Sync relationship tests from data model to schema files."""
-    updated_files = sync_dbt_tests()
+    updated_files = sync_framework_tests()
 
     return SyncTestsResponse(
         message=f"Updated {len(updated_files)} file(s)",

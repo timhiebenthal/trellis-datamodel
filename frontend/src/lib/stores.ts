@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import type { Node, Edge } from '@xyflow/svelte';
-import type { DbtModel, EntityListFilters, FieldDragState } from './types';
+import type { ModelInfo, EntityListFilters, FieldDragState } from './types';
 
 /**
  * Deep clone that handles Svelte 5 Proxy objects (which structuredClone cannot clone).
@@ -17,10 +17,12 @@ function deepClone<T>(obj: T): T {
 
 export const nodes = writable<Node[]>([]);
 export const edges = writable<Edge[]>([]);
-export const dbtModels = writable<DbtModel[]>([]);
+export const frameworkModels = writable<ModelInfo[]>([]);
 export const viewMode = writable<'conceptual' | 'logical' | 'exposures' | 'bus_matrix' | 'business_events'>('conceptual');
 export const modelingStyle = writable<'dimensional_model' | 'entity_model'>('dimensional_model');
 export const configStatus = writable<any>(null);
+// Active transformation framework (currently only 'dbt-core') — drives framework-specific UI (icons, labels, MIME types).
+export const activeFramework = writable<string>('dbt-core');
 export const labelPrefixes = writable<string[]>([]);
 export const dimensionPrefixes = writable<string[]>([]);
 export const factPrefixes = writable<string[]>([]);

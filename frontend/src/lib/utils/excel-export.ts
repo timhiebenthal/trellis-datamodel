@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { Node } from '@xyflow/svelte';
 import type { AnnotationType, EntityData, OriginEntry } from '$lib/types';
 import { stringifyOrigin } from './origin';
+import { readModelRef } from '$lib/utils/entity-compat';
 
 type ExportAttribute = {
 	name: string;
@@ -181,7 +182,7 @@ export function generateOverviewSheet(entity: EntityData, isDimensional: boolean
 		['Tags', entity.tags?.join(', ') || '-'],
 		['Source Systems', entity.source_system?.join(', ') || '-'],
 		['Description', entity.description || '-'],
-		['dbt Model', entity.dbt_model || '-'],
+		['dbt Model', readModelRef(entity) || '-'],
 		['Additional Models', entity.additional_models?.join(', ') || '-']
 	];
 

@@ -179,7 +179,7 @@ describe('Sheet Generators', () => {
         tags: ['pii', 'core'],
         source_system: ['CRM', 'ERP'],
         description: 'Customer entity',
-        dbt_model: 'model.project.customer',
+        model_ref: 'model.project.customer',
         additional_models: ['model.project.customer_history']
       };
 

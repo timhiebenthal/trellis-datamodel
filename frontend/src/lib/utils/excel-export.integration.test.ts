@@ -29,7 +29,7 @@ describe('excel-export integration tests', () => {
         tags: ['core', 'master-data'],
         source_system: ['SAP', 'Salesforce'],
         description: 'Customer master data from various sources',
-        dbt_model: 'dim_customer',
+        model_ref: 'dim_customer',
         additional_models: ['stg_customer', 'int_customer']
       };
 

@@ -1,6 +1,6 @@
 import type {
     ConfigInfo,
-    DbtModel,
+    ModelInfo,
     Relationship,
     ModelSchema,
     ModelSchemaColumn,
@@ -277,7 +277,7 @@ export function extractModelNameFromUniqueId(uniqueId: string): string {
  * Skips "models/" prefix and the first directory level (e.g., "3_core").
  * Returns null if no subfolder exists.
  */
-export function getModelFolder(model: DbtModel): string | null {
+export function getModelFolder(model: ModelInfo): string | null {
     if (!model.file_path) return null;
     let p = model.file_path.replace(/\\/g, '/');
     const lastSlash = p.lastIndexOf('/');

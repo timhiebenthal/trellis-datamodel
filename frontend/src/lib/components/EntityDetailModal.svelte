@@ -1,11 +1,12 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
-	import { nodes, edges, entityDetailModal, pushHistory, dbtModels, modelingStyle } from '$lib/stores';
+	import { nodes, edges, entityDetailModal, pushHistory, frameworkModels, modelingStyle } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
 	import type { MergedField } from '$lib/utils/merged-fields';
 	import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
+	import { readModelRef, readFrameworkTags } from '$lib/utils/entity-compat';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
@@ -142,13 +143,13 @@
 	let isBoundEntity = $derived.by(() => {
 		if (!currentEntity) return false;
 		const data = currentEntity.data as unknown as EntityData;
-		return !!data?.dbt_model;
+		return !!readModelRef(data ?? {});
 	});
 
 	// Look up the bound dbt model
 	let boundModel = $derived(
 		currentEntity
-			? $dbtModels.find((m) => m.unique_id === (currentEntity?.data as unknown as EntityData)?.dbt_model) ?? null
+			? $frameworkModels.find((m) => m.unique_id === readModelRef((currentEntity?.data as unknown as EntityData) ?? {})) ?? null
 			: null,
 	);
 
@@ -257,8 +258,9 @@
 		const data = currentEntity.data as unknown as EntityData;
 		const models: string[] = [];
 
-		if (data?.dbt_model) {
-			models.push(data.dbt_model);
+		const modelRef = readModelRef(data ?? {});
+		if (modelRef) {
+			models.push(modelRef);
 		}
 
 		if (data?.additional_models) {
@@ -654,13 +656,13 @@
 		nodes.update((n) => {
 			return n.map((node) => {
 				if (node.id === currentEntity.id) {
-					const isBound = Boolean(node.data?.dbt_model);
+					const isBound = Boolean(readModelRef((node.data ?? {}) as any));
 					// Bound entities: `tags` is a computed display union and reconcile-owned
 					// `dbt_tags` is read-only — an edit here only ever changes `ui_tags`.
 					// Unbound entities: `tags` remains the single freely-editable field.
 					const tagFields = isBound
 						? { ui_tags: (() => {
-								const uiTags = computeUiTagsAfterEdit((node.data as any)?.dbt_tags, entityTags);
+								const uiTags = computeUiTagsAfterEdit(readFrameworkTags((node.data ?? {}) as any), entityTags);
 								return uiTags.length > 0 ? uiTags : undefined;
 							})() }
 						: { tags: entityTags.length > 0 ? entityTags : undefined };
@@ -754,7 +756,7 @@
 			editableDraftedFields = editableDraftedFields.filter((_, i) => i !== draftIndex);
 			// Refresh manifest so auto-promotion runs
 			const models = await getManifest();
-			dbtModels.set(models);
+			frameworkModels.set(models);
 		} catch (e: unknown) {
 			materializeError = e instanceof Error ? e.message : 'Failed to materialize field';
 		}

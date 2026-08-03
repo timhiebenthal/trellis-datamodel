@@ -1,18 +1,20 @@
 import type { Node } from '@xyflow/svelte';
-import type { DbtModel, EntityData } from '$lib/types';
+import type { ModelInfo, EntityData } from '$lib/types';
 import { promoteDraftsAgainstModel } from './field-promotion';
+import { readModelRef } from './entity-compat';
 
 export function autoPromoteAllNodes(
 	nodes: Node[],
-	dbtModels: DbtModel[],
+	frameworkModels: ModelInfo[],
 ): { nodes: Node[]; changed: boolean } {
 	let changed = false;
-	const byUniqueId = new Map(dbtModels.map((m) => [m.unique_id, m]));
+	const byUniqueId = new Map(frameworkModels.map((m) => [m.unique_id, m]));
 	const next = nodes.map((node) => {
 		if (node.type !== 'entity') return node;
 		const data = node.data as unknown as EntityData;
-		if (!data?.dbt_model) return node;
-		const model = byUniqueId.get(data.dbt_model);
+		const modelRef = data ? readModelRef(data) : undefined;
+		if (!modelRef) return node;
+		const model = byUniqueId.get(modelRef);
 		const promoted = promoteDraftsAgainstModel(data.drafted_fields, model);
 		if (promoted === data.drafted_fields) return node;
 		changed = true;

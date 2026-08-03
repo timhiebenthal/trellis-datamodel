@@ -2,13 +2,13 @@
 
 from fastapi import APIRouter
 
-from trellis_datamodel.services.reconciliation import reconcile_dbt
+from trellis_datamodel.services.reconciliation import reconcile_framework
 
 router = APIRouter(prefix="/api", tags=["reconciliation"])
 
 
-@router.post("/reconcile-dbt")
-async def reconcile_dbt_endpoint():
+@router.post("/reconcile")
+async def reconcile_framework_endpoint():
     """Reconcile dbt manifest columns into data_model.yml with provenance tags.
 
     Reads the current manifest, merges materialized columns (source='dbt')
@@ -16,5 +16,9 @@ async def reconcile_dbt_endpoint():
     Non-destructive: entities whose model is absent from the manifest are
     left untouched (handles partial dbt compiles).
     """
-    data_model, changed = reconcile_dbt()
-    return {"status": "success", "changed": changed, "data_model": data_model}
+    data_model, changed = reconcile_framework()
+    return {
+        "status": "success",
+        "changed": changed,
+        "data_model": data_model,
+    }

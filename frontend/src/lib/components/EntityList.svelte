@@ -13,6 +13,7 @@
 	import type { Entity, EntityData } from '$lib/types';
 	import { filterEntities } from '$lib/utils/entity-filtering';
 	import { groupEntitiesByDomain } from '$lib/utils/entity-grouping';
+	import { readModelRef } from '$lib/utils/entity-compat';
 	import EntityRow from './EntityRow.svelte';
 	import CollapseChevron from './CollapseChevron.svelte';
 	import Icon from '@iconify/svelte';
@@ -31,7 +32,7 @@
 					id: node.id,
 					label: data.label,
 					description: data.description,
-					dbt_model: data.dbt_model,
+					model_ref: readModelRef(data),
 					additional_models: data.additional_models,
 					drafted_fields: data.drafted_fields,
 					position: node.position,

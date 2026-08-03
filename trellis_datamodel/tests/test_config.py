@@ -1,5 +1,6 @@
 """Tests for configuration loading."""
 
+import os
 import textwrap
 from pathlib import Path
 
@@ -423,3 +424,31 @@ def test_entity_modeling_disabled_when_dimensional_model(monkeypatch, tmp_path):
     assert cfg.MODELING_STYLE == "dimensional_model"
     assert cfg.ENTITY_MODELING_CONFIG.enabled is False
     assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == []
+
+
+def test_framework_enum_lists_only_implemented_frameworks():
+    """The enum advertises what Trellis can actually do.
+
+    A framework value only becomes selectable once its adapter exists, so a user
+    cannot configure a framework that has no working implementation behind it.
+    """
+    from trellis_datamodel.models.schemas import FrameworkEnum
+
+    assert [f.value for f in FrameworkEnum] == ["dbt-core"]
+
+
+def test_repo_trellis_yml_loads(monkeypatch):
+    """Loading this repo's real trellis.yml (dbt-based) resolves as expected."""
+    _prepare_config(monkeypatch)
+    repo_root = Path(__file__).resolve().parents[2]
+    config_path = repo_root / "trellis.yml"
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.FRAMEWORK == "dbt-core"
+    assert cfg.DBT_PROJECT_PATH == os.path.abspath(repo_root / "dbt_demo")
+    assert cfg.MODELING_STYLE == "dimensional_model"
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix == ["dim__"]
+    assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fact__"]
+    assert cfg.EXPOSURES_ENABLED is True
+    assert cfg.BUSINESS_EVENTS_ENABLED is True

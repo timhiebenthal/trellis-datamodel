@@ -22,6 +22,7 @@ import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import FeatureDisabledError
+from trellis_datamodel.models.entity_keys import get_model_ref
 
 
 def _parse_ref(ref_value: str) -> tuple[str, str | None]:
@@ -98,7 +99,7 @@ def _find_entities_for_model(unique_id: str, data_model: dict[str, Any]) -> list
     """
     Find all entity IDs that are bound to the given model unique_id.
 
-    Checks both dbt_model and additional_models fields.
+    Checks both the bound model reference and additional_models fields.
     """
     entity_ids = []
     entities = data_model.get("entities", [])
@@ -107,8 +108,8 @@ def _find_entities_for_model(unique_id: str, data_model: dict[str, Any]) -> list
         if not entity_id:
             continue
 
-        # Check primary dbt_model
-        if entity.get("dbt_model") == unique_id:
+        # Check primary model binding
+        if get_model_ref(entity) == unique_id:
             entity_ids.append(entity_id)
             continue
 

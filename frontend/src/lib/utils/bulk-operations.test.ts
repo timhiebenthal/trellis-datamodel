@@ -299,9 +299,9 @@ describe('bulk-operations', () => {
 					...createEntityNode('1', 'Customer'),
 					data: {
 						label: 'Customer',
-						dbt_model: 'model.proj.customer',
+						model_ref: 'model.proj.customer',
 						tags: ['nightly'],
-						dbt_tags: ['nightly'],
+						framework_tags: ['nightly'],
 						ui_tags: [],
 					},
 				},
@@ -313,7 +313,7 @@ describe('bulk-operations', () => {
 			const updatedNodes = get(nodesStore);
 			expect(updatedNodes[0].data.ui_tags).toEqual(['pii']);
 			expect(updatedNodes[0].data.tags).toEqual(['nightly']);
-			expect((updatedNodes[0].data as any).dbt_tags).toEqual(['nightly']);
+			expect((updatedNodes[0].data as any).framework_tags).toEqual(['nightly']);
 		});
 
 		it('adding a tag already owned by dbt is a no-op on ui_tags for a bound entity', () => {
@@ -322,8 +322,8 @@ describe('bulk-operations', () => {
 					...createEntityNode('1', 'Customer'),
 					data: {
 						label: 'Customer',
-						dbt_model: 'model.proj.customer',
-						dbt_tags: ['nightly'],
+						model_ref: 'model.proj.customer',
+						framework_tags: ['nightly'],
 						ui_tags: [],
 					},
 				},
@@ -480,9 +480,9 @@ describe('bulk-operations', () => {
 					...createEntityNode('1', 'Customer'),
 					data: {
 						label: 'Customer',
-						dbt_model: 'model.proj.customer',
+						model_ref: 'model.proj.customer',
 						tags: ['nightly', 'pii'],
-						dbt_tags: ['nightly'],
+						framework_tags: ['nightly'],
 						ui_tags: ['pii'],
 					},
 				},
@@ -493,7 +493,7 @@ describe('bulk-operations', () => {
 
 			const updatedNodes = get(nodesStore);
 			expect(updatedNodes[0].data.ui_tags).toBeUndefined();
-			expect((updatedNodes[0].data as any).dbt_tags).toEqual(['nightly']);
+			expect((updatedNodes[0].data as any).framework_tags).toEqual(['nightly']);
 			expect(updatedNodes[0].data.tags).toEqual(['nightly', 'pii']);
 		});
 
@@ -503,8 +503,8 @@ describe('bulk-operations', () => {
 					...createEntityNode('1', 'Customer'),
 					data: {
 						label: 'Customer',
-						dbt_model: 'model.proj.customer',
-						dbt_tags: ['nightly'],
+						model_ref: 'model.proj.customer',
+						framework_tags: ['nightly'],
 						ui_tags: ['pii'],
 					},
 				},
@@ -515,7 +515,7 @@ describe('bulk-operations', () => {
 
 			const updatedNodes = get(nodesStore);
 			expect(updatedNodes[0].data.ui_tags).toEqual(['pii']);
-			expect((updatedNodes[0].data as any).dbt_tags).toEqual(['nightly']);
+			expect((updatedNodes[0].data as any).framework_tags).toEqual(['nightly']);
 		});
 	});
 

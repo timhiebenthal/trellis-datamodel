@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess } from './api';
+import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt } from './api';
 import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
 
 describe('API Functions - 7 Ws', () => {
@@ -27,6 +27,51 @@ describe('API Functions - 7 Ws', () => {
         const result = await inferRelationships();
         expect(result).toHaveLength(1);
         expect(result[0]).toMatchObject(rel);
+    });
+});
+
+describe('framework-neutral endpoint paths', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it('syncDbtTests calls /api/sync-tests, not the legacy /api/sync-dbt-tests path', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: vi.fn().mockResolvedValue({ message: 'ok' }),
+            }),
+        );
+
+        await syncDbtTests();
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'http://localhost:8089/api/sync-tests',
+            expect.objectContaining({ method: 'POST' }),
+        );
+        const calledUrl = (global.fetch as any).mock.calls[0][0];
+        expect(calledUrl).not.toContain('/sync-dbt-tests');
+    });
+
+    it('reconcileDbt calls /api/reconcile, not the legacy /api/reconcile-dbt path', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: vi.fn().mockResolvedValue({ status: 'success', changed: false, data_model: {} }),
+            }),
+        );
+
+        await reconcileDbt();
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'http://localhost:8089/api/reconcile',
+            expect.objectContaining({ method: 'POST' }),
+        );
+        const calledUrl = (global.fetch as any).mock.calls[0][0];
+        expect(calledUrl).not.toContain('/reconcile-dbt');
     });
 });
 

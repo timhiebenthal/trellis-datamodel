@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
-import { nodes, edges, dbtModels, entityDetailModal } from '$lib/stores';
+import { nodes, edges, frameworkModels, entityDetailModal } from '$lib/stores';
 import type { DbtModel } from '$lib/types';
 import { updateModelSchema } from '$lib/api';
 
@@ -32,11 +32,11 @@ function setupBoundEntityWithDraft() {
     position: { x: 0, y: 0 },
     data: {
       label: 'Entity X',
-      dbt_model: 'model.proj.entity_x',
+      model_ref: 'model.proj.entity_x',
       drafted_fields: [{ name: 'pending_col', datatype: 'text' }],
     } as any,
   }] as any);
-  dbtModels.set([mockDbtModel]);
+  frameworkModels.set([mockDbtModel]);
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
@@ -59,7 +59,7 @@ function setupUnboundEntityWithDraftOrigin() {
       }],
     } as any,
   }] as any);
-  dbtModels.set([]);
+  frameworkModels.set([]);
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
@@ -71,7 +71,7 @@ function setupBoundEntityWithDraftOrigin() {
     position: { x: 0, y: 0 },
     data: {
       label: 'Mixed Entity',
-      dbt_model: 'model.proj.entity_x',
+      model_ref: 'model.proj.entity_x',
       drafted_fields: [{
         name: 'extra_col',
         datatype: 'text',
@@ -80,7 +80,7 @@ function setupBoundEntityWithDraftOrigin() {
       }],
     } as any,
   }] as any);
-  dbtModels.set([mockDbtModel]);
+  frameworkModels.set([mockDbtModel]);
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
@@ -101,7 +101,7 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
     nodes.set([]);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
   });
 
@@ -216,7 +216,7 @@ describe('EntityDetailModal — tag save behavior', () => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
     nodes.set([]);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
   });
 
@@ -232,13 +232,13 @@ describe('EntityDetailModal — tag save behavior', () => {
       position: { x: 0, y: 0 },
       data: {
         label: 'Entity X',
-        dbt_model: 'model.proj.entity_x',
+        model_ref: 'model.proj.entity_x',
         tags: ['nightly'],
-        dbt_tags: ['nightly'],
+        framework_tags: ['nightly'],
         ui_tags: [],
       } as any,
     }] as any);
-    dbtModels.set([mockDbtModel]);
+    frameworkModels.set([mockDbtModel]);
     entityDetailModal.set({ open: true, entityId: 'node-1' });
   }
 
@@ -257,7 +257,7 @@ describe('EntityDetailModal — tag save behavior', () => {
 
     const savedNode = get(nodes).find((n) => n.id === 'node-1');
     expect((savedNode?.data as any).ui_tags).toEqual(['pii']);
-    expect((savedNode?.data as any).dbt_tags).toEqual(['nightly']);
+    expect((savedNode?.data as any).framework_tags).toEqual(['nightly']);
     // `tags` is a display-only union refreshed by the next reconcile/reload —
     // handleSave doesn't need to touch it. What matters is that autosave never
     // sends it for bound entities regardless of its (possibly stale) local
@@ -271,7 +271,7 @@ describe('EntityDetailModal — tag save behavior', () => {
       position: { x: 0, y: 0 },
       data: { label: 'Draft Entity', tags: ['draft-tag'] } as any,
     }] as any);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: true, entityId: 'node-1' });
     await renderModal();
 
@@ -294,7 +294,7 @@ describe('EntityDetailModal — Relationships section', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
     nodes.set([]);
     edges.set([]);
-    dbtModels.set([]);
+    frameworkModels.set([]);
     entityDetailModal.set({ open: false, entityId: null });
   });
 

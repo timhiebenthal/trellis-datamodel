@@ -17,7 +17,7 @@ describe('EntityRow — dbt build status badge', () => {
 	it('renders a dbt badge with tooltip showing the resolved model name for a bound entity', () => {
 		const entity: Entity = {
 			...baseEntity,
-			dbt_model: 'model.project.dim_customer',
+			model_ref: 'model.project.dim_customer',
 		};
 
 		render(EntityRow, { props: { entity } });
@@ -34,7 +34,7 @@ describe('EntityRow — dbt build status badge', () => {
 	it('does not render a dbt badge for an unbound entity (no dbt_model)', () => {
 		const entity: Entity = {
 			...baseEntity,
-			dbt_model: undefined,
+			model_ref: undefined,
 		};
 
 		render(EntityRow, { props: { entity } });

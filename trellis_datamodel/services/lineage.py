@@ -1,8 +1,10 @@
 """
 Lineage extraction service.
 
-Extracts table-level upstream lineage from dbt manifest.json and catalog.json files.
-Uses native manifest parsing (primary) with optional dbt-colibri support.
+Extracts table-level upstream lineage from the active framework's manifest.json
+and catalog.json files (currently dbt-core only; other frameworks may add
+support later). Uses native manifest parsing (primary) with optional
+dbt-colibri support.
 """
 
 import json

@@ -2,7 +2,6 @@
 
 from .schemas import (
     DataModelUpdate,
-    DbtSchemaRequest,
     ModelSchemaRequest,
 )
 from .business_event import (
@@ -19,7 +18,6 @@ from .business_event import (
 
 __all__ = [
     "DataModelUpdate",
-    "DbtSchemaRequest",
     "ModelSchemaRequest",
     "BusinessEvent",
     "BusinessEventType",

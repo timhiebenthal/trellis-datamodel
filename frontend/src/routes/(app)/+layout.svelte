@@ -8,7 +8,7 @@
     import {
     nodes,
     edges,
-    dbtModels,
+    frameworkModels,
     viewMode,
     configStatus,
     initHistory,
@@ -24,6 +24,7 @@
         dimensionPrefixes,
         factPrefixes,
         sourceColors,
+        activeFramework,
     } from "$lib/stores";
     import {
         getApiBase,
@@ -46,6 +47,7 @@ import {
     getLabelPrefixesFromConfig,
 } from "$lib/utils";
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
+import { readModelRef } from "$lib/utils/entity-compat";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
@@ -56,7 +58,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
     import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
     import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { ConfigInfo, DbtModel, GuidanceConfig } from "$lib/types";
+    import type { ConfigInfo, ModelInfo, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
     import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
@@ -307,7 +309,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                     if (existingEntityIds.has(id)) return;
 
                     const model =
-                        $dbtModels.find(
+                        $frameworkModels.find(
                             (m) => m.unique_id === id || m.name === id,
                         ) ?? null;
                     const folder = model ? getModelFolder(model) : null;
@@ -320,7 +322,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                         data: {
                             label: formatModelNameForLabel((model?.name ?? id).trim(), $labelPrefixes),
                             description: model?.description ?? "",
-                            dbt_model: model?.unique_id ?? null,
+                            model_ref: model?.unique_id ?? null,
                             additional_models: [],
                             drafted_fields: [],
                             width: 280,
@@ -540,6 +542,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                 busMatrixEnabled = info?.bus_matrix_enabled ?? false;
                 businessEventsEnabled = info?.business_events_enabled ?? false;
                 $modelingStyle = info?.modeling_style ?? 'entity_model';
+                $activeFramework = info?.framework ?? 'dbt-core';
                 $labelPrefixes = getLabelPrefixesFromConfig(info ?? null);
                 dimensionPrefixes.set(info?.dimension_prefix ?? []);
                 factPrefixes.set(info?.fact_prefix ?? []);
@@ -557,7 +560,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 
                 // Load Manifest
                 const models = await getManifest();
-                $dbtModels = models;
+                $frameworkModels = models;
 
                 // Reconcile manifest columns into data_model.yml (provenance-aware, non-destructive).
                 // This writes source='dbt' fields into each bound entity before we load the data model,
@@ -589,10 +592,10 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 
                 // Helper to get folder and tags from dbt model
                 function getEntityMetadata(entity: any) {
-                    if (!entity.dbt_model) return { folder: null, model: null };
+                    if (!readModelRef(entity)) return { folder: null, model: null };
 
                     const model = models.find(
-                        (m: any) => m.unique_id === entity.dbt_model,
+                        (m: any) => m.unique_id === readModelRef(entity),
                     );
                     if (!model) return { folder: null, model: null };
 
@@ -602,7 +605,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                 // Map data model to Svelte Flow format with metadata
                 const entityNodes = (dataModel.entities || []).map((e: any) => {
                     const metadata = getEntityMetadata(e);
-                    const { tags, dbt_tags, ui_tags } = mapEntityTagsToNodeData(e);
+                    const { tags, framework_tags, ui_tags } = mapEntityTagsToNodeData(e);
                     const modelName = metadata.model ? metadata.model.name : e.id;
                     return {
                         id: e.id,
@@ -612,7 +615,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                         data: {
                             label: e.label?.trim() || formatModelNameForLabel(modelName.trim(), $labelPrefixes),
                             description: e.description,
-                            dbt_model: e.dbt_model,
+                            model_ref: readModelRef(e),
                             additional_models: e.additional_models,
                             drafted_fields: e.drafted_fields,
                             width: e.width ?? 280,
@@ -620,7 +623,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                             collapsed: e.collapsed ?? false,
                             folder: metadata.folder,
                             tags,
-                            dbt_tags,
+                            framework_tags,
                             ui_tags,
                             entity_type: e.entity_type,
                             source_system: e.source_system,
@@ -787,7 +790,7 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 
         const activeFolder = $folderFilter;
         const activeTags = $tagFilter;
-        const models = $dbtModels;
+        const models = $frameworkModels;
 
         const currentNodes = untrack(() => $nodes);
         const currentEdges = untrack(() => $edges);
@@ -797,9 +800,9 @@ import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
                 return node;
             }
 
-            const primaryModel = models.find((m) => m.unique_id === node.data.dbt_model);
+            const primaryModel = models.find((m) => m.unique_id === readModelRef(node.data as any));
             const additionalModelIds = (node.data?.additional_models as string[]) || [];
-            const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is DbtModel => m !== undefined);
+            const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is ModelInfo => m !== undefined);
             const allBoundModels = primaryModel ? [primaryModel, ...additionalModels] : additionalModels;
 
             let visible = true;

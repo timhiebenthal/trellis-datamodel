@@ -1,12 +1,15 @@
 """Tests for the dbt reconciliation service."""
 
+import yaml
 import pytest
 from trellis_datamodel.services.reconciliation import (
     reconcile_entity_fields,
     reconcile_entity_tags,
     reconcile_data_model,
+    reconcile_framework,
     compute_display_tags,
 )
+from trellis_datamodel.tests._entity_compat import get_model_ref, get_framework_tags
 
 
 class TestReconcileEntityFields:
@@ -52,8 +55,8 @@ class TestReconcileEntityFields:
         assert result[6]["datatype"] == "unknown"
 
     def test_preserves_native_dbt_type_alongside_bucket(self):
-        """The raw dbt/warehouse type is preserved in dbt_data_type, not just
-        collapsed into the coarse datatype bucket (#111)."""
+        """The raw dbt/warehouse type is preserved in physical_datatype, not
+        just collapsed into the coarse datatype bucket (#111)."""
         result = reconcile_entity_fields(
             existing_fields=[],
             manifest_columns=[
@@ -61,7 +64,7 @@ class TestReconcileEntityFields:
             ],
         )
         assert result[0]["datatype"] == "text"
-        assert result[0]["dbt_data_type"] == "varchar"
+        assert result[0]["physical_datatype"] == "varchar"
 
     def test_promotes_matching_draft(self):
         """A draft whose name matches a manifest column is promoted to source=dbt,
@@ -295,7 +298,7 @@ class TestReconcileDataModel:
                         {
                             "name": "id",
                             "datatype": "int",
-                            "dbt_data_type": "integer",
+                            "physical_datatype": "integer",
                             "description": "PK",
                             "source": "dbt",
                         }
@@ -345,7 +348,7 @@ class TestReconcileDataModel:
             {"unique_id": "model.proj.users", "columns": [], "tags": ["nightly", "core"]},
         ]
         result, changed = reconcile_data_model(data_model, manifest_models)
-        assert result["entities"][0]["dbt_tags"] == ["nightly", "core"]
+        assert get_framework_tags(result["entities"][0]) == ["nightly", "core"]
         assert changed is True
 
     def test_reconcile_data_model_leaves_ui_tags_untouched(self):
@@ -383,7 +386,7 @@ class TestTagMigrationSeed:
         result, _ = reconcile_data_model(data_model, manifest_models)
         entity = result["entities"][0]
         assert entity["ui_tags"] == ["pii"]
-        assert entity["dbt_tags"] == ["nightly"]
+        assert get_framework_tags(entity) == ["nightly"]
         assert "tags" not in entity
 
     def test_seed_does_not_reapply_once_ui_tags_exists(self):
@@ -428,7 +431,7 @@ class TestTagMigrationSeed:
         assert "ui_tags" not in entity, (
             f"dbt-mirrored tags were wrongly seeded into ui_tags; got: {entity.get('ui_tags')}"
         )
-        assert entity["dbt_tags"] == ["sdh", "entity", "customer_360"]
+        assert get_framework_tags(entity) == ["sdh", "entity", "customer_360"]
         assert "tags" not in entity
 
 
@@ -464,3 +467,177 @@ class TestReconcileIdempotency:
         twice, changed_twice = reconcile_data_model(once, manifest_models)
         assert changed_twice is False
         assert twice == once
+
+
+class TestReconcileKeyGeneralization:
+    """Reconciliation must read/write the generic model_ref/framework_tags
+    keys via trellis_datamodel.models.entity_keys, migrating any
+    legacy dbt_model/dbt_tags keys it encounters."""
+
+    def test_reconcile_migrates_legacy_keys_to_generic_names(self):
+        """An entity built with legacy dbt_model/dbt_tags keys is migrated
+        to model_ref/framework_tags, with values unchanged (manifest agrees
+        with the existing data, isolating the key rename). The field-level
+        legacy dbt_data_type key is likewise migrated to physical_datatype."""
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "dbt_model": "model.project.users",
+                    "dbt_tags": ["nightly"],
+                    "drafted_fields": [
+                        {
+                            "name": "id",
+                            "datatype": "int",
+                            "dbt_data_type": "integer",
+                            "description": "PK",
+                            "source": "dbt",
+                        }
+                    ],
+                }
+            ]
+        }
+        manifest_models = [
+            {
+                "unique_id": "model.project.users",
+                "columns": [{"name": "id", "type": "integer", "description": "PK"}],
+                "tags": ["nightly"],
+            }
+        ]
+        result, _ = reconcile_data_model(data_model, manifest_models)
+        entity = result["entities"][0]
+
+        assert get_model_ref(entity) == "model.project.users"
+        assert get_framework_tags(entity) == ["nightly"]
+        assert "model_ref" in entity
+        assert "framework_tags" in entity
+        assert "dbt_model" not in entity
+        assert "dbt_tags" not in entity
+        assert entity["drafted_fields"] == [
+            {
+                "name": "id",
+                "datatype": "int",
+                "physical_datatype": "integer",
+                "description": "PK",
+                "source": "dbt",
+            }
+        ]
+
+    def test_reconcile_on_already_migrated_entity_is_a_noop(self):
+        """An entity already using the generic key names reconciles to
+        changed=False when the manifest agrees with the existing data."""
+        data_model = {
+            "entities": [
+                {
+                    "id": "users",
+                    "model_ref": "model.project.users",
+                    "framework_tags": ["nightly"],
+                    "drafted_fields": [
+                        {
+                            "name": "id",
+                            "datatype": "int",
+                            "physical_datatype": "integer",
+                            "description": "PK",
+                            "source": "dbt",
+                        }
+                    ],
+                }
+            ]
+        }
+        manifest_models = [
+            {
+                "unique_id": "model.project.users",
+                "columns": [{"name": "id", "type": "integer", "description": "PK"}],
+                "tags": ["nightly"],
+            }
+        ]
+        result, changed = reconcile_data_model(data_model, manifest_models)
+        assert changed is False
+
+
+class TestReconcileDbtIOWrapper:
+    """Characterization tests for the reconcile_framework() IO wrapper (load manifest
+    + data_model.yml, reconcile, write back if changed). These exercise the
+    full on-disk round trip via the real adapter, not just the pure function.
+    """
+
+    def test_reconcile_is_idempotent(
+        self, test_client, mock_manifest, temp_data_model_path
+    ):
+        """Running reconcile_framework() twice against the mock manifest reports
+        changed=False on the second run and produces a byte-identical
+        data_model.yml file on disk."""
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.project.users",
+                    "drafted_fields": [],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        first_result, first_changed = reconcile_framework()
+        assert first_changed is True
+
+        with open(temp_data_model_path, "r") as f:
+            file_contents_after_first = f.read()
+
+        second_result, second_changed = reconcile_framework()
+        assert second_changed is False
+
+        with open(temp_data_model_path, "r") as f:
+            file_contents_after_second = f.read()
+
+        assert file_contents_after_second == file_contents_after_first
+        assert second_result == first_result
+
+    def test_reconcile_never_deletes_binding_for_model_absent_from_manifest(
+        self, test_client, mock_manifest, temp_data_model_path
+    ):
+        """An entity bound to a model id not present in the manifest survives
+        reconcile with its binding and its previously-mirrored tags intact."""
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "products",
+                    "label": "Products",
+                    "dbt_model": "model.project.products",  # not in mock_manifest
+                    "dbt_tags": ["legacy_mirrored_tag"],
+                    "drafted_fields": [
+                        {"name": "sku", "datatype": "text", "source": "dbt"}
+                    ],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as f:
+            yaml.dump(data_model, f)
+
+        result, changed = reconcile_framework()
+        assert changed is False
+
+        entity = result["entities"][0]
+        assert get_model_ref(entity) == "model.project.products"
+        assert get_framework_tags(entity) == ["legacy_mirrored_tag"]
+        assert entity["drafted_fields"] == [
+            {"name": "sku", "datatype": "text", "source": "dbt"}
+        ]
+
+
+class TestComputeDisplayTagsUnionOrder:
+    def test_compute_display_tags_union_order_is_framework_then_ui_deduped(self):
+        """Display tags are the union of framework-mirrored tags then
+        user-added ui_tags, in that order, deduplicated."""
+        entity = {
+            "dbt_model": "model.proj.users",
+            "dbt_tags": ["nightly", "core"],
+            "ui_tags": ["core", "pii"],
+        }
+        assert compute_display_tags(entity) == ["nightly", "core", "pii"]

@@ -369,3 +369,44 @@ class TestBusMatrixEndpoint:
             get_bus_matrix()
 
         assert "not configured" in str(exc_info.value).lower()
+
+
+def test_bus_matrix_tag_source_for_bound_vs_unbound_entity(
+    temp_data_model_path, enable_bus_matrix
+):
+    """A bound dimension's displayed tags are the union of its
+    framework-mirrored tags and ui_tags; an unbound dimension's displayed
+    tags are simply its own `tags` field."""
+    from trellis_datamodel.tests._entity_compat import get_model_ref
+
+    data = {
+        "version": 0.1,
+        "entities": [
+            {
+                "id": "dim_bound",
+                "entity_type": "dimension",
+                "dbt_model": "model.project.dim_bound",
+                "dbt_tags": ["nightly", "core"],
+                "ui_tags": ["pii"],
+            },
+            {
+                "id": "dim_unbound",
+                "entity_type": "dimension",
+                "tags": ["draft-tag"],
+            },
+        ],
+        "relationships": [],
+    }
+    with open(temp_data_model_path, "w") as f:
+        yaml.dump(data, f)
+
+    result = get_bus_matrix()
+
+    bound = next(d for d in result["dimensions"] if d["id"] == "dim_bound")
+    unbound = next(d for d in result["dimensions"] if d["id"] == "dim_unbound")
+
+    assert get_model_ref(bound) == "model.project.dim_bound"
+    assert bound["tags"] == ["nightly", "core", "pii"]
+
+    assert get_model_ref(unbound) is None
+    assert unbound["tags"] == ["draft-tag"]

@@ -7,7 +7,7 @@
     } from "@xyflow/svelte";
     import {
         viewMode,
-        dbtModels,
+        frameworkModels,
         nodes,
         edges,
         draggingField,
@@ -22,7 +22,7 @@
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
     } from "$lib/stores";
-    import type { DbtModel, DraftedField, EntityData, EntityRole } from "$lib/types";
+    import type { ModelInfo, DraftedField, EntityData, EntityRole } from "$lib/types";
     import {
         inferRelationships,
         getLineage,
@@ -42,6 +42,7 @@
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
     import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
+    import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
     import TagEditor from "./TagEditor.svelte";
@@ -94,7 +95,7 @@
     let hasExposuresData = $derived($hasExposuresDataStore);
 
     // Reactive binding check
-    let boundModelName = $derived(data.dbt_model as string | undefined);
+    let boundModelName = $derived(readModelRef(data));
     let additionalModels = $derived((data.additional_models as string[]) || []);
     let allBoundModels = $derived(
         boundModelName ? [boundModelName, ...additionalModels] : []
@@ -114,7 +115,7 @@
 
     // Find model details by unique_id (e.g. "model.elmo.entity_booking")
     let modelDetails = $derived(
-        activeModelId ? $dbtModels.find((m) => m.unique_id === activeModelId) : null,
+        activeModelId ? $frameworkModels.find((m) => m.unique_id === activeModelId) : null,
     );
 
     // Reset active index when models change
@@ -308,9 +309,9 @@
         event.stopImmediatePropagation();
         isDragOver = false;
 
-        const json = event.dataTransfer?.getData("application/dbt-model");
+        const json = event.dataTransfer?.getData("application/model-ref");
         if (!json) return;
-        const model: DbtModel = JSON.parse(json);
+        const model: ModelInfo = JSON.parse(json);
 
         // Track the final ID (may change during auto-naming)
         let finalId = id;
@@ -325,7 +326,7 @@
             activeModelIndex = currentAdditional.length + 1;
         } else {
             // Store the full unique_id (e.g. "model.elmo.entity_booking")
-            const updates: Record<string, unknown> = { dbt_model: model.unique_id };
+            const updates: Record<string, unknown> = { model_ref: model.unique_id };
             const hasDescription = (data.description || "").trim().length > 0;
             if (!hasDescription && (model.description || "").trim().length > 0) {
                 updates.description = model.description;
@@ -366,13 +367,13 @@
                             return updatedEdge;
                         });
                         
-                        // Update the node itself with new ID - include ALL updates (dbt_model, description, label)
+                        // Update the node itself with new ID - include ALL updates (model_ref, description, label)
                         $nodes = $nodes.map((node) => {
                             if (node.id === id) {
-                                const updatedData = { 
-                                    ...node.data, 
+                                const updatedData = {
+                                    ...node.data,
                                     label: formattedLabel,
-                                    ...updates // Include dbt_model and description from updates
+                                    ...updates // Include model_ref and description from updates
                                 };
                                 return {
                                     ...node,
@@ -423,7 +424,7 @@
                     }
                 } else {
                     // Other nodes: get all bound models
-                    const primary = node.data?.dbt_model as string | undefined;
+                    const primary = readModelRef((node.data ?? {}) as any);
                     const additional = (node.data?.additional_models as string[]) || [];
                     if (primary) {
                         boundModels = [primary, ...additional];
@@ -549,7 +550,7 @@
     }
 
     function unbind() {
-        updateNodeData(id, { dbt_model: null });
+        updateNodeData(id, { model_ref: null });
 
         // Clear field mappings on edges connected to this entity
         edges.update((list) =>
@@ -636,14 +637,14 @@
     // schema.yml to mirror, so `tags` remains the single freely-editable field.
     let entityTags = $derived(
         isBound
-            ? normalizeTags([...(data.dbt_tags || []), ...((data.ui_tags || []) as string[])])
+            ? normalizeTags([...readFrameworkTags(data), ...((data.ui_tags || []) as string[])])
             : normalizeTags(data.tags),
     );
 
     // dbt_tags are always dbt-owned: they render read-only in the tag editor
     // (no remove affordance) because a Trellis push never removes a tag it
     // doesn't own. Only meaningful for bound entities.
-    let readOnlyTags = $derived(isBound ? normalizeTags(data.dbt_tags) : []);
+    let readOnlyTags = $derived(isBound ? normalizeTags(readFrameworkTags(data)) : []);
 
     // Roles display (for dimensions)
     // EntityRole is an object with { role, label, source } — extract the role string
@@ -665,7 +666,7 @@
 
         allSelectedIds.forEach((nodeId) => {
             const node = $nodes.find((n) => n.id === nodeId);
-            const nodeIsBound = !!node?.data?.dbt_model;
+            const nodeIsBound = !!readModelRef((node?.data ?? {}) as any);
 
             if (nodeIsBound) {
                 // `dbt_tags` is a dbt-mirrored, reconcile-owned field for bound
@@ -673,7 +674,7 @@
                 // An edit in the tag editor only ever changes `ui_tags`; a
                 // dbt-mirrored tag missing from `newTags` (e.g. the user tried to
                 // remove a read-only chip) is not treated as a removal, since dbt wins.
-                const uiTags = computeUiTagsAfterEdit(node?.data?.dbt_tags, newTags);
+                const uiTags = computeUiTagsAfterEdit(readFrameworkTags((node?.data ?? {}) as any), newTags);
                 updateNodeData(nodeId, { ui_tags: uiTags });
             } else {
                 // Unbound entities have no schema.yml to mirror; `tags` is the
@@ -847,12 +848,12 @@
                     version: sourceNodeData._activeModelVersion as number | null | undefined,
                 };
             }
-            if (sourceNodeData?.dbt_model) {
-                return $dbtModels.find(m => m.unique_id === sourceNodeData.dbt_model) || null;
+            if (readModelRef(sourceNodeData ?? {})) {
+                return $frameworkModels.find(m => m.unique_id === readModelRef(sourceNodeData)) || null;
             }
             const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
-                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+                return $frameworkModels.find(m => m.unique_id === firstAdditional) || null;
             }
             return null;
         })();
@@ -864,12 +865,12 @@
                     version: targetNodeData._activeModelVersion as number | null | undefined,
                 };
             }
-            if (targetNodeData?.dbt_model) {
-                return $dbtModels.find(m => m.unique_id === targetNodeData.dbt_model) || null;
+            if (readModelRef(targetNodeData ?? {})) {
+                return $frameworkModels.find(m => m.unique_id === readModelRef(targetNodeData)) || null;
             }
             const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
-                return $dbtModels.find(m => m.unique_id === firstAdditional) || null;
+                return $frameworkModels.find(m => m.unique_id === firstAdditional) || null;
             }
             return null;
         })();
