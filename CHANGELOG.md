@@ -5,30 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.21.0] - 2026-08-03
 
 Adds Bruin as a second supported transformation framework, and finishes the adapter boundary the
-0.20.0 refactor started. No functional change for dbt-core users.
+0.20.0 refactor started. No functional change for dbt-core users, and nothing to migrate: an
+existing `trellis.yml` keeps working untouched, since `framework` still defaults to `dbt-core`.
 
 ### Added
 - **Bruin support**: set `framework: bruin` with `bruin_pipeline_path` in `trellis.yml` and Trellis
   reads your pipeline's assets instead of a dbt project. Asset schemas live inline in each file's
-  `@bruin` comment block, so Trellis reads and writes them there — the SQL body is never touched.
+  `@bruin` comment block, so Trellis reads and writes them there. The SQL body is never touched.
   - `bruin_asset_paths` filters which asset subdirectories appear, the same way `dbt_model_paths`
     does. Lineage and relationship resolution deliberately ignore the filter: an upstream asset
     outside the configured paths is still a real dependency.
   - **Lineage** comes from each asset's `depends:`. An `ingestr` asset, or any asset with no
-    upstreams, is where data enters the pipeline and is shown as a source — the role a dbt source
-    plays. Its source system is the `parameters.source_connection` it pulls from, which is what
+    upstreams, is where data enters the pipeline and is shown as a source (the role a dbt source
+    plays). Its source system is the `parameters.source_connection` it pulls from, which is what
     drives the source chips on the canvas.
   - **Relationships** map to Bruin's native `columns[].foreign_key: {table, column}`, so they
     round-trip: pushing writes the foreign key into the asset, pulling reads it back, and deleting a
     relationship in Trellis prunes the foreign key. References written as either `dim__customer` or
     `core.dim__customer` both resolve, and your spelling is left as you wrote it.
   - **Pushing drafted fields** to an entity with no asset yet scaffolds a new `.sql` asset with a
-    placeholder body for you to fill in — Trellis cannot know the query. `bruin_default_asset_type`
-    sets the asset type, since it is platform-specific (`duckdb.sql`, `bq.sql`, `sf.sql`, …).
-    Scaffolding never overwrites an existing file.
+    placeholder body for you to fill in, since Trellis cannot know the query.
+    `bruin_default_asset_type` sets the asset type, because it is platform-specific (`duckdb.sql`,
+    `bq.sql`, `sf.sql`, and so on). Scaffolding never overwrites an existing file.
 - **Framework capabilities in `/api/config-info` and `/api/config-status`**: each adapter declares
   what its framework supports, and the UI hides features that cannot work rather than offering a
   view that would always be empty.
@@ -39,17 +40,17 @@ Adds Bruin as a second supported transformation framework, and finishes the adap
 ### Known Bruin limitations
 - **No exposures.** Bruin has no exposures concept, so the exposures view is hidden under
   `framework: bruin` even if `exposures.enabled` is set.
-- **No column-level lineage.** `depends:` is table-level; Bruin resolves column upstreams itself and
+- **No column-level lineage.** `depends:` is table-level. Bruin resolves column upstreams itself and
   does not write them into the asset file.
 - **No model versioning.** Bruin has no equivalent of dbt's versioned models.
 
 ### Changed
 - **Lineage, exposures, source-system extraction, and project status now go through the adapter.**
-  These were the four subsystems 0.20.0 left reading `manifest.json`/`catalog.json` directly; they
-  were also what made a second framework impossible. `TransformationAdapter` gains `get_lineage`,
-  `get_exposures`, `get_source_systems_for_model`, and `get_project_status`, and no route or service
-  names a dbt artifact any more. The strict-xfail contract tests that pinned this work are now live
-  tests.
+  These were the four subsystems 0.20.0 left reading `manifest.json`/`catalog.json` directly, and
+  they were also what made a second framework impossible. `TransformationAdapter` gains
+  `get_lineage`, `get_exposures`, `get_source_systems_for_model`, and `get_project_status`, and no
+  route or service names a dbt artifact any more. The strict-xfail contract tests that pinned this
+  work are now live tests.
 - **Sidebar setup warning is framework-aware**: it shows the active adapter's own error and
   remediation hints instead of always advising `dbt compile`.
 - **Entity-type inference is shared between adapters**, keyed per framework so two adapters cannot
@@ -57,8 +58,8 @@ Adds Bruin as a second supported transformation framework, and finishes the adap
 
 ### Fixed
 - **`sync-tests` never merged inferred relationships.** `services/schema.py` called
-  `infer_relationships()` before the adapter was constructed; the resulting `NameError` was swallowed
-  by a bare `except`, so the merge silently always saw an empty list.
+  `infer_relationships()` before the adapter was constructed. The resulting `NameError` was
+  swallowed by a bare `except`, so the merge silently always saw an empty list.
 
 ## [0.20.0] - 2026-08-03
 
