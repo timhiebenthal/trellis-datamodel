@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-08-03
+
+Structural refactor that decouples Trellis from dbt-specific naming, so a second transformation
+framework becomes an adapter you write rather than `if framework == ...` branches threaded through
+every service. No functional change for dbt-core users. Validated through the 0.20.0b1/b2
+prereleases against a real project: `data_model.yml` migrates cleanly on first save, and push
+produces the expected `schema.yml` output.
+
+### ⚠️ Upgrade is one-way
+
+Entity fields are renamed on disk (`dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`,
+`dbt_data_type` → `physical_datatype`). Reading the old names is permanent, so **upgrading is
+transparent and needs no migration**. Writing is not: the first save after upgrading rewrites your
+`data_model.yml` with the new names only.
+
+That means **rolling back to 0.19.x after saving is not supported**. Older versions only look for
+`dbt_model`, so every entity would load as unbound — model bindings and framework-mirrored tags would
+not appear on the canvas. Commit or back up `data_model.yml` before upgrading if you want a clean way
+back.
+
+### Added
+- **Framework-neutral endpoint paths**: `/api/reconcile`, `/api/schema`, and `/api/sync-tests` are now the primary API surface, replacing `/api/reconcile-dbt`, `/api/dbt-schema`, and `/api/sync-dbt-tests`.
+- **Framework-driven Sidebar icon/label**: the sidebar's model icon and label are driven by the configured `framework` rather than assuming dbt. A framework Trellis has no adapter for falls back to neutral branding instead of silently rendering dbt's.
+
+### Changed
+- **`data_model.yml` entity fields generalized**: `dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`, `dbt_data_type` → `physical_datatype`. Old names load transparently and permanently; only the new names are written back. `physical_datatype` pairs with a column's `datatype`: `datatype` is the coarse logical bucket, `physical_datatype` the concrete type the framework's catalog reports, kept so a push doesn't downgrade a precise type.
+- **Reconciliation "wins" semantics reworded as framework-neutral**: described as "the active framework's materialized model wins over a drafted concept". The algorithm (one-way, idempotent, absence-is-never-deletion) is unchanged.
+- **Adapter protocol closed up**: `save_schema_file`, `infer_entity_types`, `get_model_dirs`, and `reset_inference_cache` are now declared on `TransformationAdapter` instead of being called on `DbtCoreAdapter` without a contract. No module outside `adapters/` imports `DbtCoreAdapter`. A `FakeAdapter` test double proves reconciliation and schema services work against a non-dbt adapter.
+- **Internal dbt-named functions renamed**: `reconcile_dbt()` → `reconcile_framework()`, `sync_dbt_tests()` → `sync_framework_tests()`, `_map_dbt_type()` → `_map_column_type()`, `save_dbt_schema()` → `save_model_schema_from_request()`/`save_schema_file()`. Internal only.
+
+### Notes
+- Behavior-preserving by design: dbt-core projects see no functional change beyond the transparently read-compatible field renames.
+- Some subsystems (`services/lineage.py`, `services/exposures.py`, `services/manifest.py`, and related routes) still read dbt artifacts directly rather than through the adapter protocol. Deferred to the BruinAdapter work and pinned by strict-xfail contract tests so it can't be silently forgotten.
+- No second framework ships here. `FrameworkEnum` lists only `dbt-core`, so a framework becomes selectable in `trellis.yml` at the same time as its working adapter, never before.
+
 ## [0.20.0b2] - 2026-08-03
 
 > **Prerelease.** Supersedes 0.20.0b1 — same refactor, one field renamed. See b1 below for the full
