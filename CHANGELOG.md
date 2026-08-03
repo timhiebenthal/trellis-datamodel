@@ -8,9 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.20.0] - 2026-07-31
 
 ### Added
-- **`FrameworkEnum.BRUIN` and Bruin config scaffolding**: `trellis.yml` accepts `framework: bruin` with `bruin_pipeline_path`/`bruin_asset_paths`, resolved the same way as the existing dbt config fields. Setting `framework: bruin` today raises a clear "Bruin adapter not yet implemented" error from the adapter factory instead of silently running dbt behavior. Building the actual `BruinAdapter` is left to a follow-up.
 - **Framework-neutral endpoint paths**: `/api/reconcile`, `/api/schema`, and `/api/sync-tests` are now the primary API surface. The legacy `/api/reconcile-dbt`, `/api/dbt-schema`, `/api/sync-dbt-tests` paths have been retired now that the frontend is fully migrated.
-- **Framework-driven Sidebar icon/label**: the sidebar's model icon and label now switch on the configured `framework` (dbt-core vs. bruin) instead of assuming dbt. A placeholder Bruin icon is bundled ahead of the adapter itself.
+- **Framework-driven Sidebar icon/label**: the sidebar's model icon and label are now driven by the configured `framework` rather than assuming dbt. A framework Trellis has no adapter for falls back to neutral branding instead of silently rendering dbt's icon and label.
 
 ### Changed
 - **`data_model.yml` entity fields generalized**: `dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`, `dbt_data_type` → `native_data_type`. Existing files using the old field names continue to load transparently (read-compat is permanent); only the new names are written back on save. No manual migration needed.
@@ -21,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - This is a behavior-preserving structural refactor: existing dbt-core projects see no functional change beyond internal field renames, which are transparently read-compatible.
 - Some subsystems (`services/lineage.py`, `services/exposures.py`, `services/manifest.py`, and related routes) still read dbt artifacts directly instead of going through the adapter protocol. This is deliberately deferred to the upcoming BruinAdapter work and pinned by strict-xfail contract tests so it can't be silently forgotten.
+- No second framework ships here. This release is the groundwork that makes adding one an adapter-shaped job; `FrameworkEnum` still lists only `dbt-core`, so a framework becomes selectable in `trellis.yml` at the same time as its working adapter, never before.
 
 ## [0.19.1] - 2026-07-31
 

@@ -8,7 +8,6 @@ from enum import Enum
 class FrameworkEnum(str, Enum):
     """Framework options."""
     DBT_CORE = "dbt-core"
-    BRUIN = "bruin"
 
 
 class ModelingStyleEnum(str, Enum):
@@ -82,8 +81,6 @@ class ConfigSchema(BaseModel):
     data_model_file: str = Field(default="data_model.yml", description="Path to data model file")
     dbt_model_paths: List[str] = Field(default_factory=list, description="Path patterns to filter models")
     dbt_company_dummy_path: Optional[str] = Field(default=None, description="Optional path to company dummy project")
-    bruin_pipeline_path: Optional[str] = Field(default=None, description="Path to Bruin pipeline directory")
-    bruin_asset_paths: Optional[List[str]] = Field(default=None, description="Path patterns to filter Bruin assets")
     lineage: LineageConfig = Field(default_factory=LineageConfig)
     entity_creation_guidance: EntityCreationGuidance = Field(default_factory=EntityCreationGuidance)
     exposures: ExposuresConfig = Field(default_factory=ExposuresConfig)

@@ -21,7 +21,7 @@ export const frameworkModels = writable<ModelInfo[]>([]);
 export const viewMode = writable<'conceptual' | 'logical' | 'exposures' | 'bus_matrix' | 'business_events'>('conceptual');
 export const modelingStyle = writable<'dimensional_model' | 'entity_model'>('dimensional_model');
 export const configStatus = writable<any>(null);
-// Active transformation framework (e.g. 'dbt-core', 'bruin') — drives framework-specific UI (icons, labels, MIME types).
+// Active transformation framework (currently only 'dbt-core') — drives framework-specific UI (icons, labels, MIME types).
 export const activeFramework = writable<string>('dbt-core');
 export const labelPrefixes = writable<string[]>([]);
 export const dimensionPrefixes = writable<string[]>([]);

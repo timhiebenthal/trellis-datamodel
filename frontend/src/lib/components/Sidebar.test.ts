@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
+import { FRAMEWORK_DISPLAY_KEYS } from '$lib/utils/framework-display';
 import { getModelFolder } from '$lib/utils';
 import Sidebar from './Sidebar.svelte';
 
@@ -173,15 +174,18 @@ describe('Sidebar — framework-driven header', () => {
         nodes.set([]);
     });
 
-    it('renders the Bruin icon and label when framework is "bruin"', () => {
-        activeFramework.set('bruin');
+    it('falls back to neutral branding for a framework with no branding of its own', () => {
+        // Proves the header is genuinely framework-driven rather than dbt-assumed:
+        // an unrecognised framework must not silently render dbt's icon and label.
+        activeFramework.set('some-other-framework');
         render(Sidebar, { props: {} });
 
         expect(document.body.textContent).not.toContain('dbt Models');
 
-        const icon = document.querySelector('img[alt="dbt icon"], img[alt="Bruin icon"]') as HTMLImageElement | null;
+        const icon = document.querySelector('img[alt="framework icon"]') as HTMLImageElement | null;
         expect(icon).toBeTruthy();
-        expect(icon?.getAttribute('src')).toContain('/icons/bruin.svg');
+        expect(icon?.getAttribute('src')).toContain('/icons/framework.svg');
+        expect(icon?.getAttribute('src')).not.toContain('getdbt.com');
     });
 
     it('renders the dbt icon and "dbt Models" label unchanged when framework is "dbt-core"', () => {
@@ -193,5 +197,12 @@ describe('Sidebar — framework-driven header', () => {
         const icon = document.querySelector('img[alt="dbt icon"]') as HTMLImageElement | null;
         expect(icon).toBeTruthy();
         expect(icon?.getAttribute('src')).toBe('https://www.getdbt.com/favicon.ico');
+    });
+
+    it('does not hardcode any framework beyond the one Trellis implements', () => {
+        // The display map is scaffolding for future adapters; entries may only be
+        // added alongside a working adapter, so it cannot drift into advertising
+        // frameworks that raise "unknown framework" at runtime.
+        expect(FRAMEWORK_DISPLAY_KEYS).toEqual(['dbt-core']);
     });
 });

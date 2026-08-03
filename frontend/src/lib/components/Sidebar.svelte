@@ -16,6 +16,7 @@
     import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
     import { readModelRef } from "$lib/utils/entity-compat";
+    import { getFrameworkDisplay } from "$lib/utils/framework-display";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -141,14 +142,7 @@
 
     let treeNodes = $derived(buildTree(filteredModels));
 
-    const frameworkDisplay: Record<string, { icon: string; label: string }> = {
-        "dbt-core": { icon: "https://www.getdbt.com/favicon.ico", label: "dbt Models" },
-        bruin: { icon: "/icons/bruin.svg", label: "Bruin Assets" },
-    };
-
-    let currentFrameworkDisplay = $derived(
-        frameworkDisplay[$activeFramework] ?? frameworkDisplay["dbt-core"],
-    );
+    let currentFrameworkDisplay = $derived(getFrameworkDisplay($activeFramework));
 
     function toggleFolder(folder: string) {
         if ($folderFilter.includes(folder)) {
@@ -539,7 +533,7 @@
         <div class="mb-2 flex items-center gap-2" title="These models are read from manifest/catalog artifacts of the configured framework">
             <img
                 src={currentFrameworkDisplay.icon}
-                alt={$activeFramework === "dbt-core" ? "dbt icon" : "Bruin icon"}
+                alt={currentFrameworkDisplay.alt}
                 class="w-4 h-4 flex-shrink-0"
             />
             <span class="text-xs font-semibold text-gray-600">{currentFrameworkDisplay.label}</span>

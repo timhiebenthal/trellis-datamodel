@@ -426,39 +426,19 @@ def test_entity_modeling_disabled_when_dimensional_model(monkeypatch, tmp_path):
     assert cfg.ENTITY_MODELING_CONFIG.entity_prefix == []
 
 
-def test_framework_enum_supports_bruin():
+def test_framework_enum_lists_only_implemented_frameworks():
+    """The enum advertises what Trellis can actually do.
+
+    A framework value only becomes selectable once its adapter exists, so a user
+    cannot configure a framework that has no working implementation behind it.
+    """
     from trellis_datamodel.models.schemas import FrameworkEnum
 
-    assert FrameworkEnum.BRUIN == "bruin"
-    assert FrameworkEnum("bruin") is FrameworkEnum.BRUIN
+    assert [f.value for f in FrameworkEnum] == ["dbt-core"]
 
 
-# ===== Bruin Config Scaffolding Tests (Sprint 4 Stream B) =====
-
-
-def test_load_config_resolves_bruin_pipeline_path(monkeypatch, tmp_path):
-    """Bruin framework config resolves pipeline path and asset paths."""
-    _prepare_config(monkeypatch)
-    config_path = _write_config(
-        tmp_path,
-        """
-        framework: bruin
-        bruin_pipeline_path: ./pipeline
-        bruin_asset_paths:
-          - assets
-        """,
-    )
-
-    cfg.load_config(str(config_path))
-
-    assert cfg.FRAMEWORK == "bruin"
-    assert os.path.isabs(cfg.BRUIN_PIPELINE_PATH)
-    assert cfg.BRUIN_PIPELINE_PATH == os.path.abspath(tmp_path / "pipeline")
-    assert cfg.BRUIN_ASSET_PATHS == ["assets"]
-
-
-def test_existing_dbt_config_unaffected_by_bruin_fields(monkeypatch):
-    """Loading this repo's real trellis.yml (dbt-based) is unaffected by bruin fields."""
+def test_repo_trellis_yml_loads(monkeypatch):
+    """Loading this repo's real trellis.yml (dbt-based) resolves as expected."""
     _prepare_config(monkeypatch)
     repo_root = Path(__file__).resolve().parents[2]
     config_path = repo_root / "trellis.yml"
@@ -472,5 +452,3 @@ def test_existing_dbt_config_unaffected_by_bruin_fields(monkeypatch):
     assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fact__"]
     assert cfg.EXPOSURES_ENABLED is True
     assert cfg.BUSINESS_EVENTS_ENABLED is True
-    assert cfg.BRUIN_PIPELINE_PATH is None
-    assert cfg.BRUIN_ASSET_PATHS is None

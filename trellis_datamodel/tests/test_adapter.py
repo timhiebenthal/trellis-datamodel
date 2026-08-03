@@ -9,13 +9,18 @@ def test_entity_typeddict_uses_generic_model_ref():
     assert "dbt_model" not in hints
 
 
-def test_get_adapter_raises_not_implemented_for_bruin(monkeypatch):
+def test_get_adapter_raises_value_error_for_unknown_framework(monkeypatch):
+    """An unsupported framework must fail loudly, never fall through to dbt behavior.
+
+    The error names the frameworks that are actually supported, so adding one is a
+    matter of implementing an adapter rather than teaching this message about it.
+    """
     from trellis_datamodel import config as cfg
     from trellis_datamodel.adapters import get_adapter
 
-    monkeypatch.setattr(cfg, "FRAMEWORK", "bruin")
+    monkeypatch.setattr(cfg, "FRAMEWORK", "some-unsupported-framework")
 
-    with pytest.raises(NotImplementedError, match="Bruin adapter not yet implemented"):
+    with pytest.raises(ValueError, match="dbt-core"):
         get_adapter()
 
 
