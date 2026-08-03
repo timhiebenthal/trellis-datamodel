@@ -100,6 +100,28 @@ def temp_dbt_project():
     return _TEST_TEMP_DIR
 
 
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+BRUIN_PIPELINE_FIXTURE = os.path.join(FIXTURES_DIR, "bruin_pipeline")
+
+
+@pytest.fixture
+def bruin_pipeline():
+    """Path to the committed read-only Bruin fixture pipeline.
+
+    Use for read paths (get_models, get_lineage, infer_relationships). Anything
+    that writes must use `bruin_pipeline_copy` so the fixture stays pristine.
+    """
+    return BRUIN_PIPELINE_FIXTURE
+
+
+@pytest.fixture
+def bruin_pipeline_copy(tmp_path):
+    """A writable per-test copy of the Bruin fixture pipeline."""
+    dest = os.path.join(str(tmp_path), "pipeline")
+    shutil.copytree(BRUIN_PIPELINE_FIXTURE, dest)
+    return dest
+
+
 @pytest.fixture
 def mock_manifest_data():
     """Return mock manifest data."""
