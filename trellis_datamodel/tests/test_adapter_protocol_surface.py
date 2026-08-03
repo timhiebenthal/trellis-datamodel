@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from trellis_datamodel.adapters.base import TransformationAdapter
+from trellis_datamodel.adapters.bruin import BruinAdapter
 from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
 from trellis_datamodel.exceptions import NotFoundError
 from trellis_datamodel.tests.conftest import FakeAdapter
@@ -44,6 +45,11 @@ def test_protocol_declares_every_method_services_call():
 def test_dbt_core_adapter_satisfies_protocol():
     for name in REQUIRED_PROTOCOL_METHODS:
         assert callable(getattr(DbtCoreAdapter, name, None)), name
+
+
+def test_bruin_adapter_satisfies_protocol():
+    for name in REQUIRED_PROTOCOL_METHODS:
+        assert callable(getattr(BruinAdapter, name, None)), name
 
 
 def test_fake_adapter_satisfies_protocol():

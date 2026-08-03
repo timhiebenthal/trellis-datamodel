@@ -61,6 +61,14 @@ dbt_model_paths: []  # Empty = include all models
 # Run the command to populate ./dbt_company_dummy or replace with your own project.
 dbt_company_dummy_path: "./dbt_company_dummy"
 
+# Bruin pipeline configuration (only used when framework: bruin).
+# A Bruin pipeline is a directory holding pipeline.yml and an assets/ tree;
+# each asset carries its own schema in an @bruin comment block.
+# bruin_pipeline_path: "./pipeline"
+# bruin_asset_paths: []              # Subdirectory filters under assets/, e.g. ["02_core"]
+# bruin_default_asset_type: "duckdb.sql"  # Type used when Trellis scaffolds a new asset
+#                                         # (platform-specific: bq.sql, sf.sql, pg.sql, ...)
+
 # Lineage configuration is opt-in. Uncomment to customize defaults.
 #lineage:
 #  enabled: false  # Set to true to enable lineage UI/endpoints
