@@ -5,7 +5,13 @@ dbt_manifest_path: target/manifest.json
 dbt_catalog_path: target/catalog.json
 data_model_file: data_model.yml
 dbt_model_paths:
-- 3-entity
+- 3_core
+lineage:
+  enabled: true
+  layers:
+  - 1_clean
+  - 2_prep
+  - 3_core
 entity_creation_guidance:
   enabled: false
   push_warning_enabled: true
