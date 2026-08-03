@@ -96,6 +96,19 @@ def _asset_source_name(asset: BruinAsset) -> Optional[str]:
     return asset.parameters.get("source_connection") or asset.connection or None
 
 
+def _same_reference(
+    current: Optional[dict],
+    target: dict[str, str],
+    resolve: Any,
+) -> bool:
+    """Whether two foreign_key blocks point at the same asset and column."""
+    if not isinstance(current, dict):
+        return False
+    return resolve(current.get("table")) == resolve(
+        target["table"]
+    ) and current.get("column") == target["column"]
+
+
 def _asset_to_model_info(asset: BruinAsset) -> ModelInfo:
     """Convert a BruinAsset to a ModelInfo dict."""
     schema_part, short_name = _split_asset_name(asset.name)
@@ -549,10 +562,17 @@ class BruinAdapter:
                 "column": target_field,
             }
 
+        # Resolve a foreign_key's `table` to the asset it names, so a reference
+        # written by hand as `dim__product` is recognized as the same reference
+        # as `core.dim__product`.
+        def resolve(table: str) -> str:
+            match = self._lookup_asset(assets, table)
+            return match.name if match else table
+
         updated: list[Path] = []
         for asset in self._assets_to_sync(assets, entity_to_asset):
             wanted = desired.get(asset.name, {})
-            columns = self._apply_foreign_keys(asset, wanted)
+            columns = self._apply_foreign_keys(asset, wanted, resolve)
             if columns is None:
                 continue
             updated.append(rewrite_bruin_block(asset.file_path, {"columns": columns}))
@@ -584,12 +604,17 @@ class BruinAdapter:
 
     @staticmethod
     def _apply_foreign_keys(
-        asset: BruinAsset, wanted: dict[str, dict[str, str]]
+        asset: BruinAsset,
+        wanted: dict[str, dict[str, str]],
+        resolve: Any,
     ) -> Optional[list[dict[str, Any]]]:
         """Rebuild an asset's columns with exactly the wanted foreign keys.
 
         Returns None when nothing would change, so a sync only touches files it
-        actually needs to.
+        actually needs to. Sameness is judged on the asset a reference resolves
+        to, not on how it is spelled: a hand-written `dim__product` already
+        means `core.dim__product`, and rewriting it to the canonical spelling
+        would put a spurious diff in the user's pipeline for no gain.
         """
         columns: list[dict[str, Any]] = []
         changed = False
@@ -601,7 +626,7 @@ class BruinAdapter:
             target = wanted.get(name)
 
             if target is not None:
-                if current != target:
+                if not _same_reference(current, target, resolve):
                     entry["foreign_key"] = target
                     changed = True
             elif current is not None:
