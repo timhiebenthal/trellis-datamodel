@@ -5,7 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.20.0] - 2026-07-31
+## [0.20.0b1] - 2026-08-03
+
+> **Prerelease.** This is a large structural refactor that changes how entities are stored in
+> `data_model.yml`. It is behavior-preserving by design and fully covered by tests, but the on-disk
+> change is worth exercising against a real project before a stable release.
+
+### ⚠️ Upgrade is one-way
+
+Entity fields are renamed on disk (`dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`,
+`dbt_data_type` → `native_data_type`). Reading the old names is permanent, so **upgrading is
+transparent and needs no migration**. Writing is not: the first save after upgrading rewrites your
+`data_model.yml` with the new names only.
+
+That means **rolling back to 0.19.x after saving is not supported**. Older versions only look for
+`dbt_model`, so every entity would load as unbound — model bindings and framework-mirrored tags would
+not appear on the canvas. Commit or back up `data_model.yml` before upgrading if you want a clean way
+back.
 
 ### Added
 - **Framework-neutral endpoint paths**: `/api/reconcile`, `/api/schema`, and `/api/sync-tests` are now the primary API surface. The legacy `/api/reconcile-dbt`, `/api/dbt-schema`, `/api/sync-dbt-tests` paths have been retired now that the frontend is fully migrated.
