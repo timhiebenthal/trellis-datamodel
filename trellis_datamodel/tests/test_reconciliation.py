@@ -55,7 +55,7 @@ class TestReconcileEntityFields:
         assert result[6]["datatype"] == "unknown"
 
     def test_preserves_native_dbt_type_alongside_bucket(self):
-        """The raw dbt/warehouse type is preserved in native_data_type, not
+        """The raw dbt/warehouse type is preserved in physical_datatype, not
         just collapsed into the coarse datatype bucket (#111)."""
         result = reconcile_entity_fields(
             existing_fields=[],
@@ -64,7 +64,7 @@ class TestReconcileEntityFields:
             ],
         )
         assert result[0]["datatype"] == "text"
-        assert result[0]["native_data_type"] == "varchar"
+        assert result[0]["physical_datatype"] == "varchar"
 
     def test_promotes_matching_draft(self):
         """A draft whose name matches a manifest column is promoted to source=dbt,
@@ -298,7 +298,7 @@ class TestReconcileDataModel:
                         {
                             "name": "id",
                             "datatype": "int",
-                            "native_data_type": "integer",
+                            "physical_datatype": "integer",
                             "description": "PK",
                             "source": "dbt",
                         }
@@ -478,7 +478,7 @@ class TestReconcileKeyGeneralization:
         """An entity built with legacy dbt_model/dbt_tags keys is migrated
         to model_ref/framework_tags, with values unchanged (manifest agrees
         with the existing data, isolating the key rename). The field-level
-        legacy dbt_data_type key is likewise migrated to native_data_type."""
+        legacy dbt_data_type key is likewise migrated to physical_datatype."""
         data_model = {
             "entities": [
                 {
@@ -517,7 +517,7 @@ class TestReconcileKeyGeneralization:
             {
                 "name": "id",
                 "datatype": "int",
-                "native_data_type": "integer",
+                "physical_datatype": "integer",
                 "description": "PK",
                 "source": "dbt",
             }
@@ -536,7 +536,7 @@ class TestReconcileKeyGeneralization:
                         {
                             "name": "id",
                             "datatype": "int",
-                            "native_data_type": "integer",
+                            "physical_datatype": "integer",
                             "description": "PK",
                             "source": "dbt",
                         }

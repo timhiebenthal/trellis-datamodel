@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ⚠️ Upgrade is one-way
 
 Entity fields are renamed on disk (`dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`,
-`dbt_data_type` → `native_data_type`). Reading the old names is permanent, so **upgrading is
+`dbt_data_type` → `physical_datatype`). Reading the old names is permanent, so **upgrading is
 transparent and needs no migration**. Writing is not: the first save after upgrading rewrites your
 `data_model.yml` with the new names only.
 
@@ -28,7 +28,7 @@ back.
 - **Framework-driven Sidebar icon/label**: the sidebar's model icon and label are now driven by the configured `framework` rather than assuming dbt. A framework Trellis has no adapter for falls back to neutral branding instead of silently rendering dbt's icon and label.
 
 ### Changed
-- **`data_model.yml` entity fields generalized**: `dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`, `dbt_data_type` → `native_data_type`. Existing files using the old field names continue to load transparently (read-compat is permanent); only the new names are written back on save. No manual migration needed.
+- **`data_model.yml` entity fields generalized**: `dbt_model` → `model_ref`, `dbt_tags` → `framework_tags`, `dbt_data_type` → `physical_datatype`. Existing files using the old field names continue to load transparently (read-compat is permanent); only the new names are written back on save. No manual migration needed.
 - **Reconciliation "wins" semantics reworded as framework-neutral**: `services/reconciliation.py`'s dbt-wins rule is now described as "the active framework's materialized model wins over a drafted concept." The underlying algorithm (one-way, idempotent, absence-is-never-deletion) is unchanged.
 - **Adapter protocol closed up**: `save_schema_file`, `infer_entity_types`, `get_model_dirs`, and `reset_inference_cache` are now declared on `TransformationAdapter` instead of being called on `DbtCoreAdapter` without a protocol contract. No module outside `adapters/` imports `DbtCoreAdapter` directly anymore. A new `FakeAdapter` test double proves reconciliation and schema services work against a non-dbt adapter.
 - **Internal dbt-named functions renamed**: `reconcile_dbt()` → `reconcile_framework()`, `sync_dbt_tests()` → `sync_framework_tests()`, `_map_dbt_type()` → `_map_column_type()`, `save_dbt_schema()` → `save_model_schema_from_request()`/`save_schema_file()`. Purely internal — no API impact.

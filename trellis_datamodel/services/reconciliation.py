@@ -22,7 +22,7 @@ from trellis_datamodel.models.entity_keys import (
     get_model_ref,
     set_framework_tags,
     set_model_ref,
-    set_native_data_type,
+    set_physical_datatype,
 )
 
 
@@ -145,7 +145,7 @@ def reconcile_entity_fields(
         # Preserve the exact warehouse/adapter type (e.g. "varchar") alongside
         # the coarse UI bucket above, so pushing back to the adapter doesn't
         # downgrade a precise type to the bucket's generic default (#111).
-        set_native_data_type(field, col.get("type"))
+        set_physical_datatype(field, col.get("type"))
         desc = col.get("description")
         if desc is not None:
             # Parse origin from description if embedded

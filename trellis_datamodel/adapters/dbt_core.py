@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.models.entity_keys import get_model_ref, get_native_data_type
+from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
 from .base import (
@@ -1105,7 +1105,7 @@ class DbtCoreAdapter:
                         # time this column is synced, never overwrite an
                         # existing value (#111).
                         col_payload["data_type_fallback"] = _canonicalize_catalog_type(
-                            get_native_data_type(field)
+                            get_physical_datatype(field)
                         ) or field.get("datatype")
                     else:
                         col_payload["data_type"] = field.get("datatype")
@@ -1273,7 +1273,7 @@ class DbtCoreAdapter:
             col: dict = {"name": field["name"]}
             if field.get("source") == "dbt":
                 col["data_type_fallback"] = _canonicalize_catalog_type(
-                    get_native_data_type(field)
+                    get_physical_datatype(field)
                 ) or field["datatype"]
             else:
                 col["data_type"] = field["datatype"]
