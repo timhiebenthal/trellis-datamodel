@@ -98,8 +98,11 @@ def sync_framework_tests() -> list[Path]:
         entities = data_model.get("entities", [])
         relationships = data_model.get("relationships", [])
 
-        # Merge inferred relationships from dbt yml to avoid missing tests when
-        # the data_model.yml payload is prefix-stripped or outdated.
+        adapter = get_adapter()
+
+        # Merge inferred relationships from the framework's schema files to
+        # avoid missing tests when the data_model.yml payload is prefix-stripped
+        # or outdated.
         try:
             inferred = adapter.infer_relationships(include_unbound=False)
         except Exception:
@@ -125,7 +128,6 @@ def sync_framework_tests() -> list[Path]:
                 merged[key] = rel
         relationships = list(merged.values())
 
-        adapter = get_adapter()
         updated_files = adapter.sync_relationships(entities, relationships)
 
         return updated_files

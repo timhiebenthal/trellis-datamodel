@@ -1,0 +1,4 @@
+name: trellis_test_pipeline
+schedule: daily
+default_connections:
+  duckdb: test_duckdb

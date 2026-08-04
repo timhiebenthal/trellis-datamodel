@@ -23,8 +23,8 @@ async def get_exposures_endpoint():
     """
     Return exposures data and entity usage mapping.
 
-    First tries to read exposures from manifest.json (canonical source after dbt compilation).
-    Falls back to reading exposures.yml from various locations if manifest doesn't have exposures.
+    Where the exposures come from is the active framework's adapter's business;
+    frameworks with no exposure concept report none.
     """
     result = get_exposures()
     return ExposuresResponse(**result)

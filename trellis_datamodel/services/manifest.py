@@ -1,25 +1,22 @@
 """
-Manifest and catalog service.
+Model metadata service.
 
-Handles parsing and retrieval of dbt manifest.json and catalog.json files.
-Provides a service layer for manifest operations, abstracting adapter details
-from route handlers.
+Provides a service layer over the active framework's model list, abstracting
+adapter details from route handlers.
 """
 
 from typing import Any
 
 from trellis_datamodel.adapters import get_adapter
-from trellis_datamodel.exceptions import FileOperationError
-from trellis_datamodel.utils.path_validation import validate_manifest_path
+from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
 
 
 def get_models() -> list[dict[str, Any]]:
     """
     Get parsed models from the transformation framework.
 
-    Parses the dbt manifest.json file and returns a list of model metadata
-    dictionaries. Models are filtered according to configured dbt_model_paths
-    if specified in trellis.yml.
+    Returns model metadata for every model the active framework exposes,
+    filtered to the configured model paths if any are set in trellis.yml.
 
     Returns:
         List of model dictionaries with metadata including:
@@ -35,8 +32,8 @@ def get_models() -> list[dict[str, Any]]:
         - tags: List of tags
 
     Raises:
-        FileOperationError: If manifest cannot be read or parsed
-        ConfigurationError: If manifest path is not configured
+        ConfigurationError: If the framework's project path is not configured
+        FileOperationError: If the project's metadata cannot be read or parsed
 
     Example:
         >>> models = get_models()
@@ -45,12 +42,21 @@ def get_models() -> list[dict[str, Any]]:
         >>> models[0]["name"]
         'users'
     """
+    adapter = get_adapter()
+
+    # Check the project is usable before parsing, so a misconfigured path gives
+    # the user its own error rather than a parse failure further down.
+    status = adapter.get_project_status()
+    if not status["project_path"]:
+        raise ConfigurationError(status["error"] or "Project path is not configured.")
+    if not status["artifacts_present"]:
+        raise FileOperationError(
+            status["error"] or "The framework's model metadata is not available."
+        )
+
     try:
-        validate_manifest_path()
-        adapter = get_adapter()
-        models = adapter.get_models()
-        return models
+        return adapter.get_models()
     except FileNotFoundError as e:
-        raise FileOperationError(f"Manifest not found: {str(e)}") from e
+        raise FileOperationError(f"Model metadata not found: {str(e)}") from e
     except Exception as e:
-        raise FileOperationError(f"Error reading manifest: {str(e)}") from e
+        raise FileOperationError(f"Error reading model metadata: {str(e)}") from e

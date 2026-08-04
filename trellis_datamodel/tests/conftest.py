@@ -100,6 +100,28 @@ def temp_dbt_project():
     return _TEST_TEMP_DIR
 
 
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+BRUIN_PIPELINE_FIXTURE = os.path.join(FIXTURES_DIR, "bruin_pipeline")
+
+
+@pytest.fixture
+def bruin_pipeline():
+    """Path to the committed read-only Bruin fixture pipeline.
+
+    Use for read paths (get_models, get_lineage, infer_relationships). Anything
+    that writes must use `bruin_pipeline_copy` so the fixture stays pristine.
+    """
+    return BRUIN_PIPELINE_FIXTURE
+
+
+@pytest.fixture
+def bruin_pipeline_copy(tmp_path):
+    """A writable per-test copy of the Bruin fixture pipeline."""
+    dest = os.path.join(str(tmp_path), "pipeline")
+    shutil.copytree(BRUIN_PIPELINE_FIXTURE, dest)
+    return dest
+
+
 @pytest.fixture
 def mock_manifest_data():
     """Return mock manifest data."""
@@ -159,13 +181,47 @@ class _PatchedASGITransport(httpx.ASGITransport):
 class FakeAdapter:
     """In-memory TransformationAdapter test double.
 
-    Backed by a plain list[ModelInfo] (`self.models`) that tests mutate
-    directly. Proves reconciliation and other adapter consumers depend only
-    on the TransformationAdapter protocol, not on dbt specifics.
+    Backed by plain data structures that tests mutate directly. Proves
+    reconciliation and other adapter consumers depend only on the
+    TransformationAdapter protocol, not on dbt specifics.
+
+    The lineage/exposure defaults describe a tiny two-model project fed by a
+    "crm" source, so the protocol contract tests have something concrete to
+    assert against without any framework artifacts on disk.
     """
+
+    DEFAULT_UPSTREAMS = {
+        "model.fake.customer": ["model.fake.stg_customer"],
+        "model.fake.stg_customer": ["source.fake.crm.customers"],
+    }
+    DEFAULT_SOURCE_NAMES = {"source.fake.crm.customers": "crm"}
+    DEFAULT_EXPOSURES = [
+        {
+            "name": "fake_dashboard",
+            "label": "Fake Dashboard",
+            "type": "dashboard",
+            "url": None,
+            "maturity": None,
+            "description": None,
+            "owner": {"name": "analytics"},
+            "depends_on": ["model.fake.customer"],
+        }
+    ]
 
     def __init__(self, models=None):
         self.models = models if models is not None else []
+        # unique_id -> list of upstream unique_ids
+        self.upstreams = dict(self.DEFAULT_UPSTREAMS)
+        # source unique_id -> source system name
+        self.source_names = dict(self.DEFAULT_SOURCE_NAMES)
+        self.exposures = [dict(e) for e in self.DEFAULT_EXPOSURES]
+        self.capabilities = {
+            "lineage": True,
+            "column_lineage": False,
+            "exposures": True,
+            "relationships": True,
+            "scaffolding": True,
+        }
 
     def get_models(self):
         return self.models
@@ -218,29 +274,75 @@ class FakeAdapter:
     def reset_inference_cache(self):
         return None
 
-    def get_lineage(self, unique_id):
-        raise NotImplementedError(
-            "get_lineage is not yet part of TransformationAdapter; deferred to the "
-            "BruinAdapter spec (services/lineage.py still parses dbt manifest/catalog directly)."
-        )
+    def get_lineage(self, model_unique_id):
+        from collections import deque
+
+        from trellis_datamodel.exceptions import NotFoundError
+
+        if (
+            model_unique_id not in self.upstreams
+            and model_unique_id not in self.source_names
+        ):
+            raise NotFoundError(f"Model '{model_unique_id}' not found")
+
+        node_ids = {model_unique_id}
+        edges = []
+        queue = deque([model_unique_id])
+        visited = {model_unique_id}
+
+        while queue:
+            current = queue.popleft()
+            for upstream in self.upstreams.get(current, []):
+                edges.append({"source": upstream, "target": current})
+                node_ids.add(upstream)
+                if upstream not in visited:
+                    visited.add(upstream)
+                    queue.append(upstream)
+
+        return {
+            "nodes": [self._lineage_node(nid) for nid in sorted(node_ids)],
+            "edges": edges,
+        }
+
+    def _lineage_node(self, unique_id):
+        is_source = unique_id in self.source_names
+        return {
+            "unique_id": unique_id,
+            "name": unique_id.split(".")[-1],
+            "resource_type": "source" if is_source else "model",
+            "is_source": is_source,
+            "source_name": self.source_names.get(unique_id),
+            "folder": None,
+        }
 
     def get_exposures(self):
-        raise NotImplementedError(
-            "get_exposures is not yet part of TransformationAdapter; deferred to the "
-            "BruinAdapter spec (services/exposures.py still reads manifest.json/exposures.yml directly)."
-        )
+        return self.exposures
 
-    def get_source_systems_for_model(self, unique_id):
-        raise NotImplementedError(
-            "get_source_systems_for_model is not yet part of TransformationAdapter; deferred to "
-            "the BruinAdapter spec (routes/data_model.py still reads manifest/catalog directly)."
+    def get_source_systems_for_model(self, model_unique_id):
+        try:
+            graph = self.get_lineage(model_unique_id)
+        except Exception:
+            return []
+        return sorted(
+            {
+                n["source_name"]
+                for n in graph["nodes"]
+                if n["is_source"] and n["source_name"]
+            }
         )
 
     def get_project_status(self):
-        raise NotImplementedError(
-            "get_project_status is not yet part of TransformationAdapter; deferred to the "
-            "BruinAdapter spec (routes/manifest.py still reports dbt paths directly)."
-        )
+        return {
+            "framework": "fake",
+            "artifacts_present": True,
+            "artifacts": {},
+            "project_path": "/fake/project",
+            "project_path_exists": True,
+            "model_paths_configured": [],
+            "model_paths_resolved": [],
+            "capabilities": dict(self.capabilities),
+            "error": None,
+        }
 
 
 @pytest.fixture

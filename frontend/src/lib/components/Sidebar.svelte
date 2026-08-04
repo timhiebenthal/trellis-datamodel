@@ -16,7 +16,7 @@
     import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
     import { readModelRef } from "$lib/utils/entity-compat";
-    import { getFrameworkDisplay } from "$lib/utils/framework-display";
+    import { getFrameworkDisplay, missingArtifactHints } from "$lib/utils/framework-display";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
@@ -558,7 +558,7 @@
                         <div class="text-gray-500 text-sm mb-4">
                             No models found
                         </div>
-                        {#if $configStatus && (!$configStatus.config_present || !$configStatus.dbt_project_path || !$configStatus.manifest_exists)}
+                        {#if $configStatus && (!$configStatus.config_present || !!$configStatus.error)}
                             <div
                                 class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800 text-left"
                             >
@@ -591,17 +591,14 @@
                                 </strong><br />
                                 {#if !$configStatus.config_present}
                                     Missing <code>{$configStatus.config_filename || 'trellis.yml'}</code>.
-                                {:else if !$configStatus.dbt_project_path}
-                                    Set <code>dbt_project_path</code> in config.
-                                {:else if !$configStatus.manifest_exists}
-                                    Manifest not found.<br />
+                                {:else}
+                                    <!-- The adapter words its own error; it knows
+                                         which artifacts its framework needs. -->
+                                    {$configStatus.error}<br />
                                     <span class="text-[10px] mt-1 block opacity-75">
-                                        {#if $configStatus.catalog_exists === false}
-                                            Run <code>dbt docs generate</code> to create manifest.json and catalog.json.
-                                        {:else}
-                                            Run <code>dbt compile</code> to create manifest.json.
-                                        {/if}
-                                        <br />
+                                        {#each missingArtifactHints($configStatus) as hint}
+                                            {hint}<br />
+                                        {/each}
                                         Check the <strong>Config Info</strong> button for configuration details.
                                     </span>
                                 {/if}

@@ -1,58 +1,30 @@
 """
-Exposures service for dbt exposure operations.
+Exposures service.
 
-Handles reading and processing exposures from manifest.json or exposures.yml files.
-This service:
-- Reads exposures from manifest.json (canonical source after dbt compilation)
-- Falls back to reading exposures.yml from various locations if manifest doesn't have exposures
-- Maps exposure dependencies to entity usage by traversing upstream model dependencies
-- Returns exposure metadata and entity usage mapping for frontend display
+Maps the active framework's exposures — declared downstream consumers such as
+dashboards — onto the entities in the data model, so the canvas can show which
+entities are actually used.
 
-The service traverses upstream dependencies to ensure exposures that depend on
-mart/intermediate models still mark underlying entity-bound models as "used".
+Reading the exposures themselves is the adapter's job. What lives here is the
+Trellis-owned half: expanding each exposure's dependencies to their full
+upstream set, then resolving those models to the entities bound to them. The
+expansion matters because an exposure usually points at a mart model while the
+entities live further upstream — without it, almost nothing would be marked as
+used.
 """
 
-import json
+import logging
 import os
-import re
-from collections import deque
 from typing import Any
 
 import yaml
 
 from trellis_datamodel import config as cfg
+from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.exceptions import FeatureDisabledError
 from trellis_datamodel.models.entity_keys import get_model_ref
 
-
-def _parse_ref(ref_value: str) -> tuple[str, str | None]:
-    """
-    Parse ref() targets, supporting optional version arguments.
-
-    Examples:
-        ref('player') -> ("player", None)
-        ref('player', v=1) -> ("player", "1")
-        ref("player", version=2) -> ("player", "2")
-    """
-    ref_pattern = (
-        r"ref\(\s*['\"]([^,'\"]+)['\"](?:\s*,\s*(?:v|version)\s*=\s*([0-9]+))?\s*\)"
-    )
-    match = re.fullmatch(ref_pattern, ref_value.strip())
-    if match:
-        return match.group(1), match.group(2)
-    return ref_value, None
-
-
-def _load_manifest() -> dict[str, Any]:
-    """Load dbt manifest.json."""
-    if not cfg.MANIFEST_PATH or not os.path.exists(cfg.MANIFEST_PATH):
-        return {}
-    try:
-        with open(cfg.MANIFEST_PATH, "r") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Warning: Could not load manifest: {e}")
-        return {}
+logger = logging.getLogger(__name__)
 
 
 def _load_data_model() -> dict[str, Any]:
@@ -63,36 +35,8 @@ def _load_data_model() -> dict[str, Any]:
         with open(cfg.DATA_MODEL_PATH, "r") as f:
             return yaml.safe_load(f) or {}
     except Exception as e:
-        print(f"Warning: Could not load data model: {e}")
+        logger.warning("Could not load data model: %s", e)
         return {}
-
-
-def _resolve_model_ref(ref_string: str, manifest: dict[str, Any]) -> str | None:
-    """
-    Resolve a ref('model_name') string to a model unique_id.
-
-    Returns the unique_id if found, None otherwise.
-    """
-    model_name, version = _parse_ref(ref_string)
-    if not model_name:
-        return None
-
-    # Search manifest nodes for matching model
-    nodes = manifest.get("nodes", {})
-    for unique_id, node in nodes.items():
-        if node.get("resource_type") != "model":
-            continue
-        if node.get("name") == model_name:
-            # If version specified, check if it matches
-            if version is not None:
-                node_version = node.get("version")
-                if node_version is not None and str(node_version) == version:
-                    return unique_id
-            else:
-                # No version specified, return first match
-                return unique_id
-
-    return None
 
 
 def _find_entities_for_model(unique_id: str, data_model: dict[str, Any]) -> list[str]:
@@ -121,71 +65,41 @@ def _find_entities_for_model(unique_id: str, data_model: dict[str, Any]) -> list
     return entity_ids
 
 
-def _collect_upstream_model_ids(
-    manifest: dict[str, Any], model_unique_id: str
-) -> set[str]:
+def _collect_upstream_model_ids(adapter, model_unique_id: str) -> set[str]:
     """
-    Collect all upstream model unique_ids (including the starting model) by traversing
-    manifest depends_on relationships.
+    Collect a model's upstream models, including the model itself.
 
     Notes:
     - This is table-level lineage, not column-level.
-    - We only return dbt models (unique_id starts with "model.").
-    - Sources are traversed only as stopping points; they are not returned.
+    - Only models are returned; sources are traversal stopping points.
+    - A model the framework does not know about yields just itself, so a stale
+      exposure reference still maps whatever it can instead of dropping out.
     """
-    nodes = manifest.get("nodes", {}) if isinstance(manifest, dict) else {}
-    if not nodes or not model_unique_id:
+    if not model_unique_id:
         return set()
 
-    visited: set[str] = set()
-    upstream_models: set[str] = set()
+    try:
+        graph = adapter.get_lineage(model_unique_id)
+    except Exception as e:
+        logger.warning("Could not resolve upstreams for %s: %s", model_unique_id, e)
+        return {model_unique_id}
 
-    queue: deque[str] = deque([model_unique_id])
-    while queue:
-        current_id = queue.popleft()
-        if current_id in visited:
-            continue
-        visited.add(current_id)
-
-        if current_id.startswith("model."):
-            upstream_models.add(current_id)
-
-        current_node = nodes.get(current_id)
-        if not current_node:
-            continue
-
-        depends_on = current_node.get("depends_on")
-        if not depends_on:
-            continue
-
-        if isinstance(depends_on, dict):
-            upstream_nodes = depends_on.get("nodes", [])
-        elif isinstance(depends_on, list):
-            upstream_nodes = depends_on
-        else:
-            upstream_nodes = []
-
-        for upstream_id in upstream_nodes:
-            if isinstance(upstream_id, str) and upstream_id not in visited:
-                # Continue traversal for all upstream ids; non-model ids will
-                # naturally stop when not present in manifest["nodes"].
-                queue.append(upstream_id)
-
-    return upstream_models
+    return {
+        node["unique_id"]
+        for node in graph["nodes"]
+        if node["resource_type"] == "model"
+    }
 
 
 def get_exposures() -> dict[str, Any]:
     """
     Return exposures data and entity usage mapping.
 
-    First tries to read exposures from manifest.json (canonical source after dbt compilation).
-    Falls back to reading exposures.yml from various locations if manifest doesn't have exposures.
-
     Returns:
         Dictionary with 'exposures' list and 'entityUsage' mapping
 
     Raises:
-        ConfigurationError: If exposures are disabled
+        FeatureDisabledError: If exposures are disabled
     """
     # Check if exposures feature is enabled
     if not cfg.EXPOSURES_ENABLED:
@@ -193,55 +107,18 @@ def get_exposures() -> dict[str, Any]:
             "Exposures are disabled. Set 'exposures.enabled: true' in trellis.yml to enable."
         )
 
-    # Load manifest and data model
-    manifest = _load_manifest()
-    data_model = _load_data_model()
-
-    # Try to read exposures from manifest first (canonical source)
-    exposures_dict = manifest.get("exposures", {})
-    exposures_list = []
-
-    if exposures_dict and isinstance(exposures_dict, dict):
-        # Convert manifest exposures dict to list format
-        for unique_id, exposure in exposures_dict.items():
-            if not isinstance(exposure, dict):
-                continue
-            exposures_list.append(exposure)
-    else:
-        # Fallback: try to read from exposures.yml file
-        exposures_path = None
-        if cfg.DBT_PROJECT_PATH:
-            # Check multiple locations:
-            # 1. Root of dbt project
-            root_path = os.path.join(cfg.DBT_PROJECT_PATH, "exposures.yml")
-            if os.path.exists(root_path):
-                exposures_path = root_path
-            # 2. Standard location: models/exposures.yml
-            elif os.path.exists(os.path.join(cfg.DBT_PROJECT_PATH, "models", "exposures.yml")):
-                exposures_path = os.path.join(cfg.DBT_PROJECT_PATH, "models", "exposures.yml")
-            # 3. Search in models directory
-            else:
-                models_dir = os.path.join(cfg.DBT_PROJECT_PATH, "models")
-                if os.path.exists(models_dir):
-                    for file in os.listdir(models_dir):
-                        if file == "exposures.yml":
-                            exposures_path = os.path.join(models_dir, file)
-                            break
-
-        # Load exposures.yml if found
-        if exposures_path and os.path.exists(exposures_path):
-            try:
-                with open(exposures_path, "r") as f:
-                    exposures_data = yaml.safe_load(f) or {}
-                exposures_list = exposures_data.get("exposures", [])
-                if not isinstance(exposures_list, list):
-                    exposures_list = []
-            except Exception as e:
-                print(f"Warning: Could not read exposures.yml: {e}")
+    adapter = get_adapter()
+    try:
+        exposures_list = adapter.get_exposures()
+    except Exception as e:
+        logger.warning("Could not read exposures: %s", e)
+        exposures_list = []
 
     # If no exposures found, return empty response
     if not exposures_list:
         return {"exposures": [], "entityUsage": {}}
+
+    data_model = _load_data_model()
 
     # Build response: extract exposure metadata
     exposures_response = []
@@ -252,7 +129,6 @@ def get_exposures() -> dict[str, Any]:
         if not isinstance(exposure, dict):
             continue
 
-        # Extract exposure metadata
         exposure_name = exposure.get("name", "")
         if not exposure_name:
             continue
@@ -263,40 +139,13 @@ def get_exposures() -> dict[str, Any]:
             "type": exposure.get("type"),
             "description": exposure.get("description"),
         }
-
-        # Extract owner info
-        owner = exposure.get("owner")
-        if isinstance(owner, dict):
-            exposure_meta["owner"] = {"name": owner.get("name")}
-        elif owner:
-            # Handle case where owner might be a string
-            exposure_meta["owner"] = {"name": str(owner)}
+        if exposure.get("owner"):
+            exposure_meta["owner"] = exposure["owner"]
 
         exposures_response.append(exposure_meta)
 
-        # Resolve depends_on references
-        # In manifest, depends_on is a dict with 'nodes' list containing unique_ids
-        # In YAML, depends_on is a list of ref() strings
-        depends_on_nodes = []
-        depends_on = exposure.get("depends_on")
-
-        if isinstance(depends_on, dict):
-            # Manifest format: depends_on.nodes contains unique_ids
-            depends_on_nodes = depends_on.get("nodes", [])
-        elif isinstance(depends_on, list):
-            # YAML format: list of ref() strings, need to resolve
-            for ref_string in depends_on:
-                if not isinstance(ref_string, str):
-                    continue
-                # Resolve ref() to model unique_id
-                unique_id = _resolve_model_ref(ref_string, manifest)
-                if unique_id:
-                    depends_on_nodes.append(unique_id)
-                else:
-                    print(f"Warning: Could not resolve {ref_string} to a model")
-
-        # Process each model that this exposure depends on
-        for unique_id in depends_on_nodes:
+        # `depends_on` arrives from the adapter already resolved to unique_ids.
+        for unique_id in exposure.get("depends_on") or []:
             if not isinstance(unique_id, str):
                 continue
 
@@ -305,16 +154,16 @@ def get_exposures() -> dict[str, Any]:
             # the underlying entity-bound models as "used".
             if unique_id not in upstream_cache:
                 upstream_cache[unique_id] = _collect_upstream_model_ids(
-                    manifest, unique_id
+                    adapter, unique_id
                 )
 
             for upstream_model_id in upstream_cache[unique_id]:
-                entity_ids = _find_entities_for_model(upstream_model_id, data_model)
-                for entity_id in entity_ids:
-                    if entity_id not in entity_usage:
-                        entity_usage[entity_id] = []
-                    if exposure_name not in entity_usage[entity_id]:
-                        entity_usage[entity_id].append(exposure_name)
+                for entity_id in _find_entities_for_model(
+                    upstream_model_id, data_model
+                ):
+                    usage = entity_usage.setdefault(entity_id, [])
+                    if exposure_name not in usage:
+                        usage.append(exposure_name)
 
     return {
         "exposures": exposures_response,

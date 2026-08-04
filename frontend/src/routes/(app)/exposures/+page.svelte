@@ -1,5 +1,6 @@
 <script lang="ts">
     import { viewMode, configStatus } from '$lib/stores';
+    import { isFeatureAvailable } from '$lib/utils/framework-display';
     import { getConfigStatus, getConfigInfo, getExposures } from '$lib/api';
     import ExposuresTable from '$lib/components/ExposuresTable.svelte';
 
@@ -15,7 +16,7 @@
             $configStatus = status;
             
             const info = await getConfigInfo();
-            exposuresEnabled = info?.exposures_enabled ?? false;
+            exposuresEnabled = isFeatureAvailable(info?.exposures_enabled, info?.capabilities, 'exposures');
             exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
             
             if (exposuresEnabled) {

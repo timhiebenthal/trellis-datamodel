@@ -48,6 +48,7 @@ import {
 } from "$lib/utils";
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
+import { isFeatureAvailable } from "$lib/utils/framework-display";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
@@ -275,8 +276,8 @@ import { readModelRef } from "$lib/utils/entity-compat";
                 configInfoError = "Unable to fetch config info";
             } else {
                 configInfo = info;
-                lineageEnabled = info.lineage_enabled ?? false;
-                exposuresEnabled = info.exposures_enabled ?? false;
+                lineageEnabled = isFeatureAvailable(info.lineage_enabled, info.capabilities, 'lineage');
+                exposuresEnabled = isFeatureAvailable(info.exposures_enabled, info.capabilities, 'exposures');
                 exposuresDefaultLayout = info.exposures_default_layout ?? 'dashboards-as-rows';
                 $modelingStyle = info.modeling_style ?? 'entity_model';
                 $labelPrefixes = getLabelPrefixesFromConfig(info);
@@ -536,8 +537,8 @@ import { readModelRef } from "$lib/utils/entity-compat";
                 if (info?.guidance) {
                     guidanceConfig = info.guidance;
                 }
-                lineageEnabled = info?.lineage_enabled ?? false;
-                exposuresEnabled = info?.exposures_enabled ?? false;
+                lineageEnabled = isFeatureAvailable(info?.lineage_enabled, info?.capabilities, 'lineage');
+                exposuresEnabled = isFeatureAvailable(info?.exposures_enabled, info?.capabilities, 'exposures');
                 exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
                 busMatrixEnabled = info?.bus_matrix_enabled ?? false;
                 businessEventsEnabled = info?.business_events_enabled ?? false;

@@ -1,5 +1,6 @@
 """Tests for configuration loading."""
 
+import importlib
 import os
 import textwrap
 from pathlib import Path
@@ -18,6 +19,9 @@ def _prepare_config(monkeypatch):
     monkeypatch.setattr(cfg, "EXPOSURES_ENABLED", False)
     monkeypatch.setattr(cfg, "EXPOSURES_DEFAULT_LAYOUT", "dashboards-as-rows")
     monkeypatch.setattr(cfg, "ENTITY_MODELING_CONFIG", cfg.EntityModelingConfig())
+    monkeypatch.setattr(cfg, "BRUIN_PIPELINE_PATH", "")
+    monkeypatch.setattr(cfg, "BRUIN_ASSET_PATHS", [])
+    monkeypatch.setattr(cfg, "BRUIN_DEFAULT_ASSET_TYPE", "duckdb.sql")
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -431,10 +435,90 @@ def test_framework_enum_lists_only_implemented_frameworks():
 
     A framework value only becomes selectable once its adapter exists, so a user
     cannot configure a framework that has no working implementation behind it.
+    Adding a value here without an adapter is the failure this test exists to
+    catch — extend it in the same commit that lands the adapter, never before.
     """
+    from trellis_datamodel.adapters import get_adapter
     from trellis_datamodel.models.schemas import FrameworkEnum
 
-    assert [f.value for f in FrameworkEnum] == ["dbt-core"]
+    assert [f.value for f in FrameworkEnum] == ["dbt-core", "bruin"]
+
+    # Every listed framework must be constructible by the factory, which is the
+    # substance behind the claim above.
+    for framework in FrameworkEnum:
+        cfg_module = importlib.import_module("trellis_datamodel.config")
+        original = cfg_module.FRAMEWORK
+        try:
+            cfg_module.FRAMEWORK = framework.value
+            assert get_adapter() is not None
+        finally:
+            cfg_module.FRAMEWORK = original
+
+
+def test_load_config_resolves_bruin_pipeline_path(monkeypatch, tmp_path):
+    """Bruin framework config resolves pipeline path and asset paths."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: bruin
+        bruin_pipeline_path: ./pipeline
+        bruin_asset_paths:
+          - assets
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.FRAMEWORK == "bruin"
+    assert os.path.isabs(cfg.BRUIN_PIPELINE_PATH)
+    assert cfg.BRUIN_PIPELINE_PATH == os.path.abspath(tmp_path / "pipeline")
+    assert cfg.BRUIN_ASSET_PATHS == ["assets"]
+
+
+def test_bruin_pipeline_path_resolved_regardless_of_framework(monkeypatch, tmp_path):
+    """Resolution is unconditional so config reporting does not depend on load order."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: dbt-core
+        bruin_pipeline_path: ./pipeline
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.BRUIN_PIPELINE_PATH == os.path.abspath(tmp_path / "pipeline")
+
+
+def test_bruin_default_asset_type_is_configurable(monkeypatch, tmp_path):
+    """Scaffolding needs an asset type, and it is platform-specific."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: bruin
+        bruin_pipeline_path: ./pipeline
+        bruin_default_asset_type: bq.sql
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.BRUIN_DEFAULT_ASSET_TYPE == "bq.sql"
+
+
+def test_bruin_defaults_when_unset(monkeypatch, tmp_path):
+    """A dbt project leaves the Bruin fields empty, not absent."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(tmp_path, "framework: dbt-core\n")
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.BRUIN_PIPELINE_PATH == ""
+    assert cfg.BRUIN_ASSET_PATHS == []
+    assert cfg.BRUIN_DEFAULT_ASSET_TYPE == "duckdb.sql"
 
 
 def test_repo_trellis_yml_loads(monkeypatch):

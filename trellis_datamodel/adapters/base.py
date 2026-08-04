@@ -81,6 +81,77 @@ class Relationship(TypedDict, total=False):
     target_model_version: Optional[int]  # version of the target model if versioned
 
 
+class LineageNode(TypedDict):
+    """A node in an upstream lineage graph.
+
+    Everything the lineage service needs to lay a node out, with no framework
+    artifact structure leaking through: the service maps `folder` onto the
+    configured lineage layers and computes levels from the edges.
+    """
+
+    unique_id: str
+    name: str  # display label
+    resource_type: str  # "model" | "source"
+    is_source: bool
+    source_name: Optional[str]  # dbt source name, Bruin ingestr source_connection
+    folder: Optional[str]  # first path segment under the framework's model root
+    file_path: NotRequired[str]
+
+
+class LineageGraph(TypedDict):
+    """Upstream lineage for a single model, as a node/edge graph."""
+
+    nodes: list[LineageNode]
+    edges: list[dict[str, str]]  # {"source": unique_id, "target": unique_id}
+
+
+class Exposure(TypedDict, total=False):
+    """A downstream consumer of the models in a project."""
+
+    name: str
+    label: str
+    type: str
+    url: Optional[str]
+    maturity: Optional[str]
+    owner: Optional[dict[str, str]]
+    description: Optional[str]
+    depends_on: list[str]  # upstream unique_ids
+
+
+class Capabilities(TypedDict):
+    """What the active framework can actually do.
+
+    The frontend and the services gate optional features on these flags rather
+    than on the framework name, so a new adapter never needs a
+    `if framework == "..."` branch added on its behalf.
+    """
+
+    lineage: bool
+    column_lineage: bool
+    exposures: bool
+    relationships: bool
+    scaffolding: bool  # can save_schema_file create a model that does not exist yet
+
+
+class ProjectStatus(TypedDict):
+    """Health and configuration of the active framework's project.
+
+    `artifacts` is framework-shaped on purpose — dbt reports manifest.json and
+    catalog.json, Bruin reports its pipeline definition — but callers only ever
+    read it generically, as {label: {path, exists, hint}}.
+    """
+
+    framework: str
+    artifacts_present: bool
+    artifacts: dict[str, dict[str, Any]]
+    project_path: str
+    project_path_exists: bool
+    model_paths_configured: list[str]
+    model_paths_resolved: list[str]
+    capabilities: Capabilities
+    error: Optional[str]
+
+
 class TransformationAdapter(Protocol):
     """
     Protocol defining the interface for transformation framework adapters.
@@ -216,6 +287,65 @@ class TransformationAdapter(Protocol):
 
         Should be called when configuration changes that affect inference
         (e.g., dimensional modeling config, manifest path changes).
+        """
+        ...
+
+    def get_lineage(self, model_unique_id: str) -> LineageGraph:
+        """
+        Return the upstream lineage graph for a model.
+
+        Traverses the framework's dependency metadata from the given model back
+        to its sources. The graph is raw: node levels, layer assignment, and
+        display formatting are the caller's business.
+
+        Args:
+            model_unique_id: Framework-native identifier of the root model.
+
+        Returns:
+            Nodes (including the root) and directed upstream→downstream edges.
+
+        Raises:
+            NotFoundError: If the model is not present in the project.
+        """
+        ...
+
+    def get_exposures(self) -> list[Exposure]:
+        """
+        Return the project's exposures — declared downstream consumers.
+
+        Frameworks with no exposure concept return an empty list; check
+        `get_project_status()["capabilities"]["exposures"]` to tell "none
+        declared" apart from "not supported".
+
+        Returns:
+            List of exposures, each naming the upstream models it depends on.
+        """
+        ...
+
+    def get_source_systems_for_model(self, model_unique_id: str) -> list[str]:
+        """
+        Return the names of the source systems feeding a model.
+
+        Args:
+            model_unique_id: Framework-native identifier of the model.
+
+        Returns:
+            Sorted, de-duplicated source system names. Empty when the model has
+            no identifiable sources upstream — never raises, because this feeds
+            optional display.
+        """
+        ...
+
+    def get_project_status(self) -> ProjectStatus:
+        """
+        Report whether the configured project is present and usable.
+
+        This is what lets routes answer "is Trellis wired up correctly?" without
+        knowing which artifacts the active framework happens to use.
+
+        Returns:
+            Paths, existence flags, capabilities, and a user-facing `error`
+            string when the project cannot be read.
         """
         ...
 
