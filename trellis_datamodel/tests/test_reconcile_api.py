@@ -15,6 +15,43 @@ def test_map_column_type_renamed_from_map_dbt_type():
     assert _map_column_type(None) == "unknown"
 
 
+@pytest.mark.parametrize(
+    "raw_type,expected",
+    [
+        # Snowflake catalog spellings — the bare NUMBER case that used to
+        # land on "unknown" despite a perfectly readable physical type.
+        ("NUMBER", "float"),
+        ("NUMBER(38,0)", "int"),
+        ("NUMBER(10,2)", "float"),
+        ("VARCHAR(16777216)", "text"),
+        ("TIMESTAMP_NTZ(9)", "timestamp"),
+        ("BOOLEAN", "bool"),
+        ("FLOAT", "float"),
+        # BigQuery
+        ("INT64", "int"),
+        ("FLOAT64", "float"),
+        ("NUMERIC", "float"),
+        ("BIGNUMERIC", "float"),
+        ("STRING", "text"),
+        ("DATE", "date"),
+        # Postgres / Redshift
+        ("numeric(12,4)", "float"),
+        ("character varying(50)", "text"),
+        ("bigserial", "int"),
+        ("uuid", "text"),
+        # Non-scalar types stay honest rather than guessing a bucket
+        ("VARIANT", "unknown"),
+        ("ARRAY", "unknown"),
+        ("int[]", "unknown"),
+    ],
+)
+def test_map_column_type_warehouse_spellings(raw_type, expected):
+    """Warehouse-native and parameterized types resolve to a logical bucket."""
+    from trellis_datamodel.services.reconciliation import _map_column_type
+
+    assert _map_column_type(raw_type) == expected
+
+
 class TestReconcileDbtEndpoint:
     """Tests for POST /api/reconcile."""
 
