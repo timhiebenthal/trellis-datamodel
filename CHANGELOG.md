@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.1] - 2026-08-05
+
+### Fixed
+- **Warehouse-native column types no longer land on `datatype: unknown`**: the reconcile type map only
+  knew Postgres-style spellings, so a Snowflake `NUMBER` or a BigQuery `BIGNUMERIC` fell through to
+  `unknown` even though the exact type sat right next to it in `physical_datatype`. Parameterized
+  types are now split before matching (`VARCHAR(16777216)` → `text`, `TIMESTAMP_NTZ(9)` →
+  `timestamp`), and the fixed-point families (`number`, `numeric`, `decimal`, `bignumeric`) are
+  scale-aware: an explicit scale of 0 is an `int`, anything else is a `float`. Collection and nested
+  types (`ARRAY`, `STRUCT<...>`, `VARIANT`, `int[]`) stay `unknown` on purpose rather than being
+  collapsed onto their element type. Existing `unknown` values are backfilled the next time
+  reconcile runs, which is on app load.
+
 ## [0.21.0] - 2026-08-03
 
 Adds Bruin as a second supported transformation framework, and finishes the adapter boundary the

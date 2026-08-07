@@ -30,12 +30,37 @@ from trellis_datamodel.models.entity_keys import (
 # dbt type → DraftedField datatype mapping
 # ---------------------------------------------------------------------------
 
-_INT_PREFIXES = ("int", "bigint", "smallint", "tinyint", "serial", "integer")
-_FLOAT_PREFIXES = ("float", "double", "numeric", "decimal", "real", "money")
+_INT_PREFIXES = (
+    "int",
+    "bigint",
+    "smallint",
+    "tinyint",
+    "byteint",
+    "serial",
+    "bigserial",
+    "smallserial",
+    "integer",
+)
+_FLOAT_PREFIXES = ("float", "double", "real", "money")
 _BOOL_PREFIXES = ("bool",)
 _DATE_EXACT = {"date"}
 _TIMESTAMP_PREFIXES = ("timestamp", "datetime")
-_TEXT_PREFIXES = ("varchar", "char", "text", "string", "nvarchar", "nchar", "clob")
+_TEXT_PREFIXES = (
+    "varchar",
+    "char",
+    "text",
+    "string",
+    "nvarchar",
+    "nchar",
+    "clob",
+    "uuid",
+)
+
+# Fixed-point families whose bucket depends on the declared scale: a scale of 0
+# is an integer (Snowflake's NUMBER(38,0) is the canonical case), anything else
+# — including an unparameterized NUMBER, where the catalog does not report the
+# scale — is treated as float, the wider of the two buckets.
+_NUMERIC_BASES = ("number", "numeric", "decimal", "dec", "bignumeric")
 
 _ORIGIN_SEPARATOR = " | Origin: "
 _ORIGIN_PREFIX = "Origin: "
@@ -69,11 +94,37 @@ def _parse_description_with_origin(
     return raw_description, None
 
 
+def _split_column_type(column_type: str) -> tuple[str, list[str]]:
+    """Split a raw warehouse type into its lowercase base name and parameters.
+
+    "NUMBER(38,0)" -> ("number", ["38", "0"])
+    "VARCHAR(16777216)" -> ("varchar", ["16777216"])
+    "TIMESTAMP_NTZ" -> ("timestamp_ntz", [])
+
+    Collection wrappers (ARRAY, STRUCT<...>, "int[]") are deliberately left
+    intact so they fall through to "unknown" rather than being flattened to
+    the bucket of their element type.
+    """
+    t = column_type.lower().strip()
+    open_paren = t.find("(")
+    if open_paren == -1:
+        return t, []
+    base = t[:open_paren].strip()
+    inner = t[open_paren + 1 :].rstrip().removesuffix(")")
+    return base, [arg.strip() for arg in inner.split(",") if arg.strip()]
+
+
 def _map_column_type(column_type: str | None) -> str:
     """Map a framework/warehouse column type string to a DraftedField datatype enum value."""
     if not column_type:
         return "unknown"
-    t = column_type.lower().strip()
+    t, args = _split_column_type(column_type)
+    if t.endswith("[]") or t.startswith(("array", "struct", "map")) or "<" in t:
+        # Collection / nested types have no scalar bucket — don't collapse them
+        # onto their element type.
+        return "unknown"
+    if t in _NUMERIC_BASES:
+        return "int" if len(args) >= 2 and args[1] == "0" else "float"
     if t in _DATE_EXACT:
         return "date"
     for prefix in _TIMESTAMP_PREFIXES:
