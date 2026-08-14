@@ -4,6 +4,7 @@
     import Icon from '@iconify/svelte';
     import * as XLSX from 'xlsx';
     import { readModelRef } from '$lib/utils/entity-compat';
+    import Tooltip from '$lib/components/Tooltip.svelte';
 
     interface Dimension {
         id: string;
@@ -485,12 +486,14 @@
                                             ></span>
                                             <span class="truncate">{fact.label}</span>
                                             {#if factVisibleDimensionCounts.get(fact.id) !== undefined}
-                                                <span
-                                                    aria-label="{factVisibleDimensionCounts.get(fact.id)} connected dimensions"
-                                                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700"
-                                                >
-                                                    {factVisibleDimensionCounts.get(fact.id)}
-                                                </span>
+                                                <Tooltip text={`${factVisibleDimensionCounts.get(fact.id)} currently visible dimensions are connected to this fact.`}>
+                                                    <span
+                                                        aria-label="{factVisibleDimensionCounts.get(fact.id)} connected dimensions"
+                                                        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700"
+                                                    >
+                                                        {factVisibleDimensionCounts.get(fact.id)}
+                                                    </span>
+                                                </Tooltip>
                                             {/if}
                                         </div>
                                     </th>
@@ -521,12 +524,14 @@
                                                     title={readModelRef(dimension) ? `Built with dbt: ${readModelRef(dimension)!.split('.').pop()}` : 'Not yet built with dbt'}
                                                 ></span>
                                                 <span class="truncate">{dimension.label}</span>
-                                                <span
-                                                    aria-label="{dimensionVisibleFactCounts.get(dimension.id) ?? 0} connected facts"
-                                                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 flex-shrink-0"
-                                                >
-                                                    {dimensionVisibleFactCounts.get(dimension.id) ?? 0}
-                                                </span>
+                                                <Tooltip text={`${dimensionVisibleFactCounts.get(dimension.id) ?? 0} currently visible facts are connected to this dimension.`}>
+                                                    <span
+                                                        aria-label="{dimensionVisibleFactCounts.get(dimension.id) ?? 0} connected facts"
+                                                        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 flex-shrink-0"
+                                                    >
+                                                        {dimensionVisibleFactCounts.get(dimension.id) ?? 0}
+                                                    </span>
+                                                </Tooltip>
                                             </div>
                                         </td>
                                         {#each sortedFacts as fact}
