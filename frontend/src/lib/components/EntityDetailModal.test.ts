@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/svelte';
 import { nodes, edges, frameworkModels, entityDetailModal } from '$lib/stores';
 import type { DbtModel } from '$lib/types';
 import { updateModelSchema } from '$lib/api';
@@ -84,6 +84,24 @@ function setupBoundEntityWithDraftOrigin() {
   entityDetailModal.set({ open: true, entityId: 'node-1' });
 }
 
+function setupDimensionWithRoles() {
+  nodes.set([{
+    id: 'node-1',
+    type: 'entity',
+    position: { x: 0, y: 0 },
+    data: {
+      label: 'Account',
+      entity_type: 'dimension',
+      roles: [
+        { role: 'order_date', label: 'Order Date', source: 'process_a' },
+        { role: 'ship_date' },
+      ],
+    } as any,
+  }] as any);
+  frameworkModels.set([]);
+  entityDetailModal.set({ open: true, entityId: 'node-1' });
+}
+
 async function renderModal() {
   // Dynamically import to ensure mocks are hoisted
   const { default: EntityDetailModal } = await import('./EntityDetailModal.svelte');
@@ -123,6 +141,43 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     setupBoundEntityWithDraft();
     await renderModal();
     expect(screen.getByText(/Add Attribute/i)).toBeInTheDocument();
+  });
+
+  it('renders bound dbt models above the attributes section', async () => {
+    setupBoundEntityWithDraft();
+    await renderModal();
+
+    const boundModelsHeading = screen.getByText('Bound dbt Models (1)');
+    const attributesHeading = screen.getByText(/^Attributes \(3\)/);
+
+    expect(
+      boundModelsHeading.compareDocumentPosition(attributesHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('keeps role aliases and role editing details collapsed until requested', async () => {
+    setupDimensionWithRoles();
+    await renderModal();
+
+    const rolesToggle = screen.getByRole('button', { name: /Roles & aliases/ });
+    expect(rolesToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'ship_date' })).not.toBeInTheDocument();
+
+    await fireEvent.click(rolesToggle);
+
+    expect(rolesToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Order Date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ship_date' })).toBeInTheDocument();
+  });
+
+  it('preserves the full-width attributes column grid', async () => {
+    setupBoundEntityWithDraft();
+    await renderModal();
+
+    const attributesHeader = screen.getByText('Origin', { exact: true }).parentElement!;
+    expect(attributesHeader).toHaveClass('grid-cols-12');
+    expect(within(attributesHeader).getByText('Name', { exact: true })).toBeInTheDocument();
+    expect(within(attributesHeader).getByText('Description', { exact: true })).toBeInTheDocument();
   });
 
   it('has readonly name input for dbt rows and editable for draft rows', async () => {
@@ -242,12 +297,38 @@ describe('EntityDetailModal — tag save behavior', () => {
     entityDetailModal.set({ open: true, entityId: 'node-1' });
   }
 
+  function setupUnboundEntityWithManyTags() {
+    nodes.set([{
+      id: 'node-1',
+      type: 'entity',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Tagged Entity',
+        tags: ['tag-1', 'tag-2', 'tag-3', 'tag-4', 'tag-5', 'tag-6', 'tag-7', 'tag-8'],
+      } as any,
+    }] as any);
+    frameworkModels.set([]);
+    entityDetailModal.set({ open: true, entityId: 'node-1' });
+  }
+
+  it('collapses long tag lists behind a compact disclosure', async () => {
+    setupUnboundEntityWithManyTags();
+    await renderModal();
+
+    expect(screen.getByRole('button', { name: '+2 more' })).toBeInTheDocument();
+    expect(screen.queryByText('tag-8', { exact: true })).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: '+2 more' }));
+
+    expect(screen.getByText('tag-8', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument();
+  });
+
   it('adding a tag and clicking Save writes it to ui_tags, not the reconcile-owned tags field', async () => {
     setupBoundEntityWithTags();
     await renderModal();
 
-    // Domains / Tags / Source Systems inputs all share this placeholder — Tags is index 1.
-    const tagInput = screen.getAllByPlaceholderText('Type and press Enter')[1];
+    const tagInput = screen.getByLabelText('Add tag');
     await fireEvent.input(tagInput, { target: { value: 'pii' } });
     await fireEvent.keyDown(tagInput, { key: 'Enter' });
 
@@ -275,7 +356,7 @@ describe('EntityDetailModal — tag save behavior', () => {
     entityDetailModal.set({ open: true, entityId: 'node-1' });
     await renderModal();
 
-    const tagInput = screen.getAllByPlaceholderText('Type and press Enter')[1];
+    const tagInput = screen.getByLabelText('Add tag');
     await fireEvent.input(tagInput, { target: { value: 'new-tag' } });
     await fireEvent.keyDown(tagInput, { key: 'Enter' });
 

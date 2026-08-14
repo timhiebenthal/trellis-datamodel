@@ -32,6 +32,9 @@
 	let sourceSuggestions = $state<string[]>([]);
 	let showSourceSuggestions = $state(false);
 	let activeSourceSuggestionIndex = $state(0);
+	let showAllDomains = $state(false);
+	let showAllTags = $state(false);
+	let showAllSourceSystems = $state(false);
 	let filteredSourceSuggestions = $derived(
 		sourceSuggestions.filter((s) =>
 			s.toLowerCase().includes(sourceInput.toLowerCase())
@@ -44,6 +47,8 @@
 	let showExportDropdown = $state(false);
 	let isCopyingMarkdown = $state(false);
 	let showMarkdownSuccess = $state(false);
+	let showRolesSection = $state(false);
+	const chipDisplayLimit = 6;
 
 	// Role management state
 	let entityRoles = $state<EntityRole[]>([]);
@@ -72,6 +77,10 @@
 	function normalizeDomains(domains?: string[], domain?: string): string[] {
 		const list = Array.isArray(domains) && domains.length > 0 ? domains : domain ? [domain] : [];
 		return Array.from(new Set(list.map((item) => item.trim()).filter(Boolean)));
+	}
+
+	function visibleChips(items: string[], showAll: boolean): string[] {
+		return showAll ? items : items.slice(0, chipDisplayLimit);
 	}
 
 	// Get available domains from existing entities
@@ -307,6 +316,10 @@
 		showSourceSuggestions = false;
 		activeSourceSuggestionIndex = 0;
 		showDeleteConfirm = false;
+		showAllDomains = false;
+		showAllTags = false;
+		showAllSourceSystems = false;
+		showRolesSection = false;
 		isDirty = false;
 		materializedDescriptionEdits = new Map();
 		liveSchemaDescriptions = new Map();
@@ -944,6 +957,121 @@
 						<Icon icon="lucide:x" class="w-5 h-5" />
 					</button>
 				</div>
+
+				<div class="mt-4 flex flex-wrap items-center gap-2" data-testid="entity-context">
+					{#if $modelingStyle === 'dimensional_model'}
+						<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Entity type">
+							<span class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Type</span>
+							<button
+								type="button"
+								aria-pressed={entityType === 'dimension'}
+								class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'dimension'
+									? 'bg-green-100 border-green-300 text-green-700'
+									: 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
+								onclick={() => (entityType = 'dimension')}
+							>
+								<Icon icon="lucide:list" class="w-3.5 h-3.5" />
+								Dimension
+							</button>
+							<button
+								type="button"
+								aria-pressed={entityType === 'fact'}
+								class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'fact'
+									? 'bg-blue-100 border-blue-300 text-blue-700'
+									: 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
+								onclick={() => (entityType = 'fact')}
+							>
+								<Icon icon="lucide:bar-chart-3" class="w-3.5 h-3.5" />
+								Fact
+							</button>
+							<button
+								type="button"
+								aria-pressed={entityType === 'unclassified'}
+								class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'unclassified'
+									? 'bg-gray-100 border-gray-300 text-gray-700'
+									: 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
+								onclick={() => (entityType = 'unclassified')}
+							>
+								<Icon icon="lucide:circle-help" class="w-3.5 h-3.5" />
+								Unclassified
+							</button>
+						</div>
+
+						{#if entityType === 'dimension'}
+							<div class="relative annotation-dropdown-container flex items-center gap-1.5">
+								<span class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">7Ws</span>
+								<button
+									type="button"
+									aria-label="Annotation type"
+									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
+										? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
+										: 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}"
+									onclick={() => (show7WsDropdown = !show7WsDropdown)}
+								>
+									{annotationType ? annotationTypes.find((a) => a.value === annotationType)?.label : 'Select 7W...'}
+									<Icon icon="lucide:chevron-down" class="w-3 h-3 transition-transform {show7WsDropdown ? 'rotate-180' : ''}" />
+								</button>
+
+								{#if show7WsDropdown}
+									<div class="absolute z-20 top-full mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]">
+										<div class="max-h-60 overflow-y-auto">
+											{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
+												<button
+													type="button"
+													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
+														? option.color
+														: 'text-gray-700'}"
+													onclick={() => {
+														annotationType = option.value;
+														show7WsDropdown = false;
+													}}
+												>
+													{#if annotationType === option.value}
+														<Icon icon="lucide:check" class="w-4 h-4" />
+													{:else}
+														<span class="w-4"></span>
+													{/if}
+													{option.label}
+												</button>
+											{/each}
+											<button
+												type="button"
+												class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
+													? 'bg-gray-50 text-gray-700'
+													: 'text-gray-500'}"
+												onclick={() => {
+													annotationType = undefined;
+													show7WsDropdown = false;
+												}}
+											>
+												{#if annotationType === undefined}
+													<Icon icon="lucide:check" class="w-4 h-4" />
+												{:else}
+													<span class="w-4"></span>
+												{/if}
+												None
+											</button>
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					{/if}
+
+					{#if boundModels.length > 0}
+						<div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5" data-testid="bound-model-summary">
+							<Icon icon="lucide:layers" class="h-4 w-4 shrink-0 text-primary-600" />
+							<span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-primary-700">
+								Bound dbt Models ({boundModels.length})
+							</span>
+							{#each boundModels as model}
+								<span class="max-w-full truncate rounded border border-primary-200 bg-white/70 px-1.5 py-0.5 font-mono text-[11px] text-gray-700" title={model}>
+									{model}
+								</span>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Success Message -->
@@ -979,8 +1107,8 @@
 						<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
 							Domains
 						</label>
-						<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
-							{#each entityDomains as domain}
+						<div class="flex flex-wrap items-center gap-1.5 min-h-[36px] p-1.5 border border-gray-200 rounded-lg bg-gray-50">
+							{#each visibleChips(entityDomains, showAllDomains) as domain}
 								<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-md border border-purple-200 font-medium">
 									{domain}
 									<button
@@ -1000,7 +1128,17 @@
 								onkeydown={handleDomainInputKeydown}
 								class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
 								placeholder="Type and press Enter"
+								aria-label="Add domain"
 							/>
+							{#if entityDomains.length > chipDisplayLimit}
+								<button
+									type="button"
+									class="shrink-0 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 hover:text-primary-800 rounded"
+									onclick={() => (showAllDomains = !showAllDomains)}
+								>
+									{showAllDomains ? 'Show less' : `+${entityDomains.length - chipDisplayLimit} more`}
+								</button>
+							{/if}
 						</div>
 						<datalist id="domain-suggestions">
 							{#each uniqueDomains as domain}
@@ -1023,130 +1161,13 @@
 						></textarea>
 					</div>
 
-					<!-- Entity Type and 7Ws (dimensional modeling only) -->
-					{#if $modelingStyle === 'dimensional_model'}
-						<div class="grid grid-cols-2 gap-4">
-							<!-- Entity Type - Compact Chips -->
-							<div>
-								<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Entity Type</label>
-								<div class="flex gap-2">
-									<button
-										type="button"
-										class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'dimension'
-											? 'bg-green-50 border-green-500 text-green-700'
-											: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
-										onclick={() => (entityType = 'dimension')}
-									>
-										<Icon icon="lucide:list" class="w-4 h-4 inline-block mr-1" />
-										Dimension
-									</button>
-									<button
-										type="button"
-										class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'fact'
-											? 'bg-blue-50 border-blue-500 text-blue-700'
-											: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}"
-										onclick={() => (entityType = 'fact')}
-									>
-										<Icon icon="lucide:bar-chart-3" class="w-4 h-4 inline-block mr-1" />
-										Fact
-									</button>
-									<button
-										type="button"
-										class="px-3 py-1.5 rounded-md border-2 transition-all text-sm font-medium {entityType === 'unclassified'
-											? 'bg-gray-50 border-gray-500 text-gray-700'
-											: 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}"
-										onclick={() => (entityType = 'unclassified')}
-									>
-										<Icon icon="lucide:circle-help" class="w-4 h-4 inline-block mr-1" />
-										Unclassified
-									</button>
-								</div>
-							</div>
-
-							<!-- Annotation Type (7Ws) - Chip/Badge style for dimensions only -->
-							{#if entityType === 'dimension'}
-								<div class="relative annotation-dropdown-container">
-									<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-										Annotation Type (7Ws)
-									</label>
-									<!-- Selected chip/badge or placeholder -->
-									<button
-										type="button"
-										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
-											? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
-											: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200'}"
-										onclick={() => (show7WsDropdown = !show7WsDropdown)}
-									>
-										{#if annotationType}
-											<span>
-												{annotationTypes.find((a) => a.value === annotationType)?.label}
-											</span>
-										{:else}
-											<span>Select 7W...</span>
-										{/if}
-										<Icon
-											icon="lucide:chevron-down"
-											class="w-3 h-3 transition-transform {show7WsDropdown ? 'rotate-180' : ''}"
-										/>
-									</button>
-
-									<!-- Dropdown menu -->
-									{#if show7WsDropdown}
-										<div
-											class="absolute z-10 mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]"
-										>
-											<div class="max-h-60 overflow-y-auto">
-												{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
-													<button
-														type="button"
-														class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
-															? option.color
-															: 'text-gray-700'}"
-														onclick={() => {
-															annotationType = option.value;
-															show7WsDropdown = false;
-														}}
-													>
-														{#if annotationType === option.value}
-															<Icon icon="lucide:check" class="w-4 h-4" />
-														{:else}
-															<span class="w-4"></span>
-														{/if}
-														{option.label}
-													</button>
-												{/each}
-												<button
-													type="button"
-													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
-														? 'bg-gray-50 text-gray-700'
-														: 'text-gray-500'}"
-													onclick={() => {
-														annotationType = undefined;
-														show7WsDropdown = false;
-													}}
-												>
-													{#if annotationType === undefined}
-														<Icon icon="lucide:check" class="w-4 h-4" />
-													{:else}
-														<span class="w-4"></span>
-													{/if}
-													None
-												</button>
-											</div>
-										</div>
-									{/if}
-								</div>
-							{/if}
-						</div>
-					{/if}
-
 					<!-- Tags and Source Systems - Side by Side -->
 					<div class="grid grid-cols-2 gap-4">
 						<!-- Tags -->
 						<div>
 							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Tags</label>
-							<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
-								{#each entityTags as tag}
+							<div class="flex flex-wrap items-center gap-1.5 min-h-[36px] p-1.5 border border-gray-200 rounded-lg bg-gray-50">
+								{#each visibleChips(entityTags, showAllTags) as tag}
 									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-md border border-primary-200 font-medium">
 										{tag}
 										<button
@@ -1166,7 +1187,17 @@
 									onkeydown={handleTagInputKeydown}
 									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
 									placeholder="Type and press Enter"
+									aria-label="Add tag"
 								/>
+								{#if entityTags.length > chipDisplayLimit}
+									<button
+										type="button"
+										class="shrink-0 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 hover:text-primary-800 rounded"
+										onclick={() => (showAllTags = !showAllTags)}
+									>
+										{showAllTags ? 'Show less' : `+${entityTags.length - chipDisplayLimit} more`}
+									</button>
+								{/if}
 							</div>
 							<datalist id="tag-suggestions">
 								{#each uniqueTags as tag}
@@ -1180,8 +1211,8 @@
 							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
 								Source Systems
 							</label>
-							<div class="flex flex-wrap gap-1.5 min-h-[44px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
-								{#each entitySourceSystems as source}
+							<div class="flex flex-wrap items-center gap-1.5 min-h-[36px] p-1.5 border border-gray-200 rounded-lg bg-gray-50">
+								{#each visibleChips(entitySourceSystems, showAllSourceSystems) as source}
 									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-md border border-gray-300 font-medium">
 										{source}
 										<button
@@ -1203,7 +1234,17 @@
 									oninput={handleSourceInput}
 									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
 									placeholder="Type and press Enter"
+									aria-label="Add source system"
 								/>
+								{#if entitySourceSystems.length > chipDisplayLimit}
+									<button
+										type="button"
+										class="shrink-0 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 hover:text-primary-800 rounded"
+										onclick={() => (showAllSourceSystems = !showAllSourceSystems)}
+									>
+										{showAllSourceSystems ? 'Show less' : `+${entitySourceSystems.length - chipDisplayLimit} more`}
+									</button>
+								{/if}
 							</div>
 							{#if showSourceSuggestions && filteredSourceSuggestions.length > 0}
 								<div class="mt-2 border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto">
@@ -1225,33 +1266,55 @@
 						</div>
 					</div>
 
+					{#if entityType === 'dimension'}
+						<div class="rounded-lg border border-gray-200 bg-gray-50/70" data-testid="roles-and-aliases">
+							<button
+								type="button"
+								class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-100/80 transition-colors"
+								aria-expanded={showRolesSection}
+								onclick={() => (showRolesSection = !showRolesSection)}
+							>
+								<span class="flex min-w-0 items-center gap-2">
+									<Icon icon="lucide:users-round" class="h-4 w-4 shrink-0 text-primary-600" />
+									<span class="text-sm font-semibold text-gray-700">Roles &amp; aliases</span>
+									<span class="truncate text-xs text-gray-500">
+										{uniqueEntityRoles.length} {uniqueEntityRoles.length === 1 ? 'role' : 'roles'}
+										{#if autoRoles.length > 0}
+											· {autoRoles.length} {autoRoles.length === 1 ? 'alias' : 'aliases'}
+										{/if}
+									</span>
+								</span>
+								<span class="flex shrink-0 items-center gap-1 text-xs font-medium text-primary-700">
+									{showRolesSection ? 'Hide details' : 'Manage'}
+									<Icon icon={showRolesSection ? 'lucide:chevron-up' : 'lucide:chevron-down'} class="h-4 w-4" />
+								</span>
+							</button>
+
+							{#if showRolesSection}
+								<div class="border-t border-gray-200 px-3 pb-3">
 					<!-- Role aliases (read-only auto-generated) -->
-					{#if entityType === 'dimension' && autoRoles.length > 0}
-						<div>
-							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
-								Role aliases
-							</label>
-							<div class="space-y-1">
+					{#if autoRoles.length > 0}
+						<div class="pt-3">
+							<div class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Aliases</div>
+							<div class="flex flex-wrap gap-1.5">
 								{#each autoRoles as role}
-									<div class="flex items-center gap-1.5 text-sm text-gray-600">
-										<span class="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></span>
-										<span class="font-medium text-gray-800">{role.label || role.role}</span>
+									<span class="inline-flex max-w-full items-center gap-1 rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-xs text-primary-800" title={role.source ? `Source: ${role.source}` : undefined}>
+										<Icon icon="lucide:link" class="h-3 w-3 shrink-0 text-primary-600" />
+										<span class="truncate font-medium">{role.label || role.role}</span>
 										{#if role.role && role.label}
-											<span class="text-gray-400">({role.role})</span>
+											<span class="truncate text-primary-600">({role.role})</span>
 										{/if}
 										{#if role.source}
-											<span class="text-gray-400">·</span>
-											<span class="text-gray-500 text-xs">{role.source}</span>
+											<span class="truncate text-[10px] text-primary-600">· {role.source}</span>
 										{/if}
-									</div>
+									</span>
 								{/each}
 							</div>
 						</div>
 					{/if}
 
 					<!-- Roles (for dimensions only) -->
-					{#if entityType === 'dimension'}
-						<div>
+					<div>
 							<div class="flex items-center gap-2 mb-3">
 					<label class="block text-sm font-semibold text-gray-700">
 								Roles ({uniqueEntityRoles.length})
@@ -1387,6 +1450,9 @@
 									Add Role
 								</button>
 							</div>
+						</div>
+								</div>
+							{/if}
 						</div>
 					{/if}
 
@@ -1575,27 +1641,6 @@
 							Add Attribute
 						</button>
 					</div>
-
-					<!-- Bound dbt Models (Read-only) -->
-					{#if boundModels.length > 0}
-						<div>
-							<label class="block text-sm font-semibold text-gray-700 mb-3">
-								Bound dbt Models ({boundModels.length})
-							</label>
-							<div class="space-y-2">
-							{#each boundModels as model}
-								<div
-									class="px-4 py-3 bg-primary-50 border border-primary-200 rounded-lg"
-								>
-									<div class="flex items-center gap-2">
-										<Icon icon="lucide:layers" class="w-4 h-4 text-primary-600" />
-										<span class="font-mono text-sm text-gray-900">{model}</span>
-									</div>
-								</div>
-							{/each}
-							</div>
-						</div>
-					{/if}
 
 					<!-- Relationships (read-only, click an entity to navigate) -->
 					{#if entityRelationships.length > 0}
