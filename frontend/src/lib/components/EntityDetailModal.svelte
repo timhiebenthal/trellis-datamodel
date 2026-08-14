@@ -958,54 +958,54 @@
 					</button>
 				</div>
 
-				<div class="mt-4 flex flex-wrap items-center gap-2" data-testid="entity-context">
+				<div class="mt-4 flex flex-wrap items-center gap-2.5" data-testid="entity-context">
 					{#if $modelingStyle === 'dimensional_model'}
-						<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Entity type">
-							<span class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Type</span>
+						<div class="flex flex-wrap items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-gray-200 shadow-sm" role="group" aria-label="Entity type">
+							<span class="text-[11px] font-semibold text-gray-500 px-1">Type</span>
 							<button
 								type="button"
 								aria-pressed={entityType === 'dimension'}
-								class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'dimension'
-									? 'bg-green-100 border-green-300 text-green-700'
-									: 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
+								class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'dimension'
+									? 'bg-green-100 border-green-300 text-green-800 shadow-xs'
+									: 'bg-white border-transparent text-gray-600 hover:bg-gray-100'}"
 								onclick={() => (entityType = 'dimension')}
 							>
-								<Icon icon="lucide:list" class="w-3.5 h-3.5" />
+								<Icon icon="lucide:list" class="w-3.5 h-3.5 {entityType === 'dimension' ? 'text-green-700' : 'text-gray-500'}" />
 								Dimension
 							</button>
 							<button
 								type="button"
 								aria-pressed={entityType === 'fact'}
-								class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'fact'
-									? 'bg-blue-100 border-blue-300 text-blue-700'
-									: 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
+								class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'fact'
+									? 'bg-blue-100 border-blue-300 text-blue-800 shadow-xs'
+									: 'bg-white border-transparent text-gray-600 hover:bg-gray-100'}"
 								onclick={() => (entityType = 'fact')}
 							>
-								<Icon icon="lucide:bar-chart-3" class="w-3.5 h-3.5" />
+								<Icon icon="lucide:bar-chart-3" class="w-3.5 h-3.5 {entityType === 'fact' ? 'text-blue-700' : 'text-gray-500'}" />
 								Fact
 							</button>
 							<button
 								type="button"
 								aria-pressed={entityType === 'unclassified'}
-								class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'unclassified'
-									? 'bg-gray-100 border-gray-300 text-gray-700'
-									: 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}"
+								class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-xs font-medium {entityType === 'unclassified'
+									? 'bg-gray-100 border-gray-300 text-gray-800 shadow-xs'
+									: 'bg-white border-transparent text-gray-600 hover:bg-gray-100'}"
 								onclick={() => (entityType = 'unclassified')}
 							>
-								<Icon icon="lucide:circle-help" class="w-3.5 h-3.5" />
+								<Icon icon="lucide:circle-help" class="w-3.5 h-3.5 text-gray-500" />
 								Unclassified
 							</button>
 						</div>
 
 						{#if entityType === 'dimension'}
-							<div class="relative annotation-dropdown-container flex items-center gap-1.5">
-								<span class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">7Ws</span>
+							<div class="relative annotation-dropdown-container flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-gray-200 shadow-sm">
+								<span class="text-[11px] font-semibold text-gray-500 px-1">7Ws</span>
 								<button
 									type="button"
 									aria-label="Annotation type"
-									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-xs font-medium hover:opacity-80 {annotationType
-										? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current'
-										: 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}"
+									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-xs font-medium hover:opacity-90 {annotationType
+										? annotationTypes.find((a) => a.value === annotationType)?.color + ' border-current shadow-xs'
+										: 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
 									onclick={() => (show7WsDropdown = !show7WsDropdown)}
 								>
 									{annotationType ? annotationTypes.find((a) => a.value === annotationType)?.label : 'Select 7W...'}
@@ -1013,12 +1013,12 @@
 								</button>
 
 								{#if show7WsDropdown}
-									<div class="absolute z-20 top-full mt-1 left-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[160px]">
-										<div class="max-h-60 overflow-y-auto">
+									<div class="absolute z-20 top-full mt-1.5 left-0 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden min-w-[170px] animate-fade-in">
+										<div class="max-h-60 overflow-y-auto py-1">
 											{#each annotationTypes.filter((opt) => opt.value !== 'how_many') as option}
 												<button
 													type="button"
-													class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
+													class="w-full px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 {annotationType === option.value
 														? option.color
 														: 'text-gray-700'}"
 													onclick={() => {
@@ -1027,27 +1027,25 @@
 													}}
 												>
 													{#if annotationType === option.value}
-														<Icon icon="lucide:check" class="w-4 h-4" />
+														<Icon icon="lucide:check" class="w-3.5 h-3.5" />
 													{:else}
-														<span class="w-4"></span>
+														<span class="w-3.5"></span>
 													{/if}
 													{option.label}
 												</button>
 											{/each}
 											<button
 												type="button"
-												class="w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200 {annotationType === undefined
-													? 'bg-gray-50 text-gray-700'
-													: 'text-gray-500'}"
+												class="w-full px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-gray-50 flex items-center gap-2 border-t border-gray-100 text-gray-500"
 												onclick={() => {
 													annotationType = undefined;
 													show7WsDropdown = false;
 												}}
 											>
 												{#if annotationType === undefined}
-													<Icon icon="lucide:check" class="w-4 h-4" />
+													<Icon icon="lucide:check" class="w-3.5 h-3.5" />
 												{:else}
-													<span class="w-4"></span>
+													<span class="w-3.5"></span>
 												{/if}
 												None
 											</button>
@@ -1059,13 +1057,15 @@
 					{/if}
 
 					{#if boundModels.length > 0}
-						<div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5" data-testid="bound-model-summary">
-							<Icon icon="lucide:layers" class="h-4 w-4 shrink-0 text-primary-600" />
-							<span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-primary-700">
-								Bound dbt Models ({boundModels.length})
-							</span>
+						<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-1.5 shadow-sm" data-testid="bound-model-summary">
+							<div class="flex items-center gap-1.5 shrink-0 text-primary-700">
+								<Icon icon="lucide:layers" class="h-4 w-4 shrink-0 text-primary-600" />
+								<span class="text-xs font-semibold">
+									Bound dbt Models ({boundModels.length})
+								</span>
+							</div>
 							{#each boundModels as model}
-								<span class="max-w-full truncate rounded border border-primary-200 bg-white/70 px-1.5 py-0.5 font-mono text-[11px] text-gray-700" title={model}>
+								<span class="max-w-full truncate rounded-md border border-primary-200/70 bg-white px-2 py-0.5 font-mono text-xs text-primary-900 shadow-2xs font-medium" title={model}>
 									{model}
 								</span>
 							{/each}
@@ -1096,7 +1096,7 @@
 								id="entity-name"
 								type="text"
 								bind:value={entityName}
-								class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 font-medium"
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-gray-900 font-medium"
 								placeholder="e.g., Customer, Order, Product"
 								required
 							/>
@@ -1107,14 +1107,14 @@
 						<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
 							Domains
 						</label>
-						<div class="flex flex-wrap items-center gap-1.5 min-h-[36px] p-1.5 border border-gray-200 rounded-lg bg-gray-50">
+						<div class="flex flex-wrap items-center gap-1.5 min-h-[38px] p-1.5 border border-gray-300 rounded-lg bg-white shadow-2xs hover:border-gray-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 transition-all">
 							{#each visibleChips(entityDomains, showAllDomains) as domain}
-								<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-md border border-purple-200 font-medium">
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-md border border-purple-200 font-medium shadow-3xs">
 									{domain}
 									<button
 										type="button"
 										onclick={() => removeDomain(domain)}
-										class="text-purple-600 hover:text-purple-900 focus:outline-none"
+										class="text-purple-500 hover:text-purple-800 focus:outline-none"
 										aria-label="Remove {domain}"
 									>
 										<Icon icon="lucide:x" class="w-2.5 h-2.5" />
@@ -1126,14 +1126,14 @@
 								list="domain-suggestions"
 								bind:value={domainInput}
 								onkeydown={handleDomainInputKeydown}
-								class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+								class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-400"
 								placeholder="Type and press Enter"
 								aria-label="Add domain"
 							/>
 							{#if entityDomains.length > chipDisplayLimit}
 								<button
 									type="button"
-									class="shrink-0 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 hover:text-primary-800 rounded"
+									class="shrink-0 px-2 py-0.5 text-[11px] font-semibold text-purple-700 hover:text-purple-900 hover:bg-purple-50 rounded-full border border-purple-200/70 transition-colors"
 									onclick={() => (showAllDomains = !showAllDomains)}
 								>
 									{showAllDomains ? 'Show less' : `+${entityDomains.length - chipDisplayLimit} more`}
@@ -1142,7 +1142,7 @@
 						</div>
 						<datalist id="domain-suggestions">
 							{#each uniqueDomains as domain}
-								<option value={domain} />
+								<option value={domain}></option>
 							{/each}
 						</datalist>
 						</div>
@@ -1156,7 +1156,7 @@
 							id="entity-description"
 							bind:value={entityDescription}
 							rows="3"
-							class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 resize-y"
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-gray-900 resize-y"
 							placeholder="Description..."
 						></textarea>
 					</div>
@@ -1166,14 +1166,14 @@
 						<!-- Tags -->
 						<div>
 							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Tags</label>
-							<div class="flex flex-wrap items-center gap-1.5 min-h-[36px] p-1.5 border border-gray-200 rounded-lg bg-gray-50">
+							<div class="flex flex-wrap items-center gap-1.5 min-h-[38px] p-1.5 border border-gray-300 rounded-lg bg-white shadow-2xs hover:border-gray-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 transition-all">
 								{#each visibleChips(entityTags, showAllTags) as tag}
-									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-md border border-primary-200 font-medium">
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-md border border-primary-200/80 font-medium shadow-3xs">
 										{tag}
 										<button
 											type="button"
 											onclick={() => removeTag(tag)}
-											class="text-primary-600 hover:text-primary-900 focus:outline-none"
+											class="text-primary-500 hover:text-primary-800 focus:outline-none"
 											aria-label="Remove {tag}"
 										>
 											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
@@ -1185,14 +1185,14 @@
 									list="tag-suggestions"
 									bind:value={tagInput}
 									onkeydown={handleTagInputKeydown}
-									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-400"
 									placeholder="Type and press Enter"
 									aria-label="Add tag"
 								/>
 								{#if entityTags.length > chipDisplayLimit}
 									<button
 										type="button"
-										class="shrink-0 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 hover:text-primary-800 rounded"
+										class="shrink-0 px-2 py-0.5 text-[11px] font-semibold text-primary-700 hover:text-primary-900 hover:bg-primary-50 rounded-full border border-primary-200/70 transition-colors"
 										onclick={() => (showAllTags = !showAllTags)}
 									>
 										{showAllTags ? 'Show less' : `+${entityTags.length - chipDisplayLimit} more`}
@@ -1201,7 +1201,7 @@
 							</div>
 							<datalist id="tag-suggestions">
 								{#each uniqueTags as tag}
-									<option value={tag} />
+									<option value={tag}></option>
 								{/each}
 							</datalist>
 						</div>
@@ -1211,14 +1211,14 @@
 							<label class="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
 								Source Systems
 							</label>
-							<div class="flex flex-wrap items-center gap-1.5 min-h-[36px] p-1.5 border border-gray-200 rounded-lg bg-gray-50">
+							<div class="flex flex-wrap items-center gap-1.5 min-h-[38px] p-1.5 border border-gray-300 rounded-lg bg-white shadow-2xs hover:border-gray-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 transition-all">
 								{#each visibleChips(entitySourceSystems, showAllSourceSystems) as source}
-									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-md border border-gray-300 font-medium">
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-md border border-gray-200 font-medium shadow-3xs">
 										{source}
 										<button
 											type="button"
 											onclick={() => removeSourceSystem(source)}
-											class="text-gray-600 hover:text-gray-900 focus:outline-none"
+											class="text-gray-500 hover:text-gray-800 focus:outline-none"
 											aria-label="Remove {source}"
 										>
 											<Icon icon="lucide:x" class="w-2.5 h-2.5" />
@@ -1232,14 +1232,14 @@
 									onfocus={handleSourceInputFocus}
 									onblur={handleSourceInputBlur}
 									oninput={handleSourceInput}
-									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0"
+									class="flex-1 min-w-[80px] px-2 py-1 text-xs border-0 bg-transparent focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-400"
 									placeholder="Type and press Enter"
 									aria-label="Add source system"
 								/>
 								{#if entitySourceSystems.length > chipDisplayLimit}
 									<button
 										type="button"
-										class="shrink-0 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 hover:text-primary-800 rounded"
+										class="shrink-0 px-2 py-0.5 text-[11px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full border border-gray-300 transition-colors"
 										onclick={() => (showAllSourceSystems = !showAllSourceSystems)}
 									>
 										{showAllSourceSystems ? 'Show less' : `+${entitySourceSystems.length - chipDisplayLimit} more`}
@@ -1247,7 +1247,7 @@
 								{/if}
 							</div>
 							{#if showSourceSuggestions && filteredSourceSuggestions.length > 0}
-								<div class="mt-2 border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto">
+								<div class="mt-2 border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto shadow-lg">
 									{#each filteredSourceSuggestions as suggestion, index}
 										<button
 											class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none {index === activeSourceSuggestionIndex ? 'bg-gray-50' : ''}"
@@ -1267,45 +1267,45 @@
 					</div>
 
 					{#if entityType === 'dimension'}
-						<div class="rounded-lg border border-gray-200 bg-gray-50/70" data-testid="roles-and-aliases">
+						<div class="rounded-lg border border-gray-200 bg-white shadow-2xs overflow-hidden transition-all hover:border-gray-300" data-testid="roles-and-aliases">
 							<button
 								type="button"
-								class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-100/80 transition-colors"
+								class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left bg-gray-50/70 hover:bg-gray-100/70 transition-colors"
 								aria-expanded={showRolesSection}
 								onclick={() => (showRolesSection = !showRolesSection)}
 							>
 								<span class="flex min-w-0 items-center gap-2">
 									<Icon icon="lucide:users-round" class="h-4 w-4 shrink-0 text-primary-600" />
-									<span class="text-sm font-semibold text-gray-700">Roles &amp; aliases</span>
-									<span class="truncate text-xs text-gray-500">
+									<span class="text-sm font-semibold text-gray-800">Roles &amp; aliases</span>
+									<span class="truncate text-xs text-gray-500 font-medium">
 										{uniqueEntityRoles.length} {uniqueEntityRoles.length === 1 ? 'role' : 'roles'}
 										{#if autoRoles.length > 0}
 											· {autoRoles.length} {autoRoles.length === 1 ? 'alias' : 'aliases'}
 										{/if}
 									</span>
 								</span>
-								<span class="flex shrink-0 items-center gap-1 text-xs font-medium text-primary-700">
+								<span class="inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-md border border-primary-200/70 transition-colors">
 									{showRolesSection ? 'Hide details' : 'Manage'}
-									<Icon icon={showRolesSection ? 'lucide:chevron-up' : 'lucide:chevron-down'} class="h-4 w-4" />
+									<Icon icon={showRolesSection ? 'lucide:chevron-up' : 'lucide:chevron-down'} class="h-3.5 w-3.5" />
 								</span>
 							</button>
 
 							{#if showRolesSection}
-								<div class="border-t border-gray-200 px-3 pb-3">
+								<div class="border-t border-gray-200 p-4 space-y-4">
 					<!-- Role aliases (read-only auto-generated) -->
 					{#if autoRoles.length > 0}
-						<div class="pt-3">
+						<div>
 							<div class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Aliases</div>
 							<div class="flex flex-wrap gap-1.5">
 								{#each autoRoles as role}
-									<span class="inline-flex max-w-full items-center gap-1 rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-xs text-primary-800" title={role.source ? `Source: ${role.source}` : undefined}>
+									<span class="inline-flex max-w-full items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50/80 px-2.5 py-1 text-xs text-primary-900 shadow-3xs" title={role.source ? `Source: ${role.source}` : undefined}>
 										<Icon icon="lucide:link" class="h-3 w-3 shrink-0 text-primary-600" />
 										<span class="truncate font-medium">{role.label || role.role}</span>
 										{#if role.role && role.label}
-											<span class="truncate text-primary-600">({role.role})</span>
+											<span class="truncate text-primary-700">({role.role})</span>
 										{/if}
 										{#if role.source}
-											<span class="truncate text-[10px] text-primary-600">· {role.source}</span>
+											<span class="truncate text-[10px] text-primary-600 font-normal">· {role.source}</span>
 										{/if}
 									</span>
 								{/each}
@@ -1315,8 +1315,8 @@
 
 					<!-- Roles (for dimensions only) -->
 					<div>
-							<div class="flex items-center gap-2 mb-3">
-					<label class="block text-sm font-semibold text-gray-700">
+							<div class="flex items-center gap-2 mb-2.5">
+					<label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
 								Roles ({uniqueEntityRoles.length})
 							</label>
 								<button
@@ -1324,22 +1324,22 @@
 									class="text-gray-400 hover:text-gray-600 transition-colors"
 									title="Role-playing dimensions: Track different contextual uses of the this dimension (e.g. 'date' can become 'order_date', 'ship_date', 'delivery_date')"
 								>
-									<Icon icon="lucide:info" class="w-4 h-4" />
+									<Icon icon="lucide:info" class="w-3.5 h-3.5" />
 								</button>
 							</div>
 
 							{#if uniqueEntityRoles.length === 0 && !roleInput}
 								<!-- Empty state -->
-								<p class="text-xs text-gray-400 italic">No roles defined for this dimension. Use this functionality if this entity 'slips' into different roles and functions.</p>
+								<p class="text-xs text-gray-400 italic py-1">No roles defined for this dimension. Use this functionality if this entity 'slips' into different roles and functions.</p>
 							{:else}
 								<!-- Role list -->
-								<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+								<div class="border border-gray-200 rounded-lg overflow-hidden shadow-2xs">
 									{#if uniqueEntityRoles.length > 0}
-										<div class="divide-y divide-gray-200">
+										<div class="divide-y divide-gray-100">
 											{#each uniqueEntityRoles as role}
-												<div class="border-b border-gray-200 last:border-b-0">
+												<div class="border-b border-gray-100 last:border-b-0">
 													<!-- Role header -->
-													<div class="px-4 py-3 hover:bg-gray-50 transition-colors group flex items-center justify-between">
+													<div class="px-3.5 py-2.5 hover:bg-gray-50/80 transition-colors group flex items-center justify-between">
 														<div class="flex items-center gap-2 flex-1">
 															<button
 																type="button"
@@ -1360,7 +1360,7 @@
 																	bind:value={editingRoleValue}
 																	onkeydown={handleEditRoleKeydown}
 																	onblur={saveEditingRole}
-																	class="flex-1 px-3 py-1.5 border-2 border-blue-500 rounded-lg text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+																	class="flex-1 px-2.5 py-1 border border-primary-500 rounded-md text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
 																	placeholder="e.g., order_date, ship_date"
 																	autofocus
 																/>
@@ -1369,12 +1369,12 @@
 																<button
 																	type="button"
 																	onclick={() => startEditingRole(role)}
-																	class="flex-1 text-left px-2 py-1 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors rounded"
+																	class="flex-1 text-left px-2 py-0.5 text-sm font-medium text-gray-900 hover:text-primary-700 transition-colors rounded"
 																	title="Click to edit"
 																>
 																	{role.role}
 																</button>
-																<span class="text-xs text-gray-500">
+																<span class="text-xs text-gray-500 font-medium">
 																	({getProcessesForRole(currentEntity?.id || '', role).length} processes)
 																</span>
 															{/if}
@@ -1384,10 +1384,10 @@
 															<button
 																type="button"
 																onclick={() => startEditingRole(role)}
-																class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+																class="p-1.5 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded transition-colors"
 																title="Edit role"
 															>
-																<Icon icon="lucide:pencil" class="w-4 h-4" />
+																<Icon icon="lucide:pencil" class="w-3.5 h-3.5" />
 															</button>
 															<button
 																type="button"
@@ -1395,30 +1395,30 @@
 																class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
 																title="Delete role"
 															>
-																<Icon icon="lucide:trash-2" class="w-4 h-4" />
+																<Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
 															</button>
 														</div>
 													</div>
 
 													<!-- Expandable process list -->
 													{#if expandedRoles.has(role.role || '')}
-														<div class="px-4 pb-3 pl-12 bg-gray-50">
+														<div class="px-4 pb-3 pl-12 bg-gray-50/70 border-t border-gray-100">
 															{#each getProcessesForRole(currentEntity?.id || '', role) as process}
 																<button
 																	type="button"
 																	onclick={() => navigateToProcess(process.id)}
-																	class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-white hover:text-blue-600 rounded transition-colors mb-1 last:mb-0"
+																	class="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-white hover:text-primary-700 rounded-md transition-colors mb-1 last:mb-0 shadow-3xs"
 																>
 																	<div class="flex items-center gap-2">
-																		<Icon icon="lucide:workflow" class="w-4 h-4" />
-																		<span>{process.name}</span>
+																		<Icon icon="lucide:workflow" class="w-4 h-4 text-primary-600" />
+																		<span class="font-medium">{process.name}</span>
 																		<span class="text-xs text-gray-500">({process.event_ids.length} events)</span>
 																	</div>
 																</button>
 															{/each}
 
 															{#if getProcessesForRole(currentEntity?.id || '', role).length === 0}
-																<p class="text-xs text-gray-500 italic px-3 py-2">
+																<p class="text-xs text-gray-500 italic px-3 py-1.5">
 																	No processes use this role yet
 																</p>
 															{/if}
@@ -1437,16 +1437,16 @@
 									type="text"
 									bind:value={roleInput}
 									onkeydown={handleRoleInputKeydown}
-									class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+									class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all placeholder-gray-400"
 									placeholder="e.g. Employee = Sales Agent, Manager, Team Lead, ..."
 								/>
 								<button
 									type="button"
 									onclick={addRole}
 									disabled={!roleInput.trim()}
-									class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+									class="px-3.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-2xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
 								>
-									<Icon icon="lucide:plus" class="w-4 h-4" />
+									<Icon icon="lucide:plus" class="w-3.5 h-3.5" />
 									Add Role
 								</button>
 							</div>
@@ -1458,14 +1458,14 @@
 
 					<!-- Attributes (merged dbt + drafted) -->
 					<div>
-						<label class="block text-sm font-semibold text-gray-700 mb-3">
+						<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
 							Attributes ({mergedFields.length})
-							{#if isBoundEntity}<span class="font-normal text-xs text-gray-400 ml-1">— dbt columns are read-only</span>{/if}
+							{#if isBoundEntity}<span class="font-normal normal-case text-xs text-gray-400 ml-1">— dbt columns are read-only</span>{/if}
 						</label>
 
 						{#if materializeWarnings.length > 0}
-							<div class="mb-3 px-3 py-2 bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-lg flex items-start gap-2">
-								<Icon icon="lucide:alert-triangle" class="w-4 h-4 mt-0.5 shrink-0" />
+							<div class="mb-3 px-3 py-2 bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-lg flex items-start gap-2 shadow-2xs">
+								<Icon icon="lucide:alert-triangle" class="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
 								<div class="space-y-1">
 									{#each materializeWarnings as warning}
 										<div>{warning}</div>
@@ -1477,22 +1477,22 @@
 							</div>
 						{/if}
 						{#if materializeError}
-							<div class="mb-3 px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg">{materializeError}</div>
+							<div class="mb-3 px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg shadow-2xs">{materializeError}</div>
 						{/if}
 
-						<div class="border-2 border-gray-200 rounded-lg overflow-hidden">
+						<div class="border border-gray-200 rounded-lg overflow-hidden shadow-2xs bg-white">
 							{#if mergedFields.length > 0}
 								<!-- Header -->
-								<div class="bg-gray-100 px-3 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-700">
+								<div class="bg-gray-50/90 border-b border-gray-200 px-3.5 py-2.5 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">
 									<div class="col-span-2">Name</div>
 									<div class="col-span-1">Type</div>
 									<div class="col-span-6">Description</div>
 									<div class="col-span-3">Origin</div>
 								</div>
-								<div class="divide-y divide-gray-200">
+								<div class="divide-y divide-gray-100">
 								{#each mergedFields as field (field.origin === 'draft' ? `draft-${field.draftIndex}` : `dbt-${field.name}`)}
 								<div
-									class="relative px-3 py-2 hover:bg-gray-50 group transition-colors"
+									class="relative px-3.5 py-2 hover:bg-primary-50/20 group transition-colors odd:bg-white even:bg-gray-50/30"
 									data-testid={`merged-field-row-${field.name}`}
 									draggable={field.origin === 'draft'}
 									ondragstart={field.origin === 'draft' ? (e) => onAttributeDragStart(field.draftIndex, e) : undefined}
@@ -1508,20 +1508,20 @@
 												{#if field.origin === 'draft'}
 													<div class="flex items-center gap-1">
 														<Icon icon="lucide:grip-vertical" class="w-4 h-4 text-gray-300 cursor-grab active:cursor-grabbing shrink-0" />
-						<input
-														type="text"
-														value={field.name}
-														oninput={(e) => updateDraftedField(field.draftIndex, { name: (e.target as HTMLInputElement).value })}
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
-														placeholder="attribute_name"
-													/>
+														<input
+															type="text"
+															value={field.name}
+															oninput={(e) => updateDraftedField(field.draftIndex, { name: (e.target as HTMLInputElement).value })}
+															class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-medium text-sm text-gray-900 bg-white"
+															placeholder="attribute_name"
+														/>
 													</div>
 												{:else}
 														<input
 															type="text"
 															value={field.name}
 															readonly
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm bg-gray-50 cursor-default"
+															class="w-full px-2.5 py-1.5 border border-gray-200 rounded-md focus:outline-none font-medium text-sm bg-gray-50/80 text-gray-700 cursor-default"
 															placeholder="attribute_name"
 														/>
 													{/if}
@@ -1529,13 +1529,13 @@
 												<!-- Type -->
 												<div class="col-span-1">
 													{#if field.origin === 'dbt'}
-														<span class="px-1 py-2 text-xs font-mono uppercase text-gray-500">{field.datatype ?? '—'}</span>
+														<span class="px-1 py-1.5 text-xs font-mono uppercase text-gray-500 font-semibold">{field.datatype ?? '—'}</span>
 													{:else}
-						<select
-														value={field.datatype}
-														onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as any })}
-														class="w-full px-1 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono uppercase text-gray-600"
-													>
+														<select
+															value={field.datatype}
+															onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as any })}
+															class="w-full px-1.5 py-1.5 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-xs font-mono uppercase text-gray-700 font-medium cursor-pointer"
+														>
 															<option value="text">text</option>
 															<option value="int">int</option>
 															<option value="float">float</option>
@@ -1556,7 +1556,7 @@
 															map.set(field.name, (e.target as HTMLInputElement).value);
 															materializedDescriptionEdits = map;
 														}}
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+														class="w-full px-2.5 py-1.5 border border-gray-200 hover:border-gray-300 rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white placeholder-gray-400"
 														placeholder="Description (optional)"
 													/>
 												{:else}
@@ -1564,7 +1564,7 @@
 														type="text"
 														value={field.description ?? ''}
 														oninput={(e) => updateDraftedField(field.draftIndex, { description: (e.target as HTMLInputElement).value })}
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+														class="w-full px-2.5 py-1.5 border border-gray-300 hover:border-gray-400 rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white placeholder-gray-400"
 														placeholder="Description (optional)"
 													/>
 													{/if}
@@ -1584,7 +1584,7 @@
 														{#each field.originRefs as entry (JSON.stringify(entry))}
 															{#each Object.entries(entry) as [originKey, originValue]}
 																<div
-																	class="truncate"
+																	class="truncate text-gray-500 text-[11px]"
 																	data-testid="origin-entry"
 																	title={originKey ? `${originKey}: ${originValue}` : originValue}
 																>
@@ -1611,10 +1611,10 @@
 													<button
 														type="button"
 														onclick={() => deleteDraftedField(field.draftIndex)}
-														class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+														class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
 														title="Delete attribute"
 													>
-														<Icon icon="lucide:trash-2" class="w-4 h-4" />
+														<Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
 													</button>
 											</div>
 										{/if}
@@ -1635,7 +1635,7 @@
 						<button
 							type="button"
 							onclick={addDraftedField}
-							class="mt-3 w-full px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all flex items-center justify-center gap-2"
+							class="mt-3 w-full px-4 py-2 text-xs font-semibold text-primary-700 bg-primary-50/70 border border-dashed border-primary-300 rounded-lg hover:bg-primary-100/70 hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center justify-center gap-2 shadow-3xs"
 						>
 							<Icon icon="lucide:plus" class="w-4 h-4" />
 							Add Attribute
@@ -1645,12 +1645,12 @@
 					<!-- Relationships (read-only, click an entity to navigate) -->
 					{#if entityRelationships.length > 0}
 						<div>
-							<label class="block text-sm font-semibold text-gray-700 mb-3">
+							<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
 								Relationships ({entityRelationships.length})
 							</label>
 							<div class="space-y-2">
 							{#each entityRelationships as rel (rel.edgeId)}
-								<div class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+								<div class="px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg shadow-2xs hover:border-gray-300 transition-colors">
 									<div class="flex items-center gap-2 flex-wrap">
 										<Icon
 											icon={rel.isOutgoing ? 'lucide:arrow-right' : 'lucide:arrow-left'}
@@ -1659,16 +1659,16 @@
 										<button
 											type="button"
 											onclick={() => openRelatedEntity(rel.relatedId)}
-											class="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
+											class="text-sm font-semibold text-primary-700 hover:text-primary-900 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
 										>
 											{rel.relatedName}
 										</button>
-										<span class="text-xs text-gray-500">
+										<span class="text-xs text-gray-500 font-medium">
 											({rel.cardinality}, {rel.isOutgoing ? 'Outgoing' : 'Incoming'})
 										</span>
 									</div>
 									{#if rel.keys}
-										<div class="mt-1 ml-6 font-mono text-xs text-gray-500">{rel.keys}</div>
+										<div class="mt-1 ml-6 font-mono text-xs text-gray-600">{rel.keys}</div>
 									{:else if rel.label}
 										<div class="mt-1 ml-6 text-xs text-gray-500 italic">{rel.label}</div>
 									{/if}
@@ -1682,30 +1682,30 @@
 
 			<!-- Footer Actions -->
 			<div
-				class="px-8 py-6 border-t-2 border-gray-100 bg-gray-50"
+				class="px-8 py-5 border-t border-gray-200 bg-gray-50/80"
 			>
 				{#if !showDeleteConfirm}
 					<div class="flex items-center justify-between gap-4">
 						<button
 							onclick={handleDelete}
-							class="px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border-2 border-red-200 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all flex items-center gap-2"
+							class="px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50/80 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all flex items-center gap-1.5 shadow-3xs"
 						>
-							<Icon icon="lucide:trash-2" class="w-4 h-4" />
+							<Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
 							Delete Entity
 						</button>
 
-						<div class="flex gap-3">
+						<div class="flex gap-2.5">
 							<div class="relative export-dropdown-container">
 								<button
 									onclick={() => (showExportDropdown = !showExportDropdown)}
 									disabled={isExporting}
-									class="px-5 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border-2 border-primary-200 rounded-lg hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+									class="px-3.5 py-2 text-xs font-semibold text-primary-700 bg-primary-50/80 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-3xs"
 									aria-label="Export options"
 								>
 									{#if isExporting}
-										<Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+										<Icon icon="lucide:loader-2" class="w-3.5 h-3.5 animate-spin" />
 									{:else}
-										<Icon icon="lucide:download" class="w-4 h-4" />
+										<Icon icon="lucide:download" class="w-3.5 h-3.5" />
 									{/if}
 									Export
 									<Icon icon="lucide:chevron-down" class="w-3 h-3 transition-transform {showExportDropdown ? 'rotate-180' : ''}" />
@@ -1713,13 +1713,13 @@
 
 								<!-- Dropdown Menu -->
 								{#if showExportDropdown}
-									<div class="absolute bottom-full mb-2 right-0 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[200px] z-10">
+									<div class="absolute bottom-full mb-2 right-0 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden min-w-[200px] z-10 animate-fade-in">
 										<button
 											onclick={() => {
 												handleExportToExcel();
 												showExportDropdown = false;
 											}}
-											class="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
+											class="w-full px-3.5 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
 										>
 											<Icon icon="lucide:file-spreadsheet" class="w-4 h-4 text-green-600" />
 											Download as Excel
@@ -1727,12 +1727,12 @@
 										<button
 											onclick={() => { handleCopyAsMarkdown(); }}
 											disabled={isCopyingMarkdown}
-											class="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+											class="w-full px-3.5 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-100"
 										>
 											{#if isCopyingMarkdown}
-												<Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin text-blue-600" />
+												<Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin text-primary-600" />
 											{:else}
-												<Icon icon="lucide:clipboard-copy" class="w-4 h-4 text-blue-600" />
+												<Icon icon="lucide:clipboard-copy" class="w-4 h-4 text-primary-600" />
 											{/if}
 											Copy as Markdown
 										</button>
@@ -1742,16 +1742,16 @@
 
 							<button
 								onclick={handleCancel}
-								class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
+								class="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all shadow-3xs"
 							>
 								Cancel
 							</button>
 							<button
 								onclick={handleSave}
 								disabled={!isDirty || !entityName.trim()}
-								class="px-5 py-2.5 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+								class="px-4 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all flex items-center gap-1.5 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
 							>
-								<Icon icon="lucide:save" class="w-4 h-4" />
+								<Icon icon="lucide:save" class="w-3.5 h-3.5" />
 								Save Changes
 							</button>
 						</div>
@@ -1759,24 +1759,24 @@
 				{:else}
 					<!-- Delete Confirmation -->
 					<div
-						class="flex items-center justify-between p-4 bg-red-50 border-2 border-red-300 rounded-lg"
+						class="flex items-center justify-between p-3.5 bg-red-50 border border-red-200 rounded-lg shadow-2xs"
 					>
-						<div class="flex items-center gap-3">
-							<Icon icon="lucide:alert-triangle" class="w-5 h-5 text-red-600" />
-							<span class="text-sm font-medium text-red-900"
+						<div class="flex items-center gap-2.5">
+							<Icon icon="lucide:alert-triangle" class="w-4 h-4 text-red-600 shrink-0" />
+							<span class="text-xs font-medium text-red-900"
 								>Are you sure you want to delete this entity? This action cannot be undone.</span
 							>
 						</div>
 						<div class="flex gap-2">
 							<button
 								onclick={cancelDelete}
-								class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+								class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
 							>
 								Cancel
 							</button>
 							<button
 								onclick={confirmDelete}
-								class="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+								class="px-3 py-1.5 text-xs font-bold text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
 							>
 								Delete
 							</button>
