@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-08-14
+
+### Changed
+- **Entity detail modal is less scroll-heavy to edit.** Bound dbt models show up with the header
+  context instead of below the form, so you see what the entity is tied to before digging into
+  attributes. Roles & aliases stay collapsed until you open them, and long domain / tag / source
+  lists hide behind a `+N more` control so chip walls no longer crowd the form. Attribute editing
+  keeps its full-width table; the rest of the modal is tighter and easier to scan.
+
 ## [0.21.1] - 2026-08-05
 
 ### Fixed
