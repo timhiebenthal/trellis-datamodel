@@ -1,9 +1,11 @@
 <script lang="ts">
 	import Icon from "@iconify/svelte";
-	import type { Entity } from "$lib/types";
-	import { entityDetailModal, entitySelection, modelingStyle } from "$lib/stores";
+	import type { Entity, ModelInfo } from "$lib/types";
+	import { entityDetailModal, entitySelection, modelingStyle, frameworkModels } from "$lib/stores";
 	import DomainBadge from "./DomainBadge.svelte";
+	import ModelBindingPicker from "./ModelBindingPicker.svelte";
 	import { readModelRef } from "$lib/utils/entity-compat";
+	import { bindEntityToModel } from "$lib/utils/entity-binding";
 
 	type Props = {
 		entity: Entity;
@@ -129,6 +131,13 @@
 
 	// Bound model reference (prefers new `model_ref`, falls back to legacy `dbt_model`)
 	const boundModelRef = $derived(readModelRef(entity));
+	const selectedModelIds = $derived(
+		boundModelRef ? [boundModelRef, ...(entity.additional_models || [])] : [],
+	);
+
+	function handleModelSelect(model: ModelInfo) {
+		bindEntityToModel(entity.id, model);
+	}
 </script>
 
 <div
@@ -246,6 +255,13 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if $frameworkModels.length > 0}
+		<ModelBindingPicker
+			selectedModelIds={selectedModelIds}
+			onSelect={handleModelSelect}
+		/>
+	{/if}
 
 	<!-- Right side action hint (visible on hover) -->
 	<div class="flex-shrink-0 text-gray-400 group-hover:text-gray-600 transition-colors">
