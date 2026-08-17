@@ -949,18 +949,16 @@
 
 				<div class="flex items-start justify-between">
 					<div class="flex-1">
+						<p class="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-700">
+							Entity details
+						</p>
 						<h2
 							id="entity-detail-modal-title"
-							class="text-2xl font-bold text-gray-900 mb-2"
+							class="text-3xl font-bold text-gray-900"
 							style="letter-spacing: -0.02em;"
 						>
-							{entityName || 'Entity'} Details
+							{entityName || 'Entity'}
 						</h2>
-						{#if $modelingStyle === 'dimensional_model'}
-							<p class="text-sm text-gray-600">
-								{entityType === 'dimension' ? 'Dimension' : entityType === 'fact' ? 'Fact' : 'Unclassified'} entity
-							</p>
-						{/if}
 					</div>
 					<button
 						class="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
