@@ -8,8 +8,10 @@
 	import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
 	import { readModelRef, readFrameworkTags } from '$lib/utils/entity-compat';
 	import { bindEntityToModel } from '$lib/utils/entity-binding';
+	import { getEntityDetailPath, isEntityDetailPath } from '$lib/utils/entity-list-route';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
+	import { page } from '$app/stores';
 	import type { AutoSaveService } from '$lib/services/auto-save';
 	import { exportEntityToExcel, formatRelationshipType, formatRelationshipKeys } from '$lib/utils/excel-export';
 	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
@@ -415,7 +417,7 @@
 
 	function navigateToProcess(processId: string) {
 		// Close modal
-		closeModal();
+		void closeModal({ navigateToList: false });
 		// Navigate to business events view with process highlighted/filtered
 		goto(`/business-events?process=${processId}`);
 	}
@@ -890,16 +892,23 @@
 		}
 	}
 
-	function closeModal() {
-		$entityDetailModal = { open: false, entityId: null };
+	async function closeModal(options: { navigateToList?: boolean } = {}) {
+		if (options.navigateToList !== false && isEntityDetailPath($page.url.pathname)) {
+			await goto('/entity-list');
+		}
+		entityDetailModal.set({ open: false, entityId: null });
 	}
 
 	// Navigate the modal to a related entity. Warns on unsaved changes, mirroring handleCancel.
-	function openRelatedEntity(entityId: string) {
+	async function openRelatedEntity(entityId: string) {
 		if (!entityId || entityId === currentEntity?.id) return;
 		if (isDirty) {
 			const confirmed = confirm('You have unsaved changes. Switch entities without saving?');
 			if (!confirmed) return;
+		}
+
+		if (isEntityDetailPath($page.url.pathname)) {
+			await goto(getEntityDetailPath(entityId));
 		}
 		entityDetailModal.set({ open: true, entityId });
 	}
