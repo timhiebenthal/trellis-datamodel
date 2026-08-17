@@ -51,11 +51,11 @@ test.describe('Bus Matrix Counts and Sorting', () => {
         await page.goto('/bus-matrix');
         await page.waitForLoadState('networkidle');
 
-        // Customer Dimension is connected to 2 facts (fct_orders + fct_sales)
-        await expect(page.locator('[aria-label="2 connected facts"]').first()).toBeVisible();
+        // Customer Dimension shows 2 related facts (fct_orders + fct_sales)
+        await expect(page.locator('[aria-label="2 related facts"]').first()).toBeVisible();
 
-        // Date Dimension is connected to 1 fact (fct_orders only)
-        await expect(page.locator('[aria-label="1 connected facts"]').first()).toBeVisible();
+        // Date Dimension shows 1 related fact (fct_orders only)
+        await expect(page.locator('[aria-label="1 related facts"]').first()).toBeVisible();
 
         // Apply fact filter for Orders Fact only
         await page.locator('select#fact-filter').selectOption({ label: 'Orders Fact' });
@@ -63,12 +63,12 @@ test.describe('Bus Matrix Counts and Sorting', () => {
 
         // After filtering to Orders Fact only, Customer Dimension shows count 1
         // (dim_customer was connected to fct_orders + fct_sales, but only fct_orders is now visible)
-        const filteredBadges = page.locator('[aria-label="1 connected facts"]');
+        const filteredBadges = page.locator('[aria-label="1 related facts"]');
         await expect(filteredBadges.first()).toBeVisible();
 
-        // Date Dimension still shows 1 (only connected to fct_orders which is still visible)
-        // Product Dimension shows 1 (connected to fct_orders + fct_sales but only fct_orders visible)
-        const countBadges = await page.locator('[aria-label*="connected facts"]').count();
+        // Date Dimension still shows 1 related fact (only connected to fct_orders which is still visible)
+        // Product Dimension shows 1 related fact (connected to fct_orders + fct_sales but only fct_orders visible)
+        const countBadges = await page.locator('[aria-label*="related facts"]').count();
         expect(countBadges).toBeGreaterThan(0);
     });
 
@@ -145,8 +145,8 @@ test.describe('Bus Matrix Counts and Sorting', () => {
         await page.waitForTimeout(200);
 
         // fct_a and fct_b each have 1 dimension connection (dim_high connects to both)
-        // Count badges should show connected dimensions
-        await expect(page.locator('[aria-label="1 connected dimensions"]').first()).toBeVisible();
+        // Count badges should show related dimensions
+        await expect(page.locator('[aria-label="1 related dimensions"]').first()).toBeVisible();
     });
 });
 
