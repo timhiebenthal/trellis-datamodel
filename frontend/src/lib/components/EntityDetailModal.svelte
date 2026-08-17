@@ -2,11 +2,12 @@
 	import Icon from '@iconify/svelte';
 	import { nodes, edges, entityDetailModal, pushHistory, frameworkModels, modelingStyle } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
-	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry } from '$lib/types';
+	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry, ModelInfo } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
 	import type { MergedField } from '$lib/utils/merged-fields';
 	import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
 	import { readModelRef, readFrameworkTags } from '$lib/utils/entity-compat';
+	import { bindEntityToModel } from '$lib/utils/entity-binding';
 	import type { Node } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 	import type { AutoSaveService } from '$lib/services/auto-save';
@@ -14,6 +15,7 @@
 	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
 	import { goto } from '$app/navigation';
 	import DropIndicator from './DropIndicator.svelte';
+	import ModelBindingPicker from './ModelBindingPicker.svelte';
 
 	// Get autoSaveService from parent context (set in +layout.svelte)
 	const autoSaveServiceContext = getContext<{ current: AutoSaveService | null }>('autoSaveService');
@@ -175,6 +177,7 @@
 	// Feedback banners for materialize action
 	let materializeWarnings = $state<string[]>([]);
 	let materializeError = $state('');
+	let bindingError = $state('');
 
 	// Merged field list: dbt columns first, then drafted fields that don't collide
 	let mergedFields = $derived<MergedField[]>(mergeFields(boundModel?.columns, editableDraftedFields));
@@ -279,6 +282,15 @@
 		return models;
 	});
 
+	function handleModelSelect(model: ModelInfo) {
+		if (!currentEntity) return;
+		bindingError = '';
+		const changed = bindEntityToModel(currentEntity.id, model);
+		if (!changed) {
+			bindingError = 'This model is already bound to the entity.';
+		}
+	}
+
 	// Full form sync only when opening the modal or switching entities — not when
 	// currentEntity gets a new object reference after manifest refresh / autosave
 	// (otherwise materialize banners and in-progress edits are wiped).
@@ -325,6 +337,7 @@
 		liveSchemaDescriptions = new Map();
 		materializeWarnings = [];
 		materializeError = '';
+		bindingError = '';
 	});
 
 	// Load source system suggestions when modal opens
@@ -936,18 +949,16 @@
 
 				<div class="flex items-start justify-between">
 					<div class="flex-1">
+						<p class="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-700">
+							Entity details
+						</p>
 						<h2
 							id="entity-detail-modal-title"
-							class="text-2xl font-bold text-gray-900 mb-2"
+							class="text-3xl font-bold text-gray-900"
 							style="letter-spacing: -0.02em;"
 						>
-							{entityName || 'Entity'} Details
+							{entityName || 'Entity'}
 						</h2>
-						{#if $modelingStyle === 'dimensional_model'}
-							<p class="text-sm text-gray-600">
-								{entityType === 'dimension' ? 'Dimension' : entityType === 'fact' ? 'Fact' : 'Unclassified'} entity
-							</p>
-						{/if}
 					</div>
 					<button
 						class="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
@@ -1056,21 +1067,32 @@
 						{/if}
 					{/if}
 
-					{#if boundModels.length > 0}
-						<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-1.5 shadow-sm" data-testid="bound-model-summary">
-							<div class="flex items-center gap-1.5 shrink-0 text-primary-700">
-								<Icon icon="lucide:layers" class="h-4 w-4 shrink-0 text-primary-600" />
-								<span class="text-xs font-semibold">
-									Bound dbt Models ({boundModels.length})
-								</span>
+					<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2" data-testid="model-binding-controls">
+						{#if boundModels.length > 0}
+							<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-1.5 shadow-sm" data-testid="bound-model-summary">
+								<div class="flex items-center gap-1.5 shrink-0 text-primary-700">
+									<Icon icon="lucide:layers" class="h-4 w-4 shrink-0 text-primary-600" />
+									<span class="text-xs font-semibold">
+										Bound dbt Models ({boundModels.length})
+									</span>
+								</div>
+								{#each boundModels as model}
+									<span class="max-w-full truncate rounded-md border border-primary-200/70 bg-white px-2 py-0.5 font-mono text-xs text-primary-900 shadow-2xs font-medium" title={model}>
+										{model}
+									</span>
+								{/each}
 							</div>
-							{#each boundModels as model}
-								<span class="max-w-full truncate rounded-md border border-primary-200/70 bg-white px-2 py-0.5 font-mono text-xs text-primary-900 shadow-2xs font-medium" title={model}>
-									{model}
-								</span>
-							{/each}
-						</div>
-					{/if}
+						{/if}
+						{#if $frameworkModels.length > 0}
+							<ModelBindingPicker
+								selectedModelIds={boundModels}
+								onSelect={handleModelSelect}
+							/>
+						{/if}
+						{#if bindingError}
+							<span class="text-xs text-danger-700" role="alert">{bindingError}</span>
+						{/if}
+					</div>
 				</div>
 			</div>
 

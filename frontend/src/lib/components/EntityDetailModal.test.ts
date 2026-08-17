@@ -143,6 +143,37 @@ describe('EntityDetailModal — merged dbt+draft fields', () => {
     expect(screen.getByText(/Add Attribute/i)).toBeInTheDocument();
   });
 
+  it('binds an unbound entity from the model picker', async () => {
+    setupUnboundEntityWithDraftOrigin();
+    frameworkModels.set([mockDbtModel]);
+    await renderModal();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Bind model' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'entity_x' }));
+
+    expect((get(nodes).find((node) => node.id === 'node-1')?.data as any).model_ref)
+      .toBe('model.proj.entity_x');
+    expect(screen.getByText('Bound dbt Models (1)')).toBeInTheDocument();
+  });
+
+  it('adds a second selected model as an additional binding', async () => {
+    setupBoundEntityWithDraft();
+    const secondModel = {
+      ...mockDbtModel,
+      unique_id: 'model.proj.entity_x_history',
+      name: 'entity_x_history',
+    };
+    frameworkModels.set([mockDbtModel, secondModel]);
+    await renderModal();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Bind model' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'entity_x_history' }));
+
+    expect((get(nodes).find((node) => node.id === 'node-1')?.data as any).additional_models)
+      .toEqual(['model.proj.entity_x_history']);
+    expect(screen.getByText('Bound dbt Models (2)')).toBeInTheDocument();
+  });
+
   it('renders bound dbt models above the attributes section', async () => {
     setupBoundEntityWithDraft();
     await renderModal();

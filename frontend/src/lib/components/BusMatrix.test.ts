@@ -56,6 +56,29 @@ describe('BusMatrix — dbt build status badges', () => {
 		expect(unboundFactHeader?.querySelector('[title="Not yet built with dbt"]')).toBeTruthy();
 	});
 
+	it('explains what dimension and fact usage counts represent', async () => {
+		render(BusMatrix);
+
+		await waitFor(() => {
+			expect(document.querySelector('table')).toBeTruthy();
+		});
+
+		const dimensionBadge = document.querySelector('[aria-label="1 related facts"]') as HTMLElement;
+		const factBadge = document.querySelector('[aria-label="1 related dimensions"]') as HTMLElement;
+
+		await fireEvent.mouseEnter(dimensionBadge.parentElement as HTMLElement);
+		expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(
+			'1 related facts'
+		);
+
+		await fireEvent.mouseEnter(factBadge.parentElement as HTMLElement);
+		expect(
+			Array.from(document.querySelectorAll('[role="tooltip"]')).some(tooltip =>
+				tooltip.textContent?.includes('1 related dimensions')
+			)
+		).toBe(true);
+	});
+
 	it('filtering to "Bound" only shows the bound dimension row and bound fact column', async () => {
 		render(BusMatrix);
 
@@ -78,8 +101,8 @@ describe('BusMatrix — dbt build status badges', () => {
 		expect(table.textContent).not.toContain('Unbound Fact');
 		expect(table.textContent).toContain('Bound Fact');
 
-		// only one connected fact/dimension remains visible, so counts should be 1
-		const countBadges = Array.from(table.querySelectorAll('[aria-label*="connected"]'));
-		expect(countBadges.some((el) => el.getAttribute('aria-label')?.startsWith('1 connected'))).toBe(true);
+		// only one related fact/dimension remains visible, so counts should be 1
+		expect(table.querySelector('[aria-label="1 related facts"]')).toBeTruthy();
+		expect(table.querySelector('[aria-label="1 related dimensions"]')).toBeTruthy();
 	});
 });
