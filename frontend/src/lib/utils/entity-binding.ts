@@ -42,6 +42,7 @@ export function bindModelToNode(
 			? { additional_models: [...additionalModels, model.unique_id] }
 			: {
 					model_ref: model.unique_id,
+					...migrateUserTags(data),
 					...(data.description?.trim()
 						? {}
 						: model.description?.trim()
@@ -55,6 +56,13 @@ export function bindModelToNode(
 		node: { ...node, data: nextData as unknown as Record<string, unknown> },
 		changed: true,
 	};
+}
+
+function migrateUserTags(data: EntityData): Pick<EntityData, 'ui_tags'> {
+	const existingUiTags = Array.isArray(data.ui_tags) ? data.ui_tags : [];
+	const existingTags = Array.isArray(data.tags) ? data.tags : [];
+	const uiTags = Array.from(new Set([...existingUiTags, ...existingTags]));
+	return uiTags.length > 0 ? { ui_tags: uiTags } : {};
 }
 
 function inferEntityType(

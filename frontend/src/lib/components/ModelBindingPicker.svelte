@@ -19,6 +19,7 @@
 	let isOpen = $state(false);
 	let searchTerm = $state('');
 	let containerRef = $state<HTMLDivElement>();
+	let triggerRef = $state<HTMLButtonElement>();
 	let searchInput = $state<HTMLInputElement>();
 
 	let filteredGroups = $derived.by(() => {
@@ -54,11 +55,11 @@
 		}
 
 		if (isOpen) {
-			document.addEventListener('click', handleClickOutside);
+			document.addEventListener('click', handleClickOutside, true);
 			queueMicrotask(() => searchInput?.focus());
 		}
 
-		return () => document.removeEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside, true);
 	});
 
 	function openPicker() {
@@ -67,18 +68,30 @@
 		if (!isOpen) searchTerm = '';
 	}
 
+	function closePicker() {
+		isOpen = false;
+		searchTerm = '';
+		triggerRef?.focus();
+	}
+
 	function selectModel(model: ModelInfo) {
 		if (selectedModelIds.includes(model.unique_id)) return;
 		onSelect(model);
-		isOpen = false;
-		searchTerm = '';
+		closePicker();
 	}
 
 	function handleSearchKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
 			event.preventDefault();
-			isOpen = false;
-			searchTerm = '';
+			closePicker();
+		}
+	}
+
+	function handleContainerKeydown(event: KeyboardEvent) {
+		event.stopPropagation();
+		if (event.key === 'Escape' && isOpen) {
+			event.preventDefault();
+			closePicker();
 		}
 	}
 </script>
@@ -88,10 +101,11 @@
 	bind:this={containerRef}
 	role="presentation"
 	onclick={(event) => event.stopPropagation()}
-	onkeydown={(event) => event.stopPropagation()}
+	onkeydown={handleContainerKeydown}
 >
 	<button
 		type="button"
+		bind:this={triggerRef}
 		class="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-3xs transition-colors hover:border-primary-300 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
 		onclick={openPicker}
 		disabled={disabled}

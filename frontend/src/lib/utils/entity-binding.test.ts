@@ -24,7 +24,7 @@ function entityNode(data: Record<string, unknown>): Node {
 describe('bindModelToNode', () => {
 	it('sets the primary model and copies metadata for an unbound entity', () => {
 		const result = bindModelToNode(
-			entityNode({ label: 'Customers', description: '' }),
+			entityNode({ label: 'Customers', description: '', tags: ['pii', 'core'] }),
 			model,
 			{ dimensionPrefixes: [], factPrefixes: [] },
 		);
@@ -33,6 +33,7 @@ describe('bindModelToNode', () => {
 		expect(result.node.data).toMatchObject({
 			model_ref: 'model.project.customers',
 			description: 'Customer records',
+			ui_tags: ['pii', 'core'],
 		});
 	});
 

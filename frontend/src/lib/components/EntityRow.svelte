@@ -1,9 +1,8 @@
 <script lang="ts">
 	import Icon from "@iconify/svelte";
 	import type { Entity, ModelInfo } from "$lib/types";
-	import { entityDetailModal, entitySelection, modelingStyle, frameworkModels } from "$lib/stores";
+	import { entityDetailModal, entitySelection, modelingStyle } from "$lib/stores";
 	import DomainBadge from "./DomainBadge.svelte";
-	import ModelBindingPicker from "./ModelBindingPicker.svelte";
 	import { readModelRef } from "$lib/utils/entity-compat";
 	import { bindEntityToModel } from "$lib/utils/entity-binding";
 
@@ -101,6 +100,50 @@
 		entityDetailModal.set({ open: true, entityId: entity.id });
 	}
 
+	let isDragOver = $state(false);
+
+	function handleModelDragOver(event: DragEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		isDragOver = true;
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = "copy";
+		}
+	}
+
+	function handleModelDragEnter(event: DragEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		isDragOver = true;
+	}
+
+	function handleModelDragLeave(event: DragEvent) {
+		const currentTarget = event.currentTarget as HTMLElement;
+		const relatedTarget = event.relatedTarget;
+		if (relatedTarget instanceof HTMLElement && currentTarget.contains(relatedTarget)) {
+			return;
+		}
+		isDragOver = false;
+	}
+
+	function handleModelDrop(event: DragEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		isDragOver = false;
+
+		const json = event.dataTransfer?.getData("application/model-ref");
+		if (!json) return;
+
+		try {
+			const model = JSON.parse(json) as ModelInfo;
+			if (model.unique_id) {
+				bindEntityToModel(entity.id, model);
+			}
+		} catch (error) {
+			console.warn("Could not bind dropped model:", error);
+		}
+	}
+
 	// Get visible tags (max 3, +N more if overflow)
 	const { visibleTags, hiddenCount } = $derived.by(() => {
 		const tags = entity.tags || [];
@@ -131,20 +174,21 @@
 
 	// Bound model reference (prefers new `model_ref`, falls back to legacy `dbt_model`)
 	const boundModelRef = $derived(readModelRef(entity));
-	const selectedModelIds = $derived(
-		boundModelRef ? [boundModelRef, ...(entity.additional_models || [])] : [],
-	);
-
-	function handleModelSelect(model: ModelInfo) {
-		bindEntityToModel(entity.id, model);
-	}
 </script>
 
 <div
 	class="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer group"
+	class:ring-2={isDragOver}
+	class:ring-primary-300={isDragOver}
+	class:bg-primary-50={isDragOver}
+	class:border-primary-400={isDragOver}
 	role="row"
 	onclick={handleRowClick}
 	onkeydown={(e) => e.key === "Enter" && handleRowClick()}
+	ondragenter={handleModelDragEnter}
+	ondragover={handleModelDragOver}
+	ondragleave={handleModelDragLeave}
+	ondrop={handleModelDrop}
 	tabindex="0"
 >
 	<!-- Checkbox (always visible for selection) -->
@@ -255,13 +299,6 @@
 			</div>
 		{/if}
 	</div>
-
-	{#if $frameworkModels.length > 0}
-		<ModelBindingPicker
-			selectedModelIds={selectedModelIds}
-			onSelect={handleModelSelect}
-		/>
-	{/if}
 
 	<!-- Right side action hint (visible on hover) -->
 	<div class="flex-shrink-0 text-gray-400 group-hover:text-gray-600 transition-colors">
