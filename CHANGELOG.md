@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Model binding from the UI**: Users can search and select a model from an entity's detail view,
   bind additional models to an existing entity, or drag a model from the Sidebar onto an entity row
   without opening the detail view.
+- **URL-addressable entity details**: Entity detail modals can be opened and shared through
+  `/entity-list/<entity-id>`, with browser history and related-entity navigation kept in sync.
 
 ### Changed
 - **Entity detail modal is less scroll-heavy to edit.** Bound dbt models show up with the header
