@@ -63,18 +63,18 @@ describe('BusMatrix — dbt build status badges', () => {
 			expect(document.querySelector('table')).toBeTruthy();
 		});
 
-		const dimensionBadge = document.querySelector('[aria-label="1 connected facts"]') as HTMLElement;
-		const factBadge = document.querySelector('[aria-label="1 connected dimensions"]') as HTMLElement;
+		const dimensionBadge = document.querySelector('[aria-label="1 related facts"]') as HTMLElement;
+		const factBadge = document.querySelector('[aria-label="1 related dimensions"]') as HTMLElement;
 
 		await fireEvent.mouseEnter(dimensionBadge.parentElement as HTMLElement);
 		expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(
-			'1 currently visible facts are connected to this dimension.'
+			'1 related facts'
 		);
 
 		await fireEvent.mouseEnter(factBadge.parentElement as HTMLElement);
 		expect(
 			Array.from(document.querySelectorAll('[role="tooltip"]')).some(tooltip =>
-				tooltip.textContent?.includes('1 currently visible dimensions are connected to this fact.')
+				tooltip.textContent?.includes('1 related dimensions')
 			)
 		).toBe(true);
 	});
