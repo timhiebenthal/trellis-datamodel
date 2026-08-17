@@ -83,26 +83,33 @@ describe('getModelFolder', () => {
         expect(getModelFolder({ ...createModel(''), file_path: undefined } as any)).toBeNull();
     });
 
-    it('returns subfolder after models/ and main folder', () => {
-        expect(getModelFolder(createModel('models/3_core/all/users.sql'))).toBe('all');
-        expect(getModelFolder(createModel('models/2_int/staging/stg_users.sql'))).toBe('staging');
+    it('returns the full folder path below models', () => {
+        expect(getModelFolder(createModel('models/3_core/all/users.sql'))).toBe('3_core/all');
+        expect(getModelFolder(createModel('models/2_int/staging/stg_users.sql'))).toBe('2_int/staging');
     });
 
     it('returns nested subfolders joined', () => {
-        expect(getModelFolder(createModel('models/3_core/finance/reporting/revenue.sql'))).toBe('finance/reporting');
+        expect(getModelFolder(createModel('models/3_core/finance/reporting/revenue.sql'))).toBe('3_core/finance/reporting');
     });
 
-    it('returns null when no subfolder exists (file directly in main folder)', () => {
-        expect(getModelFolder(createModel('models/1_stg/raw.sql'))).toBeNull();
+    it('returns the top-level folder when the file is directly inside it', () => {
+        expect(getModelFolder(createModel('models/1_stg/raw.sql'))).toBe('1_stg');
+    });
+
+    it('returns null for a file directly under models', () => {
+        expect(getModelFolder(createModel('models/raw.sql'))).toBeNull();
     });
 
     it('handles Windows-style backslashes', () => {
-        expect(getModelFolder(createModel('models\\3_core\\all\\users.sql'))).toBe('all');
+        expect(getModelFolder(createModel('models\\3_core\\all\\users.sql'))).toBe('3_core/all');
     });
 
     it('handles paths without models/ prefix', () => {
-        // When there's no "models" prefix, it still skips the first folder
-        expect(getModelFolder(createModel('3_core/all/test.sql'))).toBe('all');
+        expect(getModelFolder(createModel('3_core/all/test.sql'))).toBe('3_core/all');
+    });
+
+    it('handles absolute paths containing a models segment', () => {
+        expect(getModelFolder(createModel('/workspace/project/models/3-entity/dim_account.sql'))).toBe('3-entity');
     });
 });
 

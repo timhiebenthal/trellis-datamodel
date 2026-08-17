@@ -58,7 +58,25 @@ describe('ModelBindingPicker', () => {
 
 		const selectedModel = screen.getByRole('button', { name: /customers.*Already bound/i });
 		expect(selectedModel).toBeDisabled();
-		expect(screen.getByText('core')).toBeInTheDocument();
+		expect(screen.getByText('3/core')).toBeInTheDocument();
 		expect(selected).toEqual([]);
+	});
+
+	it('shows top-level folders and reserves Uncategorized for missing paths', async () => {
+		frameworkModels.set([
+			models[0],
+			{
+				...models[1],
+				unique_id: 'model.project.standalone',
+				name: 'standalone',
+				file_path: undefined,
+			},
+		]);
+
+		render(ModelBindingPicker, { props: { onSelect: () => {} } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Bind model' }));
+
+		expect(screen.getByText('3/core')).toBeInTheDocument();
+		expect(screen.getByText('Uncategorized')).toBeInTheDocument();
 	});
 });
