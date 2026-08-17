@@ -7,12 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Model binding from the UI**: Users can search and select a model from an entity's detail view,
+  bind additional models to an existing entity, or drag a model from the Sidebar onto an entity row
+  without opening the detail view.
+
 ### Changed
 - **Entity detail modal is less scroll-heavy to edit.** Bound dbt models show up with the header
   context instead of below the form, so you see what the entity is tied to before digging into
   attributes. Roles & aliases stay collapsed until you open them, and long domain / tag / source
   lists hide behind a `+N more` control so chip walls no longer crowd the form. Attribute editing
   keeps its full-width table; the rest of the modal is tighter and easier to scan.
+- **Bus Matrix usage badges are clearer**: Each badge explains how many related facts or dimensions
+  are associated with that row or column, and fact labels retain their normal casing.
+
+### Fixed
+- **Bus Matrix tooltips no longer get clipped**: Usage explanations remain readable inside the
+  scrollable matrix and size to their content.
 
 ## [0.21.1] - 2026-08-05
 
