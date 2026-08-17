@@ -1,9 +1,12 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { fireEvent, render, cleanup, screen } from '@testing-library/svelte';
 import EntityRow from './EntityRow.svelte';
 import type { Entity, ModelInfo } from '$lib/types';
 import { entityDetailModal, nodes } from '$lib/stores';
 import { get } from 'svelte/store';
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
+import { goto } from '$app/navigation';
 
 const baseEntity: Entity = {
 	id: 'booking',
@@ -45,6 +48,15 @@ describe('EntityRow — dbt build status badge', () => {
 
 		const badge = document.querySelector('[title*="Built with dbt"]');
 		expect(badge).toBeFalsy();
+	});
+
+	it('opens the detail modal and navigates to the entity route when clicked', async () => {
+		render(EntityRow, { props: { entity: baseEntity } });
+
+		await fireEvent.click(screen.getByRole('row'));
+
+		expect(get(entityDetailModal)).toEqual({ open: true, entityId: 'booking' });
+		expect(goto).toHaveBeenCalledWith('/entity-list/booking');
 	});
 
 	it('binds an entity by dropping a Sidebar model without opening the detail modal', async () => {

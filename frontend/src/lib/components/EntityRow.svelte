@@ -1,10 +1,12 @@
 <script lang="ts">
 	import Icon from "@iconify/svelte";
+	import { goto } from "$app/navigation";
 	import type { Entity, ModelInfo } from "$lib/types";
 	import { entityDetailModal, entitySelection, modelingStyle } from "$lib/stores";
 	import DomainBadge from "./DomainBadge.svelte";
 	import { readModelRef } from "$lib/utils/entity-compat";
 	import { bindEntityToModel } from "$lib/utils/entity-binding";
+	import { getEntityDetailPath } from "$lib/utils/entity-list-route";
 
 	type Props = {
 		entity: Entity;
@@ -98,6 +100,7 @@
 	// Handle row click (open detail modal)
 	function handleRowClick() {
 		entityDetailModal.set({ open: true, entityId: entity.id });
+		void goto(getEntityDetailPath(entity.id));
 	}
 
 	let isDragOver = $state(false);
