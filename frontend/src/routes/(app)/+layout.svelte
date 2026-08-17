@@ -58,10 +58,11 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     import SourceEditorModal from "$lib/components/SourceEditorModal.svelte";
     import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
     import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
+    import { getEntityIdFromPath } from "$lib/utils/entity-list-route";
     import { type Node, type Edge } from "@xyflow/svelte";
     import type { ConfigInfo, ModelInfo, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
-    import { lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
+    import { entityDetailModal, lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
     import { 
         getIncompleteEntities, 
@@ -150,6 +151,27 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
             }
         } else if (currentPath === '/entity-list') {
             // Entity list view doesn't change viewMode - maintains current mode
+        }
+    });
+
+    // Keep entity-list detail routes and the global detail modal in sync.
+    $effect(() => {
+        const entityId = getEntityIdFromPath($page.url.pathname);
+
+        if (entityId === null) {
+            if ($page.url.pathname === '/entity-list' && $entityDetailModal.open) {
+                entityDetailModal.set({ open: false, entityId: null });
+            }
+            return;
+        }
+
+        const entityExists = $nodes.some((node) => node.type === 'entity' && node.id === entityId);
+        if (entityExists) {
+            if (!$entityDetailModal.open || $entityDetailModal.entityId !== entityId) {
+                entityDetailModal.set({ open: true, entityId });
+            }
+        } else if (!loading && $entityDetailModal.open) {
+            entityDetailModal.set({ open: false, entityId: null });
         }
     });
 

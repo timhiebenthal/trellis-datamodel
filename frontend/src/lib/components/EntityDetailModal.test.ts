@@ -13,6 +13,28 @@ vi.mock('$lib/api', () => ({
   getManifest: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+const mockPage = vi.hoisted(() => {
+  let value: { url: URL } = { url: new URL('http://localhost/') };
+  const subscribers = new Set<(value: { url: URL }) => void>();
+
+  return {
+    subscribe(run: (nextValue: { url: URL }) => void) {
+      subscribers.add(run);
+      run(value);
+      return () => subscribers.delete(run);
+    },
+    set(nextValue: { url: URL }) {
+      value = nextValue;
+      subscribers.forEach((run) => run(value));
+    },
+  };
+});
+vi.mock('$app/stores', () => ({ page: mockPage }));
+import { goto } from '$app/navigation';
+
+afterEach(() => {
+  mockPage.set({ url: new URL('http://localhost/') });
+});
 
 const mockDbtModel: DbtModel = {
   unique_id: 'model.proj.entity_x',
@@ -465,6 +487,16 @@ describe('EntityDetailModal — Relationships section', () => {
       // Form reloaded to the related entity.
       expect(screen.getByDisplayValue('Invoice Recipient')).toBeInTheDocument();
     });
+  });
+
+  it('updates the entity-list URL when navigating to a related entity', async () => {
+    mockPage.set({ url: new URL('http://localhost/entity-list/node-lead') });
+    setupEntityWithRelationship();
+    await renderModal();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Invoice Recipient' }));
+
+    expect(goto).toHaveBeenCalledWith('/entity-list/node-ir');
   });
 
   it('does not render the Relationships section when the entity has no edges', async () => {
