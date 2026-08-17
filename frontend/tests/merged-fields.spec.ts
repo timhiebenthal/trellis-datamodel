@@ -85,12 +85,12 @@ test.describe('Merged dbt + drafted fields', () => {
 		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
-		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
+		await expect(page.getByRole('heading', { name: /Clean Customer E2E/i })).toBeVisible({
 			timeout: 15000,
 		});
 
 		const dialog = page.getByRole('dialog').filter({
-			has: page.getByRole('heading', { name: /Clean Customer E2E Details/i }),
+			has: page.getByRole('heading', { name: /Clean Customer E2E/i }),
 		});
 
 		await expect(dialog.getByPlaceholder('attribute_name')).toHaveCount(7);
@@ -109,12 +109,12 @@ test.describe('Merged dbt + drafted fields', () => {
 		await expect(dialog).toBeHidden({ timeout: 10000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
-		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
+		await expect(page.getByRole('heading', { name: /Clean Customer E2E/i })).toBeVisible({
 			timeout: 15000,
 		});
 
 		const dialog2 = page.getByRole('dialog').filter({
-			has: page.getByRole('heading', { name: /Clean Customer E2E Details/i }),
+			has: page.getByRole('heading', { name: /Clean Customer E2E/i }),
 		});
 		await expect(dialog2.getByTestId('merged-field-row-pending_col')).toBeVisible();
 
@@ -168,12 +168,12 @@ models:
 		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
 
 		await page.getByRole('row', { name: /Clean Customer E2E/i }).click();
-		await expect(page.getByRole('heading', { name: /Clean Customer E2E Details/i })).toBeVisible({
+		await expect(page.getByRole('heading', { name: /Clean Customer E2E/i })).toBeVisible({
 			timeout: 15000,
 		});
 
 		const dialog = page.getByRole('dialog').filter({
-			has: page.getByRole('heading', { name: /Clean Customer E2E Details/i }),
+			has: page.getByRole('heading', { name: /Clean Customer E2E/i }),
 		});
 
 		const idRow = dialog.getByTestId('merged-field-row-id');
