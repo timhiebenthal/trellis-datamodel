@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-17
+
 ### Added
 - **Model binding from the UI**: Users can search and select a model from an entity's detail view,
   bind additional models to an existing entity, or drag a model from the Sidebar onto an entity row
