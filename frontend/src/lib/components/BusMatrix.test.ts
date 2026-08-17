@@ -101,8 +101,8 @@ describe('BusMatrix — dbt build status badges', () => {
 		expect(table.textContent).not.toContain('Unbound Fact');
 		expect(table.textContent).toContain('Bound Fact');
 
-		// only one connected fact/dimension remains visible, so counts should be 1
-		const countBadges = Array.from(table.querySelectorAll('[aria-label*="connected"]'));
-		expect(countBadges.some((el) => el.getAttribute('aria-label')?.startsWith('1 connected'))).toBe(true);
+		// only one related fact/dimension remains visible, so counts should be 1
+		expect(table.querySelector('[aria-label="1 related facts"]')).toBeTruthy();
+		expect(table.querySelector('[aria-label="1 related dimensions"]')).toBeTruthy();
 	});
 });
