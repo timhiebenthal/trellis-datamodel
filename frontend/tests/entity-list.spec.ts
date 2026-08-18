@@ -36,6 +36,13 @@ const ENTITY_LIST_DATA: DataModelPayload = {
 	relationships: [],
 };
 
+function canvasEntityByLabel(page: import('@playwright/test').Page, label: string) {
+	const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return page
+		.locator('.svelte-flow__node-entity')
+		.filter({ has: page.getByRole('button', { name: new RegExp(`^${escapedLabel}\\b`) }) });
+}
+
 test('Open filtered on Canvas navigates with the complete filtered entity set', async ({ page, request }) => {
 	await resetDataModel(request, ENTITY_LIST_DATA);
 	await page.goto('/entity-list');
@@ -63,7 +70,7 @@ test('Open filtered on Canvas navigates with the complete filtered entity set', 
 	await page.waitForSelector('[data-testid="canvas-ready"]', { timeout: 30000 });
 	const canvasEntities = page.locator('.svelte-flow__node-entity');
 	await expect(canvasEntities).toHaveCount(2, { timeout: 30000 });
-	await expect(canvasEntities.filter({ hasText: 'Customer Profile' })).toBeVisible();
-	await expect(canvasEntities.filter({ hasText: 'Customer Event' })).toBeVisible();
+	await expect(canvasEntityByLabel(page, 'Customer Profile')).toBeVisible();
+	await expect(canvasEntityByLabel(page, 'Customer Event')).toBeVisible();
 	await expect(canvasEntities.filter({ hasText: 'Order Fact' })).toHaveCount(0);
 });

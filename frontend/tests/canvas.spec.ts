@@ -16,6 +16,9 @@ test.describe('Canvas Interactions', () => {
     test.beforeEach(async ({ page, request }) => {
         // Ensure a clean data model before each test run
         await resetDataModel(request);
+        await page.addInitScript(() => {
+            localStorage.setItem('trellis_all_expanded', 'true');
+        });
         await page.goto('/');
     });
 
@@ -126,7 +129,7 @@ test.describe('Canvas Interactions', () => {
         await expect(collapsedIndicator.first()).toBeVisible({ timeout: 2000 });
 
         // 3. Click collapse all button (now in the top bar)
-        const collapseAllBtn = page.getByRole('button', { name: 'Collapse All' });
+        const collapseAllBtn = page.getByRole('button', { name: /Collapse all entities/i });
         await expect(collapseAllBtn).toBeVisible({ timeout: 5000 });
         await collapseAllBtn.click();
         await page.waitForTimeout(500);
@@ -141,7 +144,7 @@ test.describe('Canvas Interactions', () => {
         }
 
         // 5. Verify button text changed to "Expand All"
-        const expandAllBtn = page.getByRole('button', { name: 'Expand All' });
+        const expandAllBtn = page.getByRole('button', { name: /Expand all entities/i });
         await expect(expandAllBtn).toBeVisible({ timeout: 2000 });
 
         // 6. Click expand all button
@@ -174,7 +177,7 @@ test.describe('Canvas Interactions', () => {
         expect(isExpandedAfterReload).toBeTruthy();
 
         // Verify button shows "Collapse All" (since state was expanded)
-        const collapseAllBtnAfterReload = page.getByRole('button', { name: 'Collapse All' });
+        const collapseAllBtnAfterReload = page.getByRole('button', { name: /Collapse all entities/i });
         await expect(collapseAllBtnAfterReload).toBeVisible({ timeout: 5000 });
     });
 });

@@ -61,6 +61,7 @@ test.describe('Role Deduplication', () => {
         await page.addInitScript(() => {
             localStorage.clear();
             sessionStorage.clear();
+            localStorage.setItem('trellis_all_expanded', 'true');
         });
         
         await page.goto('/canvas');
@@ -93,6 +94,7 @@ test.describe('Role Deduplication', () => {
         await page.addInitScript(() => {
             localStorage.clear();
             sessionStorage.clear();
+            localStorage.setItem('trellis_all_expanded', 'true');
         });
         
         await page.goto('/canvas');
@@ -131,6 +133,7 @@ test.describe('Role Deduplication', () => {
         await page.addInitScript(() => {
             localStorage.clear();
             sessionStorage.clear();
+            localStorage.setItem('trellis_all_expanded', 'true');
         });
 
         await page.goto('/canvas');
