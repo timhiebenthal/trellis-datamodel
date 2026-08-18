@@ -805,6 +805,13 @@
 	function confirmDelete() {
 		if (!currentEntity) return;
 
+		// Remove all relationships that reference the deleted entity.
+		edges.update((edgeList) =>
+			edgeList.filter(
+				(edge) => edge.source !== currentEntity.id && edge.target !== currentEntity.id
+			)
+		);
+
 		// Remove node from store
 		nodes.update((n) => n.filter((node) => node.id !== currentEntity.id));
 
