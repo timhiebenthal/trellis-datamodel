@@ -44,6 +44,9 @@ test.describe('Merged dbt + drafted fields', () => {
 		};
 		await resetDataModel(request, payload);
 
+		await page.addInitScript(() => {
+			localStorage.setItem('trellis_all_expanded', 'true');
+		});
 		await page.goto('/');
 		await page.waitForSelector('[data-testid="canvas-ready"]', { timeout: 25000 });
 		// Wait for manifest + data model to finish loading before switching views

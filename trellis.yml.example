@@ -3,6 +3,15 @@
 # Transformation framework currently supported.
 framework: dbt-core
 
+# Root landing page and project-wide Canvas defaults.
+# start_page affects only "/", while explicit routes remain authoritative.
+start_page: canvas
+canvas:
+  default_filters:
+    domains: []
+    tags: []
+# These defaults are applied once at application startup and can be cleared in the UI.
+
 # ==============================================================================
 # SWITCHING BETWEEN KIMBALL AND ENTITY VERSIONS
 # ==============================================================================

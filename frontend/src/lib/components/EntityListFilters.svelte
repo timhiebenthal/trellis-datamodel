@@ -2,14 +2,16 @@
 	import { entityListFilters, nodes, edges, modelingStyle } from '$lib/stores';
 	import type { EntityData } from '$lib/types';
 	import { exportDataModelToExcel } from '$lib/utils/excel-export';
+	import { getCanvasFilterPath } from '$lib/utils/entity-list-route';
 	import Icon from '@iconify/svelte';
 
 	interface Props {
 		filteredCount: number;
 		totalCount: number;
+		filteredEntityIds: string[];
 	}
 
-	let { filteredCount, totalCount }: Props = $props();
+	let { filteredCount, totalCount, filteredEntityIds }: Props = $props();
 
 	let searchTermLocal = $state($entityListFilters.searchTerm);
 	let searchDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -221,6 +223,27 @@
 				<span class="text-gray-600">{totalCount}</span>
 				<span class="text-gray-500">entities</span>
 			</div>
+
+			{#if filteredEntityIds.length > 0}
+				<a
+					href={getCanvasFilterPath(filteredEntityIds)}
+					aria-label={`Open filtered on Canvas (${filteredCount} ${filteredCount === 1 ? 'entity' : 'entities'})`}
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary-700 bg-primary-50 border border-primary-300 rounded-md hover:bg-primary-100 transition-colors"
+				>
+					<Icon icon="lucide:external-link" class="w-4 h-4" />
+					<span>Open filtered on Canvas ({filteredCount})</span>
+				</a>
+			{:else}
+				<button
+					type="button"
+					disabled
+					aria-label="Open filtered on Canvas (0 entities)"
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-md cursor-not-allowed"
+				>
+					<Icon icon="lucide:external-link" class="w-4 h-4" />
+					<span>Open filtered on Canvas (0)</span>
+				</button>
+			{/if}
 
 			<button
 				type="button"

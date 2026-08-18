@@ -40,6 +40,28 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         description="Transformation framework",
         beta=False,
     ),
+    "start_page": ConfigFieldMetadata(
+        type="enum",
+        enum_values=["canvas", "entity-list"],
+        default="canvas",
+        required=False,
+        description="Project default for the root route only; explicit routes remain authoritative",
+        beta=False,
+    ),
+    "canvas.default_filters.domains": ConfigFieldMetadata(
+        type="list",
+        default=[],
+        required=False,
+        description="Project-wide default Canvas domain filters, not per-user preferences",
+        beta=False,
+    ),
+    "canvas.default_filters.tags": ConfigFieldMetadata(
+        type="list",
+        default=[],
+        required=False,
+        description="Project-wide default Canvas tag filters, not per-user preferences",
+        beta=False,
+    ),
     "modeling_style": ConfigFieldMetadata(
         type="enum",
         enum_values=["dimensional_model", "entity_model"],
@@ -217,6 +239,7 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
     for key in [
         "framework",
         "modeling_style",
+        "start_page",
         "dbt_project_path",
         "dbt_manifest_path",
         "dbt_catalog_path",
@@ -238,6 +261,29 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         config = {k: v for k, v in config.items() if k != "dimensional_modeling"}
 
     # Normalize nested sections
+    # Canvas navigation and project defaults
+    if "canvas" in config:
+        canvas = config["canvas"]
+        filters = canvas.get("default_filters") if isinstance(canvas, dict) else {}
+        if not isinstance(filters, dict):
+            filters = {}
+
+        def normalize_filter_values(value: Any) -> list[str]:
+            if not isinstance(value, list):
+                return []
+            return [
+                item.strip()
+                for item in value
+                if isinstance(item, str) and item.strip()
+            ]
+
+        normalized["canvas"] = {
+            "default_filters": {
+                "domains": normalize_filter_values(filters.get("domains")),
+                "tags": normalize_filter_values(filters.get("tags")),
+            }
+        }
+
     # Lineage
     if "lineage" in config:
         lineage = config["lineage"]

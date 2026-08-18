@@ -35,8 +35,10 @@
 			});
 	});
 
-	// Calculate filtered count
-	const filteredCount = $derived(filterEntities(entities, $entityListFilters).length);
+	// Calculate the complete filtered collection for count and Canvas navigation.
+	const filteredEntities = $derived(filterEntities(entities, $entityListFilters));
+	const filteredCount = $derived(filteredEntities.length);
+	const filteredEntityIds = $derived(filteredEntities.map((entity) => entity.id));
 	const totalCount = $derived(entities.length);
 
 	// Handle modal close
@@ -69,7 +71,7 @@
 		<!-- Filters Section -->
 		<div class="bg-white border-b border-gray-200 w-full">
 			<div class="max-w-7xl mx-auto">
-				<EntityListFilters {filteredCount} {totalCount} />
+				<EntityListFilters {filteredCount} {totalCount} {filteredEntityIds} />
 			</div>
 		</div>
 

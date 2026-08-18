@@ -67,6 +67,22 @@ After `trellis init`, edit **`trellis.yml`**. Annotated options and defaults liv
 
 You can also open **`/config`** in the app to edit settings in the browser (validated saves; see example file for field meanings).
 
+### Landing page and Canvas defaults
+
+Choose the page shown when opening the root URL, and optionally define shared Canvas filters:
+
+```yaml
+start_page: canvas  # or entity-list
+canvas:
+  default_filters:
+    domains: []
+    tags: []
+```
+
+`start_page` affects only `/`; explicit routes such as `/canvas` and `/entity-list` remain authoritative. Canvas defaults are project-wide settings stored in version-controlled `trellis.yml`, not personal preferences. They are applied once to an otherwise unfiltered Canvas session. Users can clear or change them while working; those session changes are reversible and are not written back to `trellis.yml`.
+
+From Entity List, **Open filtered on Canvas** opens the complete current filtered result set on Canvas. An explicit Canvas URL entity filter takes precedence over project-wide domain and tag defaults.
+
 ## Vision
 
 trellis is built and tested around **dbt-core** today. The longer-term idea is to stay **tool-agnostic**—concepts outlive any one framework. Possible directions include dbt Fusion, Pydantic-flavored exports, or adapters for tools like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) where it makes sense. For now, the focus is a great experience with dbt-core.
