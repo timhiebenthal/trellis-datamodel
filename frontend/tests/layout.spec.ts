@@ -13,10 +13,14 @@ test.describe('Auto Layout', () => {
 
         // Start every test with a clean data model
         await resetDataModel(request);
+        await page.addInitScript(() => {
+            localStorage.setItem('trellis_all_expanded', 'true');
+        });
         await page.goto('/');
         
         // Wait for app to load
         await expect(page.locator('aside')).toBeVisible({ timeout: 10000 });
+        await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
         
         // Clear any initial errors
         consoleErrors.length = 0;

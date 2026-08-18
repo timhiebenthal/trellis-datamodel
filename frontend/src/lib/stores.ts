@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import type { Node, Edge } from '@xyflow/svelte';
-import type { ModelInfo, EntityListFilters, FieldDragState } from './types';
+import type { CanvasFilterState, ModelInfo, EntityListFilters, FieldDragState } from './types';
 
 /**
  * Deep clone that handles Svelte 5 Proxy objects (which structuredClone cannot clone).
@@ -32,7 +32,9 @@ export const sourceColors = writable<Record<string, string>>({});
 
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
-export const tagFilter = writable<string[]>([]);
+export const domainFilter = writable<CanvasFilterState['domains']>([]);
+export const tagFilter = writable<CanvasFilterState['tags']>([]);
+export const canvasFiltersInitialized = writable<boolean>(false);
 export const entityTypeFilter = writable<string | null>(null); // 'dimension' | 'fact' | 'unclassified' | null
 export const modelBoundFilter = writable<'bound' | 'unbound' | null>(null); // Filter by model bound status
 export const groupByFolder = writable<boolean>(true);

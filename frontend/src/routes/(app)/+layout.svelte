@@ -16,7 +16,9 @@
     undo,
     redo,
     folderFilter,
+    domainFilter,
     tagFilter,
+    canvasFiltersInitialized,
     groupByFolder,
     entitySelection,
         modelingStyle,
@@ -46,6 +48,7 @@ import {
 } from "$lib/utils";
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
+import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
 import { isFeatureAvailable } from "$lib/utils/framework-display";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
@@ -106,6 +109,8 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
+    let unconfiguredCanvas = $state(true);
+    let navigationConfigLoaded = $state(false);
     let lineageEnabled = $state(false);
     let exposuresEnabled = $state(false);
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
@@ -512,13 +517,17 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     const STORAGE_KEY = "trellis_all_expanded";
     let allExpanded = $state(true);
     let stateApplied = $state(false);
+    let hasPersistedCollapsePreference = $state(false);
+    let collapsePreferenceLoaded = $state(false);
 
     // Restore state from localStorage on mount
     onMount(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved !== null) {
+            hasPersistedCollapsePreference = true;
             allExpanded = saved === "true";
         }
+        collapsePreferenceLoaded = true;
     });
 
 
@@ -526,8 +535,15 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     $effect(() => {
         const currentNodes = $nodes;
         const entityNodes = currentNodes.filter((n) => n.type === "entity");
-        if (entityNodes.length > 0 && !stateApplied) {
-            // Apply the persisted state to all entity nodes
+        if (entityNodes.length > 0 && collapsePreferenceLoaded && navigationConfigLoaded && !stateApplied) {
+            // A fresh, unconfigured project starts in a conceptual, collapsed
+            // Canvas. An explicit local preference always wins for collapse.
+            if (unconfiguredCanvas) {
+                $viewMode = "conceptual";
+                if (!hasPersistedCollapsePreference) {
+                    allExpanded = false;
+                }
+            }
             applyExpandCollapseState(allExpanded);
             stateApplied = true;
         }
@@ -555,6 +571,12 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
         localStorage.setItem(STORAGE_KEY, String(allExpanded));
         // Save immediately using AutoSave service
         autoSaveService?.saveNow($nodes, $edges);
+    }
+
+    function hasExplicitCanvasEntitySubset(): boolean {
+        if ($page.url.pathname !== "/canvas") return false;
+        const entities = $page.url.searchParams.get("entities");
+        return entities !== null && entities.split(",").some((id) => id.trim().length > 0);
     }
     
     onMount(() => {
@@ -597,6 +619,24 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 });
                 const { status, config: info, models, dataModel } = await boot.core;
                 $configStatus = status;
+                unconfiguredCanvas =
+                    !status.config_present ||
+                    status.data_model_exists === false ||
+                    Boolean(status.error);
+
+                // Load Config Info (includes guidance config and Canvas defaults).
+                configInfo = info;
+                const hasCanvasNavigationConfig =
+                    info?.start_page === 'entity-list' ||
+                    (info?.canvas_default_filters?.domains?.length ?? 0) > 0 ||
+                    (info?.canvas_default_filters?.tags?.length ?? 0) > 0;
+                unconfiguredCanvas = unconfiguredCanvas || !hasCanvasNavigationConfig;
+                navigationConfigLoaded = true;
+                if (!$canvasFiltersInitialized) {
+                    domainFilter.set([...(info?.canvas_default_filters?.domains ?? [])]);
+                    tagFilter.set([...(info?.canvas_default_filters?.tags ?? [])]);
+                    canvasFiltersInitialized.set(true);
+                }
                 if (info?.guidance) {
                     guidanceConfig = info.guidance;
                 }
@@ -665,6 +705,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                             annotation_type: e.annotation_type,
                             roles: e.roles,
                             domain: e.domain,
+                            domains: e.domains,
                         },
                         parentId: undefined,
                     };
@@ -887,10 +928,18 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
         if (loading || !bootGraphIndex) return;
 
         const activeFolder = $folderFilter;
+        const activeDomains = $domainFilter;
         const activeTags = $tagFilter;
+        const explicitEntityIds = hasExplicitCanvasEntitySubset()
+            ? new Set(($page.url.searchParams.get("entities") ?? "").split(",").filter((id) => id.trim()))
+            : null;
+
         const currentNodes = untrack(() => $nodes);
         const currentEdges = untrack(() => $edges);
-        const filtering = activeFolder.length > 0 || activeTags.length > 0;
+        const filtering =
+            activeFolder.length > 0 ||
+            activeDomains.length > 0 ||
+            activeTags.length > 0;
 
         if (!filtering) {
             const hasHiddenState =
@@ -923,22 +972,28 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 .map((modelId) => bootGraphIndex?.modelsById.get(modelId))
                 .filter((model): model is NonNullable<typeof model> => model !== undefined);
 
-            let visible = true;
-            if (activeFolder.length > 0) {
-                const matchingFolders = boundModels
-                    .map((model) => getModelFolder(model))
-                    .filter((folder): folder is string => folder !== null);
-                visible = boundModels.length > 0 && matchingFolders.some((folder) => activeFolder.includes(folder));
+            let visible = explicitEntityIds?.has(node.id) ?? true;
+
+            if (!explicitEntityIds?.has(node.id) && activeFolder.length > 0) {
+                if (boundModels.length === 0) {
+                    visible = false;
+                } else {
+                    const matchingFolders = boundModels
+                        .map((model) => getModelFolder(model))
+                        .filter((folder): folder is string => folder !== null);
+                    visible = visible && matchingFolders.some((folder) => activeFolder.includes(folder));
+                }
             }
 
-            if (activeTags.length > 0) {
-                const modelTags = boundModels.flatMap((model) => normalizeTags(model.tags));
-                const entityTags = normalizeTags(node.data?.tags);
-                const nodeTags = [...new Set([...modelTags, ...entityTags])];
-                visible =
-                    visible &&
-                    nodeTags.length > 0 &&
-                    activeTags.some((tag) => nodeTags.includes(tag));
+            if (!explicitEntityIds?.has(node.id)) {
+                visible = visible && matchesCanvasFilters(
+                    node.data as any,
+                    {
+                        selectedDomains: activeDomains,
+                        selectedTags: activeTags,
+                    },
+                    boundModels,
+                );
             }
 
             if (visible) visibleNodeIds.add(node.id);

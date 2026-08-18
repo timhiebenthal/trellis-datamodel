@@ -28,6 +28,12 @@ class ExposuresLayoutEnum(str, Enum):
     ENTITIES_AS_ROWS = "entities-as-rows"
 
 
+class StartPageEnum(str, Enum):
+    """Root route options."""
+    CANVAS = "canvas"
+    ENTITY_LIST = "entity-list"
+
+
 # Nested config models
 class LineageConfig(BaseModel):
     """Lineage configuration (beta)."""
@@ -76,11 +82,24 @@ class BusinessEventsConfig(BaseModel):
     file: str = Field(default="", description="Path to business events YAML file")
 
 
+class CanvasDefaultFilters(BaseModel):
+    """Project-wide default filters for the Canvas."""
+    domains: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+
+
+class CanvasConfig(BaseModel):
+    """Canvas configuration."""
+    default_filters: CanvasDefaultFilters = Field(default_factory=CanvasDefaultFilters)
+
+
 # Main config models
 class ConfigSchema(BaseModel):
     """Complete trellis.yml configuration schema for validation."""
     framework: FrameworkEnum = FrameworkEnum.DBT_CORE
     modeling_style: ModelingStyleEnum = ModelingStyleEnum.ENTITY_MODEL
+    start_page: StartPageEnum = StartPageEnum.CANVAS
+    canvas: CanvasConfig = Field(default_factory=CanvasConfig)
     dbt_project_path: str = Field(default="", description="Path to dbt project directory")
     dbt_manifest_path: str = Field(default="", description="Path to manifest.json")
     dbt_catalog_path: str = Field(default="", description="Path to catalog.json")
@@ -194,6 +213,10 @@ class ConfigInfoResponse(BaseModel):
     dimension_prefix: List[str]
     fact_prefix: List[str]
     entity_prefix: List[str]
+    start_page: str = StartPageEnum.CANVAS.value
+    canvas_default_filters: Dict[str, List[str]] = Field(
+        default_factory=lambda: {"domains": [], "tags": []}
+    )
 
 
 class ManifestResponse(BaseModel):
