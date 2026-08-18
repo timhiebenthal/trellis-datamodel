@@ -7,14 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [Future 0.23.0] - 2026-08-18
+## [0.23.0] - 2026-08-18
 
 ### Added
 - **Canvas navigation defaults**: Projects can choose `canvas` or `entity-list` as the landing page and configure shared Canvas domain/tag defaults; users can clear or change those filters for the current session, and Entity List can open its complete filtered result set on Canvas without changing project configuration.
-
-## [0.23.0b1] - 2026-08-18
-
-### Added
 - **Frontend boot diagnostics**: Capture boot phases, request timing, response sizes,
   server timing data, and deterministic benchmark summaries for troubleshooting large projects.
 - **Deterministic boot-performance benchmark**: Add a reproducible 500-entity / 750-relationship
