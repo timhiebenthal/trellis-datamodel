@@ -9,8 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.23.0] - 2026-08-18
 
+Dedicated features for improved UX/ergonomics in large projects. 
+Canvas View often becomes cluttered and cold start of the app used to take >20s. Here's what has been done to address that:
+
 ### Added
-- **Canvas navigation defaults**: Projects can choose `canvas` or `entity-list` as the landing page and configure shared Canvas domain/tag defaults; users can clear or change those filters for the current session, and Entity List can open its complete filtered result set on Canvas without changing project configuration.
+- **Canvas navigation defaults**: Projects can choose `/canvas` or `/entity-list` as the landing page and configure shared Canvas domain/tag defaults; users can clear or change those filters for the current session, and Entity List can open its complete filtered result set on Canvas without changing project configuration.
 - **Frontend boot diagnostics**: Capture boot phases, request timing, response sizes,
   server timing data, and deterministic benchmark summaries for troubleshooting large projects.
 - **Deterministic boot-performance benchmark**: Add a reproducible 500-entity / 750-relationship
