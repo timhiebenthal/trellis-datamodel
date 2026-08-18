@@ -21,6 +21,7 @@ at the call site.
 
 import logging
 import os
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Optional
 
@@ -37,6 +38,7 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from . import entity_type_inference
+from .artifact_snapshot import clear_snapshots
 from .base import (
     Capabilities,
     ColumnInfo,
@@ -652,8 +654,9 @@ class BruinAdapter:
 
     @classmethod
     def reset_inference_cache(cls) -> None:
-        """Reset the entity type inference cache."""
-        entity_type_inference.reset_cache(FRAMEWORK_NAME)
+        """Reset all caches affected by a process-wide config reload."""
+        entity_type_inference.reset_cache()
+        clear_snapshots()
 
     def infer_entity_types(self) -> dict[str, str]:
         """Infer entity types from Bruin asset naming patterns."""
@@ -811,6 +814,56 @@ class BruinAdapter:
                 if node["is_source"] and node["source_name"]
             }
         )
+
+    def get_source_systems_for_models(
+        self, model_unique_ids: Iterable[str]
+    ) -> dict[str, list[str]]:
+        """Return source connections for many assets from one pipeline scan."""
+        ordered_model_ids = list(dict.fromkeys(model_unique_ids))
+        if not ordered_model_ids:
+            return {}
+
+        try:
+            assets = self._scan_all_assets()
+            by_name: dict[str, BruinAsset] = {}
+            for asset in assets:
+                by_name[asset.name] = asset
+                by_name.setdefault(_short_name(asset.name), asset)
+
+            memo: dict[str, tuple[str, ...]] = {}
+
+            def source_names_for(asset_name: str) -> tuple[str, ...]:
+                asset = by_name.get(asset_name)
+                if asset is None:
+                    return ()
+                canonical_name = asset.name
+                if canonical_name in memo:
+                    return memo[canonical_name]
+
+                if _is_ingestion_asset(asset) or not asset.depends:
+                    source_name = _asset_source_name(asset)
+                    memo[canonical_name] = (source_name,) if source_name else ()
+                    return memo[canonical_name]
+
+                source_names: list[str] = []
+                for upstream_name in asset.depends:
+                    for source_name in source_names_for(upstream_name):
+                        if source_name not in source_names:
+                            source_names.append(source_name)
+                memo[canonical_name] = tuple(source_names)
+                return memo[canonical_name]
+
+            result: dict[str, list[str]] = {}
+            for model_id in ordered_model_ids:
+                result[model_id] = sorted(source_names_for(model_id))
+            return result
+        except Exception as e:
+            logger.warning(
+                "Failed to extract source systems for assets %s: %s",
+                ordered_model_ids,
+                e,
+            )
+            return {model_id: [] for model_id in ordered_model_ids}
 
     def get_exposures(self) -> list[Exposure]:
         """Bruin has no exposures concept.

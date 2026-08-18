@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Canvas navigation defaults**: Projects can choose `canvas` or `entity-list` as the landing page and configure shared Canvas domain/tag defaults; users can clear or change those filters for the current session, and Entity List can open its complete filtered result set on Canvas without changing project configuration.
 
+## [0.23.0b1] - 2026-08-18
+
+### Added
+- **Frontend boot diagnostics**: Capture boot phases, request timing, response sizes,
+  server timing data, and deterministic benchmark summaries for troubleshooting large projects.
+- **Deterministic boot-performance benchmark**: Add a reproducible 500-entity / 750-relationship
+  fixture with cold and warm measurements for Canvas and Entity List startup.
+
+### Changed
+- **Faster boot loading**: Parallelize independent startup requests, publish core data earlier,
+  defer optional relationship and layout work, and lazy-load editable schemas and heavy Canvas code.
+- **Lower backend startup cost**: Cache immutable dbt artifact snapshots, reuse derived indexes,
+  batch source-system lineage extraction, and avoid redundant entity-type inference and autosaves.
+- **Improved large-graph rendering**: Reuse stable graph indexes, render only visible Svelte Flow
+  elements, and defer ELK layout and expensive Canvas content until needed.
+
+### Performance
+- The benchmark fixture measured approximately **90–96% lower time to first useful render**,
+  with all configured cold and warm startup gates passing.
+
 ## [0.22.1] - 2026-08-17
 
 ### Fixed

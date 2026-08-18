@@ -1,0 +1,806 @@
+{
+  "schemaVersion": 1,
+  "fixture": {
+    "fingerprint": "1f58f3cb8f7ad22681bf3b722cfe142cd29c445c6afafce89d9d8a5757a48547",
+    "counts": {
+      "models": 500,
+      "entities": 500,
+      "columnsPerModel": 20,
+      "relationships": 750
+    }
+  },
+  "machine": {
+    "platform": "linux",
+    "release": "6.6.87.2-microsoft-standard-WSL2",
+    "arch": "x64",
+    "cpuCount": 22,
+    "totalMemoryBytes": 33366376448,
+    "nodeVersion": "v20.19.3",
+    "browserProject": "chromium",
+    "coldProcessRestarted": true
+  },
+  "command": "cd frontend && TRELLIS_BOOT_BENCHMARK=1 npx playwright test tests/boot-performance.spec.ts --project=chromium",
+  "sampleCounts": {
+    "cold": 3,
+    "warm": 5,
+    "perRoute": {
+      "/canvas": 8,
+      "/entity-list": 8
+    }
+  },
+  "raw": {
+    "/canvas": {
+      "cold": [
+        {
+          "spinnerToFirstUsefulRenderMs": 3040.7999999970198,
+          "firstRenderedFrameMs": 3060.39999999851,
+          "requestCount": 122,
+          "responseBytes": 6374372,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 506.70000000298023
+          },
+          "backendPhaseTimings": {
+            "request": 391.26,
+            "artifact_read": 5.146,
+            "artifact_parse": 13.696,
+            "reconciliation": 68.466,
+            "model_index": 10.828,
+            "data_model_read": 19.77,
+            "layout_read": 0.747,
+            "entity_inference": 0.046,
+            "source_lineage": 1.12
+          },
+          "route": "/canvas",
+          "mode": "cold",
+          "sample": 1
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 1016.2000000029802,
+          "firstRenderedFrameMs": 1539.3000000044703,
+          "requestCount": 122,
+          "responseBytes": 6374372,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 488.70000000298023
+          },
+          "backendPhaseTimings": {
+            "request": 399.96299999999997,
+            "artifact_read": 2.889,
+            "artifact_parse": 11.363,
+            "reconciliation": 70.887,
+            "model_index": 12.38,
+            "data_model_read": 20.273,
+            "layout_read": 1.641,
+            "entity_inference": 0.04,
+            "source_lineage": 0.605
+          },
+          "route": "/canvas",
+          "mode": "cold",
+          "sample": 2
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 1044.5,
+          "firstRenderedFrameMs": 1574.6000000014901,
+          "requestCount": 122,
+          "responseBytes": 6374372,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 507.30000000447035
+          },
+          "backendPhaseTimings": {
+            "request": 415.685,
+            "artifact_read": 1.97,
+            "artifact_parse": 12.012,
+            "reconciliation": 73.284,
+            "model_index": 13.202,
+            "data_model_read": 19.060000000000002,
+            "layout_read": 0.745,
+            "entity_inference": 0.039,
+            "source_lineage": 0.637
+          },
+          "route": "/canvas",
+          "mode": "cold",
+          "sample": 3
+        }
+      ],
+      "warm": [
+        {
+          "spinnerToFirstUsefulRenderMs": 909,
+          "firstRenderedFrameMs": 1148.3000000044703,
+          "requestCount": 122,
+          "responseBytes": 6369935,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 352.20000000298023
+          },
+          "backendPhaseTimings": {
+            "request": 312.383,
+            "reconciliation": 69.11,
+            "model_index": 11.937,
+            "data_model_read": 19.756,
+            "layout_read": 1.193,
+            "entity_inference": 0.039,
+            "source_lineage": 0.577
+          },
+          "route": "/canvas",
+          "mode": "warm",
+          "sample": 1
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 918.0999999940395,
+          "firstRenderedFrameMs": 1113.2999999970198,
+          "requestCount": 122,
+          "responseBytes": 6369935,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 368.1000000014901
+          },
+          "backendPhaseTimings": {
+            "request": 323.82899999999995,
+            "reconciliation": 74.36,
+            "model_index": 9.173,
+            "data_model_read": 20.224,
+            "layout_read": 1.07,
+            "entity_inference": 0.04,
+            "source_lineage": 0.606
+          },
+          "route": "/canvas",
+          "mode": "warm",
+          "sample": 2
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 630.1999999955297,
+          "firstRenderedFrameMs": 1111,
+          "requestCount": 122,
+          "responseBytes": 4796098,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 356.8999999985099
+          },
+          "backendPhaseTimings": {
+            "request": 315.48699999999997,
+            "reconciliation": 70.756,
+            "model_index": 9.762,
+            "data_model_read": 37.574,
+            "layout_read": 1.786,
+            "entity_inference": 0.066,
+            "source_lineage": 0.797
+          },
+          "route": "/canvas",
+          "mode": "warm",
+          "sample": 3
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 921.2000000029802,
+          "firstRenderedFrameMs": 1141.7000000029802,
+          "requestCount": 122,
+          "responseBytes": 4796098,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 366.20000000298023
+          },
+          "backendPhaseTimings": {
+            "request": 322.786,
+            "reconciliation": 67.004,
+            "model_index": 11.104,
+            "data_model_read": 23.902,
+            "layout_read": 1.547,
+            "entity_inference": 0.061,
+            "source_lineage": 0.601
+          },
+          "route": "/canvas",
+          "mode": "warm",
+          "sample": 4
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 917.8999999985099,
+          "firstRenderedFrameMs": 1116.8999999985099,
+          "requestCount": 122,
+          "responseBytes": 4796098,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 1,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 357.20000000298023
+          },
+          "backendPhaseTimings": {
+            "request": 320.418,
+            "reconciliation": 66.436,
+            "model_index": 10.192,
+            "data_model_read": 18.989,
+            "layout_read": 0.866,
+            "entity_inference": 0.046,
+            "source_lineage": 0.556
+          },
+          "route": "/canvas",
+          "mode": "warm",
+          "sample": 5
+        }
+      ]
+    },
+    "/entity-list": {
+      "cold": [
+        {
+          "spinnerToFirstUsefulRenderMs": 1409,
+          "firstRenderedFrameMs": 1943.1999999955297,
+          "requestCount": 135,
+          "responseBytes": 6658115,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 481.6000000014901
+          },
+          "backendPhaseTimings": {
+            "request": 382.46500000000003,
+            "artifact_read": 1.998,
+            "artifact_parse": 11.424,
+            "reconciliation": 75.043,
+            "model_index": 10.612,
+            "data_model_read": 21.247999999999998,
+            "layout_read": 0.947,
+            "entity_inference": 0.036,
+            "source_lineage": 0.617
+          },
+          "route": "/entity-list",
+          "mode": "cold",
+          "sample": 1
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 1245.5,
+          "firstRenderedFrameMs": 1777.8000000044703,
+          "requestCount": 135,
+          "responseBytes": 6658115,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 462.79999999701977
+          },
+          "backendPhaseTimings": {
+            "request": 374.234,
+            "artifact_read": 2.051,
+            "artifact_parse": 10.133,
+            "reconciliation": 67.342,
+            "model_index": 10.347,
+            "data_model_read": 22.304000000000002,
+            "layout_read": 0.887,
+            "entity_inference": 0.039,
+            "source_lineage": 0.621
+          },
+          "route": "/entity-list",
+          "mode": "cold",
+          "sample": 2
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 1310.6999999955297,
+          "firstRenderedFrameMs": 1843.7999999970198,
+          "requestCount": 135,
+          "responseBytes": 6658115,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 490.5
+          },
+          "backendPhaseTimings": {
+            "request": 385.192,
+            "artifact_read": 2.586,
+            "artifact_parse": 9.362,
+            "reconciliation": 66.591,
+            "model_index": 10.603,
+            "data_model_read": 19.567,
+            "layout_read": 1.216,
+            "entity_inference": 0.038,
+            "source_lineage": 0.69
+          },
+          "route": "/entity-list",
+          "mode": "cold",
+          "sample": 3
+        }
+      ],
+      "warm": [
+        {
+          "spinnerToFirstUsefulRenderMs": 1044.2000000029802,
+          "firstRenderedFrameMs": 1449.7000000029802,
+          "requestCount": 137,
+          "responseBytes": 6644673,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 363.90000000596046
+          },
+          "backendPhaseTimings": {
+            "request": 323.48400000000004,
+            "reconciliation": 68.379,
+            "model_index": 12.844,
+            "data_model_read": 21.381,
+            "layout_read": 1.286,
+            "entity_inference": 0.055,
+            "source_lineage": 0.599
+          },
+          "route": "/entity-list",
+          "mode": "warm",
+          "sample": 1
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 1028.5,
+          "firstRenderedFrameMs": 1477,
+          "requestCount": 135,
+          "responseBytes": 6644673,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 378.70000000298023
+          },
+          "backendPhaseTimings": {
+            "request": 329.729,
+            "reconciliation": 75.298,
+            "model_index": 11.249,
+            "data_model_read": 25.16,
+            "layout_read": 1.735,
+            "entity_inference": 0.038,
+            "source_lineage": 0.579
+          },
+          "route": "/entity-list",
+          "mode": "warm",
+          "sample": 2
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 958.6000000014901,
+          "firstRenderedFrameMs": 1393.7999999970198,
+          "requestCount": 135,
+          "responseBytes": 6644673,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 358.79999999701977
+          },
+          "backendPhaseTimings": {
+            "request": 321.375,
+            "reconciliation": 80.285,
+            "model_index": 8.883,
+            "data_model_read": 42.699,
+            "layout_read": 2.193,
+            "entity_inference": 0.061,
+            "source_lineage": 0.747
+          },
+          "route": "/entity-list",
+          "mode": "warm",
+          "sample": 3
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 980.7999999970198,
+          "firstRenderedFrameMs": 1405,
+          "requestCount": 135,
+          "responseBytes": 6644673,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 358.29999999701977
+          },
+          "backendPhaseTimings": {
+            "request": 317.389,
+            "reconciliation": 100.949,
+            "model_index": 27.328,
+            "data_model_read": 29.201999999999998,
+            "layout_read": 0.874,
+            "entity_inference": 0.045,
+            "source_lineage": 0.579
+          },
+          "route": "/entity-list",
+          "mode": "warm",
+          "sample": 4
+        },
+        {
+          "spinnerToFirstUsefulRenderMs": 1000.6000000014901,
+          "firstRenderedFrameMs": 1421.5,
+          "requestCount": 135,
+          "responseBytes": 6644673,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "failedRequestCount": 0,
+          "entityCount": 500,
+          "relationshipCount": 750,
+          "usefulElementCount": 500,
+          "relationshipSetFingerprint": "5160b0aa83649d622a84990bb1507ee1274ca1d31c4940ede9748f4fe9e97ab1",
+          "savedLayoutFingerprint": "a44d863c7f7c02bc2045eda436f25f4a8d0ef92e9bf185ae29f3028e6543aebc",
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 351.1000000014901
+          },
+          "backendPhaseTimings": {
+            "request": 311.966,
+            "reconciliation": 86.88,
+            "model_index": 27.62,
+            "data_model_read": 18.78,
+            "layout_read": 0.825,
+            "entity_inference": 0.053,
+            "source_lineage": 0.595
+          },
+          "route": "/entity-list",
+          "mode": "warm",
+          "sample": 5
+        }
+      ]
+    }
+  },
+  "medians": {
+    "/canvas": {
+      "cold": {
+        "spinnerToFirstUsefulRenderMs": 1044.5,
+        "firstRenderedFrameMs": 1574.6000000014901,
+        "requestCount": 122,
+        "responseBytes": 6374372,
+        "manifestParseCount": 1,
+        "lineageCallCount": 0,
+        "schemaCallCount": 0,
+        "browserLongTaskCount": 0,
+        "browserLongTaskMs": 0,
+        "failedRequestCount": 0,
+        "entityCount": 500,
+        "relationshipCount": 750,
+        "usefulElementCount": 1,
+        "frontendPhaseTimings": {
+          "trellis-boot:core-publish:core-publish-1": 506.70000000298023
+        },
+        "backendPhaseTimings": {
+          "artifact_parse": 12.012,
+          "artifact_read": 2.889,
+          "data_model_read": 19.77,
+          "entity_inference": 0.04,
+          "layout_read": 0.747,
+          "model_index": 12.38,
+          "reconciliation": 70.887,
+          "request": 399.96299999999997,
+          "source_lineage": 0.637
+        }
+      },
+      "warm": {
+        "spinnerToFirstUsefulRenderMs": 917.8999999985099,
+        "firstRenderedFrameMs": 1116.8999999985099,
+        "requestCount": 122,
+        "responseBytes": 4796098,
+        "manifestParseCount": 1,
+        "lineageCallCount": 0,
+        "schemaCallCount": 0,
+        "browserLongTaskCount": 0,
+        "browserLongTaskMs": 0,
+        "failedRequestCount": 0,
+        "entityCount": 500,
+        "relationshipCount": 750,
+        "usefulElementCount": 1,
+        "frontendPhaseTimings": {
+          "trellis-boot:core-publish:core-publish-1": 357.20000000298023
+        },
+        "backendPhaseTimings": {
+          "data_model_read": 20.224,
+          "entity_inference": 0.046,
+          "layout_read": 1.193,
+          "model_index": 10.192,
+          "reconciliation": 69.11,
+          "request": 320.418,
+          "source_lineage": 0.601
+        }
+      }
+    },
+    "/entity-list": {
+      "cold": {
+        "spinnerToFirstUsefulRenderMs": 1310.6999999955297,
+        "firstRenderedFrameMs": 1843.7999999970198,
+        "requestCount": 135,
+        "responseBytes": 6658115,
+        "manifestParseCount": 1,
+        "lineageCallCount": 0,
+        "schemaCallCount": 0,
+        "browserLongTaskCount": 0,
+        "browserLongTaskMs": 0,
+        "failedRequestCount": 0,
+        "entityCount": 500,
+        "relationshipCount": 750,
+        "usefulElementCount": 500,
+        "frontendPhaseTimings": {
+          "trellis-boot:core-publish:core-publish-1": 481.6000000014901
+        },
+        "backendPhaseTimings": {
+          "artifact_parse": 10.133,
+          "artifact_read": 2.051,
+          "data_model_read": 21.247999999999998,
+          "entity_inference": 0.038,
+          "layout_read": 0.947,
+          "model_index": 10.603,
+          "reconciliation": 67.342,
+          "request": 382.46500000000003,
+          "source_lineage": 0.621
+        }
+      },
+      "warm": {
+        "spinnerToFirstUsefulRenderMs": 1000.6000000014901,
+        "firstRenderedFrameMs": 1421.5,
+        "requestCount": 135,
+        "responseBytes": 6644673,
+        "manifestParseCount": 1,
+        "lineageCallCount": 0,
+        "schemaCallCount": 0,
+        "browserLongTaskCount": 0,
+        "browserLongTaskMs": 0,
+        "failedRequestCount": 0,
+        "entityCount": 500,
+        "relationshipCount": 750,
+        "usefulElementCount": 500,
+        "frontendPhaseTimings": {
+          "trellis-boot:core-publish:core-publish-1": 358.79999999701977
+        },
+        "backendPhaseTimings": {
+          "data_model_read": 25.16,
+          "entity_inference": 0.053,
+          "layout_read": 1.286,
+          "model_index": 12.844,
+          "reconciliation": 80.285,
+          "request": 321.375,
+          "source_lineage": 0.595
+        }
+      }
+    }
+  },
+  "comparison": {
+    "baselinePath": "frontend/tests/benchmarks/frontend-boot-baseline.json",
+    "fixtureFingerprint": "1f58f3cb8f7ad22681bf3b722cfe142cd29c445c6afafce89d9d8a5757a48547",
+    "passed": true,
+    "routes": {
+      "/canvas": {
+        "cold": {
+          "gatePassed": true,
+          "baselineMs": 26710.19999999553,
+          "remainingMs": 1044.5,
+          "reductionPercent": 96.08950887675803,
+          "thresholdMs": 5000,
+          "requestCount": 122,
+          "responseBytes": 6374372,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 506.70000000298023
+          },
+          "backendPhaseTimings": {
+            "artifact_parse": 12.012,
+            "artifact_read": 2.889,
+            "data_model_read": 19.77,
+            "entity_inference": 0.04,
+            "layout_read": 0.747,
+            "model_index": 12.38,
+            "reconciliation": 70.887,
+            "request": 399.96299999999997,
+            "source_lineage": 0.637
+          }
+        },
+        "warm": {
+          "gatePassed": true,
+          "baselineMs": 17897.39999999851,
+          "remainingMs": 917.8999999985099,
+          "reductionPercent": 94.87132209148487,
+          "thresholdMs": 2000,
+          "requestCount": 122,
+          "responseBytes": 4796098,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 357.20000000298023
+          },
+          "backendPhaseTimings": {
+            "data_model_read": 20.224,
+            "entity_inference": 0.046,
+            "layout_read": 1.193,
+            "model_index": 10.192,
+            "reconciliation": 69.11,
+            "request": 320.418,
+            "source_lineage": 0.601
+          }
+        }
+      },
+      "/entity-list": {
+        "cold": {
+          "gatePassed": true,
+          "baselineMs": 19399.30000000447,
+          "remainingMs": 1310.6999999955297,
+          "reductionPercent": 93.2435706443262,
+          "thresholdMs": 5000,
+          "requestCount": 135,
+          "responseBytes": 6658115,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 481.6000000014901
+          },
+          "backendPhaseTimings": {
+            "artifact_parse": 10.133,
+            "artifact_read": 2.051,
+            "data_model_read": 21.247999999999998,
+            "entity_inference": 0.038,
+            "layout_read": 0.947,
+            "model_index": 10.603,
+            "reconciliation": 67.342,
+            "request": 382.46500000000003,
+            "source_lineage": 0.621
+          }
+        },
+        "warm": {
+          "gatePassed": true,
+          "baselineMs": 10579.30000000447,
+          "remainingMs": 1000.6000000014901,
+          "reductionPercent": 90.54190730954726,
+          "thresholdMs": 2000,
+          "requestCount": 135,
+          "responseBytes": 6644673,
+          "browserLongTaskCount": 0,
+          "browserLongTaskMs": 0,
+          "manifestParseCount": 1,
+          "lineageCallCount": 0,
+          "schemaCallCount": 0,
+          "frontendPhaseTimings": {
+            "trellis-boot:core-publish:core-publish-1": 358.79999999701977
+          },
+          "backendPhaseTimings": {
+            "data_model_read": 25.16,
+            "entity_inference": 0.053,
+            "layout_read": 1.286,
+            "model_index": 12.844,
+            "reconciliation": 80.285,
+            "request": 321.375,
+            "source_lineage": 0.595
+          }
+        }
+      }
+    }
+  }
+}

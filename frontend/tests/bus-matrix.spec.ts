@@ -321,20 +321,17 @@ test.describe('Bus Matrix View', () => {
     });
 
     test('should handle empty state when no matching data', async ({ page }) => {
+        await mockBusMatrixRoutes(page, {
+            dimensions: [],
+            facts: [],
+            connections: [],
+        });
         await page.goto('/bus-matrix');
         await page.waitForLoadState('networkidle');
 
-        const tableRows = page.locator('tbody tr');
+        const table = page.locator('table');
         const emptyMessage = page.locator('td:has-text("No dimensions match the current filters")');
-
-        const rowCount = await tableRows.count();
-
-        // If there's data, this test doesn't apply
-        if (rowCount > 0) {
-            test.skip();
-        }
-
-        // Verify empty state message appears
+        await expect(table).toBeVisible({ timeout: 10000 });
         await expect(emptyMessage).toBeVisible();
     });
 

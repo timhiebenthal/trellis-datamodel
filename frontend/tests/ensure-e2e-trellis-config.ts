@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
+import { buildBootFixture } from './boot-fixture';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,10 +20,35 @@ const TEST_CONFIG_PATH = path.join(CONFIG_DIR, 'trellis.yml');
 const dbtCompanyDummyPath = path.resolve(__dirname, '..', '..', 'dbt_company_dummy');
 const manifestPath = path.join(dbtCompanyDummyPath, 'target', 'manifest.json');
 const catalogPath = path.join(dbtCompanyDummyPath, 'target', 'catalog.json');
+let benchmarkFixture: ReturnType<typeof buildBootFixture> | undefined;
 
 export function ensureE2ETrellisConfig(): void {
     if (!fs.existsSync(CONFIG_DIR)) {
         fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+
+    if (process.env['TRELLIS_BOOT_BENCHMARK'] === '1') {
+        benchmarkFixture ??= buildBootFixture();
+        const fixture = benchmarkFixture;
+        const benchmarkConfig = `framework: dbt-core
+dbt_project_path: ${fixture.projectDir}
+dbt_manifest_path: ${fixture.manifestPath}
+dbt_catalog_path: ${fixture.catalogPath}
+data_model_file: ${fixture.dataModelPath}
+canvas_layout_file: ${fixture.layoutPath}
+dbt_model_paths:
+  - models/boot_fixture
+modeling_style: dimensional_model
+lineage:
+  enabled: false
+bus_matrix:
+  enabled: true
+business_events:
+  enabled: true
+`;
+        fs.writeFileSync(TEST_CONFIG_PATH, benchmarkConfig);
+        process.env['TRELLIS_CONFIG_PATH'] = TEST_CONFIG_PATH;
+        return;
     }
 
     const manifestStale =

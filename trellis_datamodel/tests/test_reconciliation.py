@@ -641,3 +641,73 @@ class TestComputeDisplayTagsUnionOrder:
             "ui_tags": ["core", "pii"],
         }
         assert compute_display_tags(entity) == ["nightly", "core", "pii"]
+
+
+class TestReconcileSnapshotIndexes:
+    def test_supplied_snapshot_indexes_avoid_artifact_lookup_and_are_idempotent(
+        self, monkeypatch, temp_data_model_path
+    ):
+        """Supplied indexes drive reconciliation without reopening artifacts."""
+        data_model = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "users",
+                    "label": "Users",
+                    "dbt_model": "model.project.users",
+                    "drafted_fields": [],
+                }
+            ],
+            "relationships": [],
+        }
+        with open(temp_data_model_path, "w") as data_model_file:
+            yaml.safe_dump(data_model, data_model_file)
+
+        model_index = {
+            "model.project.users": {
+                "unique_id": "model.project.users",
+                "name": "users",
+                "tags": ["core"],
+            }
+        }
+        schema_index = {
+            "model.project.users": {
+                "id": {
+                    "name": "id",
+                    "type": "integer",
+                    "description": "Primary key",
+                }
+            }
+        }
+
+        import trellis_datamodel.adapters as adapters_module
+        import trellis_datamodel.observability as observability
+
+        def fail_if_artifacts_are_reopened():
+            raise AssertionError("reconciliation reopened artifacts")
+
+        monkeypatch.setattr(
+            adapters_module, "get_adapter", fail_if_artifacts_are_reopened
+        )
+
+        with observability.collector_scope() as collector:
+            first_result, first_changed = reconcile_framework(
+                model_index=model_index,
+                schema_index=schema_index,
+            )
+        with open(temp_data_model_path, "rb") as data_model_file:
+            first_bytes = data_model_file.read()
+
+        second_result, second_changed = reconcile_framework(
+            model_index=model_index,
+            schema_index=schema_index,
+        )
+        with open(temp_data_model_path, "rb") as data_model_file:
+            second_bytes = data_model_file.read()
+
+        assert first_changed is True
+        assert second_changed is False
+        assert second_result == first_result
+        assert second_bytes == first_bytes
+        assert collector.records["model_index"].call_count == 1
+        assert collector.records["reconciliation"].call_count == 1

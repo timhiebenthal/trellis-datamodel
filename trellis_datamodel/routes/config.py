@@ -215,8 +215,10 @@ async def reload_config_endpoint() -> Dict[str, Any]:
         # Reload config (updates all global variables)
         reload_config()
 
-        # Clear adapter caches that depend on config
-        get_adapter().reset_inference_cache()
+        # Reset through a fresh adapter so the shared, framework-neutral
+        # cache boundary is applied after the new configuration is active.
+        adapter = get_adapter()
+        adapter.reset_inference_cache()
 
         logger.info("Configuration reloaded successfully via API")
         return {

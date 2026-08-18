@@ -153,27 +153,55 @@
         displayTags: [],
     });
 
-    // Initialize SchemaManager when component mounts
-    $effect(() => {
-        if (!schemaManager) {
-            schemaManager = new SchemaManager((newState) => {
-                schemaState = newState;
-            });
-        }
-    });
+    let previousLogicalDetailsOpen = false;
+    let previousLogicalModelKey: string | null = null;
+    let schemaTriggerInitialized = false;
+    let schemaLoadedFor: string | null = null;
 
-    // Fetch schema when active model changes
-    $effect(() => {
-        if (activeModelId && modelDetails && schemaManager) {
-            schemaManager.loadSchema(
+    function loadEditableSchema() {
+        if (!activeModelId || !modelDetails || $viewMode !== "logical" || isCollapsed) {
+            return;
+        }
+
+        const schemaKey = `${activeModelId}:${modelDetails.version ?? ""}`;
+        if (schemaLoadedFor === schemaKey) {
+            return;
+        }
+        schemaLoadedFor = schemaKey;
+
+        schemaManager ??= new SchemaManager((newState) => {
+            schemaState = newState;
+        });
+        void schemaManager
+            .loadSchema(
                 modelDetails.name,
                 modelDetails.version,
                 modelDetails.tags,
                 modelDetails.columns,
-            );
-        } else if (schemaManager) {
-            schemaManager.reset();
+            )
+            .catch(() => {
+                // SchemaManager records the error and keeps manifest columns as fallback.
+            });
+    }
+
+    // Defer editable schema work until logical details are opened.
+    $effect(() => {
+        const logicalDetailsOpen = $viewMode === "logical" && !isCollapsed;
+        const logicalModelKey = activeModelId
+            ? `${activeModelId}:${modelDetails?.version ?? ""}`
+            : null;
+        const openedLogicalDetails =
+            schemaTriggerInitialized &&
+            logicalDetailsOpen &&
+            (!previousLogicalDetailsOpen || previousLogicalModelKey !== logicalModelKey);
+
+        if (openedLogicalDetails) {
+            loadEditableSchema();
         }
+
+        schemaTriggerInitialized = true;
+        previousLogicalDetailsOpen = logicalDetailsOpen;
+        previousLogicalModelKey = logicalModelKey;
     });
 
     // Expose active model info on node data (ephemeral; not persisted)
