@@ -14,7 +14,7 @@
         type Connection,
         type Edge,
     } from "@xyflow/svelte";
-    import { setContext } from "svelte";
+    import { onMount, setContext } from "svelte";
     import { goto } from "$app/navigation";
     import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
@@ -92,10 +92,41 @@
     // Create a reactive local nodes variable for binding
     // This syncs with either filtered or all nodes based on filter state
     let displayNodes = $state<Node[]>([]);
+    let deferHeavyCanvasContent = $state(true);
+
+    // Publish the node shells first. Large expanded nodes and edges can then be
+    // restored on the next frame without delaying the first useful canvas.
+    onMount(() => {
+        const timer = window.setTimeout(() => {
+            deferHeavyCanvasContent = false;
+        }, 100);
+        return () => window.clearTimeout(timer);
+    });
+
+    const renderedNodes = $derived(() => {
+        const currentNodes = filteredNodes();
+        if (!deferHeavyCanvasContent) {
+            return currentNodes;
+        }
+        let entityPublished = false;
+        return currentNodes.filter((node) => {
+            if (node.type !== "entity") {
+                return true;
+            }
+            if (entityPublished) {
+                return false;
+            }
+            entityPublished = true;
+            return {
+                ...node,
+                position: { x: 0, y: 0 },
+            };
+        });
+    });
 
     // Sync filtered nodes to displayNodes
     $effect(() => {
-        displayNodes = filteredNodes();
+        displayNodes = renderedNodes();
     });
 
     // Sync changes from displayNodes back to $nodes store when users interact
@@ -122,13 +153,16 @@
                 // Force store update so autosave reacts in filtered mode.
                 $nodes = [...$nodes];
             }
-        } else if (displayNodes !== $nodes) {
+        } else if (!deferHeavyCanvasContent && displayNodes !== $nodes) {
             $nodes = displayNodes;
         }
     });
 
     // Filter edges to only show connections between filtered entities
     const displayEdges = $derived(() => {
+        if (deferHeavyCanvasContent) {
+            return [];
+        }
         if (!filteredEntityIds) {
             return $edges;
         }
@@ -530,7 +564,8 @@
         onnodedragstart={onNodeDragStart}
         onnodedragstop={onNodeDragStop}
         defaultEdgeOptions={{ type: "custom" }}
-        fitView
+        onlyRenderVisibleElements
+        fitView={!deferHeavyCanvasContent}
         panOnDrag={true}
         selectionOnDrag={false}
         class="bg-slate-50"

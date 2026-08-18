@@ -27,10 +27,8 @@
         activeFramework,
     } from "$lib/stores";
     import {
-        getApiBase,
         getManifest,
         getDataModel,
-        saveDataModel,
         getConfigStatus,
         getConfigInfo,
         inferRelationships,
@@ -60,10 +58,22 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
     import { getEntityIdFromPath } from "$lib/utils/entity-list-route";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { ConfigInfo, ModelInfo, GuidanceConfig } from "$lib/types";
+    import type { ConfigInfo, GuidanceConfig } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
     import { entityDetailModal, lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
+    import { createBootLoader } from "$lib/boot-loader";
+    import {
+        failBootPhase,
+        finishBootPhase,
+        emitBootSummary,
+        startBootPhase,
+    } from "$lib/boot-diagnostics";
+    import {
+        buildBootGraphIndex,
+        transformBootGraph,
+        type BootGraphIndex,
+    } from "$lib/utils/boot-graph";
     import { 
         getIncompleteEntities, 
         getEntitiesWithUndescribedAttributes,
@@ -72,7 +82,6 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
 
     let { children } = $props();
 
-    const API_BASE = getApiBase();
     let loading = $state(true);
     let syncing = $state(false);
     let syncMessage = $state<string | null>(null);
@@ -82,6 +91,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     let lastSyncedState = $state("");
     let needsSync = $state(false);
     let saving = $state(false);
+    let bootGraphIndex: BootGraphIndex | null = null;
 
     // Update derived values once autoSaveService is initialized
     $effect(() => {
@@ -549,13 +559,44 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     
     onMount(() => {
         (async () => {
+            const corePhase = startBootPhase("core-publish");
             try {
-                // Check Config Status
-                const status = await getConfigStatus();
+                let releaseRelationshipInference!: () => void;
+                const corePublished = new Promise<void>((resolve) => {
+                    releaseRelationshipInference = resolve;
+                });
+                const boot = createBootLoader({
+                    getConfigStatus,
+                    getConfigInfo,
+                    getManifest,
+                    reconcile: reconcileDbt,
+                    getDataModel,
+                    getExposures: async () => {
+                        const phase = startBootPhase("exposures");
+                        try {
+                            const result = await getExposures();
+                            finishBootPhase(phase);
+                            return result;
+                        } catch (error) {
+                            failBootPhase(phase, error);
+                            throw error;
+                        }
+                    },
+                    inferRelationships: async () => {
+                        await corePublished;
+                        const phase = startBootPhase("relationship-inference");
+                        try {
+                            const result = await inferRelationships();
+                            finishBootPhase(phase);
+                            return result;
+                        } catch (error) {
+                            failBootPhase(phase, error);
+                            throw error;
+                        }
+                    },
+                });
+                const { status, config: info, models, dataModel } = await boot.core;
                 $configStatus = status;
-
-                // Load Config Info (includes guidance config)
-                const info = await getConfigInfo();
                 if (info?.guidance) {
                     guidanceConfig = info.guidance;
                 }
@@ -570,28 +611,11 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 dimensionPrefixes.set(info?.dimension_prefix ?? []);
                 factPrefixes.set(info?.fact_prefix ?? []);
 
-                // Check if exposures data exists
-                if (exposuresEnabled) {
-                    try {
-                        const exposuresData = await getExposures();
-                        hasExposuresData = exposuresData.exposures.length > 0;
-                    } catch (e) {
-                        console.error("Failed to check exposures data:", e);
-                        hasExposuresData = false;
-                    }
-                }
-
-                // Load Manifest
-                const models = await getManifest();
                 $frameworkModels = models;
 
-                // Reconcile manifest columns into data_model.yml (provenance-aware, non-destructive).
-                // This writes source='dbt' fields into each bound entity before we load the data model,
-                // so the data model read below sees the fully reconciled state.
-                await reconcileDbt();
-
-                // Load Data Model (reads the reconciled file)
-                const dataModel = await getDataModel();
+                void boot.optional.exposures.then((exposuresData) => {
+                    hasExposuresData = (exposuresData?.exposures?.length ?? 0) > 0;
+                });
 
                 // Load source_colors from canvas_layout.yml
                 if (dataModel.source_colors) {
@@ -600,26 +624,14 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
 
                 // If no relationships in data model, try to infer from dbt yml files
                 let relationships = dataModel.relationships || [];
-                if (relationships.length === 0) {
-                    console.log(
-                        "No relationships found in data model, attempting to infer from dbt yml files...",
-                    );
-                    const inferred = await inferRelationships();
-                    if (inferred.length > 0) {
-                        relationships = inferred;
-                        console.log(
-                            `Inferred ${inferred.length} relationships from dbt yml files`,
-                        );
-                    }
-                }
 
                 // Helper to get folder and tags from dbt model
+                const modelsById = new Map(models.map((model) => [model.unique_id, model]));
                 function getEntityMetadata(entity: any) {
-                    if (!readModelRef(entity)) return { folder: null, model: null };
+                    const modelRef = readModelRef(entity);
+                    if (!modelRef) return { folder: null, model: null };
 
-                    const model = models.find(
-                        (m: any) => m.unique_id === readModelRef(entity),
-                    );
+                    const model = modelsById.get(modelRef);
                     if (!model) return { folder: null, model: null };
 
                     return { folder: getModelFolder(model), model };
@@ -739,26 +751,89 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
 
                 $nodes = [...groupNodes, ...entityNodes] as Node[];
                 $edges = aggregateRelationshipsIntoEdges(relationships);
-
-                const layoutCheckNodes = $nodes.filter((n) => n.type === "entity");
-                if (layoutCheckNodes.length > 0) {
-                    const allAtDefaultPosition = layoutCheckNodes.every((n) => n.position.x === 0 && n.position.y === 0);
-                    
-                    if (allAtDefaultPosition) {
-                        console.log("No saved positions found, applying auto-layout...");
-                        $nodes = await applyDagreLayout($nodes, $edges);
-                    }
-                }
+                bootGraphIndex = buildBootGraphIndex({
+                    models,
+                    entities: dataModel.entities || [],
+                    nodes: $nodes,
+                });
+                const coreGraph = transformBootGraph(bootGraphIndex, $edges);
+                $nodes = coreGraph.nodes as Node[];
+                $edges = coreGraph.edges as Edge[];
 
                 if (!autoSaveService) {
                     autoSaveService = new AutoSaveService(400);
-                    autoSaveService.clearLastSavedState();
-                    autoSaveService.saveNow($nodes, $edges);
                     autoSaveServiceContext.current = autoSaveService;
                 }
+                autoSaveService.initializeBaseline($nodes, $edges);
                 lastSyncedState = autoSaveService.getLastSavedState();
                 initHistory();
+                finishBootPhase(corePhase);
+                loading = false;
+                releaseRelationshipInference();
+                setTimeout(() => {
+                    autoSaveService?.initializeBaseline($nodes, $edges);
+                    lastSyncedState = autoSaveService?.getLastSavedState() ?? lastSyncedState;
+                });
+
+                if (relationships.length === 0) {
+                    setTimeout(() => {
+                        void boot.optional.relationships.then((inferred) => {
+                            if (inferred.length > 0) {
+                                relationships = inferred;
+                                $edges = aggregateRelationshipsIntoEdges(relationships);
+                            }
+                        });
+                    });
+                }
+
+                const layoutCheckNodes = $nodes.filter((n) => n.type === "entity");
+                const allAtDefaultPosition =
+                    layoutCheckNodes.length > 0 &&
+                    layoutCheckNodes.every((n) => n.position.x === 0 && n.position.y === 0);
+                let deferredLayout: Promise<void> = Promise.resolve();
+                if (allAtDefaultPosition) {
+                    const layoutPhase = startBootPhase("elk-layout");
+                    deferredLayout = new Promise((resolve) => {
+                        setTimeout(() => {
+                            void applyDagreLayout($nodes, $edges)
+                                .then((layoutedNodes) => {
+                                    if (layoutedNodes !== $nodes) {
+                                        $nodes = layoutedNodes;
+                                    }
+                                    return new Promise<void>((resolve) => {
+                                        setTimeout(() => {
+                                            autoSaveService?.initializeBaseline($nodes, $edges);
+                                            lastSyncedState =
+                                                autoSaveService?.getLastSavedState() ?? lastSyncedState;
+                                            finishBootPhase(layoutPhase);
+                                            resolve();
+                                        });
+                                    });
+                                })
+                                .catch((error) => {
+                                    return new Promise<void>((resolve) => {
+                                        setTimeout(() => {
+                                            failBootPhase(layoutPhase, error);
+                                            autoSaveService?.initializeBaseline($nodes, $edges);
+                                            lastSyncedState =
+                                                autoSaveService?.getLastSavedState() ?? lastSyncedState;
+                                            resolve();
+                                        });
+                                    });
+                                })
+                                .finally(resolve);
+                        });
+                    });
+                }
+                setTimeout(() => {
+                    void Promise.allSettled([
+                        boot.optional.exposures,
+                        boot.optional.relationships,
+                        deferredLayout,
+                    ]).then(() => emitBootSummary());
+                });
             } catch (e) {
+                failBootPhase(corePhase, e);
                 console.error(e);
                 alert("Failed to initialize. Check backend connection.");
             } finally {
@@ -809,61 +884,85 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     });
 
     $effect(() => {
-        if (loading) return;
+        if (loading || !bootGraphIndex) return;
 
         const activeFolder = $folderFilter;
         const activeTags = $tagFilter;
-        const models = $frameworkModels;
-
         const currentNodes = untrack(() => $nodes);
         const currentEdges = untrack(() => $edges);
+        const filtering = activeFolder.length > 0 || activeTags.length > 0;
 
-        const updatedNodes = currentNodes.map((node) => {
+        if (!filtering) {
+            const hasHiddenState =
+                currentNodes.some((node) => node.hidden) || currentEdges.some((edge) => edge.hidden);
+            if (!hasHiddenState) return;
+
+            $nodes = currentNodes.map((node) => (node.hidden ? { ...node, hidden: false } : node));
+            $edges = currentEdges.map((edge) => (edge.hidden ? { ...edge, hidden: false } : edge));
+            return;
+        }
+
+        const visibleNodeIds = new Set<string>();
+        for (const node of bootGraphIndex.nodes) {
             if (node.type === "group") {
-                return node;
+                visibleNodeIds.add(node.id);
+                continue;
             }
 
-            const primaryModel = models.find((m) => m.unique_id === readModelRef(node.data as any));
-            const additionalModelIds = (node.data?.additional_models as string[]) || [];
-            const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is ModelInfo => m !== undefined);
-            const allBoundModels = primaryModel ? [primaryModel, ...additionalModels] : additionalModels;
+            const entity = bootGraphIndex.entitiesById.get(node.id);
+            if (!entity) {
+                visibleNodeIds.add(node.id);
+                continue;
+            }
+
+            const modelIds = [
+                readModelRef(entity),
+                ...(entity.additional_models ?? []),
+            ].filter((modelId): modelId is string => Boolean(modelId));
+            const boundModels = modelIds
+                .map((modelId) => bootGraphIndex?.modelsById.get(modelId))
+                .filter((model): model is NonNullable<typeof model> => model !== undefined);
 
             let visible = true;
-
             if (activeFolder.length > 0) {
-                if (allBoundModels.length === 0) {
-                    visible = false;
-                } else {
-                    const matchingFolders = allBoundModels.map((m) => getModelFolder(m)).filter((f): f is string => f !== null);
-                    visible = visible && matchingFolders.some((folder) => activeFolder.includes(folder));
-                }
+                const matchingFolders = boundModels
+                    .map((model) => getModelFolder(model))
+                    .filter((folder): folder is string => folder !== null);
+                visible = boundModels.length > 0 && matchingFolders.some((folder) => activeFolder.includes(folder));
             }
 
             if (activeTags.length > 0) {
-                const allModelTags = allBoundModels.flatMap((m) => normalizeTags(m.tags));
+                const modelTags = boundModels.flatMap((model) => normalizeTags(model.tags));
                 const entityTags = normalizeTags(node.data?.tags);
-                const nodeTags = [...new Set([...allModelTags, ...entityTags])];
-
-                visible = visible && nodeTags.length > 0 && activeTags.some((tag) => nodeTags.includes(tag));
+                const nodeTags = [...new Set([...modelTags, ...entityTags])];
+                visible =
+                    visible &&
+                    nodeTags.length > 0 &&
+                    activeTags.some((tag) => nodeTags.includes(tag));
             }
 
-            return { ...node, hidden: !visible };
-        });
+            if (visible) visibleNodeIds.add(node.id);
+        }
 
-        const nodeVisibility = new Map<string, boolean>();
-        updatedNodes.forEach((node) => {
-            nodeVisibility.set(node.id, !node.hidden);
+        const transformed = transformBootGraph(bootGraphIndex, currentEdges, { visibleNodeIds });
+        const visibleIds = new Set(transformed.nodes.map((node) => node.id));
+        const updatedNodes = currentNodes.map((node) => {
+            if (node.type === "group") return node;
+            const hidden = !visibleIds.has(node.id);
+            return node.hidden === hidden ? node : { ...node, hidden };
         });
-
         const updatedEdges = currentEdges.map((edge) => {
-            const sourceVisible = nodeVisibility.get(edge.source) ?? true;
-            const targetVisible = nodeVisibility.get(edge.target) ?? true;
-
-            return { ...edge, hidden: !sourceVisible || !targetVisible };
+            const hidden =
+                !visibleIds.has(edge.source) || !visibleIds.has(edge.target);
+            return edge.hidden === hidden ? edge : { ...edge, hidden };
         });
 
-        $nodes = updatedNodes;
-        $edges = updatedEdges;
+        if (updatedNodes.some((node, index) => node !== currentNodes[index])) {
+            $nodes = updatedNodes;
+        }
+        if (updatedEdges.some((edge, index) => edge !== currentEdges[index])) {
+            $edges = updatedEdges;
+        }
     });
 </script>
 

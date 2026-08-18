@@ -1,5 +1,4 @@
 import type { Node, Edge } from "@xyflow/svelte";
-import ELK from "elkjs/lib/elk.bundled.js";
 
 export interface LayoutOptions {
     direction?: "TB" | "LR";
@@ -13,17 +12,25 @@ const DEFAULT_OPTIONS: Required<LayoutOptions> = {
     rankSpacing: 150,
 };
 
-// Single ELK instance (lazy-loaded on client)
-let elkInstance: InstanceType<typeof ELK> | null = null;
+type ElkConstructor = typeof import("elkjs/lib/elk.bundled.js").default;
+type ElkInstance = InstanceType<ElkConstructor>;
 
-function getElk(): InstanceType<typeof ELK> | null {
+let elkInstancePromise: Promise<ElkInstance> | null = null;
+
+async function getElk(): Promise<ElkInstance | null> {
     if (typeof window === "undefined") {
         return null; // SSR
     }
-    if (!elkInstance) {
-        elkInstance = new ELK();
+
+    if (!elkInstancePromise) {
+        elkInstancePromise = import("elkjs/lib/elk.bundled.js").then(
+            ({ default: Elk }) => {
+                return new Elk();
+            },
+        );
     }
-    return elkInstance;
+
+    return elkInstancePromise;
 }
 
 function getNodeDimensions(node: Node): { width: number; height: number } {
@@ -43,8 +50,13 @@ export async function applyDagreLayout(
     const entityNodes = nodes.filter((n) => n.type === "entity");
     if (entityNodes.length === 0) return nodes;
 
+    const allAtDefaultPosition = entityNodes.every(
+        (node) => node.position.x === 0 && node.position.y === 0,
+    );
+    if (!allAtDefaultPosition) return nodes;
+
     const groupNodes = nodes.filter((n) => n.type === "group");
-    const elk = getElk();
+    const elk = await getElk();
     if (!elk) {
         return nodes; // SSR fallback
     }
@@ -103,9 +115,6 @@ export async function applyDagreLayout(
         const sourceExists = entityNodes.some((n) => n.id === edge.source);
         const targetExists = entityNodes.some((n) => n.id === edge.target);
         if (sourceExists && targetExists) {
-            const sourceGroup = nodeToGroup.get(edge.source);
-            const targetGroup = nodeToGroup.get(edge.target);
-
             elkEdges.push({
                 id: edge.id || `e${idx}`,
                 sources: [edge.source],

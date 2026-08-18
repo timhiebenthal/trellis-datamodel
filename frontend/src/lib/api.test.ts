@@ -1,6 +1,99 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt } from './api';
+import { inferRelationships, addSevenWsEntry, removeSevenWsEntry, updateSevenWsEntry, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt, getModelSchema } from './api';
 import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
+import { recordBootRequest } from './boot-diagnostics';
+
+vi.mock('./boot-diagnostics', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('./boot-diagnostics')>();
+    return {
+        ...actual,
+        recordBootRequest: vi.fn(),
+    };
+});
+
+describe('boot request diagnostics', () => {
+    afterEach(() => {
+        vi.clearAllMocks();
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it('records duration, status, content length, and server timing for boot requests', async () => {
+        const response = {
+            ok: true,
+            status: 200,
+            headers: new Headers({
+                'Content-Length': '42',
+                'Server-Timing': 'db;dur=12.5,app;dur=4',
+            }),
+            json: vi.fn().mockResolvedValue({ columns: [] }),
+        };
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+        vi.spyOn(performance, 'now').mockReturnValueOnce(100).mockReturnValueOnce(145);
+
+        await getModelSchema('orders');
+
+        expect(recordBootRequest).toHaveBeenCalledWith({
+            url: 'http://localhost:8089/api/models/orders/schema',
+            method: 'GET',
+            status: 200,
+            bytes: 42,
+            duration: 45,
+            serverTiming: [
+                { name: 'db', duration: 12.5 },
+                { name: 'app', duration: 4 },
+            ],
+        });
+    });
+
+    it('counts repeated schema requests', async () => {
+        const response = {
+            ok: true,
+            status: 200,
+            headers: new Headers(),
+            json: vi.fn().mockResolvedValue({ columns: [] }),
+        };
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+
+        await Promise.all([
+            getModelSchema('orders'),
+            getModelSchema('orders'),
+            getModelSchema('customers'),
+        ]);
+
+        const requests = vi.mocked(recordBootRequest).mock.calls.map(([request]) => request as { url: string });
+        expect(requests).toHaveLength(3);
+        expect(requests.filter((request) => request.url.endsWith('/api/models/orders/schema'))).toHaveLength(2);
+        expect(requests.filter((request) => request.url.endsWith('/api/models/customers/schema'))).toHaveLength(1);
+    });
+
+    it('records failed HTTP and network requests without consuming response bodies twice', async () => {
+        const errorText = vi.fn().mockResolvedValue('backend failed');
+        const failedResponse = {
+            ok: false,
+            status: 500,
+            statusText: 'Internal Server Error',
+            headers: new Headers(),
+            text: errorText,
+        };
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(failedResponse));
+
+        await expect(inferRelationships()).rejects.toThrow('Failed to infer relationships: 500');
+        expect(errorText).toHaveBeenCalledTimes(1);
+        expect(recordBootRequest).toHaveBeenCalledWith(expect.objectContaining({
+            url: 'http://localhost:8089/api/infer-relationships',
+            status: 500,
+        }));
+
+        vi.mocked(recordBootRequest).mockClear();
+        vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+        await expect(getModelSchema('orders')).resolves.toBeNull();
+        expect(recordBootRequest).toHaveBeenCalledWith(expect.objectContaining({
+            url: 'http://localhost:8089/api/models/orders/schema',
+        }));
+    });
+});
 
 describe('API Functions - 7 Ws', () => {
     afterEach(() => {
@@ -60,11 +153,11 @@ describe('framework-neutral endpoint paths', () => {
             'fetch',
             vi.fn().mockResolvedValue({
                 ok: true,
-                json: vi.fn().mockResolvedValue({ status: 'success', changed: false, data_model: {} }),
+                json: vi.fn().mockResolvedValue({ status: 'success', changed: false }),
             }),
         );
 
-        await reconcileDbt();
+        await expect(reconcileDbt()).resolves.toEqual({ status: 'success', changed: false });
 
         expect(global.fetch).toHaveBeenCalledWith(
             'http://localhost:8089/api/reconcile',

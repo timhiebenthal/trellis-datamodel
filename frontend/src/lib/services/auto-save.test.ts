@@ -194,6 +194,71 @@ describe('AutoSaveService', () => {
         });
     });
 
+    describe('initializeBaseline', () => {
+        const bootNodes: Node[] = [
+            { id: 'boot-node', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Boot node' } },
+        ];
+        const bootEdges: Edge[] = [];
+
+        it('initializeBaseline_sets_last_state_without_POST', () => {
+            service.initializeBaseline(bootNodes, bootEdges);
+
+            expect(service.getLastSavedState()).toBe(JSON.stringify({
+                nodes: bootNodes,
+                edges: bootEdges,
+            }));
+            expect(apiSaveDataModel).not.toHaveBeenCalled();
+        });
+
+        it('unchanged_boot_state_does_not_schedule_or_flush_save', async () => {
+            service.initializeBaseline(bootNodes, bootEdges);
+
+            service.save(bootNodes, bootEdges);
+            await service.flushSync(bootNodes, bootEdges);
+            vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync();
+
+            expect(apiSaveDataModel).not.toHaveBeenCalled();
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(service.isSavingActive()).toBe(false);
+        });
+
+        it('first_user_change_after_baseline_saves_normally', async () => {
+            service.initializeBaseline(bootNodes, bootEdges);
+            const changedNodes = [
+                { ...bootNodes[0], data: { ...bootNodes[0].data, label: 'Changed node' } },
+            ];
+
+            service.save(changedNodes, bootEdges);
+            vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync();
+
+            expect(apiSaveDataModel).toHaveBeenCalledTimes(1);
+        });
+
+        it('reinitializing_baseline_cancels_stale_pending_save', async () => {
+            service.initializeBaseline(bootNodes, bootEdges);
+            const changedNodes = [
+                { ...bootNodes[0], data: { ...bootNodes[0].data, label: 'Stale change' } },
+            ];
+            const reloadedNodes = [
+                { ...bootNodes[0], data: { ...bootNodes[0].data, label: 'Reloaded node' } },
+            ];
+
+            service.save(changedNodes, bootEdges);
+            service.initializeBaseline(reloadedNodes, bootEdges);
+            vi.advanceTimersByTime(400);
+            await vi.runAllTimersAsync();
+
+            expect(apiSaveDataModel).not.toHaveBeenCalled();
+            expect(service.getLastSavedState()).toBe(JSON.stringify({
+                nodes: reloadedNodes,
+                edges: bootEdges,
+            }));
+            expect(service.isSavingActive()).toBe(false);
+        });
+    });
+
     describe('saveNow', () => {
         const mockNodes: Node[] = [
             { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },

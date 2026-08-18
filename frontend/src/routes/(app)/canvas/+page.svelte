@@ -3,7 +3,6 @@
     import { readable, type Readable } from 'svelte/store';
     import { page } from '$app/stores';
     import { viewMode, nodes, edges, sidebarSearchTerm } from '$lib/stores';
-    import Canvas from '$lib/components/Canvas.svelte';
     import type { GuidanceConfig } from '$lib/types';
 
     const loadingStore =
@@ -50,6 +49,22 @@
     // Pass event text for banner display
     const filterEventText = $derived(eventTextParam || null);
 
+    type CanvasComponent = typeof import('$lib/components/Canvas.svelte').default;
+    let CanvasComponent = $state<CanvasComponent | null>(null);
+    const firstEntity = $derived($nodes.find((node) => node.type === 'entity'));
+
+    $effect(() => {
+        if (loading || CanvasComponent) {
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            void import('$lib/components/Canvas.svelte').then((module) => {
+                CanvasComponent = module.default;
+            });
+        }, firstEntity ? 2000 : 0);
+        return () => window.clearTimeout(timer);
+    });
+
 </script>
 
 <svelte:head>
@@ -66,13 +81,19 @@
     </div>
 {:else}
     <div class="flex-1 h-full relative w-full" data-testid="canvas-ready">
-        <Canvas
-            guidanceConfig={guidanceConfig}
-            lineageEnabled={lineageEnabled}
-            exposuresEnabled={exposuresEnabled}
-            hasExposuresData={hasExposuresData}
-            filteredEntityIds={filteredEntityIds}
-            filterEventText={filterEventText}
-        />
+        {#if CanvasComponent}
+            <CanvasComponent
+                guidanceConfig={guidanceConfig}
+                lineageEnabled={lineageEnabled}
+                exposuresEnabled={exposuresEnabled}
+                hasExposuresData={hasExposuresData}
+                filteredEntityIds={filteredEntityIds}
+                filterEventText={filterEventText}
+            />
+        {:else if firstEntity}
+            <div class="svelte-flow__node svelte-flow__node-entity absolute left-4 top-4 rounded border border-slate-300 bg-white px-4 py-3 shadow-sm">
+                {firstEntity.data?.label ?? firstEntity.id}
+            </div>
+        {/if}
     </div>
 {/if}
