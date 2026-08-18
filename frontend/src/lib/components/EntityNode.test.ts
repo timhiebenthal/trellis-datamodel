@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { frameworkModels, viewMode } from '$lib/stores';
 import EntityNode from './EntityNode.svelte';
 import type { EntityData } from '$lib/types';
 import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
+import { getModelSchema } from '$lib/api';
 
 // Mock heavy dependencies
 vi.mock('@xyflow/svelte', async () => {
@@ -29,16 +30,6 @@ vi.mock('$lib/api', () => ({
   getLineage: vi.fn().mockResolvedValue(null),
   getModelSchema: vi.fn().mockResolvedValue(null),
 }));
-
-vi.mock('$lib/services/schema-manager', () => {
-  class SchemaManager {
-    loadSchema = vi.fn();
-    getState = vi.fn().mockReturnValue({ editableColumns: [], isLoading: false, isSaving: false, error: null, hasUnsavedChanges: false });
-    onStateChange = vi.fn();
-    constructor(_cb: unknown) {}
-  }
-  return { SchemaManager };
-});
 
 vi.mock('$app/navigation', () => ({
   goto: vi.fn(),
@@ -137,6 +128,90 @@ describe('EntityNode — merged field rendering', () => {
     } as EntityData;
     expect(data.dbt_tags).toEqual(['nightly']);
     expect(data.ui_tags).toEqual(['pii']);
+  });
+});
+
+describe('EntityNode — lazy editable schema loading', () => {
+  const expandedProps = {
+    ...mockProps,
+    data: { ...mockProps.data, collapsed: false },
+  };
+  const collapsedProps = {
+    ...mockProps,
+    data: { ...mockProps.data, collapsed: true },
+  };
+
+  beforeEach(() => {
+    frameworkModels.set([mockDbtModel] as any);
+    viewMode.set('logical');
+    vi.mocked(getModelSchema).mockResolvedValue({
+      model_name: mockDbtModel.name,
+      description: '',
+      columns: [
+        { name: 'id', data_type: 'integer', description: 'Identifier' },
+      ],
+      tags: [],
+      file_path: 'schema.yml',
+    });
+    vi.clearAllMocks();
+  });
+
+  it('mounted nodes render manifest columns without schema fetches', () => {
+    render(EntityNode, {
+      props: expandedProps,
+      context: svelteFlowContext,
+    });
+
+    expect(document.body.textContent).toContain('created_at');
+    expect(getModelSchema).not.toHaveBeenCalled();
+  });
+
+  it('opening logical details fetches editable schema once', async () => {
+    const { rerender } = render(EntityNode, {
+      props: collapsedProps,
+      context: svelteFlowContext,
+    });
+
+    expect(getModelSchema).not.toHaveBeenCalled();
+    await fireEvent.click(document.querySelector('[title="Click to expand"]')!);
+    await rerender({ data: expandedProps.data });
+
+    await waitFor(() => expect(getModelSchema).toHaveBeenCalledTimes(1));
+  });
+
+  it('repeated open reuses the loaded schema', async () => {
+    const { rerender } = render(EntityNode, {
+      props: collapsedProps,
+      context: svelteFlowContext,
+    });
+
+    const header = document.querySelector('[title="Click to expand"]')!;
+    expect(getModelSchema).not.toHaveBeenCalled();
+    await fireEvent.click(header);
+    await rerender({ data: expandedProps.data });
+    await waitFor(() => expect(getModelSchema).toHaveBeenCalledTimes(1));
+
+    await fireEvent.click(document.querySelector('[title="Click to collapse"]')!);
+    await rerender({ data: collapsedProps.data });
+    await fireEvent.click(document.querySelector('[title="Click to expand"]')!);
+    await rerender({ data: expandedProps.data });
+    await waitFor(() => expect(getModelSchema).toHaveBeenCalledTimes(1));
+  });
+
+  it('failed lazy schema fetch leaves manifest columns visible', async () => {
+    vi.mocked(getModelSchema).mockRejectedValueOnce(new Error('schema unavailable'));
+    const { rerender } = render(EntityNode, {
+      props: collapsedProps,
+      context: svelteFlowContext,
+    });
+
+    expect(getModelSchema).not.toHaveBeenCalled();
+    await fireEvent.click(document.querySelector('[title="Click to expand"]')!);
+    await rerender({ data: expandedProps.data });
+
+    await waitFor(() => expect(getModelSchema).toHaveBeenCalledTimes(1));
+    expect(document.body.textContent).toContain('id');
+    expect(document.body.textContent).toContain('created_at');
   });
 });
 

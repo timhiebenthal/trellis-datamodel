@@ -35,6 +35,24 @@ export class AutoSaveService {
     }
 
     /**
+     * Initialize the current node/edge state as the saved baseline.
+     *
+     * @param currentNodes - Current state of nodes
+     * @param currentEdges - Current state of edges
+     */
+    initializeBaseline(currentNodes: Node[], currentEdges: Edge[]): void {
+        if (this.pendingSaveTimeout) {
+            clearTimeout(this.pendingSaveTimeout);
+            this.pendingSaveTimeout = null;
+        }
+
+        this.lastSavedState = this.serializeState(currentNodes, currentEdges);
+        this.queuedState = null;
+        this.inFlightState = null;
+        this.setSaving(false);
+    }
+
+    /**
      * Request a save operation (debounced)
      * This will wait for the configured delay before saving, unless flush() is called
      *
@@ -42,10 +60,7 @@ export class AutoSaveService {
      * @param currentEdges - Current state of edges
      */
     save(currentNodes: Node[], currentEdges: Edge[]): void {
-        const state = JSON.stringify({
-            nodes: currentNodes,
-            edges: currentEdges,
-        });
+        const state = this.serializeState(currentNodes, currentEdges);
         const matchLast = state === this.lastSavedState;
         const matchQueued = state === this.queuedState;
         const matchInFlight = state === this.inFlightState;
@@ -96,10 +111,7 @@ export class AutoSaveService {
             this.pendingSaveTimeout = null;
         }
 
-        const state = JSON.stringify({
-            nodes: currentNodes,
-            edges: currentEdges,
-        });
+        const state = this.serializeState(currentNodes, currentEdges);
 
         this.queuedState = null;
         this.inFlightState = state;
@@ -121,10 +133,7 @@ export class AutoSaveService {
      * @returns Promise that resolves when save is complete
      */
     async flushSync(currentNodes: Node[], currentEdges: Edge[]): Promise<void> {
-        const state = JSON.stringify({
-            nodes: currentNodes,
-            edges: currentEdges,
-        });
+        const state = this.serializeState(currentNodes, currentEdges);
 
         // Cancel pending save if exists (do this first, before early return)
         if (this.pendingSaveTimeout) {
@@ -180,10 +189,7 @@ export class AutoSaveService {
      * @returns True if there are unsaved changes
      */
     hasUnsavedChanges(currentNodes: Node[], currentEdges: Edge[]): boolean {
-        const state = JSON.stringify({
-            nodes: currentNodes,
-            edges: currentEdges,
-        });
+        const state = this.serializeState(currentNodes, currentEdges);
 
         const baseline = this.inFlightState ?? this.lastSavedState;
         return baseline !== '' && baseline !== state;
@@ -221,6 +227,16 @@ export class AutoSaveService {
      */
     clearLastSavedState(): void {
         this.lastSavedState = '';
+    }
+
+    /**
+     * Serialize node/edge state for save comparisons.
+     */
+    private serializeState(currentNodes: Node[], currentEdges: Edge[]): string {
+        return JSON.stringify({
+            nodes: currentNodes,
+            edges: currentEdges,
+        });
     }
 
     /**

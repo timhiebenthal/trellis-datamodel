@@ -336,6 +336,18 @@ class TransformationAdapter(Protocol):
         """
         ...
 
+    def get_source_systems_for_models(
+        self, model_unique_ids: list[str]
+    ) -> dict[str, list[str]]:
+        """
+        Return source systems for multiple models using one graph snapshot.
+
+        The result has one entry per unique requested model ID, in first-seen
+        request order. Each value preserves the adapter's per-model ordering
+        and deduplication behavior.
+        """
+        ...
+
     def get_project_status(self) -> ProjectStatus:
         """
         Report whether the configured project is present and usable.

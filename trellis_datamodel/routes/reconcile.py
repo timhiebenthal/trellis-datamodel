@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api", tags=["reconciliation"])
 
 
 @router.post("/reconcile")
-async def reconcile_framework_endpoint():
+def reconcile_framework_endpoint():
     """Reconcile dbt manifest columns into data_model.yml with provenance tags.
 
     Reads the current manifest, merges materialized columns (source='dbt')
@@ -16,9 +16,8 @@ async def reconcile_framework_endpoint():
     Non-destructive: entities whose model is absent from the manifest are
     left untouched (handles partial dbt compiles).
     """
-    data_model, changed = reconcile_framework()
+    _, changed = reconcile_framework()
     return {
         "status": "success",
         "changed": changed,
-        "data_model": data_model,
     }

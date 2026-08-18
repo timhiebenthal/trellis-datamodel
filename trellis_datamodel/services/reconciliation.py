@@ -13,9 +13,8 @@ from __future__ import annotations
 
 import copy
 import os
+from collections.abc import Mapping
 from typing import Any
-
-import yaml
 
 from trellis_datamodel.models.entity_keys import (
     get_framework_tags,
@@ -24,6 +23,14 @@ from trellis_datamodel.models.entity_keys import (
     set_model_ref,
     set_physical_datatype,
 )
+from trellis_datamodel.utils.structured_data import load_yaml_or_json
+
+
+def _timed_phase(name: str):
+    """Resolve timing from the live observability module after config reloads."""
+    from trellis_datamodel import observability
+
+    return observability.timed_phase(name)
 
 
 # ---------------------------------------------------------------------------
@@ -256,9 +263,95 @@ def compute_display_tags(entity: dict[str, Any]) -> list[str]:
     return entity.get("tags") or []
 
 
+def _snapshot_columns(
+    model: Mapping[str, Any],
+    unique_id: str,
+    schema_index: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Normalize an indexed schema into the columns reconciliation consumes."""
+    model_columns = model.get("columns") or []
+    if isinstance(model_columns, Mapping):
+        model_columns_by_name = {
+            name: column
+            for name, column in model_columns.items()
+            if isinstance(name, str) and isinstance(column, Mapping)
+        }
+        model_column_items = list(model_columns_by_name.items())
+    elif isinstance(model_columns, (list, tuple)):
+        model_column_items = [
+            (column.get("name"), column)
+            for column in model_columns
+            if isinstance(column, Mapping) and column.get("name")
+        ]
+        model_columns_by_name = dict(model_column_items)
+    else:
+        model_column_items = []
+        model_columns_by_name = {}
+
+    indexed_columns = schema_index.get(unique_id) if schema_index else None
+    if isinstance(indexed_columns, Mapping):
+        column_items = [
+            (name, column)
+            for name, column in indexed_columns.items()
+            if isinstance(name, str) and isinstance(column, Mapping)
+        ]
+    elif isinstance(indexed_columns, (list, tuple)):
+        column_items = [
+            (column.get("name"), column)
+            for column in indexed_columns
+            if isinstance(column, Mapping) and column.get("name")
+        ]
+    else:
+        column_items = model_column_items
+
+    columns: list[dict[str, Any]] = []
+    for column_name, indexed_column in column_items:
+        if not column_name:
+            continue
+        model_column = model_columns_by_name.get(column_name, {})
+        normalized = dict(model_column) if isinstance(model_column, Mapping) else {}
+        normalized.update(indexed_column)
+        normalized["name"] = normalized.get("name") or column_name
+        if "type" not in normalized and "data_type" in normalized:
+            normalized["type"] = normalized["data_type"]
+        if normalized.get("description") is None and normalized.get("comment") is not None:
+            normalized["description"] = normalized["comment"]
+        columns.append(normalized)
+    return columns
+
+
+def _models_from_snapshot_indexes(
+    model_index: Mapping[str, Any] | None,
+    schema_index: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Build the legacy model-list contract from immutable snapshot indexes."""
+    model_items = list(model_index.items()) if isinstance(model_index, Mapping) else []
+    if not model_items and isinstance(schema_index, Mapping):
+        model_items = [(unique_id, {}) for unique_id in schema_index]
+
+    models: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index_key, raw_model in model_items:
+        if not isinstance(raw_model, Mapping):
+            continue
+        unique_id = raw_model.get("unique_id") or index_key
+        if not isinstance(unique_id, str) or unique_id in seen_ids:
+            continue
+        seen_ids.add(unique_id)
+        model = dict(raw_model)
+        model["unique_id"] = unique_id
+        model["columns"] = _snapshot_columns(model, unique_id, schema_index)
+        models.append(model)
+    return models
+
+
 def reconcile_data_model(
     data_model: dict[str, Any],
-    manifest_models: list[dict[str, Any]],
+    manifest_models: list[dict[str, Any]] | None = None,
+    *,
+    snapshot: Any | None = None,
+    model_index: Mapping[str, Any] | None = None,
+    schema_index: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """
     Apply reconcile_entity_fields to each bound entity in the data model.
@@ -266,20 +359,39 @@ def reconcile_data_model(
     Args:
         data_model: Parsed data_model.yml content.
         manifest_models: List of model dicts from get_models() (each has
-            unique_id, name, columns).
+            unique_id, name, columns). When snapshot indexes are supplied,
+            this argument is not required.
+        snapshot: Optional artifact snapshot exposing model_index and
+            schema_index.
+        model_index: Optional indexed model metadata from an artifact snapshot.
+        schema_index: Optional indexed column metadata from an artifact snapshot.
 
     Returns:
         (reconciled_data_model, changed) where changed is True only if at
         least one entity's field list was modified.
     """
-    # Index manifest by unique_id for O(1) lookup
-    manifest_by_id: dict[str, list[dict[str, Any]]] = {}
-    manifest_tags_by_id: dict[str, list[str]] = {}
-    for model in manifest_models:
-        uid = model.get("unique_id")
-        if uid:
-            manifest_by_id[uid] = model.get("columns") or []
-            manifest_tags_by_id[uid] = model.get("tags") or []
+    if snapshot is not None:
+        model_index = model_index if model_index is not None else getattr(
+            snapshot, "model_index", None
+        )
+        schema_index = schema_index if schema_index is not None else getattr(
+            snapshot, "schema_index", None
+        )
+
+    with _timed_phase("model_index"):
+        if model_index is not None or schema_index is not None:
+            manifest_models = _models_from_snapshot_indexes(model_index, schema_index)
+        else:
+            manifest_models = manifest_models or []
+
+        # Index manifest by unique_id for O(1) lookup
+        manifest_by_id: dict[str, list[dict[str, Any]]] = {}
+        manifest_tags_by_id: dict[str, list[str]] = {}
+        for model in manifest_models:
+            uid = model.get("unique_id")
+            if uid:
+                manifest_by_id[uid] = model.get("columns") or []
+                manifest_tags_by_id[uid] = model.get("tags") or []
 
     result = copy.deepcopy(data_model)
     changed = False
@@ -342,7 +454,27 @@ def reconcile_data_model(
 # IO wrapper
 # ---------------------------------------------------------------------------
 
-def reconcile_framework() -> tuple[dict[str, Any], bool]:
+def reconcile_framework(
+    snapshot: Any | None = None,
+    *,
+    model_index: Mapping[str, Any] | None = None,
+    schema_index: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], bool]:
+    """Reconcile framework metadata while timing the service boundary."""
+    with _timed_phase("reconciliation"):
+        return _reconcile_framework(
+            snapshot=snapshot,
+            model_index=model_index,
+            schema_index=schema_index,
+        )
+
+
+def _reconcile_framework(
+    *,
+    snapshot: Any | None = None,
+    model_index: Mapping[str, Any] | None = None,
+    schema_index: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], bool]:
     """
     Load manifest + data_model.yml, reconcile, write back if changed.
 
@@ -360,22 +492,42 @@ def reconcile_framework() -> tuple[dict[str, Any], bool]:
         return {}, False
 
     try:
-        with open(data_model_path, "r") as f:
-            data_model = yaml.safe_load(f) or {}
+        with _timed_phase("data_model_read"):
+            data_model = load_yaml_or_json(data_model_path) or {}
     except Exception:
         return {}, False
 
-    # Load manifest models — guard against missing/broken manifest
-    try:
-        adapter = get_adapter()
-        manifest_models = adapter.get_models()
-    except Exception:
+    # A caller that already loaded the shared snapshot can supply its indexes
+    # directly. This avoids both adapter lookup and reopening artifacts.
+    if snapshot is not None:
+        model_index = model_index if model_index is not None else getattr(
+            snapshot, "model_index", None
+        )
+        schema_index = schema_index if schema_index is not None else getattr(
+            snapshot, "schema_index", None
+        )
+
+    if model_index is not None or schema_index is not None:
+        manifest_models = None
+    else:
+        # Load manifest models — guard against missing/broken manifest
+        try:
+            with _timed_phase("model_index"):
+                adapter = get_adapter()
+                manifest_models = adapter.get_models()
+        except Exception:
+            return data_model, False
+
+    if not manifest_models and model_index is None and schema_index is None:
         return data_model, False
 
-    if not manifest_models:
-        return data_model, False
-
-    reconciled, changed = reconcile_data_model(data_model, manifest_models)
+    reconciled, changed = reconcile_data_model(
+        data_model,
+        manifest_models,
+        snapshot=snapshot,
+        model_index=model_index,
+        schema_index=schema_index,
+    )
 
     if changed:
         handler = YamlHandler()

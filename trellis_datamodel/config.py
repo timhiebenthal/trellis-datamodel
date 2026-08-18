@@ -622,6 +622,12 @@ def reload_config(config_path: Optional[str] = None) -> None:
         
         # Reload config (this updates all global variables)
         load_config(config_path)
+        # Artifact paths and framework options may have changed even when a
+        # file's filesystem identity did not, so config reload is an explicit
+        # snapshot boundary.
+        from trellis_datamodel.adapters.artifact_snapshot import clear_snapshots
+
+        clear_snapshots()
         logger.info("Configuration reloaded successfully")
     except ConfigurationError:
         # Re-raise ConfigurationError as-is

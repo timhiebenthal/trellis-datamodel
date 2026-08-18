@@ -5,6 +5,7 @@ import sys
 import tempfile
 import json
 import shutil
+import importlib
 import pytest
 import httpx
 from starlette.testclient import TestClient
@@ -35,6 +36,8 @@ def pytest_sessionfinish(session, exitstatus):
 @pytest.fixture(autouse=True)
 def clean_test_files():
     """Clean up test files before each test to ensure isolation."""
+    _reset_shared_test_state()
+
     # Clean data model file before each test
     data_model_path = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
     if os.path.exists(data_model_path):
@@ -50,6 +53,11 @@ def clean_test_files():
     if os.path.exists(manifest_path):
         os.remove(manifest_path)
 
+    # Clean catalog file
+    catalog_path = os.path.join(_TEST_TEMP_DIR, "catalog.json")
+    if os.path.exists(catalog_path):
+        os.remove(catalog_path)
+
     # Clean business_events.yml file
     business_events_path = os.path.join(_TEST_TEMP_DIR, "business_events.yml")
     if os.path.exists(business_events_path):
@@ -63,17 +71,46 @@ def clean_test_files():
                 if fname.endswith((".yml", ".yaml")):
                     os.remove(os.path.join(root, fname))
     yield
-    # After each test, ensure config is reset to test mode values
-    # This is needed because some tests (like CLI tests) may reload modules
+    _reset_shared_test_state()
+
+
+def _reset_shared_test_state():
+    """Reset process-wide config and adapter caches between tests."""
+    global cfg
+    cfg = importlib.import_module("trellis_datamodel.config")
+
+    cfg.CONFIG_PATH = os.path.join(_TEST_TEMP_DIR, "config.yml")
+    cfg.FRAMEWORK = "dbt-core"
+    cfg.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
+    cfg.CATALOG_PATH = os.path.join(_TEST_TEMP_DIR, "catalog.json")
+    cfg.DATA_MODEL_PATH = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
+    cfg.CANVAS_LAYOUT_PATH = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
+    cfg.CANVAS_LAYOUT_VERSION_CONTROL = True
+    cfg.DBT_PROJECT_PATH = _TEST_TEMP_DIR
+    cfg.DBT_MODEL_PATHS = ["3_core"]
+    cfg.BRUIN_PIPELINE_PATH = ""
+    cfg.BRUIN_ASSET_PATHS = []
+    cfg.BRUIN_DEFAULT_ASSET_TYPE = "duckdb.sql"
+    cfg.FRONTEND_BUILD_DIR = os.path.join(_TEST_TEMP_DIR, "frontend/build")
+    cfg.DBT_COMPANY_DUMMY_PATH = os.path.join(_TEST_TEMP_DIR, "dbt_company_dummy")
     cfg.LINEAGE_ENABLED = False
     cfg.LINEAGE_LAYERS = []
     cfg.EXPOSURES_ENABLED = False
     cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
-    cfg.Bus_MATRIX_ENABLED = True  # Default to enabled
-    cfg.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
-    cfg.DATA_MODEL_PATH = os.path.join(_TEST_TEMP_DIR, "data_model.yml")
-    cfg.CANVAS_LAYOUT_PATH = os.path.join(_TEST_TEMP_DIR, "canvas_layout.yml")
-    cfg.DBT_PROJECT_PATH = _TEST_TEMP_DIR
+    cfg.MODELING_STYLE = "entity_model"
+    cfg.Bus_MATRIX_ENABLED = True
+    cfg.BUSINESS_EVENTS_ENABLED = False
+    cfg.BUSINESS_EVENTS_PATH = ""
+    cfg.GUIDANCE_CONFIG = cfg.GuidanceConfig()
+    cfg.DIMENSIONAL_MODELING_CONFIG = cfg.DimensionalModelingConfig()
+    cfg.ENTITY_MODELING_CONFIG = cfg.EntityModelingConfig()
+    cfg.SOURCE_CHIPS_CONFIG = cfg.SourceChipsConfig()
+
+    from trellis_datamodel.adapters.artifact_snapshot import clear_snapshots
+    from trellis_datamodel.adapters import entity_type_inference
+
+    clear_snapshots()
+    entity_type_inference.reset_cache()
 
 
 @pytest.fixture
@@ -330,6 +367,13 @@ class FakeAdapter:
                 if n["is_source"] and n["source_name"]
             }
         )
+
+    def get_source_systems_for_models(self, model_unique_ids):
+        ordered_model_ids = list(dict.fromkeys(model_unique_ids))
+        return {
+            model_id: self.get_source_systems_for_model(model_id)
+            for model_id in ordered_model_ids
+        }
 
     def get_project_status(self):
         return {

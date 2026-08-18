@@ -10,6 +10,7 @@ adapter's business.
 
 import logging
 from collections import deque
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from trellis_datamodel import config as cfg
@@ -74,6 +75,42 @@ def extract_source_systems_for_model(model_unique_id: str) -> list[str]:
             "Failed to extract source systems for model %s: %s", model_unique_id, e
         )
         return []
+
+
+def extract_source_systems_for_models(
+    model_unique_ids: Iterable[str],
+) -> dict[str, list[str]]:
+    """Extract source systems for multiple models in one adapter pass.
+
+    The adapter owns framework-specific graph loading and traversal.  This
+    service function keeps the batch contract framework-neutral and returns
+    entries in the first-seen order of ``model_unique_ids``.  Duplicate model
+    IDs therefore share one result and never trigger duplicate adapter work.
+    """
+    ordered_model_ids = list(dict.fromkeys(model_unique_ids))
+    if not ordered_model_ids:
+        return {}
+
+    try:
+        adapter = get_adapter()
+        batch_method = getattr(adapter, "get_source_systems_for_models", None)
+        if callable(batch_method):
+            batch_result = batch_method(ordered_model_ids)
+            if not isinstance(batch_result, Mapping):
+                raise TypeError("batch source-system result must be a mapping")
+            return {
+                model_id: list(batch_result.get(model_id, ()))
+                for model_id in ordered_model_ids
+            }
+
+        # Keep third-party adapters that predate the batch contract usable.
+        return {
+            model_id: adapter.get_source_systems_for_model(model_id)
+            for model_id in ordered_model_ids
+        }
+    except Exception as e:
+        logger.warning("Failed to extract source systems for models: %s", e)
+        return {model_id: [] for model_id in ordered_model_ids}
 
 
 def _transform_lineage_data(

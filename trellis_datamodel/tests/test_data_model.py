@@ -119,6 +119,256 @@ class TestGetDataModel:
         assert entity["tags"] == ["draft-tag"]
 
 
+def test_source_system_enrichment_uses_one_indexed_lineage_pass(
+    test_client, temp_data_model_path, monkeypatch
+):
+    """All primary and additional bindings are sent to lineage in one pass."""
+    import trellis_datamodel.routes.data_model as data_model_route
+
+    with open(temp_data_model_path, "w") as f:
+        yaml.safe_dump(
+            {
+                "version": 0.1,
+                "entities": [
+                    {
+                        "id": "customer",
+                        "model_ref": "model.project.customer",
+                        "additional_models": [
+                            "model.project.customer_history",
+                            "model.project.customer",
+                        ],
+                    },
+                    {
+                        "id": "orders",
+                        "model_ref": "model.project.orders",
+                    },
+                ],
+                "relationships": [],
+            },
+            f,
+        )
+
+    batch_calls = []
+    monkeypatch.setattr(
+        data_model_route,
+        "extract_source_systems_for_models",
+        lambda model_ids: (
+            batch_calls.append(list(model_ids))
+            or {
+                "model.project.customer": ["crm"],
+                "model.project.customer_history": ["warehouse"],
+                "model.project.orders": ["erp"],
+            }
+        ),
+        raising=False,
+    )
+    response = test_client.get("/api/data-model")
+
+    assert response.status_code == 200
+    assert batch_calls == [
+        [
+            "model.project.customer",
+            "model.project.customer_history",
+            "model.project.orders",
+        ]
+    ]
+
+
+def test_entity_type_inference_skips_adapter_when_all_entities_are_classified(
+    monkeypatch,
+):
+    """Already classified entities do not trigger expensive adapter inference."""
+    from trellis_datamodel.routes.data_model import _apply_entity_type_inference
+    import trellis_datamodel.routes.data_model as data_model_route
+
+    def fail_if_called():
+        pytest.fail("infer_entity_types should not be called")
+
+    class UnexpectedAdapter:
+        infer_entity_types = staticmethod(fail_if_called)
+
+    monkeypatch.setattr(data_model_route, "get_adapter", lambda: UnexpectedAdapter())
+    model_data = {
+        "entities": [
+            {"id": "customer", "entity_type": "dimension"},
+            {"id": "orders", "entity_type": "fact"},
+        ],
+        "relationships": [],
+    }
+
+    assert _apply_entity_type_inference(model_data) == model_data
+
+
+def test_entity_type_inference_still_infers_missing_entity_types(monkeypatch):
+    """Missing and unclassified entities still use adapter inference."""
+    from trellis_datamodel.routes.data_model import _apply_entity_type_inference
+    import trellis_datamodel.routes.data_model as data_model_route
+
+    class Adapter:
+        def infer_entity_types(self):
+            return {"customer": "dimension", "orders": "fact"}
+
+    monkeypatch.setattr(data_model_route, "get_adapter", lambda: Adapter())
+    model_data = {
+        "entities": [
+            {"id": "customer"},
+            {"id": "orders", "entity_type": "unclassified"},
+            {"id": "already_classified", "entity_type": "dimension"},
+        ],
+        "relationships": [],
+    }
+
+    result = _apply_entity_type_inference(model_data)
+
+    assert result["entities"][0]["entity_type"] == "dimension"
+    assert result["entities"][1]["entity_type"] == "fact"
+    assert result["entities"][2]["entity_type"] == "dimension"
+
+
+def test_batched_enrichment_matches_legacy_results_for_primary_and_additional_models(
+    test_client, temp_data_model_path, monkeypatch
+):
+    """Batch enrichment preserves the legacy union and output ordering."""
+    import trellis_datamodel.routes.data_model as data_model_route
+
+    with open(temp_data_model_path, "w") as f:
+        yaml.safe_dump(
+            {
+                "version": 0.1,
+                "entities": [
+                    {
+                        "id": "customer",
+                        "model_ref": "model.project.customer",
+                        "additional_models": ["model.project.customer_history"],
+                    },
+                    {
+                        "id": "orders",
+                        "model_ref": "model.project.orders",
+                        "additional_models": ["model.project.customer"],
+                    },
+                    {"id": "draft", "source_system": ["mock"]},
+                ],
+                "relationships": [],
+            },
+            f,
+        )
+
+    monkeypatch.setattr(
+        data_model_route,
+        "extract_source_systems_for_models",
+        lambda _model_ids: {
+            "model.project.customer": ["warehouse", "crm", "crm"],
+            "model.project.customer_history": ["crm"],
+            "model.project.orders": ["erp", "warehouse"],
+        },
+        raising=False,
+    )
+
+    response = test_client.get("/api/data-model")
+
+    assert response.status_code == 200
+    entities = {entity["id"]: entity for entity in response.json()["entities"]}
+    assert entities["customer"]["source_system"] == ["crm", "warehouse"]
+    assert entities["orders"]["source_system"] == ["crm", "erp", "warehouse"]
+    assert entities["draft"]["source_system"] == ["mock"]
+
+
+def test_data_model_request_does_not_reopen_manifest_or_catalog_per_entity(
+    test_client, temp_data_model_path, monkeypatch
+):
+    """The request uses one indexed artifact read instead of one per entity."""
+    import trellis_datamodel.routes.data_model as data_model_route
+    import trellis_datamodel.services.lineage as lineage_service
+
+    with open(temp_data_model_path, "w") as f:
+        yaml.safe_dump(
+            {
+                "version": 0.1,
+                "entities": [
+                    {"id": "one", "model_ref": "model.project.one"},
+                    {"id": "two", "model_ref": "model.project.two"},
+                    {"id": "three", "model_ref": "model.project.three"},
+                ],
+                "relationships": [],
+            },
+            f,
+        )
+
+    class CountingArtifactAdapter:
+        def __init__(self):
+            self.manifest_reads = 0
+            self.catalog_reads = 0
+
+        def get_source_systems_for_model(self, model_id):
+            self.manifest_reads += 1
+            self.catalog_reads += 1
+            return {"model.project.one": ["crm"]}.get(model_id, [])
+
+        def get_source_systems_for_models(self, model_ids):
+            self.manifest_reads += 1
+            self.catalog_reads += 1
+            return {model_id: ["crm"] for model_id in model_ids}
+
+    adapter = CountingArtifactAdapter()
+    monkeypatch.setattr(lineage_service, "get_adapter", lambda: adapter)
+
+    response = test_client.get("/api/data-model")
+
+    assert response.status_code == 200
+    assert adapter.manifest_reads == 1
+    assert adapter.catalog_reads == 1
+
+
+def test_data_model_server_timing_includes_read_inference_and_source_enrichment_phases(
+    test_client, temp_data_model_path, monkeypatch
+):
+    """Data-model boot exposes fixed phases without request-specific values."""
+    import trellis_datamodel.routes.data_model as data_model_route
+    import trellis_datamodel.services.lineage as lineage_service
+
+    with open(temp_data_model_path, "w") as f:
+        yaml.safe_dump(
+            {
+                "version": 0.1,
+                "entities": [
+                    {"id": "customer", "model_ref": "model.project.customer"}
+                ],
+                "relationships": [],
+            },
+            f,
+        )
+
+    class TimingAdapter:
+        def infer_entity_types(self):
+            return {"customer": "dimension"}
+
+        def get_source_systems_for_models(self, model_ids):
+            return {model_id: ["crm"] for model_id in model_ids}
+
+    adapter = TimingAdapter()
+    monkeypatch.setattr(data_model_route, "get_adapter", lambda: adapter)
+    monkeypatch.setattr(lineage_service, "get_adapter", lambda: adapter)
+    from trellis_datamodel import config as cfg
+
+    monkeypatch.setattr(
+        cfg,
+        "DIMENSIONAL_MODELING_CONFIG",
+        cfg.DimensionalModelingConfig(enabled=True, dimension_prefix=["dim_"]),
+    )
+
+    response = test_client.get("/api/data-model")
+
+    assert response.status_code == 200
+    server_timing = response.headers["server-timing"]
+    for phase in (
+        "data_model_read",
+        "layout_read",
+        "entity_inference",
+        "source_lineage",
+    ):
+        assert f"{phase};" in server_timing
+
+
 class TestSaveDataModel:
     """Tests for POST /api/data-model endpoint."""
 

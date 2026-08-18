@@ -28,6 +28,8 @@ import type {
     ConfigGetResponse,
     ConfigUpdateResponse,
 } from './types';
+import { parseServerTiming, recordBootRequest } from './boot-diagnostics';
+import type { ReconciliationResult } from './boot-loader';
 
 // Re-export types for backward compatibility
 export type {
@@ -81,6 +83,95 @@ export function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
+type BootResponse = {
+    ok: boolean;
+    status: number;
+    statusText?: string;
+    headers?: Headers;
+    json: () => Promise<unknown>;
+    text: () => Promise<string>;
+    readJson: <T>() => Promise<T>;
+    readText: () => Promise<string>;
+    record: (body?: unknown) => void;
+};
+
+function responseHeader(response: Response, name: string): string | null {
+    return typeof response.headers?.get === 'function' ? response.headers.get(name) : null;
+}
+
+function serializedByteLength(value: unknown): number {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+async function request(url: string, options?: RequestInit): Promise<BootResponse> {
+    const startedAt = performance.now();
+    const method = String(options?.method ?? 'GET').toUpperCase();
+    try {
+        const response = await fetch(url, options);
+        let recorded = false;
+        const contentLength = responseHeader(response, 'content-length');
+        const serverTiming = responseHeader(response, 'server-timing');
+        const record = (body?: unknown): void => {
+            if (recorded) return;
+            recorded = true;
+            const parsedContentLength = contentLength === null ? undefined : Number(contentLength);
+            recordBootRequest({
+                url,
+                method,
+                status: response.status,
+                bytes: Number.isFinite(parsedContentLength)
+                    ? parsedContentLength
+                    : body === undefined
+                      ? undefined
+                      : serializedByteLength(body),
+                duration: performance.now() - startedAt,
+                serverTiming: parseServerTiming(serverTiming),
+            });
+        };
+        const readJson = async <T>(): Promise<T> => {
+            const body = await response.json();
+            record(body);
+            return body as T;
+        };
+        const readText = async (): Promise<string> => {
+            const body = await response.text();
+            record(body);
+            return body;
+        };
+
+        return {
+            ok: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            json:
+                typeof response.json === 'function'
+                    ? response.json.bind(response)
+                    : async () => {
+                          throw new Error('Response does not support JSON parsing');
+                      },
+            text:
+                typeof response.text === 'function'
+                    ? response.text.bind(response)
+                    : async () => {
+                          throw new Error('Response does not support text parsing');
+                      },
+            readJson,
+            readText,
+            record,
+        };
+    } catch (error) {
+        recordBootRequest({
+            url,
+            method,
+            bytes: undefined,
+            duration: performance.now() - startedAt,
+            serverTiming: [],
+        });
+        throw error;
+    }
+}
+
 export async function getManifest(): Promise<ModelInfo[]> {
     try {
         // Short-circuit in test/smoke environments to avoid console 500s when backend is absent
@@ -93,12 +184,13 @@ export async function getManifest(): Promise<ModelInfo[]> {
             return [];
         }
 
-        const res = await fetch(`${API_BASE}/manifest`);
+        const res = await request(`${API_BASE}/manifest`);
         if (!res.ok) {
+            res.record();
             if (res.status === 404) return [];
             throw new Error(`Failed to fetch manifest: ${res.status}`);
         }
-        const data = await res.json();
+        const data = await res.readJson<{ models?: ModelInfo[] }>();
         return data.models || [];
     } catch (e) {
         console.error("Error fetching manifest:", e);
@@ -107,11 +199,12 @@ export async function getManifest(): Promise<ModelInfo[]> {
 }
 
 async function fetchDataModelOnce(): Promise<DataModel> {
-    const res = await fetch(`${API_BASE}/data-model`);
+    const res = await request(`${API_BASE}/data-model`);
     if (!res.ok) {
+        res.record();
         throw new Error(`Failed to fetch data model: ${res.status}`);
     }
-    return await res.json();
+    return await res.readJson<DataModel>();
 }
 
 export async function getDataModel(): Promise<DataModel> {
@@ -185,19 +278,20 @@ export async function getConfigInfo(): Promise<ConfigInfo> {
 
 export async function inferRelationships(): Promise<Relationship[]> {
     try {
-        const res = await fetch(`${API_BASE}/infer-relationships`);
+        const res = await request(`${API_BASE}/infer-relationships`);
         if (!res.ok) {
             if (res.status === 400) {
                 // Treat config/schema absence as a non-fatal case for the UI/tests
+                res.record();
                 return [];
             }
-            const errorText = await res.text();
+            const errorText = await res.readText();
             const details = errorText ? ` - ${errorText}` : '';
             throw new Error(
                 `Failed to infer relationships: ${res.status} ${res.statusText}${details}`,
             );
         }
-        const payload = await res.json();
+        const payload = await res.readJson<Relationship[] | { relationships?: Relationship[] }>();
         const relationships = Array.isArray(payload)
             ? payload
             : Array.isArray((payload as any)?.relationships)
@@ -265,12 +359,13 @@ export async function getModelSchema(
         const url = version
             ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
             : `${API_BASE}/models/${encodedModel}/schema`;
-        const res = await fetch(url);
+        const res = await request(url);
         if (!res.ok) {
+            res.record();
             if (res.status === 404) return null;
             throw new Error(`Failed to fetch schema: ${res.status}`);
         }
-        return await res.json();
+        return await res.readJson<ModelSchema>();
     } catch (e) {
         console.error("Error fetching schema:", e);
         return null;
@@ -1133,17 +1228,21 @@ export async function detachEventsFromProcess(
     }
 }
 
-export async function reconcileDbt(): Promise<{ status: string; changed: boolean; data_model: DataModel }> {
+export async function reconcileDbt(): Promise<ReconciliationResult> {
     try {
         const res = await fetch(`${API_BASE}/reconcile`, { method: 'POST' });
         if (!res.ok) {
-            if (res.status === 404) return { status: 'success', changed: false, data_model: {} as DataModel };
+            if (res.status === 404) return { status: 'success', changed: false };
             throw new Error(`Failed to reconcile dbt: ${res.status}`);
         }
-        return await res.json();
+        const result = await res.json();
+        return {
+            status: result.status,
+            changed: result.changed,
+        };
     } catch (e) {
         console.error('Error reconciling dbt:', e);
-        return { status: 'success', changed: false, data_model: {} as DataModel };
+        return { status: 'success', changed: false };
     }
 }
 

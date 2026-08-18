@@ -378,6 +378,92 @@ async def test_reload_config_success(client: AsyncClient, temp_config_dir):
 
 
 @pytest.mark.asyncio
+async def test_reload_config_clears_artifact_and_entity_inference_caches(
+    client: AsyncClient, temp_config_dir, monkeypatch
+):
+    """A successful reload invalidates every adapter cache namespace."""
+    import trellis_datamodel.config as config_module
+    import trellis_datamodel.routes.config as config_route
+    from trellis_datamodel.adapters import artifact_snapshot, entity_type_inference
+
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    original_config = config_path.read_text()
+    manifest_path = (
+        Path(temp_config_dir) / "dbt_project" / "target" / "manifest.json"
+    )
+    old_snapshot = artifact_snapshot.get_snapshot(manifest_path)
+    entity_type_inference._CACHES.update(
+        {
+            "dbt-core": ("old-dbt", {"old_dbt": "dimension"}),
+            "bruin": ("old-bruin", {"old_bruin": "fact"}),
+        }
+    )
+
+    # Switch frameworks to prove the reset is not limited to the newly selected
+    # adapter, and bypass config.reload_config's lower-level snapshot cleanup.
+    config_path.write_text(
+        original_config.replace("framework: dbt-core", "framework: bruin")
+        + "\nbruin_pipeline_path: .\n"
+    )
+    monkeypatch.setattr(
+        config_route,
+        "reload_config",
+        lambda: config_module.load_config(str(config_path)),
+    )
+
+    try:
+        response = await client.post("/api/config/reload")
+    finally:
+        config_path.write_text(original_config)
+        importlib.reload(config_module)
+
+    assert response.status_code == 200
+    assert entity_type_inference._CACHES == {}
+    assert artifact_snapshot.get_snapshot(manifest_path) is not old_snapshot
+
+
+@pytest.mark.asyncio
+async def test_reload_with_new_artifact_paths_cannot_reuse_previous_snapshot(
+    client: AsyncClient, temp_config_dir, monkeypatch
+):
+    """Reloading a changed manifest path reads the new artifact."""
+    import trellis_datamodel.config as config_module
+    import trellis_datamodel.routes.config as config_route
+    from trellis_datamodel.adapters import artifact_snapshot
+    from trellis_datamodel.adapters import get_adapter
+
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    original_config = config_path.read_text()
+    project_target = Path(temp_config_dir) / "dbt_project" / "target"
+    old_manifest_path = project_target / "manifest.json"
+    new_manifest_path = project_target / "new_manifest.json"
+    old_snapshot = artifact_snapshot.get_snapshot(old_manifest_path)
+    new_manifest_path.write_text('{"snapshot_version": 2}')
+    config_path.write_text(
+        original_config.replace(
+            "dbt_manifest_path: target/manifest.json",
+            "dbt_manifest_path: target/new_manifest.json",
+        )
+    )
+    monkeypatch.setattr(
+        config_route,
+        "reload_config",
+        lambda: config_module.load_config(str(config_path)),
+    )
+
+    try:
+        response = await client.post("/api/config/reload")
+        new_snapshot = get_adapter()._get_artifact_snapshot()
+    finally:
+        config_path.write_text(original_config)
+        importlib.reload(config_module)
+
+    assert response.status_code == 200
+    assert new_snapshot is not old_snapshot
+    assert new_snapshot.manifest["snapshot_version"] == 2
+
+
+@pytest.mark.asyncio
 async def test_reload_config_missing_file(client: AsyncClient, temp_config_dir, monkeypatch):
     """Test POST /api/config/reload fails gracefully when config file is missing."""
     import trellis_datamodel.config as config_module
