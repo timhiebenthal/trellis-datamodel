@@ -35,10 +35,11 @@
     // Read URL parameters for entity filtering
     const entitiesParam = $derived($page.url.searchParams.get('entities'));
     const eventTextParam = $derived($page.url.searchParams.get('eventText'));
+    const urlEntityFilterActive = $derived(entitiesParam !== null);
 
     // Parse comma-separated entity IDs from URL parameter, or filter by sidebar search term
     const filteredEntityIds = $derived(
-        entitiesParam
+        entitiesParam !== null
             ? entitiesParam.split(',').filter(id => id.trim())
             : $sidebarSearchTerm.trim()
                 ? $nodes
@@ -73,6 +74,7 @@
             hasExposuresData={hasExposuresData}
             filteredEntityIds={filteredEntityIds}
             filterEventText={filterEventText}
+            urlEntityFilterActive={urlEntityFilterActive}
         />
     </div>
 {/if}

@@ -42,6 +42,9 @@
     $: lineageLayers = config.lineage?.layers || [];
     $: dbtModelPaths = config.dbt_model_paths || [];
     $: bruinAssetPaths = config.bruin_asset_paths || [];
+    $: canvasDefaultFilters = getFieldValue('canvas.default_filters') || {};
+    $: canvasDefaultDomains = Array.isArray(canvasDefaultFilters.domains) ? canvasDefaultFilters.domains : [];
+    $: canvasDefaultTags = Array.isArray(canvasDefaultFilters.tags) ? canvasDefaultFilters.tags : [];
 
     // Path fields are framework-specific: a dbt project has no pipeline and a
     // Bruin pipeline has no manifest, so showing both sets would invite a user
@@ -446,6 +449,129 @@
                                 {#if getFieldMetadata('modeling_style')?.description}
                                     <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('modeling_style')?.description}</p>
                                 {/if}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Section -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <div class="flex items-center gap-2 mb-2">
+                            <h2 class="text-lg font-semibold text-gray-900">Canvas</h2>
+                            <Tooltip text="Choose the default landing page and filters for this shared project.">
+                                <Icon icon="lucide:help-circle" class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </Tooltip>
+                        </div>
+                        <p class="mb-5 text-sm text-gray-600">
+                            These are shared project defaults stored in <code class="font-mono text-xs">trellis.yml</code>, not personal preferences.
+                            Changes are written to the shared project configuration when you select Apply Configuration.
+                        </p>
+                        <div class="space-y-5">
+                            <div>
+                                <label for="canvas-start-page-select" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Start Page
+                                </label>
+                                <select
+                                    id="canvas-start-page-select"
+                                    value={getFieldValue('start_page') || 'canvas'}
+                                    onchange={(e) => handleFieldChange('start_page', e.currentTarget.value)}
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                >
+                                    <option value="canvas">Canvas</option>
+                                    <option value="entity-list">Entity List</option>
+                                </select>
+                                <p class="mt-1.5 text-xs text-gray-500">
+                                    Select which page opens when navigating to the project root.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label for="canvas-default-domain-0" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Default Domains
+                                </label>
+                                {#each canvasDefaultDomains as domain, index (index)}
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <input
+                                            id={`canvas-default-domain-${index}`}
+                                            type="text"
+                                            value={domain}
+                                            aria-label={`Canvas Default Domain ${index + 1}`}
+                                            oninput={(e) => {
+                                                const newDomains = [...canvasDefaultDomains];
+                                                newDomains[index] = e.currentTarget.value;
+                                                handleNestedFieldChange('canvas.default_filters.domains', newDomains);
+                                            }}
+                                            placeholder="sales"
+                                            class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove Domain ${index + 1}`}
+                                            onclick={() => {
+                                                const newDomains = [...canvasDefaultDomains];
+                                                newDomains.splice(index, 1);
+                                                handleNestedFieldChange('canvas.default_filters.domains', newDomains);
+                                            }}
+                                            class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                {/each}
+                                {#if canvasDefaultDomains.length === 0}
+                                    <p class="mt-1.5 text-xs text-gray-500">Empty = all domains included</p>
+                                {/if}
+                                <button
+                                    type="button"
+                                    onclick={() => handleNestedFieldChange('canvas.default_filters.domains', [...canvasDefaultDomains, ''])}
+                                    class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
+                                >
+                                    + Add Domain
+                                </button>
+                            </div>
+
+                            <div>
+                                <label for="canvas-default-tag-0" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Default Tags
+                                </label>
+                                {#each canvasDefaultTags as tag, index (index)}
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <input
+                                            id={`canvas-default-tag-${index}`}
+                                            type="text"
+                                            value={tag}
+                                            aria-label={`Canvas Default Tag ${index + 1}`}
+                                            oninput={(e) => {
+                                                const newTags = [...canvasDefaultTags];
+                                                newTags[index] = e.currentTarget.value;
+                                                handleNestedFieldChange('canvas.default_filters.tags', newTags);
+                                            }}
+                                            placeholder="important"
+                                            class="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove Tag ${index + 1}`}
+                                            onclick={() => {
+                                                const newTags = [...canvasDefaultTags];
+                                                newTags.splice(index, 1);
+                                                handleNestedFieldChange('canvas.default_filters.tags', newTags);
+                                            }}
+                                            class="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-300 rounded-md text-lg font-medium"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                {/each}
+                                {#if canvasDefaultTags.length === 0}
+                                    <p class="mt-1.5 text-xs text-gray-500">Empty = all tags included</p>
+                                {/if}
+                                <button
+                                    type="button"
+                                    onclick={() => handleNestedFieldChange('canvas.default_filters.tags', [...canvasDefaultTags, ''])}
+                                    class="mt-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-300 rounded-md"
+                                >
+                                    + Add Tag
+                                </button>
                             </div>
                         </div>
                     </div>

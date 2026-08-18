@@ -1,23 +1,30 @@
 version: 0.1
 entities:
-  customer:
-    position:
-      x: 50
-      y: 450
-    width: 280
-    panel_height: 200
-    collapsed: false
-  order:
+  customer_profile:
     position:
       x: 50
       y: 850
     width: 280
     panel_height: 200
     collapsed: false
-  product:
+  customer_event:
+    position:
+      x: 50
+      y: 1250
+    width: 280
+    panel_height: 200
+    collapsed: false
+  order_fact:
     position:
       x: 50
       y: 50
+    width: 280
+    panel_height: 200
+    collapsed: false
+  inventory_dimension:
+    position:
+      x: 50
+      y: 450
     width: 280
     panel_height: 200
     collapsed: false

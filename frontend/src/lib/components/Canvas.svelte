@@ -16,7 +16,15 @@
     } from "@xyflow/svelte";
     import { setContext } from "svelte";
     import { goto } from "$app/navigation";
-    import { nodes, edges, viewMode, modelingStyle } from "$lib/stores";
+    import {
+        nodes,
+        edges,
+        viewMode,
+        modelingStyle,
+        frameworkModels,
+        domainFilter,
+        tagFilter,
+    } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
     import { DimensionalModelPositioner, GroupSizeCalculator } from "$lib/services/position-calculator";
     import EntityNode from "./EntityNode.svelte";
@@ -24,8 +32,10 @@
     import CustomEdge from "./CustomEdge.svelte";
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
     import EventFilterBanner from "./EventFilterBanner.svelte";
+    import CanvasFilterBar from "./CanvasFilterBar.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
+    import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
     import { writable } from "svelte/store";
 
     const nodeTypes = {
@@ -45,6 +55,7 @@
         hasExposuresData = false,
         filteredEntityIds = null,
         filterEventText = null,
+        urlEntityFilterActive = false,
     }: {
         guidanceConfig: GuidanceConfig;
         lineageEnabled?: boolean;
@@ -52,6 +63,7 @@
         hasExposuresData?: boolean;
         filteredEntityIds?: string[] | null;
         filterEventText?: string | null;
+        urlEntityFilterActive?: boolean;
     } = $props();
 
     const lineageEnabledStore = writable(lineageEnabled);
@@ -75,18 +87,33 @@
         hasExposuresDataStore.set(hasExposuresData);
     });
 
-    // Entity filtering logic
-    // Filter nodes to show only entities with IDs in filteredEntityIds
+    const isCanvasFilterActive = $derived(() =>
+        $domainFilter.length > 0 || $tagFilter.length > 0
+    );
+
+    // Entity filtering logic. URL-selected entities are authoritative and
+    // must remain visible even when project/session filters would exclude them.
     const filteredNodes = $derived(() => {
-        if (!filteredEntityIds) {
+        if (filteredEntityIds === null && !isCanvasFilterActive()) {
             return $nodes;
         }
 
-        // Filter out entity IDs that don't exist in $nodes (handle deleted entities)
-        // Keep group nodes visible to maintain canvas structure
-        return $nodes.filter(node =>
-            node.type === 'group' || filteredEntityIds.includes(node.id)
-        );
+        return $nodes.filter((node) => {
+            if (node.type === "group") return true;
+
+            const matchesUrlSubset =
+                filteredEntityIds === null || filteredEntityIds.includes(node.id);
+            if (!matchesUrlSubset) return false;
+
+            if (urlEntityFilterActive || !isCanvasFilterActive()) {
+                return true;
+            }
+
+            return matchesCanvasFilters(node.data, {
+                selectedDomains: $domainFilter,
+                selectedTags: $tagFilter,
+            }, $frameworkModels);
+        });
     });
 
     // Create a reactive local nodes variable for binding
@@ -98,38 +125,26 @@
         displayNodes = filteredNodes();
     });
 
-    // Sync changes from displayNodes back to $nodes store when users interact
-    // This ensures drag operations and other changes are persisted
+    // Sync changes from displayNodes back to $nodes store when users interact.
+    // Merge visible nodes so filtering never removes hidden nodes from the model.
     $effect(() => {
-        if (filteredEntityIds && filteredEntityIds.length > 0) {
-            let updatedCount = 0;
-            let missingCount = 0;
-            const updatedIds: string[] = [];
-            // In filtered mode, update the corresponding nodes in the store
-            displayNodes.forEach(displayNode => {
-                const storeNodeIndex = $nodes.findIndex(n => n.id === displayNode.id);
-                if (storeNodeIndex >= 0 && $nodes[storeNodeIndex] !== displayNode) {
-                    $nodes[storeNodeIndex] = displayNode;
-                    updatedCount += 1;
-                    if (updatedIds.length < 5) {
-                        updatedIds.push(displayNode.id);
-                    }
-                } else if (storeNodeIndex < 0) {
-                    missingCount += 1;
-                }
-            });
-            if (updatedCount > 0) {
-                // Force store update so autosave reacts in filtered mode.
-                $nodes = [...$nodes];
+        if (!isCanvasFilterActive() && filteredEntityIds === null) {
+            if (displayNodes !== $nodes) {
+                $nodes = displayNodes;
             }
-        } else if (displayNodes !== $nodes) {
-            $nodes = displayNodes;
+            return;
+        }
+
+        const displayById = new Map(displayNodes.map((node) => [node.id, node]));
+        const mergedNodes = $nodes.map((node) => displayById.get(node.id) ?? node);
+        if (mergedNodes.some((node, index) => node !== $nodes[index])) {
+            $nodes = mergedNodes;
         }
     });
 
-    // Filter edges to only show connections between filtered entities
+    // Filter edges to only show connections between visible entities.
     const displayEdges = $derived(() => {
-        if (!filteredEntityIds) {
+        if (!isCanvasFilterActive() && filteredEntityIds === null) {
             return $edges;
         }
 
@@ -152,20 +167,29 @@
 
     // Calculate filtered entity count (exclude group nodes)
     const filteredEntityCount = $derived(() => {
-        if (!filteredEntityIds) {
-            return 0;
-        }
         return displayNodes.filter(node => node.type === 'entity').length;
     });
 
     // Detect if all filtered entities have been deleted
     const allFilteredEntitiesDeleted = $derived(() => {
-        return filteredEntityIds && filteredEntityIds.length > 0 && filteredEntityCount() === 0;
+        return urlEntityFilterActive && filteredEntityCount() === 0;
     });
+
+    const canvasFilterHidesEntities = $derived(() =>
+        !urlEntityFilterActive &&
+        isCanvasFilterActive() &&
+        $nodes.some((node) => node.type === "entity") &&
+        filteredEntityCount() === 0
+    );
 
     // Clear filter handler - navigates back to canvas without URL params
     function handleClearFilter() {
         goto('/canvas');
+    }
+
+    function handleShowAllEntities() {
+        $domainFilter = [];
+        $tagFilter = [];
     }
 
     // Wizard state
@@ -579,6 +603,36 @@
                     </button>
                 </div>
             </div>
+        {:else if canvasFilterHidesEntities()}
+            <div
+                class="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+            >
+                <div
+                    class="bg-white/90 backdrop-blur-sm p-8 rounded-xl border border-slate-200 shadow-xl text-center max-w-md mx-4"
+                >
+                    <div
+                        class="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4"
+                    >
+                        <Icon
+                            icon="lucide:filter-x"
+                            class="w-8 h-8 text-primary-600"
+                        />
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">
+                        No Entities Match
+                    </h3>
+                    <p class="text-slate-600 mb-6">
+                        The active Canvas domain and tag filters hide all entities.
+                    </p>
+                    <button
+                        class="bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 font-medium transition-colors shadow-md pointer-events-auto flex items-center justify-center gap-2 mx-auto"
+                        onclick={handleShowAllEntities}
+                    >
+                        <Icon icon="lucide:eye" class="w-4 h-4" />
+                        Show all entities
+                    </button>
+                </div>
+            </div>
         {:else if $nodes.length === 0}
             <div
                 class="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
@@ -612,6 +666,11 @@
             </div>
         {/if}
     </SvelteFlow>
+
+    <CanvasFilterBar
+        visibleCount={filteredEntityCount()}
+        totalCount={$nodes.filter((node) => node.type === "entity").length}
+    />
 
     <!-- Event Filter Banner - Show when filtering by business event -->
     {#if filteredEntityIds && filteredEntityIds.length > 0 && filterEventText}

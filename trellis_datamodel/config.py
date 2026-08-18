@@ -91,6 +91,8 @@ if _TEST_DIR:
     BRUIN_PIPELINE_PATH: str = ""
     BRUIN_ASSET_PATHS: list[str] = []
     BRUIN_DEFAULT_ASSET_TYPE: str = "duckdb.sql"
+    START_PAGE: str = "canvas"
+    CANVAS_DEFAULT_FILTERS: dict[str, list[str]] = {"domains": [], "tags": []}
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
@@ -118,6 +120,8 @@ else:
     BRUIN_PIPELINE_PATH: str = ""
     BRUIN_ASSET_PATHS: list[str] = []
     BRUIN_DEFAULT_ASSET_TYPE: str = "duckdb.sql"
+    START_PAGE: str = "canvas"
+    CANVAS_DEFAULT_FILTERS: dict[str, list[str]] = {"domains": [], "tags": []}
     FRONTEND_BUILD_DIR: str = ""
     DBT_COMPANY_DUMMY_PATH: str = ""
     LINEAGE_LAYERS: list[str] = []
@@ -363,6 +367,38 @@ def _load_business_events_config(config: dict[str, Any]) -> bool:
     return enabled
 
 
+def _load_canvas_navigation_config(
+    config: dict[str, Any],
+) -> tuple[str, dict[str, list[str]]]:
+    """Load and normalize the root page and Canvas project defaults."""
+    start_page = config.get("start_page", "canvas")
+    if start_page not in {"canvas", "entity-list"}:
+        logger.warning(
+            "'start_page' must be 'canvas' or 'entity-list'. Using default 'canvas'."
+        )
+        start_page = "canvas"
+
+    default_filters: dict[str, list[str]] = {"domains": [], "tags": []}
+    canvas_config = config.get("canvas")
+    if not isinstance(canvas_config, dict):
+        return start_page, default_filters
+
+    filters = canvas_config.get("default_filters")
+    if not isinstance(filters, dict):
+        return start_page, default_filters
+
+    for filter_name in default_filters:
+        values = filters.get(filter_name, [])
+        if isinstance(values, list):
+            default_filters[filter_name] = [
+                value.strip()
+                for value in values
+                if isinstance(value, str) and value.strip()
+            ]
+
+    return start_page, default_filters
+
+
 def _resolve_business_events_path(
     config_path: str, data_model_path: str, config: dict[str, Any]
 ) -> str:
@@ -500,7 +536,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
 
     # Skip loading config file in test mode (paths already set via environment)
     # unless a config file is explicitly selected (TRELLIS_CONFIG_PATH or CLI --config).
@@ -559,33 +595,36 @@ def load_config(config_path: Optional[str] = None) -> None:
     # 7. Frontend build directory
     FRONTEND_BUILD_DIR = _resolve_frontend_build_dir(CONFIG_PATH, config)
 
-    # 8. dbt company dummy path (optional)
+    # 8. Root route and Canvas project defaults
+    START_PAGE, CANVAS_DEFAULT_FILTERS = _load_canvas_navigation_config(config)
+
+    # 9. dbt company dummy path (optional)
     DBT_COMPANY_DUMMY_PATH = _resolve_company_dummy_path(CONFIG_PATH, config)
 
-    # 9. Lineage configuration
+    # 10. Lineage configuration
     LINEAGE_ENABLED, LINEAGE_LAYERS = _load_lineage_config(config)
 
-    # 10. Guidance configuration
+    # 11. Guidance configuration
     GUIDANCE_CONFIG = _load_guidance_config(config)
 
-    # 11. Exposures configuration
+    # 12. Exposures configuration
     EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT = _load_exposures_config(config)
 
-    # 12. Modeling style and bus matrix
+    # 13. Modeling style and bus matrix
     MODELING_STYLE = _load_modeling_style(config)
     Bus_MATRIX_ENABLED = _resolve_bus_matrix_enabled(
         MODELING_STYLE, config.get("bus_matrix")
     )
 
-    # 13. Dimensional modeling configuration
+    # 14. Dimensional modeling configuration
     DIMENSIONAL_MODELING_CONFIG = _load_dimensional_modeling_config(
         MODELING_STYLE, config
     )
 
-    # 14. Entity modeling configuration
+    # 15. Entity modeling configuration
     ENTITY_MODELING_CONFIG = _load_entity_modeling_config(MODELING_STYLE, config)
 
-    # 15. Business events configuration
+    # 16. Business events configuration
     BUSINESS_EVENTS_ENABLED = _load_business_events_config(config)
     BUSINESS_EVENTS_PATH = _resolve_business_events_path(
         CONFIG_PATH, DATA_MODEL_PATH, config
@@ -637,6 +676,8 @@ def print_config() -> None:
     logger.info("Framework: %s", FRAMEWORK)
     logger.info("Project Path: %s", DBT_PROJECT_PATH)
     logger.info("Frontend build dir: %s", FRONTEND_BUILD_DIR)
+    logger.info("Start page: %s", START_PAGE)
+    logger.info("Canvas default filters: %s", CANVAS_DEFAULT_FILTERS)
     logger.info("Looking for manifest at: %s", MANIFEST_PATH)
     logger.info("Looking for catalog at: %s", CATALOG_PATH)
     logger.info("Looking for data model at: %s", DATA_MODEL_PATH)

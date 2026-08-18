@@ -117,6 +117,11 @@ async def get_config_info():
             cfg.CANVAS_LAYOUT_PATH and os.path.exists(cfg.CANVAS_LAYOUT_PATH)
         ),
         "frontend_build_dir": cfg.FRONTEND_BUILD_DIR,
+        "start_page": cfg.START_PAGE,
+        "canvas_default_filters": {
+            "domains": list(cfg.CANVAS_DEFAULT_FILTERS.get("domains", [])),
+            "tags": list(cfg.CANVAS_DEFAULT_FILTERS.get("tags", [])),
+        },
         "model_paths_configured": status["model_paths_configured"],
         "model_paths_resolved": status["model_paths_resolved"],
         "guidance": {

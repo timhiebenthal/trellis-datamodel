@@ -16,7 +16,9 @@
     undo,
     redo,
     folderFilter,
+    domainFilter,
     tagFilter,
+    canvasFiltersInitialized,
     groupByFolder,
     entitySelection,
         modelingStyle,
@@ -48,6 +50,7 @@ import {
 } from "$lib/utils";
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
+import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
 import { isFeatureAvailable } from "$lib/utils/framework-display";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
@@ -96,6 +99,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     let configInfoLoading = $state(false);
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
+    let unconfiguredCanvas = $state(true);
     let lineageEnabled = $state(false);
     let exposuresEnabled = $state(false);
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
@@ -502,11 +506,13 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     const STORAGE_KEY = "trellis_all_expanded";
     let allExpanded = $state(true);
     let stateApplied = $state(false);
+    let hasPersistedCollapsePreference = $state(false);
 
     // Restore state from localStorage on mount
     onMount(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved !== null) {
+            hasPersistedCollapsePreference = true;
             allExpanded = saved === "true";
         }
     });
@@ -517,7 +523,14 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
         const currentNodes = $nodes;
         const entityNodes = currentNodes.filter((n) => n.type === "entity");
         if (entityNodes.length > 0 && !stateApplied) {
-            // Apply the persisted state to all entity nodes
+            // A fresh, unconfigured project starts in a conceptual, collapsed
+            // Canvas. An explicit local preference always wins for collapse.
+            if (unconfiguredCanvas) {
+                $viewMode = "conceptual";
+                if (!hasPersistedCollapsePreference) {
+                    allExpanded = false;
+                }
+            }
             applyExpandCollapseState(allExpanded);
             stateApplied = true;
         }
@@ -546,6 +559,12 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
         // Save immediately using AutoSave service
         autoSaveService?.saveNow($nodes, $edges);
     }
+
+    function hasExplicitCanvasEntitySubset(): boolean {
+        if ($page.url.pathname !== "/canvas") return false;
+        const entities = $page.url.searchParams.get("entities");
+        return entities !== null && entities.split(",").some((id) => id.trim().length > 0);
+    }
     
     onMount(() => {
         (async () => {
@@ -553,9 +572,19 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 // Check Config Status
                 const status = await getConfigStatus();
                 $configStatus = status;
+                unconfiguredCanvas =
+                    !status.config_present ||
+                    status.data_model_exists === false ||
+                    Boolean(status.error);
 
                 // Load Config Info (includes guidance config)
                 const info = await getConfigInfo();
+                configInfo = info;
+                if (!$canvasFiltersInitialized) {
+                    domainFilter.set([...(info?.canvas_default_filters?.domains ?? [])]);
+                    tagFilter.set([...(info?.canvas_default_filters?.tags ?? [])]);
+                    canvasFiltersInitialized.set(true);
+                }
                 if (info?.guidance) {
                     guidanceConfig = info.guidance;
                 }
@@ -653,6 +682,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                             annotation_type: e.annotation_type,
                             roles: e.roles,
                             domain: e.domain,
+                            domains: e.domains,
                         },
                         parentId: undefined,
                     };
@@ -812,8 +842,12 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
         if (loading) return;
 
         const activeFolder = $folderFilter;
+        const activeDomains = $domainFilter;
         const activeTags = $tagFilter;
         const models = $frameworkModels;
+        const explicitEntityIds = hasExplicitCanvasEntitySubset()
+            ? new Set(($page.url.searchParams.get("entities") ?? "").split(",").filter((id) => id.trim()))
+            : null;
 
         const currentNodes = untrack(() => $nodes);
         const currentEdges = untrack(() => $edges);
@@ -828,9 +862,9 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
             const additionalModels = additionalModelIds.map((id) => models.find((m) => m.unique_id === id)).filter((m): m is ModelInfo => m !== undefined);
             const allBoundModels = primaryModel ? [primaryModel, ...additionalModels] : additionalModels;
 
-            let visible = true;
+            let visible = explicitEntityIds?.has(node.id) ?? true;
 
-            if (activeFolder.length > 0) {
+            if (!explicitEntityIds?.has(node.id) && activeFolder.length > 0) {
                 if (allBoundModels.length === 0) {
                     visible = false;
                 } else {
@@ -839,12 +873,15 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 }
             }
 
-            if (activeTags.length > 0) {
-                const allModelTags = allBoundModels.flatMap((m) => normalizeTags(m.tags));
-                const entityTags = normalizeTags(node.data?.tags);
-                const nodeTags = [...new Set([...allModelTags, ...entityTags])];
-
-                visible = visible && nodeTags.length > 0 && activeTags.some((tag) => nodeTags.includes(tag));
+            if (!explicitEntityIds?.has(node.id)) {
+                visible = visible && matchesCanvasFilters(
+                    node.data as any,
+                    {
+                        selectedDomains: activeDomains,
+                        selectedTags: activeTags,
+                    },
+                    allBoundModels,
+                );
             }
 
             return { ...node, hidden: !visible };

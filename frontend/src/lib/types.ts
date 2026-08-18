@@ -197,6 +197,11 @@ export interface GuidanceConfig {
     disabled_guidance: string[];
 }
 
+export interface CanvasDefaultFilters {
+    domains: string[];
+    tags: string[];
+}
+
 export interface EntityWizardData {
     label: string;
     description: string;
@@ -226,6 +231,8 @@ export interface ConfigInfo {
     model_paths_resolved: string[];
     entity_creation_guidance?: GuidanceConfig;
     guidance?: GuidanceConfig;
+    start_page?: 'canvas' | 'entity-list';
+    canvas_default_filters?: CanvasDefaultFilters;
     lineage_enabled?: boolean;
     lineage_layers?: string[];
     exposures_enabled?: boolean;
@@ -508,6 +515,11 @@ export interface EntityListFilters {
     selectedBuildStatus: Array<'bound' | 'unbound'>;
     sortDirection: 'asc' | 'desc';
     groupByEntityType: boolean;
+}
+
+export interface CanvasFilterState {
+    domains: string[];
+    tags: string[];
 }
 
 export interface EntityDetailModalState {
