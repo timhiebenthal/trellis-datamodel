@@ -499,6 +499,32 @@ describe('EntityDetailModal — Relationships section', () => {
     expect(goto).toHaveBeenCalledWith('/entity-list/node-ir');
   });
 
+  it('removes relationships when deleting an entity', async () => {
+    setupEntityWithRelationship();
+    edges.update((edgeList) => [
+      ...edgeList,
+      {
+        id: 'e-lead-ir',
+        source: 'node-lead',
+        target: 'node-ir',
+        type: 'custom',
+      },
+      {
+        id: 'e-unrelated',
+        source: 'node-ir',
+        target: 'node-other',
+        type: 'custom',
+      },
+    ] as any);
+    await renderModal();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Entity' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }));
+
+    expect(get(nodes).map((node) => node.id)).toEqual(['node-ir']);
+    expect(get(edges).map((edge) => edge.id)).toEqual(['e-unrelated']);
+  });
+
   it('does not render the Relationships section when the entity has no edges', async () => {
     nodes.set([
       { id: 'node-lead', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Lead' } },
