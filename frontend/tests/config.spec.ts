@@ -1,7 +1,26 @@
 import { test, expect } from '@playwright/test';
-import { applyConfigOverrides, restoreConfig } from './helpers';
+import { applyConfigOverrides, resetDataModel, restoreConfig } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
+
+const CANVAS_CONFIG_DATA_MODEL = {
+    version: 0.1,
+    entities: [
+        {
+            id: 'sales_orders',
+            label: 'Sales Orders',
+            domain: 'sales',
+            tags: ['important'],
+        },
+        {
+            id: 'finance_orders',
+            label: 'Finance Orders',
+            domain: 'finance',
+            tags: ['trusted'],
+        },
+    ],
+    relationships: [],
+};
 
 test.describe('Canvas configuration controls', () => {
     test('renders configured values and supports adding and removing defaults', async ({ page, request }) => {
@@ -16,6 +35,7 @@ test.describe('Canvas configuration controls', () => {
         });
 
         try {
+            await resetDataModel(request, CANVAS_CONFIG_DATA_MODEL);
             await page.goto('/config');
 
             await expect(page.getByLabel('Start Page')).toHaveValue('entity-list');
@@ -24,19 +44,18 @@ test.describe('Canvas configuration controls', () => {
 
             await page.getByRole('button', { name: 'Add Domain' }).click();
             await expect(page.getByLabel('Canvas Default Domain 2')).toBeVisible();
-            await page.getByLabel('Canvas Default Domain 2').fill('finance');
 
             await page.getByRole('button', { name: 'Remove Domain 1' }).click();
             await expect(page.getByLabel('Canvas Default Domain 1')).toHaveValue('finance');
 
             await page.getByRole('button', { name: 'Add Tag' }).click();
             await expect(page.getByLabel('Canvas Default Tag 2')).toBeVisible();
-            await page.getByLabel('Canvas Default Tag 2').fill('trusted');
 
             await page.getByRole('button', { name: 'Remove Tag 1' }).click();
             await expect(page.getByLabel('Canvas Default Tag 1')).toHaveValue('trusted');
         } finally {
             await restoreConfig(request, originalConfig);
+            await resetDataModel(request);
         }
     });
 
@@ -52,12 +71,13 @@ test.describe('Canvas configuration controls', () => {
         });
 
         try {
+            await resetDataModel(request, CANVAS_CONFIG_DATA_MODEL);
             await page.goto('/config');
             await page.getByLabel('Start Page').selectOption('entity-list');
             await page.getByRole('button', { name: 'Add Domain' }).click();
-            await page.getByLabel('Canvas Default Domain 1').fill('operations');
             await page.getByRole('button', { name: 'Add Tag' }).click();
-            await page.getByLabel('Canvas Default Tag 1').fill('certified');
+            const selectedDomain = await page.getByLabel('Canvas Default Domain 1').inputValue();
+            const selectedTag = await page.getByLabel('Canvas Default Tag 1').inputValue();
 
             let submittedConfig: Record<string, any> | undefined;
             let reloadCalls = 0;
@@ -100,14 +120,15 @@ test.describe('Canvas configuration controls', () => {
                 start_page: 'entity-list',
                 canvas: {
                     default_filters: {
-                        domains: ['operations'],
-                        tags: ['certified'],
+                        domains: [selectedDomain],
+                        tags: [selectedTag],
                     },
                 },
             });
             expect(reloadCalls).toBe(1);
         } finally {
             await restoreConfig(request, originalConfig);
+            await resetDataModel(request);
         }
     });
 });
