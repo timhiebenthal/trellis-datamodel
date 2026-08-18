@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-08-17
+
+### Fixed
+- **Canonical model folder paths**: top-level and nested model directories below `models/`
+  are now preserved consistently for grouping and filtering instead of being misclassified
+  as `Uncategorized`.
+
 ## [0.22.0] - 2026-08-17
 
 ### Added

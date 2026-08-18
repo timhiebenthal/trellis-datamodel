@@ -273,23 +273,22 @@ export function extractModelNameFromUniqueId(uniqueId: string): string {
 }
 
 /**
- * Extract folder path from a dbt model's file_path.
- * Skips "models/" prefix and the first directory level (e.g., "3_core").
- * Returns null if no subfolder exists.
+ * Extract the canonical folder path from a model's file_path.
+ * Returns every directory component below the last "models" segment, or the
+ * normalized path when no "models" segment exists. Returns null when the file
+ * is directly under "models" or has no usable parent directory.
  */
 export function getModelFolder(model: ModelInfo): string | null {
     if (!model.file_path) return null;
-    let p = model.file_path.replace(/\\/g, '/');
+    const p = model.file_path.replace(/\\/g, '/');
     const lastSlash = p.lastIndexOf('/');
     const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : '';
     let parts = dir.split('/').filter((x) => x !== '.' && x !== '');
-    if (parts[0] === 'models') parts.shift();
-    // Skip the main folder (first part after models/)
-    if (parts.length > 1) {
-        parts.shift();
-        return parts.join('/');
+    const modelsIndex = parts.lastIndexOf('models');
+    if (modelsIndex !== -1) {
+        parts = parts.slice(modelsIndex + 1);
     }
-    return null;
+    return parts.length > 0 ? parts.join('/') : null;
 }
 
 /**

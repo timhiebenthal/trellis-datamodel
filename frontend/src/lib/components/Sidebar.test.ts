@@ -148,9 +148,9 @@ describe('Filter Helper Functions', () => {
         const model3 = { file_path: 'models/1_stg/raw.sql' } as any;
         const model4 = { file_path: '' } as any;
 
-        expect(getModelFolder(model1)).toBe('all');
-        expect(getModelFolder(model2)).toBe('staging');
-        expect(getModelFolder(model3)).toBeNull();
+        expect(getModelFolder(model1)).toBe('3_core/all');
+        expect(getModelFolder(model2)).toBe('2_int/staging');
+        expect(getModelFolder(model3)).toBe('1_stg');
         expect(getModelFolder(model4)).toBeNull();
     });
 
