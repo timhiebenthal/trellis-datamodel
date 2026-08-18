@@ -4,12 +4,14 @@ Trellis Data - FastAPI Server
 This is the FastAPI application that serves the API and frontend.
 """
 
-import os
 from importlib.resources import files
+import os
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import (
@@ -19,6 +21,12 @@ from trellis_datamodel.exceptions import (
     ConfigurationError,
     FileOperationError,
     FeatureDisabledError,
+)
+from trellis_datamodel.observability import (
+    PhaseCollector,
+    reset_collector,
+    serialize_server_timing,
+    set_collector,
 )
 from trellis_datamodel.routes import (
     bus_matrix_router,
@@ -31,6 +39,63 @@ from trellis_datamodel.routes import (
     reconcile_router,
     schema_router,
 )
+
+
+class _RequestTimingMiddleware:
+    """Attach safe request timing metadata to every HTTP response."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request_id = str(uuid4())
+        collector = PhaseCollector()
+        collector_token = set_collector(collector)
+        started_at = perf_counter()
+        response_started = False
+        total_recorded = False
+
+        def record_total_request() -> None:
+            nonlocal total_recorded
+            if not total_recorded:
+                collector.add("request", (perf_counter() - started_at) * 1000)
+                total_recorded = True
+
+        async def send_with_headers(message):
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                record_total_request()
+                response_started = True
+                headers = [
+                    (name, value)
+                    for name, value in message.get("headers", [])
+                    if name.lower()
+                    not in {b"server-timing", b"x-trellis-request-id"}
+                ]
+                headers.append((b"x-trellis-request-id", request_id.encode("ascii")))
+                headers.append(
+                    (
+                        b"server-timing",
+                        serialize_server_timing(collector).encode("ascii"),
+                    )
+                )
+                message = {**message, "headers": headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_headers)
+        except Exception:
+            record_total_request()
+            if not response_started:
+                error_response = PlainTextResponse("Internal Server Error", status_code=500)
+                await error_response(scope, receive, send_with_headers)
+            raise
+        finally:
+            reset_collector(collector_token)
 
 
 def _configure_cors(app: FastAPI) -> None:
@@ -167,6 +232,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Trellis Data", version="0.1.0")
 
     _configure_cors(app)
+    app.add_middleware(_RequestTimingMiddleware)
     _register_exception_handlers(app)
 
     # Health check endpoint

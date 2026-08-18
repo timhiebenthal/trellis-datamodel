@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.models.schemas import (
     FileOperationResponse,
     ModelSchemaRequest,
@@ -51,7 +52,8 @@ async def sync_framework_tests_endpoint():
 @router.get("/models/{model_name}/schema", response_model=ModelSchemaResponse)
 async def get_model_schema_endpoint(model_name: str, version: int | None = None):
     """Get the schema for a specific model from its YAML file."""
-    schema = get_model_schema(model_name, version=version)
+    with timed_phase("schema_read"):
+        schema = get_model_schema(model_name, version=version)
     return ModelSchemaResponse(**schema)
 
 
@@ -77,5 +79,6 @@ async def update_model_schema_endpoint(
 @router.get("/infer-relationships", response_model=RelationshipsResponse)
 async def infer_relationships_endpoint(include_unbound: bool = False):
     """Scan schema files and infer entity relationships from relationship tests."""
-    relationships = infer_relationships(include_unbound=include_unbound)
+    with timed_phase("relationship_scan"):
+        relationships = infer_relationships(include_unbound=include_unbound)
     return RelationshipsResponse(relationships=relationships)

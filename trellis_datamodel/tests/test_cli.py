@@ -291,14 +291,12 @@ class TestCLIRun:
         original_cwd = os.getcwd()
         # Clear test environment variable to simulate production
         old_test_dir = os.environ.pop("DATAMODEL_TEST_DIR", None)
+        import importlib
+        import trellis_datamodel.config as config_module
 
-        # Force reload of config and cli modules
-        modules_to_remove = [
-            k for k in list(sys.modules.keys()) if "trellis_datamodel" in k
-        ]
-        for mod in modules_to_remove:
-            del sys.modules[mod]
-
+        # Reload the config in place so already-collected test modules retain
+        # references to the same module objects.
+        importlib.reload(config_module)
         from trellis_datamodel.cli import app
 
         try:
@@ -312,12 +310,7 @@ class TestCLIRun:
             os.chdir(original_cwd)
             if old_test_dir:
                 os.environ["DATAMODEL_TEST_DIR"] = old_test_dir
-            # Reload modules to restore test mode
-            modules_to_remove = [
-                k for k in list(sys.modules.keys()) if "trellis_datamodel" in k
-            ]
-            for mod in modules_to_remove:
-                del sys.modules[mod]
+            importlib.reload(config_module)
 
 
 class TestCLIHelp:

@@ -1,16 +1,19 @@
 """Routes for data model CRUD operations."""
 from fastapi import APIRouter, HTTPException
-import yaml
 import os
 from typing import Dict, Any, List, Tuple
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.schemas import DataModelUpdate
-from trellis_datamodel.services.lineage import extract_source_systems_for_model
+from trellis_datamodel.services.lineage import (
+    extract_source_systems_for_models,
+)
 from trellis_datamodel.services.reconciliation import compute_display_tags
 from trellis_datamodel.adapters import get_adapter
+from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.utils.yaml_handler import YamlHandler
+from trellis_datamodel.utils.structured_data import load_yaml_or_json
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.models.entity_keys import (
     MODEL_REF_KEY,
@@ -55,8 +58,7 @@ def load_data_model_raw() -> Dict[str, Any]:
         }
     
     try:
-        with open(cfg.DATA_MODEL_PATH, "r") as f:
-            model_data = yaml.safe_load(f) or {}
+        model_data = load_yaml_or_json(cfg.DATA_MODEL_PATH) or {}
         
         if not model_data.get("entities"):
             model_data["entities"] = []
@@ -83,35 +85,35 @@ def save_data_model_raw(model_data: Dict[str, Any]) -> None:
 
 def _load_canvas_layout() -> Dict[str, Any]:
     """Load canvas layout file if it exists."""
-    if not os.path.exists(cfg.CANVAS_LAYOUT_PATH):
-        return {
-            "version": 0.1,
-            "entities": {},
-            "relationships": {},
-            "source_colors": {},
-        }
+    with timed_phase("layout_read"):
+        if not os.path.exists(cfg.CANVAS_LAYOUT_PATH):
+            return {
+                "version": 0.1,
+                "entities": {},
+                "relationships": {},
+                "source_colors": {},
+            }
 
-    try:
-        with open(cfg.CANVAS_LAYOUT_PATH, "r") as f:
-            layout = yaml.safe_load(f) or {}
-        source_colors = layout.get("source_colors")
-        # Ensure source_colors is always a dict, not None
-        if source_colors is None:
-            source_colors = {}
-        return {
-            "version": layout.get("version", 0.1),
-            "entities": layout.get("entities", {}),
-            "relationships": layout.get("relationships", {}),
-            "source_colors": source_colors,
-        }
-    except Exception as e:
-        print(f"Warning: Could not load canvas layout: {e}")
-        return {
-            "version": 0.1,
-            "entities": {},
-            "relationships": {},
-            "source_colors": {},
-        }
+        try:
+            layout = load_yaml_or_json(cfg.CANVAS_LAYOUT_PATH) or {}
+            source_colors = layout.get("source_colors")
+            # Ensure source_colors is always a dict, not None
+            if source_colors is None:
+                source_colors = {}
+            return {
+                "version": layout.get("version", 0.1),
+                "entities": layout.get("entities", {}),
+                "relationships": layout.get("relationships", {}),
+                "source_colors": source_colors,
+            }
+        except Exception as e:
+            print(f"Warning: Could not load canvas layout: {e}")
+            return {
+                "version": 0.1,
+                "entities": {},
+                "relationships": {},
+                "source_colors": {},
+            }
 
 
 def _merge_layout_into_model(
@@ -183,6 +185,13 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
     2. ID-based fallback: unbound entities not in the manifest but whose entity ID
        itself matches the configured dimension/fact prefix patterns.
     """
+    entities = model_data.get("entities", [])
+    if not any(
+        entity.get("entity_type") is None or entity.get("entity_type") == "unclassified"
+        for entity in entities
+    ):
+        return model_data
+
     try:
         adapter = get_adapter()
         inferred_types = adapter.infer_entity_types()
@@ -193,7 +202,6 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
     dim_prefixes: List[str] = cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix
     fact_prefixes: List[str] = cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix
 
-    entities = model_data.get("entities", [])
     for entity in entities:
         entity_id = entity.get("id")
         if not entity_id:
@@ -220,6 +228,12 @@ def _apply_entity_type_inference(model_data: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.get("/data-model")
 async def get_data_model():
+    """Return current data model with layout merged in, with a read boundary."""
+    with timed_phase("data_model_read"):
+        return await _get_data_model()
+
+
+async def _get_data_model():
     """Return current data model with layout merged in."""
     # Load layout data (including source_colors) even if data_model.yml doesn't exist
     layout_data = _load_canvas_layout()
@@ -235,8 +249,7 @@ async def get_data_model():
 
     try:
         # Load model data
-        with open(cfg.DATA_MODEL_PATH, "r") as f:
-            model_data = yaml.safe_load(f) or {}
+        model_data = load_yaml_or_json(cfg.DATA_MODEL_PATH) or {}
 
         if not model_data.get("entities"):
             model_data["entities"] = []
@@ -247,7 +260,8 @@ async def get_data_model():
 
         # Apply entity type inference when dimensional modeling is enabled
         if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
-            model_data = _apply_entity_type_inference(model_data)
+            with timed_phase("entity_inference"):
+                model_data = _apply_entity_type_inference(model_data)
 
         # Merge layout data
         merged_data = _merge_layout_into_model(model_data, layout_data)
@@ -255,10 +269,32 @@ async def get_data_model():
         # Pass through source_colors from canvas_layout.yml
         merged_data["source_colors"] = layout_data.get("source_colors", {})
 
-        # Add source_system field to entities
-        # For bound entities: extract from lineage
-        # For unbound entities: read from persisted YAML
+        # Collect all bound model IDs before doing one source-system lookup.
         entities = merged_data.get("entities", [])
+        bound_model_ids: list[str] = []
+        for entity in entities:
+            model_ref = get_model_ref(entity)
+            if not model_ref:
+                continue
+            additional_models = entity.get("additional_models", [])
+            if not isinstance(additional_models, list):
+                additional_models = []
+            for model_id in [model_ref, *additional_models]:
+                if isinstance(model_id, str) and model_id not in bound_model_ids:
+                    bound_model_ids.append(model_id)
+
+        source_index: Dict[str, List[str]] = {}
+        if bound_model_ids:
+            try:
+                with timed_phase("source_lineage"):
+                    source_index = extract_source_systems_for_models(bound_model_ids)
+            except Exception:
+                # Source enrichment is optional and must not break the response.
+                pass
+
+        # Add source_system field to entities.
+        # For bound entities: look up source systems from the batch index.
+        # For unbound entities: read from persisted YAML.
         for entity in entities:
             model_ref = get_model_ref(entity)
             additional_models = entity.get("additional_models", [])
@@ -269,17 +305,11 @@ async def get_data_model():
             entity["tags"] = compute_display_tags(entity)
 
             if model_ref:
-                # Bound entity: extract source systems from lineage, for the
-                # primary model and any additional models bound to it.
                 source_systems = set()
+                if not isinstance(additional_models, list):
+                    additional_models = []
                 for model_id in [model_ref, *additional_models]:
-                    try:
-                        source_systems.update(
-                            extract_source_systems_for_model(model_id)
-                        )
-                    except Exception:
-                        # Gracefully handle errors - log but don't fail
-                        pass
+                    source_systems.update(source_index.get(model_id, []))
 
                 # Set source_system if any sources found
                 if source_systems:
@@ -480,44 +510,44 @@ async def get_source_system_suggestions():
     """
     suggestions: set[str] = set()
 
-    # 1. Collect mock sources from data_model.yml
+    # Load data_model.yml once for both persisted and lineage-derived sources.
+    model_data: Dict[str, Any] = {}
     if os.path.exists(cfg.DATA_MODEL_PATH):
         try:
-            with open(cfg.DATA_MODEL_PATH, "r") as f:
-                model_data = yaml.safe_load(f) or {}
-
-            entities = model_data.get("entities", [])
-            for entity in entities:
-                # Only collect from unbound entities (mock sources)
-                if not get_model_ref(entity) and entity.get("source_system"):
-                    source_systems = entity.get("source_system", [])
-                    if isinstance(source_systems, list):
-                        for source in source_systems:
-                            if source and isinstance(source, str):
-                                suggestions.add(source.strip())
+            model_data = load_yaml_or_json(cfg.DATA_MODEL_PATH) or {}
         except Exception:
             # Gracefully handle errors
             pass
 
-    # 2. Collect lineage-derived sources from all bound entities
-    try:
-        with open(cfg.DATA_MODEL_PATH, "r") as f:
-            model_data = yaml.safe_load(f) or {}
+    # 1. Collect mock sources from unbound entities.
+    entities = model_data.get("entities", [])
+    bound_model_ids: list[str] = []
+    for entity in entities:
+        model_ref = get_model_ref(entity)
+        if not model_ref and entity.get("source_system"):
+            source_systems = entity.get("source_system", [])
+            if isinstance(source_systems, list):
+                for source in source_systems:
+                    if source and isinstance(source, str):
+                        suggestions.add(source.strip())
+        if not model_ref:
+            continue
+        additional_models = entity.get("additional_models", [])
+        if not isinstance(additional_models, list):
+            additional_models = []
+        for model_id in [model_ref, *additional_models]:
+            if isinstance(model_id, str) and model_id not in bound_model_ids:
+                bound_model_ids.append(model_id)
 
-        for entity in model_data.get("entities", []):
-            model_ref = get_model_ref(entity)
-            if not model_ref:
-                continue
-
-            additional_models = entity.get("additional_models", [])
-            for model_id in [model_ref, *additional_models]:
-                try:
-                    suggestions.update(extract_source_systems_for_model(model_id))
-                except Exception:
-                    pass
-    except Exception:
-        # Gracefully handle errors
-        pass
+    # 2. Collect lineage-derived sources in one batch.
+    if bound_model_ids:
+        try:
+            with timed_phase("source_lineage"):
+                source_index = extract_source_systems_for_models(bound_model_ids)
+            for source_systems in source_index.values():
+                suggestions.update(source_systems)
+        except Exception:
+            pass
 
     # 3. Collect from dbt sources.yml (if available)
     # Note: This would require parsing sources.yml files, which is out of scope for now

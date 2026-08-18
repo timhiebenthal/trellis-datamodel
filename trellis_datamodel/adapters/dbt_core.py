@@ -12,14 +12,17 @@ import re
 import time
 import yaml
 from collections import deque
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import FileOperationError, NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
+from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
+from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
 from .base import (
     Capabilities,
@@ -96,7 +99,13 @@ def _resolve_origin_from_column(
     col_data: dict[str, Any], description: str | None
 ) -> tuple[str | None, list[dict[str, str]]]:
     meta = col_data.get("meta") or {}
-    origin = parse_origin(meta.get("origin"))
+    raw_origin = meta.get("origin")
+    if isinstance(raw_origin, tuple):
+        raw_origin = [
+            dict(entry) if isinstance(entry, Mapping) else entry
+            for entry in raw_origin
+        ]
+    origin = parse_origin(raw_origin)
     desc = description
     if not origin and desc and " | Origin: " in desc:
         prefix, suffix = desc.split(" | Origin: ", 1)
@@ -123,21 +132,25 @@ class DbtCoreAdapter:
         self.model_paths = model_paths
         self.yaml_handler = YamlHandler()
 
-    def _load_catalog(self) -> Optional[dict]:
-        """Load catalog.json if it exists."""
-        if not os.path.exists(self.catalog_path):
-            return None
-        try:
-            with open(self.catalog_path, "r") as f:
-                return json.load(f)
-        except Exception as exc:
-            print(f"Warning: failed to read catalog at {self.catalog_path}: {exc}")
-            return None
+    def _get_artifact_snapshot(self) -> ArtifactSnapshot:
+        """Return the shared snapshot used by read-only adapter operations."""
+        if not os.path.exists(self.manifest_path):
+            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+
+        catalog_path = (
+            self.catalog_path
+            if self.catalog_path and os.path.isfile(self.catalog_path)
+            else None
+        )
+        return get_snapshot(self.manifest_path, catalog_path)
 
     def _load_manifest(self) -> dict:
-        """Load manifest.json."""
-        with open(self.manifest_path, "r") as f:
-            return json.load(f)
+        """Load manifest.json for uncached write/edit operations."""
+        with timed_phase("artifact_read"):
+            with open(self.manifest_path, "r") as f:
+                content = f.read()
+        with timed_phase("artifact_parse"):
+            return json.loads(content)
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
@@ -289,13 +302,22 @@ class DbtCoreAdapter:
 
     def _get_model_to_entity_map(self) -> dict[str, str]:
         """Build mapping from model names (with version aliases) to entity IDs."""
+        with timed_phase("model_index"):
+            return self._build_model_to_entity_map()
+
+    def _build_model_to_entity_map(self) -> dict[str, str]:
+        """Build the model/entity index without changing adapter behavior."""
         model_to_entity: dict[str, str] = {}
         data_model = self._load_data_model()
         entities = data_model.get("entities", [])
 
         # Load manifest once to look up model aliases
-        manifest = self._load_manifest() if os.path.exists(self.manifest_path) else {}
-        manifest_nodes = manifest.get("nodes", {})
+        snapshot = (
+            self._get_artifact_snapshot()
+            if os.path.exists(self.manifest_path)
+            else None
+        )
+        manifest = snapshot.manifest if snapshot else {}
 
         for entity in entities:
             entity_id = entity.get("id")
@@ -316,7 +338,7 @@ class DbtCoreAdapter:
 
                 # Also map the dbt YAML-documented model name (if different from unique_id)
                 # Read the YAML file to see if it documents a different model name
-                yml_path = self._get_model_yml_path(base_name)
+                yml_path = self._get_model_yml_path(base_name, manifest=manifest)
                 if yml_path and os.path.exists(yml_path):
                     try:
                         with open(yml_path, "r") as f:
@@ -405,13 +427,16 @@ class DbtCoreAdapter:
         return model_to_entity
 
     def _get_model_yml_path(
-        self, model_name: str, target_version: Optional[int] = None
+        self,
+        model_name: str,
+        target_version: Optional[int] = None,
+        manifest: Optional[dict] = None,
     ) -> Optional[str]:
         """Get the yml file path for a model from the manifest."""
-        if not os.path.exists(self.manifest_path):
-            return None
-
-        manifest = self._load_manifest()
+        if manifest is None:
+            if not os.path.exists(self.manifest_path):
+                return None
+            manifest = self._load_manifest()
         preferred_node: Optional[dict] = None
         fallback_node: Optional[dict] = None
         for key, node in manifest.get("nodes", {}).items():
@@ -550,18 +575,12 @@ class DbtCoreAdapter:
 
     def get_models(self) -> list[ModelInfo]:
         """Parse dbt manifest and catalog to return available models."""
-        if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
-
-        manifest = self._load_manifest()
-        catalog = self._load_catalog()
+        snapshot = self._get_artifact_snapshot()
+        catalog = snapshot.catalog
         catalog_nodes = (catalog or {}).get("nodes", {})
 
         models: list[ModelInfo] = []
-        for key, node in manifest.get("nodes", {}).items():
-            if node.get("resource_type") != "model":
-                continue
-
+        for node in snapshot.models:
             # Filter by path
             original_path = node.get("original_file_path", "")
             if self.model_paths:
@@ -632,7 +651,7 @@ class DbtCoreAdapter:
                     "description": node.get("description"),
                     "materialization": materialized,
                     "file_path": original_path,
-                    "tags": node.get("tags", []),
+                    "tags": list(node.get("tags", [])),
                 }
             )
 
@@ -642,13 +661,23 @@ class DbtCoreAdapter:
     def get_model_schema(
         self, model_name: str, version: Optional[int] = None
     ) -> ModelSchema:
+        """Get a model schema while timing the adapter-owned lookup."""
+        with timed_phase("schema_read"):
+            return self._get_model_schema(model_name, version=version)
+
+    def _get_model_schema(
+        self, model_name: str, version: Optional[int] = None
+    ) -> ModelSchema:
         """Get the current schema definition for a specific model from its YAML file."""
         if not os.path.exists(self.manifest_path):
             raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
 
-        manifest = self._load_manifest()
-
-        candidate_nodes = self._find_manifest_model_nodes(manifest, model_name)
+        snapshot = self._get_artifact_snapshot()
+        candidate_nodes = [
+            node
+            for node in snapshot.models
+            if node.get("name") == model_name
+        ]
         model_node = self._select_model_node(candidate_nodes, target_version=version)
 
         if not model_node:
@@ -803,6 +832,84 @@ class DbtCoreAdapter:
         return model_to_entity.get(base_name, base_name)
 
     def infer_relationships(self, include_unbound: bool = False) -> list[Relationship]:
+        """Scan dbt schema files while timing the adapter-owned scan."""
+        with timed_phase("relationship_scan"):
+            return self._infer_relationships(include_unbound=include_unbound)
+
+    def _relationships_from_snapshot(
+        self,
+        snapshot: ArtifactSnapshot,
+        model_to_entity: dict[str, str],
+        bound_entities: set[str],
+        include_unbound: bool,
+    ) -> list[Relationship]:
+        """Convert indexed manifest relationship tests to adapter results."""
+        relationships: list[Relationship] = []
+
+        def version_number(value: object) -> int | None:
+            try:
+                return int(value) if value is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        for unique_id, entries in snapshot.relationship_index.items():
+            node = snapshot.model_index.get(unique_id)
+            if not node:
+                continue
+
+            model_name = node.get("name")
+            if not model_name:
+                continue
+            model_version = node.get("version")
+            entity_id = self._resolve_entity_id(
+                model_to_entity,
+                model_name,
+                str(model_version) if model_version is not None else None,
+            )
+            for entry in entries:
+                column_name = entry.get("column")
+                rel_test = entry.get("relationship")
+                if not column_name or not isinstance(rel_test, Mapping):
+                    continue
+
+                args = rel_test.get("arguments", {}) or {}
+                to_ref = rel_test.get("to", "") or args.get("to", "")
+                source_field = rel_test.get("field", "") or args.get(
+                    "field", ""
+                )
+                if not to_ref or not source_field:
+                    continue
+
+                source_model_name, source_version = self._parse_ref(to_ref)
+                source_entity_id = self._resolve_entity_id(
+                    model_to_entity, source_model_name, source_version
+                )
+                if not include_unbound and (
+                    entity_id not in bound_entities
+                    or source_entity_id not in bound_entities
+                ):
+                    continue
+
+                relationships.append(
+                    {
+                        "source": source_entity_id,
+                        "target": entity_id,
+                        "label": "",
+                        "type": "one_to_many",
+                        "source_field": source_field,
+                        "target_field": column_name,
+                        "source_model_name": source_model_name,
+                        "source_model_version": version_number(source_version),
+                        "target_model_name": model_name,
+                        "target_model_version": (
+                            version_number(model_version)
+                        ),
+                    }
+                )
+
+        return relationships
+
+    def _infer_relationships(self, include_unbound: bool = False) -> list[Relationship]:
         """Scan dbt yml files and infer entity relationships from relationship tests.
 
         When include_unbound=True, returns ALL relationships found in dbt yml files
@@ -810,6 +917,7 @@ class DbtCoreAdapter:
         to entity IDs based on current canvas state (which may not be saved yet).
         """
         model_dirs = self.get_model_dirs()
+        snapshot = self._get_artifact_snapshot()
         model_to_entity = self._get_model_to_entity_map()
         # Only keep relationships where both ends map to entities that are bound to
         # at least one dbt model (including additional_models). This prevents writing
@@ -828,6 +936,23 @@ class DbtCoreAdapter:
                 for e in data_model.get("entities", [])
                 if e.get("id") and (get_model_ref(e) or e.get("additional_models"))
             }
+        indexed_relationships = self._relationships_from_snapshot(
+            snapshot, model_to_entity, bound_entities, include_unbound
+        )
+        if indexed_relationships:
+            yml_found = any(
+                filename.endswith((".yml", ".yaml"))
+                for models_dir in model_dirs
+                if os.path.exists(models_dir)
+                for _, _, files in os.walk(models_dir)
+                for filename in files
+            )
+            if not yml_found:
+                raise FileNotFoundError(
+                    f"No schema yml files found under configured dbt model paths: {model_dirs}"
+                )
+            return indexed_relationships
+
         relationships: list[Relationship] = []
         yml_found = False
 
@@ -1412,12 +1537,15 @@ class DbtCoreAdapter:
     @classmethod
     def reset_inference_cache(cls) -> None:
         """
-        Reset the entity type inference cache.
+        Reset inference and shared artifact caches.
 
         Should be called when configuration changes that affect inference
         (e.g., dimensional modeling config, manifest path changes).
         """
-        entity_type_inference.reset_cache(FRAMEWORK_NAME)
+        # Configuration is process-wide, so invalidate every framework
+        # namespace rather than only the currently selected adapter.
+        entity_type_inference.reset_cache()
+        clear_snapshots()
 
     def infer_entity_types(self) -> dict[str, str]:
         """
@@ -1436,21 +1564,30 @@ class DbtCoreAdapter:
         if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             return {}
 
-        # The manifest's mtime is what makes a dbt project's inference stale.
-        cache_key = f"{self.manifest_path}:{os.path.getmtime(self.manifest_path)}"
-
-        return entity_type_inference.infer_entity_types(
-            framework=FRAMEWORK_NAME,
-            cache_key=cache_key,
-            get_models=self.get_models,
-            get_model_to_entity_map=self._get_model_to_entity_map,
+        snapshot = self._get_artifact_snapshot()
+        cache_key = "|".join(
+            f"{identity.path}:{identity.mtime_ns}:{identity.size}"
+            for identity in snapshot.identities
         )
+
+        with timed_phase("entity_inference"):
+            return entity_type_inference.infer_entity_types(
+                framework=FRAMEWORK_NAME,
+                cache_key=cache_key,
+                get_models=self.get_models,
+                get_model_to_entity_map=self._get_model_to_entity_map,
+            )
 
     # ------------------------------------------------------------------
     # Lineage, exposures, and project status
     # ------------------------------------------------------------------
 
     def get_lineage(self, model_unique_id: str) -> LineageGraph:
+        """Build lineage while timing the adapter-owned source walk."""
+        with timed_phase("source_lineage"):
+            return self._get_lineage(model_unique_id)
+
+    def _get_lineage(self, model_unique_id: str) -> LineageGraph:
         """
         Build the upstream lineage graph for a model from manifest.json.
 
@@ -1460,9 +1597,10 @@ class DbtCoreAdapter:
         if not os.path.exists(self.manifest_path):
             raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
-        manifest = self._load_manifest()
+        snapshot = self._get_artifact_snapshot()
+        manifest = snapshot.manifest
         nodes = manifest.get("nodes", {})
-        sources = manifest.get("sources", {})
+        sources = snapshot.source_index
 
         if model_unique_id not in nodes:
             raise NotFoundError(self._model_not_found_message(model_unique_id, nodes))
@@ -1483,12 +1621,11 @@ class DbtCoreAdapter:
             if not depends_on:
                 continue
 
-            if isinstance(depends_on, dict):
+            upstream_ids = snapshot.dependency_index.get(current_id, ())
+            if isinstance(depends_on, Mapping):
                 upstream_ids = depends_on.get("nodes", [])
-            elif isinstance(depends_on, list):
+            elif isinstance(depends_on, (list, tuple)):
                 upstream_ids = depends_on
-            else:
-                upstream_ids = []
 
             for upstream_id in upstream_ids:
                 edges.append({"source": upstream_id, "target": current_id})
@@ -1579,6 +1716,61 @@ class DbtCoreAdapter:
             }
         )
 
+    def get_source_systems_for_models(
+        self, model_unique_ids: Iterable[str]
+    ) -> dict[str, list[str]]:
+        """Return source names for many models from one manifest snapshot."""
+        ordered_model_ids = list(dict.fromkeys(model_unique_ids))
+        if not ordered_model_ids:
+            return {}
+
+        try:
+            snapshot = self._get_artifact_snapshot()
+            manifest_nodes = snapshot.manifest.get("nodes", {})
+            source_index = snapshot.source_index
+            dependency_index = snapshot.dependency_index
+            memo: dict[str, tuple[str, ...]] = {}
+            visiting: set[str] = set()
+
+            def source_ids_for(node_id: str) -> tuple[str, ...]:
+                """Memoize source leaves for every shared upstream node."""
+                if node_id in memo:
+                    return memo[node_id]
+                if node_id in source_index:
+                    memo[node_id] = (node_id,)
+                    return memo[node_id]
+                if node_id not in manifest_nodes or node_id in visiting:
+                    memo[node_id] = ()
+                    return memo[node_id]
+
+                visiting.add(node_id)
+                source_ids: list[str] = []
+                for upstream_id in dependency_index.get(node_id, ()):
+                    for source_id in source_ids_for(upstream_id):
+                        if source_id not in source_ids:
+                            source_ids.append(source_id)
+                visiting.remove(node_id)
+                memo[node_id] = tuple(source_ids)
+                return memo[node_id]
+
+            result: dict[str, list[str]] = {}
+            for model_id in ordered_model_ids:
+                source_names: list[str] = []
+                for source_id in source_ids_for(model_id):
+                    source_name = source_index[source_id].get("source_name")
+                    if source_name and source_name not in source_names:
+                        source_names.append(source_name)
+                # Preserve the singular adapter's public ordering contract.
+                result[model_id] = sorted(source_names)
+            return result
+        except Exception as e:
+            logger.warning(
+                "Failed to extract source systems for models %s: %s",
+                ordered_model_ids,
+                e,
+            )
+            return {model_id: [] for model_id in ordered_model_ids}
+
     def get_exposures(self) -> list[Exposure]:
         """
         Return dbt exposures with their dependencies resolved to unique_ids.
@@ -1588,7 +1780,12 @@ class DbtCoreAdapter:
         case `depends_on` holds `ref()` strings, which are resolved here so
         callers only ever see unique_ids.
         """
-        manifest = self._load_manifest() if os.path.exists(self.manifest_path) else {}
+        snapshot = (
+            self._get_artifact_snapshot()
+            if os.path.exists(self.manifest_path)
+            else None
+        )
+        manifest = snapshot.manifest if snapshot else {}
 
         raw_exposures = self._manifest_exposures(manifest)
         if not raw_exposures:
@@ -1596,14 +1793,14 @@ class DbtCoreAdapter:
 
         exposures: list[Exposure] = []
         for raw in raw_exposures:
-            if not isinstance(raw, dict):
+            if not isinstance(raw, Mapping):
                 continue
             name = raw.get("name", "")
             if not name:
                 continue
 
             owner = raw.get("owner")
-            if isinstance(owner, dict):
+            if isinstance(owner, Mapping):
                 owner_meta = {"name": owner.get("name")}
             elif owner:
                 owner_meta = {"name": str(owner)}
@@ -1629,10 +1826,10 @@ class DbtCoreAdapter:
     def _manifest_exposures(manifest: dict) -> list[dict]:
         """Exposures as compiled into manifest.json, if any."""
         exposures = manifest.get("exposures", {})
-        if isinstance(exposures, dict):
-            return [e for e in exposures.values() if isinstance(e, dict)]
-        if isinstance(exposures, list):
-            return [e for e in exposures if isinstance(e, dict)]
+        if isinstance(exposures, Mapping):
+            return [e for e in exposures.values() if isinstance(e, Mapping)]
+        if isinstance(exposures, (list, tuple)):
+            return [e for e in exposures if isinstance(e, Mapping)]
         return []
 
     def _exposures_from_yaml(self) -> list[dict]:
@@ -1665,11 +1862,11 @@ class DbtCoreAdapter:
         depends_on = raw_exposure.get("depends_on")
 
         # Manifest format: already unique_ids.
-        if isinstance(depends_on, dict):
+        if isinstance(depends_on, Mapping):
             return [n for n in depends_on.get("nodes", []) if isinstance(n, str)]
 
         # YAML format: ref() strings needing resolution against the manifest.
-        if isinstance(depends_on, list):
+        if isinstance(depends_on, (list, tuple)):
             resolved = []
             for ref_string in depends_on:
                 if not isinstance(ref_string, str):

@@ -33,6 +33,7 @@ REQUIRED_PROTOCOL_METHODS = {
     "get_lineage",
     "get_exposures",
     "get_source_systems_for_model",
+    "get_source_systems_for_models",
     "get_project_status",
 }
 
@@ -103,6 +104,12 @@ def test_adapter_exposes_exposures(fake_adapter):
 
 def test_adapter_exposes_source_systems_for_model(fake_adapter):
     assert fake_adapter.get_source_systems_for_model("model.fake.customer") == ["crm"]
+
+
+def test_adapter_exposes_source_systems_for_models(fake_adapter):
+    assert fake_adapter.get_source_systems_for_models(
+        ["model.fake.customer", "model.fake.customer"]
+    ) == {"model.fake.customer": ["crm"]}
 
 
 def test_source_systems_never_raises(fake_adapter):

@@ -80,8 +80,9 @@ class TestReconcileDbtEndpoint:
         data = response.json()
         assert data["status"] == "success"
         assert data["changed"] is True
+        assert set(data) == {"status", "changed"}
 
-        entities = data["data_model"]["entities"]
+        entities = test_client.get("/api/data-model").json()["entities"]
         users = next(e for e in entities if e["id"] == "users")
         fields = users["drafted_fields"]
         assert len(fields) == 2
@@ -197,7 +198,7 @@ class TestReconcileDbtEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["changed"] is False
-        fields = data["data_model"]["entities"][0]["drafted_fields"]
+        fields = test_client.get("/api/data-model").json()["entities"][0]["drafted_fields"]
         assert fields == [{"name": "sku", "datatype": "text", "source": "dbt"}]
 
 
@@ -233,8 +234,9 @@ class TestFrameworkNeutralReconcileEndpoint:
         data = response.json()
         assert data["status"] == "success"
         assert data["changed"] is True
+        assert set(data) == {"status", "changed"}
 
-        entities = data["data_model"]["entities"]
+        entities = test_client.get("/api/data-model").json()["entities"]
         users = next(e for e in entities if e["id"] == "users")
         fields = users["drafted_fields"]
         assert len(fields) == 2
