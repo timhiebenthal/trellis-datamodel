@@ -211,9 +211,10 @@ const CANVAS_FILTER_DATA_MODEL: DataModelPayload = {
 };
 
 function entityNode(page: Page, label: string) {
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return page
         .locator('.svelte-flow__node-entity')
-        .filter({ has: page.locator(`input[value="${label}"]`) });
+        .filter({ has: page.getByRole('button', { name: new RegExp(`^${escapedLabel}\\b`) }) });
 }
 
 async function expectEntityHidden(page: Page, label: string): Promise<void> {

@@ -100,6 +100,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     let configInfoError = $state<string | null>(null);
     let configInfo = $state<ConfigInfo | null>(null);
     let unconfiguredCanvas = $state(true);
+    let navigationConfigLoaded = $state(false);
     let lineageEnabled = $state(false);
     let exposuresEnabled = $state(false);
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
@@ -507,6 +508,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     let allExpanded = $state(true);
     let stateApplied = $state(false);
     let hasPersistedCollapsePreference = $state(false);
+    let collapsePreferenceLoaded = $state(false);
 
     // Restore state from localStorage on mount
     onMount(() => {
@@ -515,6 +517,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
             hasPersistedCollapsePreference = true;
             allExpanded = saved === "true";
         }
+        collapsePreferenceLoaded = true;
     });
 
 
@@ -522,7 +525,7 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     $effect(() => {
         const currentNodes = $nodes;
         const entityNodes = currentNodes.filter((n) => n.type === "entity");
-        if (entityNodes.length > 0 && !stateApplied) {
+        if (entityNodes.length > 0 && collapsePreferenceLoaded && navigationConfigLoaded && !stateApplied) {
             // A fresh, unconfigured project starts in a conceptual, collapsed
             // Canvas. An explicit local preference always wins for collapse.
             if (unconfiguredCanvas) {
@@ -580,6 +583,12 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 // Load Config Info (includes guidance config)
                 const info = await getConfigInfo();
                 configInfo = info;
+                const hasCanvasNavigationConfig =
+                    info?.start_page === 'entity-list' ||
+                    (info?.canvas_default_filters?.domains?.length ?? 0) > 0 ||
+                    (info?.canvas_default_filters?.tags?.length ?? 0) > 0;
+                unconfiguredCanvas = unconfiguredCanvas || !hasCanvasNavigationConfig;
+                navigationConfigLoaded = true;
                 if (!$canvasFiltersInitialized) {
                     domainFilter.set([...(info?.canvas_default_filters?.domains ?? [])]);
                     tagFilter.set([...(info?.canvas_default_filters?.tags ?? [])]);

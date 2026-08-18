@@ -1,32 +1,25 @@
 version: 0.1
 entities:
-  customer_profile:
+  sales_orders:
     position:
-      x: 50
-      y: 850
+      x: 0
+      y: 0
     width: 280
     panel_height: 200
-    collapsed: false
-  customer_event:
+    collapsed: true
+  marketing_campaigns:
     position:
-      x: 50
-      y: 1250
+      x: 400
+      y: 0
     width: 280
     panel_height: 200
-    collapsed: false
-  order_fact:
+    collapsed: true
+  sales_customers:
     position:
-      x: 50
-      y: 50
+      x: 200
+      y: 300
     width: 280
     panel_height: 200
-    collapsed: false
-  inventory_dimension:
-    position:
-      x: 50
-      y: 450
-    width: 280
-    panel_height: 200
-    collapsed: false
+    collapsed: true
 relationships: {}
 source_colors: {}

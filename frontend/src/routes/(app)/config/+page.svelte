@@ -42,7 +42,7 @@
     $: lineageLayers = config.lineage?.layers || [];
     $: dbtModelPaths = config.dbt_model_paths || [];
     $: bruinAssetPaths = config.bruin_asset_paths || [];
-    $: canvasDefaultFilters = getFieldValue('canvas.default_filters') || {};
+    $: canvasDefaultFilters = config.canvas?.default_filters || {};
     $: canvasDefaultDomains = Array.isArray(canvasDefaultFilters.domains) ? canvasDefaultFilters.domains : [];
     $: canvasDefaultTags = Array.isArray(canvasDefaultFilters.tags) ? canvasDefaultFilters.tags : [];
 
