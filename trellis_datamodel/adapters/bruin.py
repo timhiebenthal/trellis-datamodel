@@ -28,6 +28,7 @@ from typing import Any, Optional
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref
+from trellis_datamodel.services.fk_placement import place_foreign_key
 from trellis_datamodel.services.tag_ownership import plan_tag_push
 from trellis_datamodel.utils.bruin_parser import (
     BruinAsset,
@@ -467,19 +468,19 @@ class BruinAdapter:
 
         relationships: list[Relationship] = []
         for asset in assets:
-            source_entity = self._resolve_entity(asset.name, model_to_entity)
-            if source_entity is None and not include_unbound:
+            holder_entity = self._resolve_entity(asset.name, model_to_entity)
+            if holder_entity is None and not include_unbound:
                 continue
-            source_entity = source_entity or _short_name(asset.name)
+            holder_entity = holder_entity or _short_name(asset.name)
 
             for column in asset.columns:
                 foreign_key = column.get("foreign_key")
                 if not isinstance(foreign_key, dict):
                     continue
 
-                target_table = foreign_key.get("table")
-                target_column = foreign_key.get("column")
-                if not target_table or not target_column:
+                ref_table = foreign_key.get("table")
+                ref_column = foreign_key.get("column")
+                if not ref_table or not ref_column:
                     logger.warning(
                         "Ignoring incomplete foreign_key on %s.%s: %s",
                         asset.name,
@@ -488,34 +489,36 @@ class BruinAdapter:
                     )
                     continue
 
-                target_asset = self._lookup_asset(assets, target_table)
-                if target_asset is None:
+                ref_asset = self._lookup_asset(assets, ref_table)
+                if ref_asset is None:
                     logger.warning(
                         "foreign_key on %s.%s references unknown asset '%s'",
                         asset.name,
                         column.get("name"),
-                        target_table,
+                        ref_table,
                     )
                     continue
 
-                target_entity = self._resolve_entity(
-                    target_asset.name, model_to_entity
+                ref_entity = self._resolve_entity(
+                    ref_asset.name, model_to_entity
                 )
-                if target_entity is None and not include_unbound:
+                if ref_entity is None and not include_unbound:
                     continue
-                target_entity = target_entity or _short_name(target_asset.name)
+                ref_entity = ref_entity or _short_name(ref_asset.name)
 
+                # dbt and canvas convention: source is the referenced side,
+                # target the asset holding the foreign key.
                 relationships.append(
                     Relationship(
-                        source=source_entity,
-                        target=target_entity,
+                        source=ref_entity,
+                        target=holder_entity,
                         label="",
                         type="one_to_many",
-                        source_field=column["name"],
-                        target_field=target_column,
-                        source_model_name=_short_name(asset.name),
+                        source_field=ref_column,
+                        target_field=column["name"],
+                        source_model_name=_short_name(ref_asset.name),
                         source_model_version=None,
-                        target_model_name=_short_name(target_asset.name),
+                        target_model_name=_short_name(asset.name),
                         target_model_version=None,
                     )
                 )
@@ -537,7 +540,8 @@ class BruinAdapter:
     ) -> list[Path]:
         """Write relationships back as Bruin `foreign_key` column blocks.
 
-        One-way, entity-model-wins: every foreign_key on a synced asset is
+        The relationship type decides which asset holds the foreign key, via
+        the same `place_foreign_key` rule dbt uses. One-way, entity-model-wins: every foreign_key on a synced asset is
         rebuilt from *relationships*, so a relationship deleted in Trellis has
         its foreign_key pruned. Only assets bound to an entity in the payload
         are touched — an asset Trellis does not know about is never rewritten.
@@ -548,19 +552,28 @@ class BruinAdapter:
         # asset name -> {column name: foreign_key block}
         desired: dict[str, dict[str, dict[str, str]]] = {}
         for relationship in relationships:
-            source_asset = entity_to_asset.get(relationship.get("source"))
-            target_asset = entity_to_asset.get(relationship.get("target"))
             source_field = relationship.get("source_field")
             target_field = relationship.get("target_field")
-
-            if not (source_asset and target_asset and source_field and target_field):
+            if not (source_field and target_field):
                 continue
 
-            desired.setdefault(source_asset.name, {})[source_field] = {
-                # Write back the spelling the target asset itself declares, so
-                # the file stays consistent with the rest of the pipeline.
-                "table": target_asset.name,
-                "column": target_field,
+            placement = place_foreign_key(
+                relationship.get("type", "one_to_many"),
+                relationship.get("source"),
+                source_field,
+                relationship.get("target"),
+                target_field,
+            )
+            fk_asset = entity_to_asset.get(placement.fk_entity)
+            ref_asset = entity_to_asset.get(placement.ref_entity)
+            if not (fk_asset and ref_asset):
+                continue
+
+            desired.setdefault(fk_asset.name, {})[placement.fk_field] = {
+                # Write back the spelling the referenced asset itself declares,
+                # so the file stays consistent with the rest of the pipeline.
+                "table": ref_asset.name,
+                "column": placement.ref_field,
             }
 
         # Resolve a foreign_key's `table` to the asset it names, so a reference

@@ -13,6 +13,7 @@ import pytest
 import yaml
 
 from trellis_datamodel.adapters.bruin import BruinAdapter
+from trellis_datamodel.services.fk_placement import place_foreign_key
 
 
 DATA_MODEL = {
@@ -84,30 +85,30 @@ class TestInferRelationships:
         relationships = adapter.infer_relationships()
 
         pairs = {(r["source"], r["target"]) for r in relationships}
-        assert ("order", "customer") in pairs
-        assert ("order", "product") in pairs
+        assert ("customer", "order") in pairs
+        assert ("product", "order") in pairs
 
     def test_carries_the_joining_fields(self, adapter):
         relationship = next(
             r
             for r in adapter.infer_relationships()
-            if (r["source"], r["target"]) == ("order", "customer")
+            if (r["source"], r["target"]) == ("customer", "order")
         )
 
         assert relationship["source_field"] == "customer_id"
         assert relationship["target_field"] == "customer_id"
-        assert relationship["source_model_name"] == "fct__order"
-        assert relationship["target_model_name"] == "dim__customer"
+        assert relationship["source_model_name"] == "dim__customer"
+        assert relationship["target_model_name"] == "fct__order"
 
     def test_resolves_a_dotted_foreign_key_target(self, adapter):
         """fct__order references core.dim__customer by its full name."""
         assert any(
-            r["target"] == "customer" for r in adapter.infer_relationships()
+            r["source"] == "customer" for r in adapter.infer_relationships()
         )
 
     def test_resolves_a_short_name_foreign_key_target(self, adapter):
         """fct__order references dim__product by its short name."""
-        assert any(r["target"] == "product" for r in adapter.infer_relationships())
+        assert any(r["source"] == "product" for r in adapter.infer_relationships())
 
     def test_unbound_entities_excluded_by_default(self, bruin_pipeline, tmp_path):
         """With nothing bound, there is nothing to infer."""
@@ -133,7 +134,7 @@ class TestInferRelationships:
             (r["source"], r["target"])
             for r in adapter.infer_relationships(include_unbound=True)
         }
-        assert ("fct__order", "dim__customer") in pairs
+        assert ("dim__customer", "fct__order") in pairs
 
     def test_incomplete_foreign_key_is_skipped(self, tmp_path):
         """A foreign_key missing its column cannot be resolved."""
@@ -202,10 +203,11 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
-                    "source_field": "amount",
-                    "target_field": "customer_id",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "amount",
                 }
             ],
         )
@@ -217,11 +219,6 @@ class TestSyncRelationships:
             "column": "customer_id",
         }
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Bruin writes the FK on the source asset regardless of type; "
-        "the shared FK placement rule puts one_to_many FK on the target.",
-    )
     def test_one_to_many_places_fk_on_target_asset(self, writable_adapter):
         writable_adapter.sync_relationships(
             entities=DATA_MODEL["entities"],
@@ -248,10 +245,11 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "product",
-                    "source_field": "amount",
-                    "target_field": "product_id",
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
+                    "source_field": "product_id",
+                    "target_field": "amount",
                 }
             ],
         )
@@ -274,8 +272,9 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 }
@@ -296,8 +295,9 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 }
@@ -307,8 +307,9 @@ class TestSyncRelationships:
         inferred = writable_adapter.infer_relationships()
 
         assert len(inferred) == 1
-        assert (inferred[0]["source"], inferred[0]["target"]) == ("order", "customer")
+        assert (inferred[0]["source"], inferred[0]["target"]) == ("customer", "order")
         assert inferred[0]["source_field"] == "customer_id"
+        assert inferred[0]["target_field"] == "customer_id"
 
     def test_adds_a_column_the_asset_does_not_declare(self, writable_adapter):
         """A relationship on an undocumented column must not be lost."""
@@ -316,10 +317,11 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
-                    "source_field": "undocumented_id",
-                    "target_field": "customer_id",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "undocumented_id",
                 }
             ],
         )
@@ -359,14 +361,16 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 },
                 {
-                    "source": "order",
-                    "target": "product",
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
                     "source_field": "product_id",
                     "target_field": "product_id",
                 },
@@ -413,20 +417,23 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "not_an_entity",
-                    "source_field": "amount",
-                    "target_field": "id",
+                    "type": "one_to_many",
+                    "source": "not_an_entity",
+                    "target": "order",
+                    "source_field": "id",
+                    "target_field": "amount",
                 },
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 },
                 {
-                    "source": "order",
-                    "target": "product",
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
                     "source_field": "product_id",
                     "target_field": "product_id",
                 },
@@ -436,6 +443,117 @@ class TestSyncRelationships:
         # Only the unresolvable one was dropped, so nothing else changed.
         assert updated == []
         assert "foreign_key" not in _columns(self._fct_path(writable_adapter))["amount"]
+
+    def test_push_then_pull_returns_the_same_single_edge(self, writable_adapter):
+        """A canvas edge customer -> order must come back as itself, once."""
+        edge = {
+            "type": "one_to_many",
+            "source": "customer",
+            "target": "order",
+            "source_field": "customer_id",
+            "target_field": "customer_id",
+        }
+        writable_adapter.sync_relationships(
+            entities=DATA_MODEL["entities"], relationships=[edge]
+        )
+
+        dim_path = writable_adapter._find_asset("core.dim__customer").file_path
+        assert "foreign_key" not in _columns(dim_path)["customer_id"]
+        assert _columns(self._fct_path(writable_adapter))["customer_id"][
+            "foreign_key"
+        ] == {"table": "core.dim__customer", "column": "customer_id"}
+
+        inferred = writable_adapter.infer_relationships()
+        assert [
+            (r["source"], r["target"], r["source_field"], r["target_field"])
+            for r in inferred
+        ] == [("customer", "order", "customer_id", "customer_id")]
+
+
+# The asset each entity in DATA_MODEL is bound to, by its declared name.
+_ASSET_OF = {"customer": "core.dim__customer", "order": "core.fct__order"}
+
+
+@pytest.mark.parametrize(
+    "rel_type",
+    [
+        "one_to_many",
+        "one_to_zero_or_many",
+        "zero_or_one_to_many",
+        "zero_or_many_to_many",
+        "many_to_one",
+        "many_to_many",
+        "zero_or_many_to_one",
+        "one_to_one",
+        "unknown_type",
+        "",
+    ],
+)
+def test_push_places_fk_where_the_shared_rule_says(writable_adapter, rel_type):
+    """Bruin push follows `place_foreign_key`, exactly like dbt."""
+    writable_adapter.sync_relationships(
+        entities=DATA_MODEL["entities"],
+        relationships=[
+            {
+                "type": rel_type,
+                "source": "customer",
+                "target": "order",
+                "source_field": "src_key",
+                "target_field": "tgt_key",
+            }
+        ],
+    )
+
+    placement = place_foreign_key(
+        rel_type, "customer", "src_key", "order", "tgt_key"
+    )
+    fk_path = writable_adapter._find_asset(_ASSET_OF[placement.fk_entity]).file_path
+    ref_path = writable_adapter._find_asset(_ASSET_OF[placement.ref_entity]).file_path
+
+    assert _columns(fk_path)[placement.fk_field]["foreign_key"] == {
+        "table": _ASSET_OF[placement.ref_entity],
+        "column": placement.ref_field,
+    }
+    assert placement.ref_field not in _columns(ref_path)
+
+
+def test_infer_emits_the_dbt_convention(tmp_path):
+    """source = referenced asset, target = FK holder, fields to match."""
+    assets = tmp_path / "pipeline" / "assets" / "core"
+    assets.mkdir(parents=True)
+    (assets / "a.sql").write_text(
+        "/* @bruin\n"
+        "name: core.a\n"
+        "columns:\n"
+        "  - name: b_id\n"
+        "    foreign_key:\n"
+        "      table: core.b\n"
+        "      column: id\n"
+        "@bruin */\n"
+    )
+    (assets / "b.sql").write_text(
+        "/* @bruin\nname: core.b\ncolumns:\n  - name: id\n@bruin */\n"
+    )
+    adapter = BruinAdapter(
+        pipeline_path=str(tmp_path / "pipeline"),
+        data_model_path="",
+        asset_paths=[],
+    )
+
+    assert adapter.infer_relationships(include_unbound=True) == [
+        {
+            "source": "b",
+            "target": "a",
+            "label": "",
+            "type": "one_to_many",
+            "source_field": "id",
+            "target_field": "b_id",
+            "source_model_name": "b",
+            "source_model_version": None,
+            "target_model_name": "a",
+            "target_model_version": None,
+        }
+    ]
 
 
 @pytest.mark.xfail(

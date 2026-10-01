@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Trellis now removes it from schema.yml on the next "Sync to dbt", without touching
   tags added in dbt. Trellis records what it pushed in a new backend-owned
   `pushed_tags` entity key in data_model.yml. Known gap: Bruin's sync does not push tags yet.
+- **Bruin relationship direction matches dbt and the canvas**: Pull now reports the
+  referenced asset as `source` and the foreign-key holder as `target`, and Push places
+  each `foreign_key` by relationship type (a one-to-many lands on the "many" asset), so
+  Pull after Push returns one edge instead of two. No migration needed: Bruin had no users.
 
 
 ## [0.23.1] - 2026-08-18
