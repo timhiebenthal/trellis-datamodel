@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed Trellis tags are removed from dbt on push**: removing a tag you added in
   Trellis now removes it from schema.yml on the next "Sync to dbt", without touching
   tags added in dbt. Trellis records what it pushed in a new backend-owned
-  `pushed_tags` entity key in data_model.yml. Known gap: Bruin's sync does not push tags yet.
+  `pushed_tags` entity key in data_model.yml.
 - **Bruin projects can pull and push schema**: reading and saving a model's schema,
   inferring relationships and syncing to Bruin no longer fail with 400
   "dbt_project_path is not configured" on a Bruin project. A missing pipeline is now
@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removes a `foreign_key` from a column that is an end of a data-model relationship but no
   longer holds its key (e.g. after a type change moved the key). Hand-written keys on
   columns outside any data-model relationship, including keys to unbound assets, are kept.
+- **Bruin Push writes more than foreign keys**: for each bound asset, Push now writes the
+  entity description, drafted columns (a type only where the asset declares none; declared
+  types are never overwritten and undrafted columns are never removed), each column's origin
+  (asset-level `meta`, one string entry per column, e.g.
+  `origin.email: "System: CRM | Table: customers"`, read back by reconcile) and Trellis
+  tags, including removal of tags Trellis pushed earlier. Known limit: Push does not
+  scaffold assets for unbound entities.
 
 
 ## [0.23.1] - 2026-08-18

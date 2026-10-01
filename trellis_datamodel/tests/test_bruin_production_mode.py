@@ -143,6 +143,85 @@ class TestBruinSchemaRoutesWithoutDbtProjectPath:
             assert "region_id" in f.read()
 
 
+def _customer_asset(pipeline):
+    return os.path.join(pipeline, "assets", "02_core", "dim__customer.sql")
+
+
+def _asset_tags(pipeline):
+    with open(_customer_asset(pipeline)) as f:
+        content = f.read()
+    block = content.split("/* @bruin\n", 1)[1].split("\n@bruin */", 1)[0]
+    return yaml.safe_load(block).get("tags")
+
+
+def _autosave_customer(client, ui_tags):
+    """Save with the payload shape auto-save.ts sends for a bound entity:
+    model_ref + ui_tags (omitted once emptied), never pushed_tags."""
+    customer = {"id": "customer", "label": "Customer", "model_ref": "core.dim__customer"}
+    if ui_tags:
+        customer["ui_tags"] = ui_tags
+    response = client.post(
+        "/api/data-model",
+        json={
+            "version": 0.1,
+            "entities": [
+                customer,
+                {"id": "order", "label": "Order", "model_ref": "core.fct__order"},
+            ],
+            "relationships": [],
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+def _push(client):
+    response = client.post("/api/sync-tests")
+    _assert_not_rejected_for_dbt(response)
+
+
+def _pushed_tags(data_model_path):
+    with open(data_model_path) as f:
+        entities = yaml.safe_load(f)["entities"]
+    return next(e for e in entities if e["id"] == "customer").get("pushed_tags")
+
+
+class TestBruinTagPushThroughRoutes:
+    @pytest.fixture
+    def data_model_path(self):
+        return _config_module().DATA_MODEL_PATH
+
+    def test_push_records_pushed_tags_in_the_data_model(
+        self, bruin_production_app, bruin_pipeline_copy, data_model_path
+    ):
+        _autosave_customer(bruin_production_app, ["core", "pii"])
+        _push(bruin_production_app)
+
+        assert _asset_tags(bruin_pipeline_copy) == ["core", "entity", "pii"]
+        # `core` was already on the asset: Bruin's tag, not Trellis's.
+        assert _pushed_tags(data_model_path) == ["pii"]
+
+    def test_removed_trellis_tag_leaves_the_asset_on_next_push(
+        self, bruin_production_app, bruin_pipeline_copy
+    ):
+        _autosave_customer(bruin_production_app, ["pii", "gdpr"])
+        _push(bruin_production_app)
+        _autosave_customer(bruin_production_app, ["gdpr"])
+        _push(bruin_production_app)
+
+        assert _asset_tags(bruin_pipeline_copy) == ["core", "entity", "gdpr"]
+
+    def test_removing_the_last_trellis_tag_removes_it_from_the_asset(
+        self, bruin_production_app, bruin_pipeline_copy, data_model_path
+    ):
+        _autosave_customer(bruin_production_app, ["pii"])
+        _push(bruin_production_app)
+        _autosave_customer(bruin_production_app, [])
+        _push(bruin_production_app)
+
+        assert _asset_tags(bruin_pipeline_copy) == ["core", "entity"]
+        assert _pushed_tags(data_model_path) == []
+
+
 class TestBruinSchemaRoutesWithoutPipelinePath:
     def test_reports_the_bruin_setting_not_the_dbt_one(
         self, bruin_production_app, monkeypatch
