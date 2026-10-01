@@ -435,6 +435,11 @@ def _split_model_and_layout(
         )
         if pushed_model_ref and pushed_model_ref == get_model_ref(entity):
             model_entity[PUSHED_TAGS_KEY] = pushed_tags
+            # auto-save sends ui_tags as undefined once the list is emptied;
+            # for an entity with a push record that means "cleared", not "no
+            # opinion", so the push can remove what Trellis previously added.
+            if "ui_tags" not in entity:
+                model_entity["ui_tags"] = []
         if "domain" in entity:
             model_entity["domain"] = entity["domain"]
         if "domains" in entity:

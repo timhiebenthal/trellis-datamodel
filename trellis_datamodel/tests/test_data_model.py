@@ -942,6 +942,59 @@ def test_split_drops_pushed_tags_when_entity_is_rebound_or_unbound():
     assert "pushed_tags" not in unbound
 
 
+def _split_bound_users_omitting_ui_tags(
+    incoming_overrides=None, with_push_record=True
+):
+    """Split a bound `users` payload that carries no ui_tags key."""
+    from trellis_datamodel.routes.data_model import _split_model_and_layout
+
+    existing_entity = {
+        "id": "users",
+        "model_ref": "model.proj.users",
+        "ui_tags": ["pii"],
+    }
+    if with_push_record:
+        existing_entity["pushed_tags"] = ["pii"]
+    incoming_entity = {
+        "id": "users",
+        "label": "Users",
+        "model_ref": "model.proj.users",
+        "position": {"x": 0, "y": 0},
+        **(incoming_overrides or {}),
+    }
+    model_data, _layout_data = _split_model_and_layout(
+        {"version": 0.1, "entities": [incoming_entity], "relationships": []},
+        {"entities": [existing_entity]},
+    )
+    return model_data["entities"][0]
+
+
+def test_split_writes_empty_ui_tags_when_omitted_and_entity_has_push_record():
+    """auto-save sends no ui_tags once the last tag is removed; with a push
+    record on disk for the same model that means 'cleared'."""
+    entity = _split_bound_users_omitting_ui_tags()
+    assert entity["ui_tags"] == []
+    assert entity["pushed_tags"] == ["pii"]
+
+
+def test_split_keeps_ui_tags_omitted_when_no_push_record_on_disk():
+    entity = _split_bound_users_omitting_ui_tags(with_push_record=False)
+    assert "ui_tags" not in entity
+
+
+def test_split_keeps_ui_tags_omitted_when_push_record_belongs_to_other_model():
+    rebound = _split_bound_users_omitting_ui_tags({"model_ref": "model.proj.customers"})
+    unbound = _split_bound_users_omitting_ui_tags({"model_ref": None})
+    for entity in (rebound, unbound):
+        assert "ui_tags" not in entity
+        assert "pushed_tags" not in entity
+
+
+def test_split_does_not_override_explicit_ui_tags_with_push_record():
+    assert _split_bound_users({})["ui_tags"] == ["pii", "gdpr"]
+    assert _split_bound_users({"ui_tags": []})["ui_tags"] == []
+
+
 def test_split_never_persists_tags_for_bound_entity_even_if_sent():
     """Bound entities never persist a `tags` key at all, even if a stale
     client sends one — only unbound entities use plain `tags`."""

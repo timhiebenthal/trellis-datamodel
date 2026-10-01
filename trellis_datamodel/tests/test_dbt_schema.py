@@ -1584,14 +1584,6 @@ def test_tag_removed_directly_in_dbt_is_resurrected_by_next_push(
     assert set(_read_model_tags(yml_path)) == {"nightly", "pii"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KNOWN GAP: auto-save.ts omits ui_tags (sends undefined) when the last "
-        "tag is removed, and an absent ui_tags must never remove anything (hard "
-        "safety rule), so the last Trellis tag cannot be removed via push."
-    ),
-)
 def test_removing_the_last_trellis_tag_removes_it_from_schema_yml(
     test_client, temp_dir, mock_manifest
 ):
