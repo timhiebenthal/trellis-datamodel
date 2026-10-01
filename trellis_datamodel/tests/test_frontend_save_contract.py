@@ -186,3 +186,72 @@ class TestBoundEntityPayload:
         ]
         assert saved["framework_tags"] == ["nightly"]
         assert saved["ui_tags"] == ["finance"]
+
+
+class TestPushedTagsContract:
+    """`pushed_tags` is backend-owned; the frontend never sends it."""
+
+    @staticmethod
+    def _seed_pushed(path: str, model_ref: str = "model.proj.orders") -> None:
+        _seed(
+            path,
+            [
+                {
+                    "id": "orders",
+                    "label": "Orders",
+                    "model_ref": model_ref,
+                    "ui_tags": ["finance"],
+                    "pushed_tags": ["finance"],
+                }
+            ],
+        )
+
+    def test_emptied_ui_tags_with_push_record_saved_as_empty_list(
+        self, test_client, temp_data_model_path
+    ):
+        self._seed_pushed(temp_data_model_path)
+        payload = _load_payload("bound_entity_ui_tags_cleared")
+        assert "ui_tags" not in payload["entities"][0]
+        assert "pushed_tags" not in payload["entities"][0]
+        assert payload["entities"][0]["model_ref"] == "model.proj.orders"
+
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+
+        saved = _saved_entity(temp_data_model_path, "orders")
+        assert saved["ui_tags"] == []
+        assert saved["pushed_tags"] == ["finance"]
+
+        loaded = _loaded_entity(test_client, "orders")
+        assert loaded["ui_tags"] == []
+        assert loaded["pushed_tags"] == ["finance"]
+
+    def test_rebound_entity_drops_push_record(
+        self, test_client, temp_data_model_path
+    ):
+        self._seed_pushed(temp_data_model_path, model_ref="model.proj.old_orders")
+        payload = _load_payload("bound_entity_ui_tags_cleared")
+        assert payload["entities"][0]["model_ref"] == "model.proj.orders"
+
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+
+        saved = _saved_entity(temp_data_model_path, "orders")
+        assert "pushed_tags" not in saved
+        assert "ui_tags" not in saved
+
+        loaded = _loaded_entity(test_client, "orders")
+        assert "pushed_tags" not in loaded
+        assert loaded.get("ui_tags") in (None, [])
+
+    def test_client_cannot_inject_pushed_tags(
+        self, test_client, temp_data_model_path
+    ):
+        _seed(temp_data_model_path, [_seeded_bound_orders()])
+        payload = _load_payload("bound_entity")
+        payload["entities"][0]["pushed_tags"] = ["evil"]
+
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+
+        saved = _saved_entity(temp_data_model_path, "orders")
+        assert "pushed_tags" not in saved
+        assert saved["ui_tags"] == ["finance"]
+        assert "pushed_tags" not in _loaded_entity(test_client, "orders")

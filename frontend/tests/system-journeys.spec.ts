@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { resetDataModel, type DataModelPayload } from './helpers';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -116,6 +116,106 @@ models:
 		const tags: string[] = model.config?.tags ?? model.tags ?? [];
 		expect(tags).toContain('nightly');
 		expect(tags).toContain('finance');
+	});
+
+	test('J1b: remove a pushed tag on the canvas -> autosave clears ui_tags -> push removes it from schema.yml', async ({
+		page,
+		request,
+	}) => {
+		fs.writeFileSync(
+			CLEAN_CUSTOMER_SCHEMA_YML,
+			`version: 2
+models:
+  - name: clean_customer
+    config:
+      tags:
+        - nightly
+`,
+			'utf8',
+		);
+
+		const payload: DataModelPayload = {
+			version: 0.1,
+			entities: [
+				{
+					id: 'clean_customer_journey',
+					label: 'Clean Customer Journey',
+					description: 'Customer master used by the tag journey test',
+					entity_type: 'dimension',
+					model_ref: 'model.company_dummy.clean_customer',
+					drafted_fields: [],
+				},
+			],
+			relationships: [],
+		};
+		await resetDataModel(request, payload);
+
+		await page.addInitScript(() => {
+			localStorage.setItem('trellis_all_expanded', 'true');
+		});
+		await page.goto('/');
+		await page.waitForSelector('[data-testid="canvas-ready"]', { timeout: 25000 });
+		await page.waitForSelector('[data-testid="app-ready"]', { timeout: 30000 });
+
+		const nameInput = page.getByPlaceholder('Entity Name').first();
+		await expect(nameInput).toHaveValue('Clean Customer Journey', { timeout: 20000 });
+		const node = page.locator('.svelte-flow__node-entity').filter({ has: nameInput });
+		await expect(node).toBeVisible();
+
+		const readEntity = () => findEntity(readDataModelFile().entities, 'clean_customer_journey');
+		const readModelTags = (): string[] => {
+			const schema = parseYaml(fs.readFileSync(CLEAN_CUSTOMER_SCHEMA_YML, 'utf8'));
+			const model = schema.models.find((m: Record<string, any>) => m.name === 'clean_customer');
+			return model.config?.tags ?? model.tags ?? [];
+		};
+		const pushToDbt = async () => {
+			await page.getByRole('button', { name: 'Push to dbt' }).click();
+			const warning = page.getByRole('dialog', { name: /Attributes Without Descriptions/ });
+			await expect(warning).toBeVisible();
+			await warning.getByRole('button', { name: 'Continue Anyway' }).click();
+		};
+
+		// Add finance and push it.
+		await node.getByRole('button', { name: 'Add new tag' }).click();
+		const tagInput = node.getByRole('textbox', { name: 'Add new tag' });
+		await tagInput.fill('finance');
+		await tagInput.press('Enter');
+		await expect(node.getByRole('button', { name: 'Remove finance tag' })).toBeVisible();
+		await expect.poll(() => readEntity()?.ui_tags, { timeout: 15000 }).toEqual(['finance']);
+
+		await pushToDbt();
+		await expect(page.getByText(/Updated \d+ file\(s\)/)).toBeVisible({ timeout: 20000 });
+
+		// (1) schema.yml carries both; (2) backend recorded what it pushed.
+		expect(readModelTags()).toContain('nightly');
+		expect(readModelTags()).toContain('finance');
+		expect(readEntity()!.pushed_tags).toEqual(['finance']);
+
+		// A dbt developer hand-adds a tag; Trellis must never touch it.
+		const schemaDoc = parseYaml(fs.readFileSync(CLEAN_CUSTOMER_SCHEMA_YML, 'utf8'));
+		const schemaModel = schemaDoc.models.find(
+			(m: Record<string, any>) => m.name === 'clean_customer',
+		);
+		if (schemaModel.config?.tags) {
+			schemaModel.config.tags.push('hourly');
+		} else {
+			schemaModel.tags.push('hourly');
+		}
+		fs.writeFileSync(CLEAN_CUSTOMER_SCHEMA_YML, stringifyYaml(schemaDoc), 'utf8');
+		expect(readModelTags()).toContain('hourly');
+
+		// Remove the pushed tag on the canvas: autosave omits ui_tags, backend stores [].
+		await node.getByRole('button', { name: 'Remove finance tag' }).click();
+		await expect(node.getByRole('button', { name: 'Remove finance tag' })).toBeHidden();
+		await expect.poll(() => readEntity()?.ui_tags, { timeout: 15000 }).toEqual([]);
+		expect(readEntity()!.pushed_tags).toEqual(['finance']);
+
+		// Second push removes finance only.
+		await pushToDbt();
+		await expect
+			.poll(() => [...readModelTags()].sort(), { timeout: 20000 })
+			.toEqual(['hourly', 'nightly']);
+		await expect.poll(() => readEntity()?.pushed_tags, { timeout: 15000 }).toEqual([]);
 	});
 
 	test('J2-lite: structured roles survive a description edit made in the modal', async ({
