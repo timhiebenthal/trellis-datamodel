@@ -25,11 +25,15 @@ from trellis_datamodel.exceptions import (
     NotFoundError,
     ValidationError,
 )
+from trellis_datamodel.models.entity_keys import get_model_ref
+from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
 from trellis_datamodel.utils.path_validation import (
     ensure_data_model_path_exists,
     validate_data_model_path,
     validate_dbt_project_path,
 )
+from trellis_datamodel.utils.structured_data import load_yaml_or_json
+from trellis_datamodel.utils.yaml_handler import YamlHandler
 
 
 def save_model_schema_from_request(
@@ -128,11 +132,44 @@ def sync_framework_tests() -> list[Path]:
                 merged[key] = rel
         relationships = list(merged.values())
 
+        pushed_before = {e.get("id"): e.get(PUSHED_TAGS_KEY) for e in entities}
         updated_files = adapter.sync_relationships(entities, relationships)
+        _persist_pushed_tags(data_model_path, entities, pushed_before)
 
         return updated_files
     except Exception as e:
         raise FileOperationError(f"Error syncing tests: {str(e)}") from e
+
+
+def _persist_pushed_tags(
+    data_model_path: str,
+    entities: list[dict[str, Any]],
+    pushed_before: dict[Any, Any],
+) -> None:
+    """Record in data_model.yml which tags this push put into the schema files.
+
+    The adapter sets `pushed_tags` on the entity dicts it was handed. Only bound
+    entities whose record changed are written, onto a fresh read of the file,
+    and only while the entity is still bound to the model that was pushed — a
+    rebound entity's old record must not drive removals on its new model.
+    """
+    changed = {
+        entity["id"]: (get_model_ref(entity), entity[PUSHED_TAGS_KEY])
+        for entity in entities
+        if entity.get("id")
+        and get_model_ref(entity)
+        and PUSHED_TAGS_KEY in entity
+        and entity[PUSHED_TAGS_KEY] != pushed_before.get(entity["id"])
+    }
+    if not changed:
+        return
+
+    data_model = load_yaml_or_json(data_model_path) or {}
+    for entity in data_model.get("entities", []):
+        model_ref, pushed_tags = changed.get(entity.get("id"), (None, None))
+        if model_ref and get_model_ref(entity) == model_ref:
+            entity[PUSHED_TAGS_KEY] = pushed_tags
+    YamlHandler().save_file(data_model_path, data_model)
 
 
 def get_model_schema(model_name: str, version: int | None = None) -> dict[str, Any]:

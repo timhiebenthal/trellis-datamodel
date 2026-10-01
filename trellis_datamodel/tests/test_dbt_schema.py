@@ -1456,13 +1456,8 @@ def test_sync_relationships_preserves_dbt_only_tag_when_pushing_trellis_tag(
     assert "pii" in tags
 
 
-def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
-    test_client, temp_dir, temp_data_model_path, mock_manifest
-):
-    """End-to-end: schema.yml has 'nightly' (dbt-only). User adds 'pii' via
-    ui_tags. Push adds 'pii' without touching 'nightly'. Push is
-    additive-only for v1: removing 'pii' from ui_tags and pushing again
-    does NOT remove it from schema.yml (documented v1 limitation)."""
+def _write_users_schema_yml(temp_dir, tags):
+    """A bound `users` model whose schema.yml already carries dbt-native tags."""
     sql_dir = os.path.join(temp_dir, "models", "3_core")
     os.makedirs(sql_dir, exist_ok=True)
     with open(os.path.join(sql_dir, "users.sql"), "w") as f:
@@ -1473,47 +1468,133 @@ def test_full_round_trip_dbt_tag_survives_trellis_add_push_is_additive_only(
             {
                 "version": 2,
                 "models": [
-                    {"name": "users", "tags": ["nightly"], "columns": [{"name": "id", "data_type": "int"}]}
+                    {"name": "users", "tags": tags, "columns": [{"name": "id", "data_type": "int"}]}
                 ],
             },
             f,
         )
-    with open(temp_data_model_path, "w") as f:
-        yaml.dump(
-            {
-                "entities": [
-                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "ui_tags": ["pii"]}
-                ],
-                "relationships": [],
-            },
-            f,
-        )
+    return yml_path
 
-    # Push: pii added, nightly must survive
+
+def _read_model_tags(yml_path):
+    with open(yml_path, "r") as f:
+        return yaml.safe_load(f)["models"][0].get("tags", [])
+
+
+def _hand_edit_model_tags(yml_path, tags):
+    """Simulate a dbt developer editing the tag list directly in schema.yml."""
+    with open(yml_path, "r") as f:
+        data = yaml.safe_load(f)
+    data["models"][0]["tags"] = tags
+    with open(yml_path, "w") as f:
+        yaml.dump(data, f)
+
+
+def _autosave_users(test_client, ui_tags):
+    """Save through the real route with the payload shape auto-save.ts sends
+    for a bound entity: model_ref + ui_tags, never framework_tags/pushed_tags."""
+    entity = {"id": "users", "label": "Users", "model_ref": "model.project.users"}
+    if ui_tags:
+        entity["ui_tags"] = ui_tags
+    response = test_client.post(
+        "/api/data-model",
+        json={"version": 0.1, "entities": [entity], "relationships": []},
+    )
+    assert response.status_code == 200
+
+
+def _push(test_client):
     response = test_client.post("/api/sync-tests")
     assert response.status_code == 200
-    with open(yml_path, "r") as f:
-        after_add = yaml.safe_load(f)["models"][0]["tags"]
-    assert set(after_add) == {"nightly", "pii"}
 
-    # Simulate the user removing 'pii' from ui_tags and pushing again —
-    # additive-only means this is a documented no-op for schema.yml removal.
-    with open(temp_data_model_path, "w") as f:
-        yaml.dump(
-            {
-                "entities": [
-                    {"id": "users", "label": "Users", "dbt_model": "model.project.users", "ui_tags": []}
-                ],
-                "relationships": [],
-            },
-            f,
-        )
-    response = test_client.post("/api/sync-tests")
-    assert response.status_code == 200
-    with open(yml_path, "r") as f:
-        after_second_push = yaml.safe_load(f)["models"][0]["tags"]
-    assert "nightly" in after_second_push, "nightly is dbt-owned and must survive"
-    assert "pii" in after_second_push, "v1 is additive-only: pushing ui_tags=[] never removes a tag already in schema.yml"
+
+def test_removing_trellis_tag_removes_it_from_schema_yml_on_next_push(
+    test_client, temp_dir, mock_manifest
+):
+    """End-to-end through the real save + push routes: a tag Trellis pushed is
+    removed from schema.yml once the user removes it from ui_tags, while every
+    tag dbt owns — present before the push or hand-added after it — survives."""
+    yml_path = _write_users_schema_yml(temp_dir, ["nightly"])
+
+    _autosave_users(test_client, ["pii", "gdpr"])
+    _push(test_client)
+    assert set(_read_model_tags(yml_path)) == {"nightly", "pii", "gdpr"}
+
+    # A dbt developer adds a tag by hand between the two pushes.
+    _hand_edit_model_tags(yml_path, [*_read_model_tags(yml_path), "hourly"])
+
+    _autosave_users(test_client, ["gdpr"])
+    _push(test_client)
+
+    tags = _read_model_tags(yml_path)
+    assert "pii" not in tags, f"removed Trellis tag survived the push; got {tags}"
+    assert set(tags) == {"nightly", "gdpr", "hourly"}
+
+
+def test_push_records_pushed_tags_in_data_model_and_is_idempotent(
+    test_client, temp_dir, temp_data_model_path, mock_manifest
+):
+    """The push itself writes `pushed_tags` back to data_model.yml (only the tags
+    Trellis added, not the dbt-native one), and a repeat push with nothing new
+    to record leaves data_model.yml untouched."""
+    _write_users_schema_yml(temp_dir, ["nightly"])
+    _autosave_users(test_client, ["nightly", "pii"])
+
+    _push(test_client)
+    with open(temp_data_model_path) as f:
+        after_first_push = f.read()
+    assert yaml.safe_load(after_first_push)["entities"][0]["pushed_tags"] == ["pii"]
+
+    _push(test_client)
+    with open(temp_data_model_path) as f:
+        assert f.read() == after_first_push
+
+
+def test_removing_ui_tag_that_dbt_already_owned_never_deletes_it(
+    test_client, temp_dir, mock_manifest
+):
+    """A ui_tag that schema.yml already carried was never Trellis's to push, so
+    dropping it from ui_tags must leave the dbt-native tag in place."""
+    yml_path = _write_users_schema_yml(temp_dir, ["nightly"])
+
+    _autosave_users(test_client, ["nightly", "pii"])
+    _push(test_client)
+    _autosave_users(test_client, ["pii"])
+    _push(test_client)
+
+    assert set(_read_model_tags(yml_path)) == {"nightly", "pii"}
+
+
+def test_tag_removed_directly_in_dbt_is_resurrected_by_next_push(
+    test_client, temp_dir, mock_manifest
+):
+    """KNOWN LIMITATION (out of scope, deliberately not fixed): when a dbt
+    developer deletes a Trellis-pushed tag straight from schema.yml, Trellis
+    still lists it in ui_tags, so the next push writes it back. Trellis does not
+    drop a pushed tag from ui_tags when it vanishes from the manifest, because
+    the manifest can be stale right after a push."""
+    yml_path = _write_users_schema_yml(temp_dir, ["nightly"])
+
+    _autosave_users(test_client, ["pii"])
+    _push(test_client)
+    _hand_edit_model_tags(yml_path, ["nightly"])
+
+    _push(test_client)
+
+    assert set(_read_model_tags(yml_path)) == {"nightly", "pii"}
+
+
+def test_removing_the_last_trellis_tag_removes_it_from_schema_yml(
+    test_client, temp_dir, mock_manifest
+):
+    yml_path = _write_users_schema_yml(temp_dir, ["nightly"])
+
+    _autosave_users(test_client, ["pii"])
+    _push(test_client)
+    _autosave_users(test_client, [])
+    _push(test_client)
+
+    assert _read_model_tags(yml_path) == ["nightly"]
 
 
 class TestGetModelSchema:

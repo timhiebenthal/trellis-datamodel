@@ -563,6 +563,31 @@ class TestTagHandling:
         handler.merge_model_tags(model, [], previously_pushed=["pii"])
         assert model["tags"] == ["nightly"]
 
+    def test_merge_model_tags_returns_the_tags_trellis_now_owns(self):
+        """Only tags this push added are Trellis's; a ui_tag dbt already had is not."""
+        handler = YamlHandler()
+        model = CommentedMap({"name": "test", "config": CommentedMap({"tags": ["nightly"]})})
+        assert handler.merge_model_tags(model, ["nightly", "pii"]) == ["pii"]
+        assert model["config"]["tags"] == ["nightly", "pii"]
+
+    def test_merge_version_tags_removes_only_dropped_trellis_tag(self):
+        """Versioned entries share the same rule as top-level models."""
+        handler = YamlHandler()
+        version = CommentedMap(
+            {"v": 2, "config": CommentedMap({"tags": ["nightly", "pii", "gdpr"]})}
+        )
+        pushed = handler.merge_version_tags(
+            version, ["gdpr"], previously_pushed=["pii", "gdpr"]
+        )
+        assert version["config"]["tags"] == ["nightly", "gdpr"]
+        assert pushed == ["gdpr"]
+
+    def test_merge_version_tags_noop_when_ui_tags_none(self):
+        handler = YamlHandler()
+        version = CommentedMap({"v": 2, "config": CommentedMap({"tags": ["pii"]})})
+        assert handler.merge_version_tags(version, None, previously_pushed=["pii"]) is None
+        assert version["config"]["tags"] == ["pii"]
+
     def test_merge_model_tags_noop_when_trellis_tags_none(self):
         handler = YamlHandler()
         model = CommentedMap({"name": "test", "tags": ["nightly"]})

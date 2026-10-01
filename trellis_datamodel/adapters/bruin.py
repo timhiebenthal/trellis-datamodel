@@ -28,6 +28,7 @@ from typing import Any, Optional
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref
+from trellis_datamodel.services.tag_ownership import plan_tag_push
 from trellis_datamodel.utils.bruin_parser import (
     BruinAsset,
     asset_folder,
@@ -349,13 +350,11 @@ class BruinAdapter:
         """Add tags without dropping any the asset already carries.
 
         Matches the dbt adapter: incoming tags are Trellis-authored additions,
-        never a replacement for the live list.
+        never a replacement for the live list. These request-driven paths have
+        no `pushed_tags` record to diff against, so they never remove a tag.
         """
-        result = list(asset.tags or [])
-        for tag in tags:
-            if tag not in result:
-                result.append(tag)
-        return result
+        live_tags = list(asset.tags or [])
+        return plan_tag_push(tags, None, live_tags).apply(live_tags)
 
     def save_schema_file(
         self,
