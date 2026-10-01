@@ -17,7 +17,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import FileOperationError, NotFoundError
+from trellis_datamodel.exceptions import (
+    ConfigurationError,
+    FileOperationError,
+    NotFoundError,
+)
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.services.fk_placement import place_foreign_key
@@ -1902,3 +1906,17 @@ class DbtCoreAdapter:
             ),
             error=error,
         )
+
+    def validate_project_path(self) -> str:
+        """Check dbt_project_path is configured and exists."""
+        if not self.project_path:
+            raise ConfigurationError(
+                "dbt_project_path is not configured. Please set it in trellis.yml"
+            )
+
+        if not os.path.exists(self.project_path):
+            raise ConfigurationError(
+                f"dbt_project_path does not exist: {self.project_path}"
+            )
+
+        return self.project_path

@@ -30,7 +30,6 @@ from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
 from trellis_datamodel.utils.path_validation import (
     ensure_data_model_path_exists,
     validate_data_model_path,
-    validate_dbt_project_path,
 )
 from trellis_datamodel.utils.structured_data import load_yaml_or_json
 from trellis_datamodel.utils.yaml_handler import YamlHandler
@@ -57,10 +56,10 @@ def save_model_schema_from_request(
         Path to the saved schema file
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured
+        ConfigurationError: If the project path is not configured
         FileOperationError: If schema save fails
     """
-    validate_dbt_project_path()
+    get_adapter().validate_project_path()
 
     try:
         adapter = get_adapter()
@@ -84,10 +83,10 @@ def sync_framework_tests() -> list[Path]:
         List of paths to updated schema files
 
     Raises:
-        ConfigurationError: If dbt_project_path or data_model_path is not configured
+        ConfigurationError: If the project path or data_model_path is not configured
         FileOperationError: If data model file not found or sync fails
     """
-    validate_dbt_project_path()
+    get_adapter().validate_project_path()
     data_model_path = validate_data_model_path()
 
     import os
@@ -184,11 +183,11 @@ def get_model_schema(model_name: str, version: int | None = None) -> dict[str, A
         Dictionary with model_name, description, columns, tags, file_path
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured
+        ConfigurationError: If the project path is not configured
         NotFoundError: If model not found
         FileOperationError: If schema read fails
     """
-    validate_dbt_project_path()
+    get_adapter().validate_project_path()
 
     try:
         adapter = get_adapter()
@@ -230,11 +229,11 @@ def update_model_schema(
         Path to the updated schema file
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured
+        ConfigurationError: If the project path is not configured
         NotFoundError: If model not found
         FileOperationError: If schema update fails
     """
-    validate_dbt_project_path()
+    get_adapter().validate_project_path()
 
     try:
         adapter = get_adapter()
@@ -265,10 +264,10 @@ def infer_relationships(include_unbound: bool = False) -> list[dict[str, Any]]:
         List of inferred relationships
 
     Raises:
-        ConfigurationError: If dbt_project_path is not configured or no schema files found
+        ConfigurationError: If the project path is not configured or no schema files found
         FileOperationError: If schema files cannot be read
     """
-    validate_dbt_project_path()
+    get_adapter().validate_project_path()
 
     try:
         adapter = get_adapter()

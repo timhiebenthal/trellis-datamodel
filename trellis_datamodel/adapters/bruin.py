@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import NotFoundError
+from trellis_datamodel.exceptions import ConfigurationError, NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref
 from trellis_datamodel.services.tag_ownership import plan_tag_push
 from trellis_datamodel.utils.bruin_parser import (
@@ -926,3 +926,17 @@ class BruinAdapter:
             ),
             error=error,
         )
+
+    def validate_project_path(self) -> str:
+        """Check bruin_pipeline_path is configured and is a directory."""
+        if not self.pipeline_path:
+            raise ConfigurationError(
+                "bruin_pipeline_path is not configured. Please set it in trellis.yml"
+            )
+
+        if not os.path.isdir(self.pipeline_path):
+            raise ConfigurationError(
+                f"bruin_pipeline_path does not exist: {self.pipeline_path}"
+            )
+
+        return self.pipeline_path
