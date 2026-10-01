@@ -37,6 +37,7 @@ class BruinAsset:
     columns: list[dict] = field(default_factory=list)
     description: str = ""
     tags: list[str] = field(default_factory=list)
+    meta: dict = field(default_factory=dict)
     custom_checks: list[dict] = field(default_factory=list)
     file_path: str = ""
 
@@ -136,6 +137,7 @@ def parse_bruin_block(file_path: str) -> Optional[BruinAsset]:
         columns=data.get("columns", []),
         description=data.get("description", ""),
         tags=data.get("tags", []),
+        meta=data.get("meta") if isinstance(data.get("meta"), dict) else {},
         custom_checks=data.get("custom_checks", []),
         file_path=file_path,
     )

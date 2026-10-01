@@ -675,15 +675,6 @@ def test_infer_emits_the_dbt_convention(tmp_path):
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KNOWN GAP: Bruin's sync_relationships (the UI's 'Sync' push) writes only "
-        "foreign keys, never ui_tags, so a Bruin entity has no push path that "
-        "records pushed_tags. The tag-carrying save_model_schema/save_schema_file "
-        "paths take request tags and stay additive-only."
-    ),
-)
 def test_removing_trellis_tag_removes_it_from_the_bruin_block_on_next_push(
     writable_adapter,
 ):

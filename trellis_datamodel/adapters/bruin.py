@@ -27,9 +27,9 @@ from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ConfigurationError, NotFoundError
-from trellis_datamodel.models.entity_keys import get_model_ref
+from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.services.fk_placement import place_foreign_key
-from trellis_datamodel.services.tag_ownership import plan_tag_push
+from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY, plan_tag_push
 from trellis_datamodel.utils.bruin_parser import (
     BruinAsset,
     asset_folder,
@@ -39,6 +39,7 @@ from trellis_datamodel.utils.bruin_rewriter import (
     rewrite_bruin_block,
     write_bruin_asset,
 )
+from trellis_datamodel.utils.origin import parse_origin, stringify_origin
 from . import entity_type_inference
 from .artifact_snapshot import clear_snapshots
 from .base import (
@@ -62,6 +63,11 @@ FRAMEWORK_NAME = "bruin"
 # within it. These terminate a lineage walk the way a dbt source does.
 INGESTION_ASSET_TYPE_PREFIXES = ("ingestr",)
 
+# A column's origin lives in the asset-level `meta` under this prefix plus the
+# column name. Bruin types `meta` as a string-to-string map, so the value is
+# the `stringify_origin` text, e.g. `origin.email: "System: CRM | Table: x"`.
+ORIGIN_META_PREFIX = "origin."
+
 
 def _split_asset_name(name: str) -> tuple[str, str]:
     """Split a dotted asset name into (schema_part, short_name).
@@ -83,6 +89,43 @@ def _short_name(name: str) -> str:
 def _column_type(column: dict) -> str:
     """Bruin writes a column's type as `type`; tolerate `data_type` too."""
     return column.get("type", column.get("data_type", "")) or ""
+
+
+def _drafted_type(field: dict[str, Any]) -> Optional[str]:
+    """The type to declare for a drafted field, or None when Trellis has none.
+
+    The precise physical type wins over the logical bucket; `unknown` is not
+    a type Bruin could use in DDL, so it is never written.
+    """
+    datatype = get_physical_datatype(field) or field.get("datatype")
+    return datatype if datatype and datatype != "unknown" else None
+
+
+def _column_origin(asset: BruinAsset, column_name: str) -> list[dict[str, str]]:
+    """A column's origin, read back from the asset-level `meta`."""
+    return parse_origin(asset.meta.get(f"{ORIGIN_META_PREFIX}{column_name}"))
+
+
+def _push_origin_meta(
+    meta: dict[str, Any], drafted_fields: Optional[list[dict[str, Any]]]
+) -> dict[str, Any]:
+    """The asset `meta` after writing each drafted field's origin.
+
+    Only the `origin.<column>` key of a drafted field is set or, when that
+    field has no origin, removed; every other `meta` key is kept.
+    """
+    result = dict(meta)
+    for field in drafted_fields or []:
+        name = field.get("name")
+        if not name:
+            continue
+        key = f"{ORIGIN_META_PREFIX}{name}"
+        origin = stringify_origin(parse_origin(field.get("origin")))
+        if origin:
+            result[key] = origin
+        else:
+            result.pop(key, None)
+    return result
 
 
 def _is_ingestion_asset(asset: BruinAsset) -> bool:
@@ -116,15 +159,19 @@ def _same_reference(
 def _asset_to_model_info(asset: BruinAsset) -> ModelInfo:
     """Convert a BruinAsset to a ModelInfo dict."""
     schema_part, short_name = _split_asset_name(asset.name)
-    columns: list[ColumnInfo] = [
-        {
-            "name": column["name"],
-            "type": _column_type(column),
-            "description": column.get("description"),
-        }
-        for column in asset.columns
-        if column.get("name")
-    ]
+    columns: list[ColumnInfo] = []
+    for column in asset.columns:
+        if not column.get("name"):
+            continue
+        info = ColumnInfo(
+            name=column["name"],
+            type=_column_type(column),
+            description=column.get("description"),
+        )
+        origin = _column_origin(asset, column["name"])
+        if origin:
+            info["origin"] = origin
+        columns.append(info)
     materialization = (
         asset.materialization.get("type", "")
         if isinstance(asset.materialization, dict)
@@ -538,9 +585,17 @@ class BruinAdapter:
         entities: list[dict[str, Any]],
         relationships: list[dict[str, Any]],
     ) -> list[Path]:
-        """Write relationships back as Bruin `foreign_key` column blocks.
+        """Push entities and relationships into their bound assets' @bruin blocks.
 
-        The relationship type decides which asset holds the foreign key, via
+        For each bound asset this writes the entity description (only when it
+        has one), its drafted columns (description; a type only where the
+        asset declares none, since Bruin uses `type` for DDL), each drafted
+        column's origin (asset `meta`, see ORIGIN_META_PREFIX) and its
+        `ui_tags` via `plan_tag_push`, setting `entity["pushed_tags"]` for the
+        caller to persist. Asset columns that are not drafted are never
+        removed. An entity without an asset is not scaffolded here.
+
+        Relationships become Bruin `foreign_key` column blocks. The relationship type decides which asset holds the foreign key, via
         the same `place_foreign_key` rule dbt uses. Pruning mirrors dbt: a
         column is managed when it is an end of a relationship in the payload,
         and a managed column that no longer holds a relationship's key loses
@@ -603,17 +658,89 @@ class BruinAdapter:
                 managed.get(entity_id, set()) - fk_fields.get(entity_id, set())
             )
 
+        entity_by_asset: dict[str, dict[str, Any]] = {}
+        for entity in entities:
+            asset = entity_to_asset.get(entity.get("id"))
+            if asset is not None:
+                entity_by_asset.setdefault(asset.name, entity)
+
         updated: list[Path] = []
         for asset in self._assets_to_sync(assets, entity_to_asset):
-            wanted = desired.get(asset.name, {})
+            entity = entity_by_asset[asset.name]
+            updates = self._entity_updates(asset, entity)
             columns = self._apply_foreign_keys(
-                asset, wanted, stale.get(asset.name, set()), resolve
+                self._apply_drafted_fields(asset.columns, entity.get("drafted_fields")),
+                desired.get(asset.name, {}),
+                stale.get(asset.name, set()),
+                resolve,
             )
-            if columns is None:
-                continue
-            updated.append(rewrite_bruin_block(asset.file_path, {"columns": columns}))
+            if columns != asset.columns:
+                updates["columns"] = columns
+            # Only touch files that actually change.
+            if updates:
+                updated.append(rewrite_bruin_block(asset.file_path, updates))
 
         return updated
+
+    @staticmethod
+    def _entity_updates(asset: BruinAsset, entity: dict[str, Any]) -> dict[str, Any]:
+        """The description, tags and origin `meta` an entity pushes onto its asset.
+
+        Holds only what differs from the asset. Sets `entity["pushed_tags"]`
+        whenever the entity has an opinion on tags (`ui_tags` is not None).
+        """
+        updates: dict[str, Any] = {}
+
+        description = entity.get("description")
+        if description and description != asset.description:
+            updates["description"] = description
+
+        live_tags = list(asset.tags or [])
+        plan = plan_tag_push(
+            entity.get("ui_tags"), entity.get(PUSHED_TAGS_KEY), live_tags
+        )
+        if plan is not None:
+            entity[PUSHED_TAGS_KEY] = plan.pushed_tags
+            tags = plan.apply(live_tags)
+            if tags != live_tags:
+                updates["tags"] = tags
+
+        meta = _push_origin_meta(asset.meta, entity.get("drafted_fields"))
+        if meta != asset.meta:
+            updates["meta"] = meta
+
+        return updates
+
+    @staticmethod
+    def _apply_drafted_fields(
+        columns: list[dict[str, Any]],
+        drafted_fields: Optional[list[dict[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Overlay drafted fields onto the asset's columns.
+
+        A drafted field the asset lacks is appended. A declared type is never
+        overwritten, only a missing one filled; a description is written when
+        the field has one. Columns that are not drafted are kept as they are.
+        """
+        result = [dict(column) for column in columns]
+        by_name = {column.get("name"): column for column in result}
+
+        for field in drafted_fields or []:
+            name = field.get("name")
+            if not name:
+                continue
+            column = by_name.get(name)
+            if column is None:
+                column = by_name[name] = {"name": name}
+                result.append(column)
+
+            datatype = _drafted_type(field)
+            if datatype and not _column_type(column):
+                column["type"] = datatype
+            if field.get("description"):
+                column["description"] = field["description"]
+
+        return result
 
     @staticmethod
     def _assets_to_sync(
@@ -640,24 +767,20 @@ class BruinAdapter:
 
     @staticmethod
     def _apply_foreign_keys(
-        asset: BruinAsset,
+        columns: list[dict[str, Any]],
         wanted: dict[str, dict[str, str]],
         stale: set[str],
         resolve: Any,
-    ) -> Optional[list[dict[str, Any]]]:
+    ) -> list[dict[str, Any]]:
         """Write the wanted foreign keys and drop those on *stale* columns.
 
-        Any other column's foreign_key is left as it is. Returns None when
-        nothing would change, so a sync only touches files it actually needs to.
-        Sameness is judged on the asset a reference resolves to, not on how it
+        Any other column's foreign_key is left as it is. Sameness is judged on the asset a reference resolves to, not on how it
         is spelled: a hand-written `dim__product` already means
         `core.dim__product`, and rewriting it to the canonical spelling would
         put a spurious diff in the user's pipeline for no gain.
         """
-        columns: list[dict[str, Any]] = []
-        changed = False
-
-        for column in asset.columns:
+        result: list[dict[str, Any]] = []
+        for column in columns:
             entry = dict(column)
             name = entry.get("name")
             current = entry.get("foreign_key")
@@ -666,23 +789,20 @@ class BruinAdapter:
             if target is not None:
                 if not _same_reference(current, target, resolve):
                     entry["foreign_key"] = target
-                    changed = True
             elif current is not None and name in stale:
                 # The relationship's key moved off this column: prune it.
                 entry.pop("foreign_key")
-                changed = True
 
-            columns.append(entry)
+            result.append(entry)
 
-        declared = {c.get("name") for c in asset.columns}
+        declared = {c.get("name") for c in columns}
         for name, target in wanted.items():
             if name not in declared:
                 # The relationship names a column the asset does not declare.
                 # Add it so the reference is not silently lost.
-                columns.append({"name": name, "foreign_key": target})
-                changed = True
+                result.append({"name": name, "foreign_key": target})
 
-        return columns if changed else None
+        return result
 
     # ------------------------------------------------------------------
     # Entity type inference

@@ -104,6 +104,23 @@ def _normalize_columns(columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return normalized
 
 
+def _replace_meta(parsed: CommentedMap, meta: Dict[str, Any]) -> None:
+    """Make the asset-level `meta` equal *meta*, editing the existing map in
+    place so comments on the keys that stay are kept. An empty *meta* drops
+    the key altogether rather than leaving `meta: {}` behind."""
+    if not meta:
+        parsed.pop("meta", None)
+        return
+    current = parsed.get("meta")
+    if not isinstance(current, dict):
+        current = parsed["meta"] = CommentedMap()
+    for key in [key for key in current if key not in meta]:
+        del current[key]
+    for key, value in meta.items():
+        if current.get(key) != value:
+            current[key] = value
+
+
 def _atomic_write(path: Path, content: str) -> None:
     """Write *content* to *path* atomically, within the same directory."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,7 +140,8 @@ def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
 
     Args:
         file_path: Path to the SQL or Python source file.
-        updates: Dict with keys like 'description', 'tags', 'columns'.
+        updates: Dict with keys like 'description', 'tags', 'columns',
+                 'meta'.
                  Columns may use either 'data_type' or 'type'.
 
     Returns:
@@ -155,6 +173,9 @@ def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
 
     if updates.get("columns") is not None:
         parsed["columns"] = _normalize_columns(updates["columns"])
+
+    if updates.get("meta") is not None:
+        _replace_meta(parsed, updates["meta"])
 
     new_yaml_str = _dump_to_str(yaml_rt, parsed)
 
