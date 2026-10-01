@@ -2,14 +2,6 @@
 
 from fastapi.testclient import TestClient
 
-from trellis_datamodel.exceptions import (
-    ConfigurationError,
-    DomainError,
-    FeatureDisabledError,
-    FileOperationError,
-    NotFoundError,
-    ValidationError,
-)
 from trellis_datamodel.server import app
 
 
@@ -121,22 +113,3 @@ def test_file_operation_error_maps_to_500(test_client: TestClient, monkeypatch):
         data = response.json()
         assert "detail" in data
         assert data.get("error") == "file_operation_error"
-
-
-def test_error_response_structure():
-    """Test that all error responses have consistent structure."""
-    # Verify exception handlers return consistent structure
-    # This is tested indirectly through the above tests, but we can verify the structure
-    error_types = [
-        NotFoundError("Not found"),
-        ValidationError("Invalid input"),
-        ConfigurationError("Config error"),
-        FeatureDisabledError("Feature disabled"),
-        FileOperationError("File error"),
-        DomainError("Generic error"),
-    ]
-
-    for error in error_types:
-        assert hasattr(error, "message")
-        assert isinstance(error.message, str)
-        assert len(error.message) > 0

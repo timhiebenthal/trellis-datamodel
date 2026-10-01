@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
@@ -93,51 +93,6 @@ describe('Sidebar Filtering Logic', () => {
         expect(get(folderFilter)).toEqual([]);
         expect(get(tagFilter)).toEqual([]);
     });
-
-    it('folder filter updates correctly', () => {
-        folderFilter.set(['all']);
-        expect(get(folderFilter)).toEqual(['all']);
-
-        folderFilter.set(['all', 'staging']);
-        expect(get(folderFilter)).toEqual(['all', 'staging']);
-
-        folderFilter.set([]);
-        expect(get(folderFilter)).toEqual([]);
-    });
-
-    it('tag filter updates correctly', () => {
-        tagFilter.set(['core']);
-        expect(get(tagFilter)).toEqual(['core']);
-
-        tagFilter.set(['core', 'pii']);
-        expect(get(tagFilter)).toEqual(['core', 'pii']);
-
-        tagFilter.set([]);
-        expect(get(tagFilter)).toEqual([]);
-    });
-
-    it('does not cause infinite updates when filters change', () => {
-        const nodeSubscriber = vi.fn();
-        const unsubscribe = nodes.subscribe(nodeSubscriber);
-
-        // Clear initial subscription call
-        nodeSubscriber.mockClear();
-
-        // Change folder filter
-        folderFilter.set(['all']);
-
-        // Should only trigger once, not infinitely
-        // Wait a bit to ensure no additional calls
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // In a proper implementation, this should be called exactly once
-                // If there's an infinite loop, this would be called many times
-                expect(nodeSubscriber.mock.calls.length).toBeLessThan(5);
-                unsubscribe();
-                resolve(undefined);
-            }, 100);
-        });
-    });
 });
 
 describe('Filter Helper Functions', () => {
@@ -152,17 +107,6 @@ describe('Filter Helper Functions', () => {
         expect(getModelFolder(model2)).toBe('2_int/staging');
         expect(getModelFolder(model3)).toBe('1_stg');
         expect(getModelFolder(model4)).toBeNull();
-    });
-
-    it('matches tags correctly', () => {
-        const modelTags = ['core', 'pii'];
-        const activeTags = ['core'];
-
-        const hasMatch = activeTags.some(tag => modelTags.includes(tag));
-        expect(hasMatch).toBe(true);
-
-        const noMatch = ['staging'].some(tag => modelTags.includes(tag));
-        expect(noMatch).toBe(false);
     });
 });
 

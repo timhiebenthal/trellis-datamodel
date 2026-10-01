@@ -273,10 +273,10 @@ def test_batched_enrichment_matches_legacy_results_for_primary_and_additional_mo
     assert entities["draft"]["source_system"] == ["mock"]
 
 
-def test_data_model_request_does_not_reopen_manifest_or_catalog_per_entity(
+def test_data_model_request_uses_batch_source_system_lookup_once(
     test_client, temp_data_model_path, monkeypatch
 ):
-    """The request uses one indexed artifact read instead of one per entity."""
+    """The request calls the batch adapter lookup once instead of once per entity."""
     import trellis_datamodel.routes.data_model as data_model_route
     import trellis_datamodel.services.lineage as lineage_service
 
