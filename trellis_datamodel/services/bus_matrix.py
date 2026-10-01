@@ -21,7 +21,7 @@ import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
-from trellis_datamodel.services.reconciliation import compute_display_tags
+from trellis_datamodel.services.tag_ownership import compute_display_tags
 
 
 def get_bus_matrix(

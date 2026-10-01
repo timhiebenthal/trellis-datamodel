@@ -4,10 +4,11 @@ Preserves comments, formatting, and structure while allowing updates.
 """
 
 import os
-from typing import Dict, List, Optional, Any
+from typing import Any, Callable, Dict, List, Optional
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
+from trellis_datamodel.services.tag_ownership import plan_tag_push
 from trellis_datamodel.utils.column_metadata import split_description_origin
 
 
@@ -272,56 +273,51 @@ class YamlHandler:
         model: CommentedMap,
         ui_tags: Optional[List[str]],
         previously_pushed: Optional[List[str]] = None,
-    ) -> None:
-        """Additively union `ui_tags` into a model's existing tags, dropping only
-        tags in `previously_pushed` that are no longer present in `ui_tags`.
-
-        No-op when `ui_tags is None` (Trellis has no opinion on tags this push).
-        Tags outside `previously_pushed` (e.g. added directly in schema.yml by dbt) are
-        never touched, since dbt owns tags it did not receive from Trellis.
-        """
-        if ui_tags is None:
-            return
-
-        current_tags = self.get_model_tags(model)
-        dropped = set(previously_pushed or []) - set(ui_tags)
-        merged = [tag for tag in current_tags if tag not in dropped]
-
-        seen = set(merged)
-        for tag in ui_tags:
-            if tag not in seen:
-                seen.add(tag)
-                merged.append(tag)
-
-        self.update_model_tags(model, merged)
+    ) -> Optional[List[str]]:
+        """Push `ui_tags` onto a model's live tags; see `_merge_tags`."""
+        return self._merge_tags(
+            self.get_model_tags(model),
+            ui_tags,
+            previously_pushed,
+            lambda tags: self.update_model_tags(model, tags),
+        )
 
     def merge_version_tags(
         self,
         version: CommentedMap,
         ui_tags: Optional[List[str]],
         previously_pushed: Optional[List[str]] = None,
-    ) -> None:
-        """Additively union `ui_tags` into a version's existing tags, dropping only
-        tags in `previously_pushed` that are no longer present in `ui_tags`.
+    ) -> Optional[List[str]]:
+        """Push `ui_tags` onto a version's live tags; see `_merge_tags`."""
+        return self._merge_tags(
+            list(version.get("config", {}).get("tags", [])),
+            ui_tags,
+            previously_pushed,
+            lambda tags: self.update_version_tags(version, tags),
+        )
+
+    @staticmethod
+    def _merge_tags(
+        live_tags: List[str],
+        ui_tags: Optional[List[str]],
+        previously_pushed: Optional[List[str]],
+        write: Callable[[List[str]], None],
+    ) -> Optional[List[str]]:
+        """Additively union `ui_tags` into the live tags, dropping only tags in
+        `previously_pushed` that are no longer present in `ui_tags`.
 
         No-op when `ui_tags is None` (Trellis has no opinion on tags this push).
         Tags outside `previously_pushed` (e.g. added directly in schema.yml by dbt) are
         never touched, since dbt owns tags it did not receive from Trellis.
+
+        Returns the tags Trellis owns after this push (to persist as the next
+        push's `previously_pushed`), or None when nothing was pushed.
         """
-        if ui_tags is None:
-            return
-
-        current_tags = list(version.get("config", {}).get("tags", []))
-        dropped = set(previously_pushed or []) - set(ui_tags)
-        merged = [tag for tag in current_tags if tag not in dropped]
-
-        seen = set(merged)
-        for tag in ui_tags:
-            if tag not in seen:
-                seen.add(tag)
-                merged.append(tag)
-
-        self.update_version_tags(version, merged)
+        plan = plan_tag_push(ui_tags, previously_pushed, live_tags)
+        if plan is None:
+            return None
+        write(plan.apply(live_tags))
+        return plan.pushed_tags
 
     def find_column(
         self, model: CommentedMap, column_name: str
