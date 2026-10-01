@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
     "framework": ConfigFieldMetadata(
         type="enum",
-        enum_values=["dbt-core"],
+        enum_values=["dbt-core", "bruin"],
         default="dbt-core",
         required=True,
         description="Transformation framework",
@@ -110,6 +110,27 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         default="",
         required=False,
         description="Optional path to company dummy project",
+        beta=False,
+    ),
+    "bruin_pipeline_path": ConfigFieldMetadata(
+        type="string",
+        default="",
+        required=False,
+        description="Path to Bruin pipeline directory holding pipeline.yml and assets/ (relative or absolute)",
+        beta=False,
+    ),
+    "bruin_asset_paths": ConfigFieldMetadata(
+        type="list",
+        default=[],
+        required=False,
+        description="Subdirectories under assets/ to include (filters Bruin assets)",
+        beta=False,
+    ),
+    "bruin_default_asset_type": ConfigFieldMetadata(
+        type="string",
+        default="duckdb.sql",
+        required=False,
+        description="Asset type used when Trellis scaffolds a new Bruin asset (e.g. bq.sql, sf.sql)",
         beta=False,
     ),
     "lineage.enabled": ConfigFieldMetadata(
@@ -246,6 +267,9 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "data_model_file",
         "dbt_model_paths",
         "dbt_company_dummy_path",
+        "bruin_pipeline_path",
+        "bruin_asset_paths",
+        "bruin_default_asset_type",
     ]:
         if key in config:
             normalized[key] = config[key]
@@ -418,6 +442,28 @@ def _validate_paths(config: Dict[str, Any], config_path: str) -> list[str]:
         )
         if not os.path.exists(full_catalog):
             messages.append(f"Warning: dbt_catalog_path does not exist: {full_catalog}")
+
+    # Check bruin_pipeline_path
+    pipeline_path = config.get("bruin_pipeline_path", "")
+    if pipeline_path:
+        full_pipeline = (
+            pipeline_path
+            if os.path.isabs(pipeline_path)
+            else os.path.abspath(os.path.join(base_dir, pipeline_path))
+        )
+        if not os.path.exists(full_pipeline):
+            messages.append(f"bruin_pipeline_path does not exist: {full_pipeline}")
+
+        # Check asset paths (relative to the pipeline's assets/; warning only,
+        # since a filter may also match a deeper subdirectory)
+        for asset_path in config.get("bruin_asset_paths") or []:
+            full_asset = os.path.abspath(
+                os.path.join(full_pipeline, "assets", asset_path)
+            )
+            if not os.path.exists(full_asset):
+                messages.append(
+                    f"Warning: bruin_asset_paths entry does not exist: {full_asset}"
+                )
 
     return messages
 

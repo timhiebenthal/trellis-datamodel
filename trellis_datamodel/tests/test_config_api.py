@@ -9,6 +9,7 @@ from datetime import datetime
 import importlib
 
 import pytest
+import yaml
 from httpx import AsyncClient
 
 
@@ -481,3 +482,122 @@ async def test_reload_config_missing_file(client: AsyncClient, temp_config_dir, 
 
     assert "error" in data["detail"]
     assert "configuration_error" in data["detail"]["error"]
+
+
+BRUIN_CONFIG = textwrap.dedent(
+    """\
+    framework: bruin
+    modeling_style: dimensional_model
+    bruin_pipeline_path: ./pipeline
+    bruin_asset_paths:
+      - 02_core
+    bruin_default_asset_type: bq.sql
+    data_model_file: data_model.yml
+    lineage:
+      enabled: true
+      layers:
+        - 01_prep
+        - 02_core
+    """
+)
+BRUIN_KEYS = {
+    "bruin_pipeline_path": "./pipeline",
+    "bruin_asset_paths": ["02_core"],
+    "bruin_default_asset_type": "bq.sql",
+}
+
+
+def _write_bruin_project(config_dir: str) -> Path:
+    """Replace the fixture's dbt trellis.yml with a Bruin one and its pipeline."""
+    (Path(config_dir) / "pipeline" / "assets" / "02_core").mkdir(parents=True)
+    (Path(config_dir) / "pipeline" / "pipeline.yml").write_text("name: shop\n")
+    config_path = Path(config_dir) / "trellis.yml"
+    config_path.write_text(BRUIN_CONFIG)
+    return config_path
+
+
+async def _load_then_save(client: AsyncClient) -> dict:
+    """What the config page does on Save: GET the config, PUT it back unchanged."""
+    loaded = (await client.get("/api/config")).json()
+    response = await client.put(
+        "/api/config",
+        json={
+            "config": loaded["config"],
+            "expected_mtime": loaded["file_info"]["mtime"],
+            "expected_hash": loaded["file_info"]["hash"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    return loaded["config"]
+
+
+@pytest.mark.asyncio
+async def test_bruin_settings_survive_load_then_save(client: AsyncClient, temp_config_dir):
+    config_path = _write_bruin_project(temp_config_dir)
+
+    loaded = await _load_then_save(client)
+
+    assert {k: loaded.get(k) for k in BRUIN_KEYS} == BRUIN_KEYS
+    saved = yaml.safe_load(config_path.read_text())
+    assert saved["framework"] == "bruin"
+    assert {k: saved.get(k) for k in BRUIN_KEYS} == BRUIN_KEYS
+
+
+@pytest.mark.asyncio
+async def test_dbt_config_save_adds_no_bruin_keys(client: AsyncClient, temp_config_dir):
+    await _load_then_save(client)
+
+    saved = yaml.safe_load((Path(temp_config_dir) / "trellis.yml").read_text())
+    assert saved["dbt_project_path"] == "./dbt_project"
+    assert not [k for k in saved if k.startswith("bruin_")]
+
+
+@pytest.mark.asyncio
+async def test_config_schema_describes_bruin_fields(client: AsyncClient):
+    fields = (await client.get("/api/config/schema")).json()["fields"]
+
+    assert "bruin" in fields["framework"]["enum_values"]
+    for key in BRUIN_KEYS:
+        assert fields[key]["description"], key
+    assert fields["bruin_asset_paths"]["type"] == "list"
+    assert fields["bruin_default_asset_type"]["default"] == "duckdb.sql"
+
+
+def test_validate_paths_accepts_an_existing_bruin_pipeline(temp_config_dir):
+    from trellis_datamodel.services.config_service import _validate_paths
+
+    config_path = _write_bruin_project(temp_config_dir)
+
+    assert _validate_paths(yaml.safe_load(BRUIN_CONFIG), str(config_path)) == []
+
+
+def test_validate_paths_flags_a_missing_bruin_pipeline(temp_config_dir):
+    from trellis_datamodel.services.config_service import _validate_paths
+
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    config = {"framework": "bruin", "bruin_pipeline_path": "./no_such_pipeline"}
+
+    messages = _validate_paths(config, str(config_path))
+
+    expected = os.path.abspath(os.path.join(temp_config_dir, "no_such_pipeline"))
+    assert messages == [f"bruin_pipeline_path does not exist: {expected}"]
+
+
+def test_validate_paths_warns_about_a_missing_bruin_asset_path(temp_config_dir):
+    from trellis_datamodel.services.config_service import _validate_paths
+
+    config_path = _write_bruin_project(temp_config_dir)
+    config = {**yaml.safe_load(BRUIN_CONFIG), "bruin_asset_paths": ["02_core", "99_gone"]}
+
+    messages = _validate_paths(config, str(config_path))
+
+    expected = os.path.join(temp_config_dir, "pipeline", "assets", "99_gone")
+    assert messages == [f"Warning: bruin_asset_paths entry does not exist: {expected}"]
+
+
+def test_validate_paths_ignores_bruin_for_a_dbt_config(temp_config_dir):
+    from trellis_datamodel.services.config_service import _validate_paths
+
+    config = {"framework": "dbt-core", "dbt_project_path": "./dbt_project"}
+
+    assert _validate_paths(config, str(Path(temp_config_dir) / "trellis.yml")) == []

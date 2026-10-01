@@ -388,6 +388,9 @@ class FakeAdapter:
             "error": None,
         }
 
+    def validate_project_path(self):
+        return "/fake/project"
+
 
 @pytest.fixture
 def fake_adapter():
