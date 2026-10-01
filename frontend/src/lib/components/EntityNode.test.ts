@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { frameworkModels, viewMode } from '$lib/stores';
 import EntityNode from './EntityNode.svelte';
-import type { EntityData } from '$lib/types';
 import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
 import { getModelSchema } from '$lib/api';
 
@@ -117,17 +116,6 @@ describe('EntityNode — merged field rendering', () => {
       b => b.title?.toLowerCase().includes('materialize') || b.getAttribute('aria-label')?.toLowerCase().includes('materialize')
     );
     expect(materializeBtns.length).toBe(0);
-  });
-
-  it('accepts dbt_tags/ui_tags on EntityData without a type error', () => {
-    const data: EntityData = {
-        label: 'Users',
-        tags: ['nightly', 'pii'],
-        dbt_tags: ['nightly'],
-        ui_tags: ['pii'],
-    } as EntityData;
-    expect(data.dbt_tags).toEqual(['nightly']);
-    expect(data.ui_tags).toEqual(['pii']);
   });
 });
 

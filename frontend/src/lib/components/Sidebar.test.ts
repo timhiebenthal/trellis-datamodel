@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, cleanup, fireEvent } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
 import { FRAMEWORK_DISPLAY_KEYS, isFeatureAvailable, missingArtifactHints } from '$lib/utils/framework-display';
@@ -93,51 +93,6 @@ describe('Sidebar Filtering Logic', () => {
         expect(get(folderFilter)).toEqual([]);
         expect(get(tagFilter)).toEqual([]);
     });
-
-    it('folder filter updates correctly', () => {
-        folderFilter.set(['all']);
-        expect(get(folderFilter)).toEqual(['all']);
-
-        folderFilter.set(['all', 'staging']);
-        expect(get(folderFilter)).toEqual(['all', 'staging']);
-
-        folderFilter.set([]);
-        expect(get(folderFilter)).toEqual([]);
-    });
-
-    it('tag filter updates correctly', () => {
-        tagFilter.set(['core']);
-        expect(get(tagFilter)).toEqual(['core']);
-
-        tagFilter.set(['core', 'pii']);
-        expect(get(tagFilter)).toEqual(['core', 'pii']);
-
-        tagFilter.set([]);
-        expect(get(tagFilter)).toEqual([]);
-    });
-
-    it('does not cause infinite updates when filters change', () => {
-        const nodeSubscriber = vi.fn();
-        const unsubscribe = nodes.subscribe(nodeSubscriber);
-
-        // Clear initial subscription call
-        nodeSubscriber.mockClear();
-
-        // Change folder filter
-        folderFilter.set(['all']);
-
-        // Should only trigger once, not infinitely
-        // Wait a bit to ensure no additional calls
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // In a proper implementation, this should be called exactly once
-                // If there's an infinite loop, this would be called many times
-                expect(nodeSubscriber.mock.calls.length).toBeLessThan(5);
-                unsubscribe();
-                resolve(undefined);
-            }, 100);
-        });
-    });
 });
 
 describe('Filter Helper Functions', () => {
@@ -152,17 +107,6 @@ describe('Filter Helper Functions', () => {
         expect(getModelFolder(model2)).toBe('2_int/staging');
         expect(getModelFolder(model3)).toBe('1_stg');
         expect(getModelFolder(model4)).toBeNull();
-    });
-
-    it('matches tags correctly', () => {
-        const modelTags = ['core', 'pii'];
-        const activeTags = ['core'];
-
-        const hasMatch = activeTags.some(tag => modelTags.includes(tag));
-        expect(hasMatch).toBe(true);
-
-        const noMatch = ['staging'].some(tag => modelTags.includes(tag));
-        expect(noMatch).toBe(false);
     });
 });
 
@@ -216,6 +160,45 @@ describe('Sidebar — framework-driven header', () => {
         const icon = document.querySelector('img[alt="Bruin icon"]') as HTMLImageElement | null;
         expect(icon).toBeTruthy();
         expect(icon?.getAttribute('src')).toBe('https://getbruin.com/favicon.ico');
+    });
+});
+
+describe('Sidebar — filtering through the UI', () => {
+    beforeEach(() => {
+        cleanup();
+        activeFramework.set('dbt-core');
+        frameworkModels.set(mockModels);
+        folderFilter.set([]);
+        tagFilter.set([]);
+        nodes.set([]);
+    });
+
+    it('shows only models in the folder picked from the folder dropdown', async () => {
+        render(Sidebar, { props: {} });
+
+        expect(screen.getByText('users')).toBeTruthy();
+        expect(screen.getByText('orders')).toBeTruthy();
+        expect(screen.getByText('stg_users')).toBeTruthy();
+
+        await fireEvent.change(screen.getByRole('combobox', { name: /Filter by Folder/ }), {
+            target: { value: '2_int/staging' }
+        });
+
+        expect(screen.getByText('stg_users')).toBeTruthy();
+        expect(screen.queryByText('users')).toBeNull();
+        expect(screen.queryByText('orders')).toBeNull();
+    });
+
+    it('shows only models carrying the tag picked from the tag dropdown', async () => {
+        render(Sidebar, { props: {} });
+
+        await fireEvent.change(screen.getByRole('combobox', { name: /Filter by Tag/ }), {
+            target: { value: 'pii' }
+        });
+
+        expect(screen.getByText('users')).toBeTruthy();
+        expect(screen.queryByText('orders')).toBeNull();
+        expect(screen.queryByText('stg_users')).toBeNull();
     });
 });
 

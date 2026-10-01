@@ -6,15 +6,6 @@ import yaml
 import pytest
 
 
-def test_map_column_type_renamed_from_map_dbt_type():
-    """_map_dbt_type was renamed to the framework-neutral _map_column_type."""
-    from trellis_datamodel.services.reconciliation import _map_column_type
-
-    assert _map_column_type("bigint") == "int"
-    assert _map_column_type("varchar") == "text"
-    assert _map_column_type(None) == "unknown"
-
-
 @pytest.mark.parametrize(
     "raw_type,expected",
     [
@@ -43,6 +34,10 @@ def test_map_column_type_renamed_from_map_dbt_type():
         ("VARIANT", "unknown"),
         ("ARRAY", "unknown"),
         ("int[]", "unknown"),
+        # dbt-style lowercase types and missing type
+        ("bigint", "int"),
+        ("varchar", "text"),
+        (None, "unknown"),
     ],
 )
 def test_map_column_type_warehouse_spellings(raw_type, expected):

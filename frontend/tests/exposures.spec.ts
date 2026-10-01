@@ -5,20 +5,6 @@ test.describe('Exposures View', () => {
         await page.goto('/');
     });
 
-    test('should show Exposures button when exposures_enabled is true', async ({ page, request }) => {
-        // Note: This test requires a test config with exposures.enabled: true
-        // For now, we'll just check if the Exposures button exists in the DOM when enabled
-        
-        // Navigate to page
-        await page.waitForLoadState('networkidle');
-        
-        // Check if Exposures button is visible
-        const exposuresButton = page.getByRole('link', { name: 'Exposures' });
-        
-        // In a real test environment with exposures.enabled: true, this should be visible
-        // For now, we're documenting the expected behavior
-    });
-
     test('should hide Exposures button when exposures_enabled is false', async ({ page, request }) => {
         // Note: This test requires a test config with exposures.enabled: false
         // For now, we'll just check if the Exposures button doesn't exist when disabled
