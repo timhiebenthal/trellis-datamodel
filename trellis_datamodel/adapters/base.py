@@ -227,6 +227,12 @@ class TransformationAdapter(Protocol):
         """
         Sync relationship definitions from data model to framework schema files.
 
+        An implementation that also pushes an entity's `ui_tags` must remove
+        only tags in that entity's `pushed_tags`, and must set
+        `entity["pushed_tags"]` on the dict it was handed to the tags it now
+        owns (see `services.tag_ownership.plan_tag_push`); the caller persists
+        that record to data_model.yml.
+
         Args:
             entities: List of entity definitions from the data model.
             relationships: List of relationship definitions to sync.

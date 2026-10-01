@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Pushed column origins survive reconcile**: origins pushed to dbt are no longer
   dropped when reconciling from dbt.
+- **Removed Trellis tags are removed from dbt on push**: removing a tag you added in
+  Trellis now removes it from schema.yml on the next "Sync to dbt", without touching
+  tags added in dbt. Trellis records what it pushed in a new backend-owned
+  `pushed_tags` entity key in data_model.yml. Known gaps: removing an entity's last
+  Trellis tag is not yet pushed, and Bruin's sync does not push tags yet.
 
 
 ## [0.23.1] - 2026-08-18

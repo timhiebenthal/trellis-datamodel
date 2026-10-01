@@ -23,6 +23,13 @@ from trellis_datamodel.models.entity_keys import (
     set_model_ref,
     set_physical_datatype,
 )
+# compute_display_tags and reconcile_entity_tags are re-exported: tests import
+# them from here.
+from trellis_datamodel.services.tag_ownership import (
+    compute_display_tags,  # noqa: F401
+    migrate_legacy_tags,
+    reconcile_entity_tags,
+)
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.structured_data import load_yaml_or_json
 
@@ -195,41 +202,6 @@ def reconcile_entity_fields(
     return result
 
 
-def reconcile_entity_tags(
-    existing_tags: list[str],
-    manifest_tags: list[str] | None,
-) -> list[str]:
-    """The active framework is authoritative for the mirrored `framework_tags` field.
-    manifest_tags=None -> model absent from manifest, non-destructive (unchanged).
-    manifest_tags=[] (present, no tags) -> mirrored tags cleared.
-    """
-    if manifest_tags is None:
-        return existing_tags
-    return list(manifest_tags)
-
-
-def compute_display_tags(entity: dict[str, Any]) -> list[str]:
-    """The tag list to show/export for an entity — never persisted.
-
-    Bound entities: the union of `framework_tags` (framework-owned,
-    reconcile-refreshed) and `ui_tags` (user-added via the Trellis tag
-    editor), deduplicated, framework_tags first. Unbound entities have no
-    schema.yml to mirror — `tags` is their single, freely-editable,
-    already-authoritative field.
-    """
-    if get_model_ref(entity):
-        framework_tags = get_framework_tags(entity)
-        ui_tags = entity.get("ui_tags") or []
-        seen: set[str] = set()
-        result: list[str] = []
-        for tag in [*framework_tags, *ui_tags]:
-            if tag not in seen:
-                seen.add(tag)
-                result.append(tag)
-        return result
-    return entity.get("tags") or []
-
-
 def _snapshot_columns(
     model: Mapping[str, Any],
     unique_id: str,
@@ -381,29 +353,10 @@ def reconcile_data_model(
             changed = True
 
         manifest_tags = manifest_tags_by_id.get(model_ref) if model_ref in manifest_by_id else None
-        legacy_tags = entity.get("tags") or []
         existing_framework_tags = get_framework_tags(entity)
         reconciled_framework_tags = reconcile_entity_tags(existing_framework_tags, manifest_tags)
 
-        # One-time migration: a bound entity's legacy `tags` value (from
-        # before the framework_tags/ui_tags split existed) is folded into
-        # ui_tags ONLY if it represents real legacy/user-curated data — i.e.
-        # it differs from what framework reconciliation says right now. A
-        # value that already matches is the framework's own tag list from an
-        # earlier run under the old field name, not something the user
-        # added, and must NOT be copied into ui_tags (that would wrongly
-        # mark the framework's tags as Trellis-authored and defeat the
-        # read-only/removable UI split). The legacy `tags` key itself is
-        # always retired afterward — bound entities never persist `tags`
-        # going forward, only framework_tags/ui_tags.
-        if "tags" in entity:
-            if (
-                "ui_tags" not in entity
-                and legacy_tags
-                and legacy_tags != reconciled_framework_tags
-            ):
-                entity["ui_tags"] = list(legacy_tags)
-            del entity["tags"]
+        if migrate_legacy_tags(entity, reconciled_framework_tags):
             changed = True
 
         if reconciled_framework_tags != existing_framework_tags:

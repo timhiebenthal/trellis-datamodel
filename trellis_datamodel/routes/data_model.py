@@ -9,7 +9,10 @@ from trellis_datamodel.models.schemas import DataModelUpdate
 from trellis_datamodel.services.lineage import (
     extract_source_systems_for_models,
 )
-from trellis_datamodel.services.reconciliation import compute_display_tags
+from trellis_datamodel.services.tag_ownership import (
+    PUSHED_TAGS_KEY,
+    compute_display_tags,
+)
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.utils.yaml_handler import YamlHandler
@@ -371,6 +374,21 @@ def _split_model_and_layout(
                     existing_entity
                 )
 
+    # `pushed_tags` is backend-owned — written only by a push, never sent by
+    # auto-save.ts — so it is carried over from disk and never taken from the
+    # payload. It is kept only while the entity stays bound to the model it was
+    # pushed to: on any other model it would drive removals of tags Trellis
+    # never put there.
+    existing_pushed_tags_by_id: Dict[str, Tuple[str | None, Any]] = {}
+    if existing_model_data:
+        for existing_entity in existing_model_data.get("entities", []):
+            existing_entity_id = existing_entity.get("id")
+            if existing_entity_id and PUSHED_TAGS_KEY in existing_entity:
+                existing_pushed_tags_by_id[existing_entity_id] = (
+                    get_model_ref(existing_entity),
+                    existing_entity[PUSHED_TAGS_KEY],
+                )
+
     # Split entities
     entities = content.get("entities", [])
     seen_entity_ids: set = set()
@@ -412,6 +430,11 @@ def _split_model_and_layout(
             set_framework_tags(model_entity, existing_framework_tags_by_id[entity_id])
         if "ui_tags" in entity:
             model_entity["ui_tags"] = entity["ui_tags"]
+        pushed_model_ref, pushed_tags = existing_pushed_tags_by_id.get(
+            entity_id, (None, None)
+        )
+        if pushed_model_ref and pushed_model_ref == get_model_ref(entity):
+            model_entity[PUSHED_TAGS_KEY] = pushed_tags
         if "domain" in entity:
             model_entity["domain"] = entity["domain"]
         if "domains" in entity:

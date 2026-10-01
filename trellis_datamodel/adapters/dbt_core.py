@@ -21,6 +21,7 @@ from trellis_datamodel.exceptions import FileOperationError, NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.services.fk_placement import place_foreign_key
+from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
@@ -1208,10 +1209,13 @@ class DbtCoreAdapter:
                     model_entry, entity.get("description")
                 )
 
-            # Sync Tags
-            ui_tags = entity.get("ui_tags")
-            if ui_tags is not None:
-                self.yaml_handler.merge_model_tags(model_entry, ui_tags)
+            # Sync Tags: drop only tags this entity's previous pushes put there,
+            # and hand the new record back to the caller on the entity itself.
+            pushed_tags = self.yaml_handler.merge_model_tags(
+                model_entry, entity.get("ui_tags"), entity.get(PUSHED_TAGS_KEY)
+            )
+            if pushed_tags is not None:
+                entity[PUSHED_TAGS_KEY] = pushed_tags
 
             # Sync Drafted Fields. When drafted_fields is provided we treat it as
             # the authoritative column list — fields removed/renamed in the data

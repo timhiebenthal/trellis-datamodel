@@ -436,3 +436,32 @@ class TestSyncRelationships:
         # Only the unresolvable one was dropped, so nothing else changed.
         assert updated == []
         assert "foreign_key" not in _columns(self._fct_path(writable_adapter))["amount"]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "KNOWN GAP: Bruin's sync_relationships (the UI's 'Sync' push) writes only "
+        "foreign keys, never ui_tags, so a Bruin entity has no push path that "
+        "records pushed_tags. The tag-carrying save_model_schema/save_schema_file "
+        "paths take request tags and stay additive-only."
+    ),
+)
+def test_removing_trellis_tag_removes_it_from_the_bruin_block_on_next_push(
+    writable_adapter,
+):
+    """Mirror of the dbt end-to-end: push ui_tags, drop one, push again."""
+    customer = {
+        "id": "customer",
+        "label": "Customer",
+        "model_ref": "core.dim__customer",
+        "ui_tags": ["pii"],
+    }
+    asset_path = writable_adapter._find_asset("core.dim__customer").file_path
+
+    writable_adapter.sync_relationships([customer], [])
+    assert _block(asset_path)["tags"] == ["core", "entity", "pii"]
+
+    customer["ui_tags"] = []
+    writable_adapter.sync_relationships([customer], [])
+    assert _block(asset_path)["tags"] == ["core", "entity"]
