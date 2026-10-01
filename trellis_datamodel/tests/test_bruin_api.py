@@ -283,3 +283,63 @@ class TestSchemaEndpoints:
             (r["source"], r["target"], r["source_field"], r["target_field"])
             for r in response.json()["relationships"]
         ] == [("customer", "order", "customer_id", "customer_id")]
+
+
+class TestAmbiguousShortName:
+    """`prep.dim__customer` next to `core.dim__customer`: the frontend sends the
+    short name, which must fail loudly rather than write to the first match."""
+
+    @pytest.fixture
+    def twin_path(self, bruin_pipeline_copy):
+        path = os.path.join(
+            bruin_pipeline_copy, "assets", "01_prep", "dim__customer.sql"
+        )
+        with open(path, "w") as f:
+            f.write("/* @bruin\nname: prep.dim__customer\ntype: duckdb.sql\n@bruin */\n")
+        return path
+
+    @staticmethod
+    def _asset_files(pipeline):
+        return {
+            os.path.join(root, name): open(os.path.join(root, name)).read()
+            for root, _dirs, names in os.walk(pipeline)
+            for name in names
+        }
+
+    def test_read_by_short_name_is_a_422_naming_both(self, bruin_app, twin_path):
+        response = bruin_app.get("/api/models/dim__customer/schema")
+
+        assert response.status_code == 422
+        assert "core.dim__customer" in response.json()["detail"]
+        assert "prep.dim__customer" in response.json()["detail"]
+
+    def test_read_by_full_name_still_works(self, bruin_app, twin_path):
+        response = bruin_app.get("/api/models/core.dim__customer/schema")
+
+        assert response.status_code == 200
+        assert response.json()["file_path"].endswith(
+            os.path.join("02_core", "dim__customer.sql")
+        )
+
+    def test_writes_by_short_name_are_422_and_touch_nothing(
+        self, bruin_app, twin_path, bruin_pipeline_copy
+    ):
+        before = self._asset_files(bruin_pipeline_copy)
+
+        update = bruin_app.post(
+            "/api/models/dim__customer/schema",
+            json={"columns": [{"name": "x", "data_type": "varchar"}]},
+        )
+        save = bruin_app.post(
+            "/api/schema",
+            json={
+                "entity_id": "customer",
+                "model_name": "dim__customer",
+                "fields": [{"name": "x", "data_type": "varchar"}],
+            },
+        )
+
+        assert update.status_code == 422
+        assert save.status_code == 422
+        assert "prep.dim__customer" in save.json()["detail"]
+        assert self._asset_files(bruin_pipeline_copy) == before

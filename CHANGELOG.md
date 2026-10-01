@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `origin.email: "System: CRM | Table: customers"`, read back by reconcile) and Trellis
   tags, including removal of tags Trellis pushed earlier. Known limit: Push does not
   scaffold assets for unbound entities.
+- **Bruin YAML assets are read and written**: standalone `*.asset.yml` / `*.asset.yaml`
+  assets (ingestr, seed, sensor, dashboard) now appear in the model list and lineage, an
+  ingestr YAML asset counts as a source system, and Push writes into them keeping comments
+  and unknown keys. `.r` assets are still not supported.
+- **Ambiguous Bruin asset names are an error**: when two assets share a short name (e.g.
+  `raw.customers` and `core.customers`), reading or saving by that short name now fails
+  with a 422 naming both assets instead of writing to the first match. Full names still work.
+- **Bruin models group by asset folder**: the model list now reports `file_path` relative to
+  the pipeline, so the sidebar and binding picker group `assets/02_core/x.sql` under `02_core`
+  instead of the absolute path.
 
 
 ## [0.23.1] - 2026-08-18

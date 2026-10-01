@@ -306,3 +306,79 @@ class TestOrigin:
             "origin.customer_id": "System: ERP",
             "origin.customer_name": "System: CRM | Table: customers",
         }
+
+
+class TestPushIntoYamlAsset:
+    """Push writes into a standalone `*.asset.yml` exactly as into a block."""
+
+    @pytest.fixture
+    def page_views_path(self, bruin_pipeline_copy):
+        return os.path.join(
+            bruin_pipeline_copy, "assets", "00_ingest", "raw__page_views.asset.yml"
+        )
+
+    @staticmethod
+    def _page_view():
+        return {
+            "id": "page_view",
+            "label": "Page view",
+            "model_ref": "raw.raw__page_views",
+            "description": "One row per page view.",
+            "ui_tags": ["pii"],
+            "drafted_fields": [
+                {"name": "customer_id", "description": "Viewer, if known."},
+                {
+                    "name": "session_id",
+                    "datatype": "text",
+                    "description": "Browser session.",
+                    "origin": ORIGIN,
+                },
+            ],
+        }
+
+    def test_push_writes_fields_tags_origin_and_foreign_key(
+        self, adapter, page_views_path
+    ):
+        relationship = {
+            "source": "customer",
+            "target": "page_view",
+            "type": "one_to_many",
+            "source_field": "customer_id",
+            "target_field": "customer_id",
+        }
+
+        updated = adapter.sync_relationships(
+            [_customer(), self._page_view()], [relationship]
+        )
+
+        assert page_views_path in [str(p) for p in updated]
+        content = open(page_views_path).read()
+        data = yaml.safe_load(content)
+        columns = {c["name"]: c for c in data["columns"]}
+        assert data["description"] == "One row per page view."
+        assert data["tags"] == ["pii"]
+        assert columns["customer_id"]["description"] == "Viewer, if known."
+        assert columns["customer_id"]["foreign_key"] == {
+            "table": CUSTOMER_REF,
+            "column": "customer_id",
+        }
+        assert columns["session_id"] == {
+            "name": "session_id",
+            "type": "text",
+            "description": "Browser session.",
+        }
+        assert data["meta"] == {
+            "origin.session_id": "System: CRM | Table: customers"
+        }
+        # Comments and keys Trellis does not model survive the rewrite.
+        assert content.startswith("# Page views replicated from Segment")
+        assert "owner: web-team  # a key Trellis does not model" in content
+        assert data["parameters"]["source_connection"] == "segment"
+
+    def test_second_push_is_a_no_op(self, adapter, page_views_path):
+        entities = [self._page_view()]
+        assert adapter.sync_relationships(entities, []) != []
+        after_first = open(page_views_path).read()
+
+        assert adapter.sync_relationships(entities, []) == []
+        assert open(page_views_path).read() == after_first

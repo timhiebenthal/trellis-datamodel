@@ -3,8 +3,9 @@ Bruin adapter implementation.
 
 Implements the TransformationAdapter protocol for the Bruin transformation
 framework. Bruin keeps a model's schema inline in the asset file's `@bruin`
-comment block rather than in a sidecar YAML, so reads scan those blocks and
-writes rewrite them in place.
+comment block (or, for ingestr/seed/sensor/dashboard assets, in a standalone
+`*.asset.yml`) rather than in a sidecar YAML, so reads scan those definitions
+and writes rewrite them in place.
 
 Two Bruin conventions carry most of the mapping:
 
@@ -21,12 +22,17 @@ at the call site.
 
 import logging
 import os
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Optional
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import ConfigurationError, NotFoundError
+from trellis_datamodel.exceptions import (
+    ConfigurationError,
+    NotFoundError,
+    ValidationError,
+)
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.services.fk_placement import place_foreign_key
 from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY, plan_tag_push
@@ -84,6 +90,15 @@ def _split_asset_name(name: str) -> tuple[str, str]:
 def _short_name(name: str) -> str:
     """The asset name without its schema prefix."""
     return _split_asset_name(name)[1]
+
+
+def _ambiguous_short_names(assets: list[BruinAsset]) -> set[str]:
+    """Short names carried by more than one asset, e.g. `customers` for
+    `raw.customers` and `core.customers`. A name that is itself some asset's
+    full name is not ambiguous: the exact match wins."""
+    counts = Counter(_short_name(asset.name) for asset in assets)
+    shared = {name for name, count in counts.items() if count > 1}
+    return shared - {asset.name for asset in assets}
 
 
 def _column_type(column: dict) -> str:
@@ -156,8 +171,12 @@ def _same_reference(
     ) and current.get("column") == target["column"]
 
 
-def _asset_to_model_info(asset: BruinAsset) -> ModelInfo:
-    """Convert a BruinAsset to a ModelInfo dict."""
+def _asset_to_model_info(asset: BruinAsset, pipeline_path: str) -> ModelInfo:
+    """Convert a BruinAsset to a ModelInfo dict.
+
+    `file_path` is relative to the pipeline and POSIX-style, like dbt's
+    `original_file_path`, so the UI can group models by asset folder.
+    """
     schema_part, short_name = _split_asset_name(asset.name)
     columns: list[ColumnInfo] = []
     for column in asset.columns:
@@ -186,7 +205,7 @@ def _asset_to_model_info(asset: BruinAsset) -> ModelInfo:
         columns=columns,
         description=asset.description or None,
         materialization=materialization,
-        file_path=asset.file_path,
+        file_path=os.path.relpath(asset.file_path, pipeline_path).replace(os.sep, "/"),
         tags=asset.tags or [],
     )
 
@@ -267,13 +286,28 @@ class BruinAdapter:
     def _lookup_asset(
         assets: list[BruinAsset], model_name: str
     ) -> Optional[BruinAsset]:
-        """Match a name against both the dotted and short spelling."""
+        """Match a name against the dotted spelling, then the short one.
+
+        An exact name always wins. A short name resolves only when one asset
+        carries it: for `raw.customers` and `core.customers`, `customers` is
+        ambiguous and raises, because guessing would write the wrong file.
+
+        Raises:
+            ValidationError: If *model_name* is a short name several assets share.
+        """
         if not model_name:
             return None
         for asset in assets:
-            if asset.name == model_name or _short_name(asset.name) == model_name:
+            if asset.name == model_name:
                 return asset
-        return None
+        matches = [asset for asset in assets if _short_name(asset.name) == model_name]
+        if len(matches) > 1:
+            candidates = ", ".join(sorted(asset.name for asset in matches))
+            raise ValidationError(
+                f"Asset name '{model_name}' is ambiguous: it matches {candidates}. "
+                f"Use the full asset name."
+            )
+        return matches[0] if matches else None
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
@@ -292,9 +326,12 @@ class BruinAdapter:
         """Map asset names to the entity bound to them.
 
         Both spellings of every bound asset are registered, because a binding
-        may hold either and callers look up by whichever they have.
+        may hold either and callers look up by whichever they have. A short
+        name several assets share is left out, so an unbound twin is never
+        attributed to the bound asset's entity.
         """
         model_to_entity: dict[str, str] = {}
+        ambiguous = _ambiguous_short_names(self._scan_all_assets())
 
         for entity in self._load_data_model().get("entities", []):
             entity_id = entity.get("id")
@@ -307,8 +344,9 @@ class BruinAdapter:
             for model in bound_models:
                 if not model:
                     continue
-                model_to_entity[model] = entity_id
-                model_to_entity[_short_name(model)] = entity_id
+                for key in (model, _short_name(model)):
+                    if key not in ambiguous:
+                        model_to_entity[key] = entity_id
 
             model_to_entity[entity_id] = entity_id
 
@@ -320,7 +358,10 @@ class BruinAdapter:
 
     def get_models(self) -> list[ModelInfo]:
         """Scan pipeline assets and return ModelInfo for each."""
-        return [_asset_to_model_info(asset) for asset in self._scan_assets()]
+        return [
+            _asset_to_model_info(asset, self.pipeline_path)
+            for asset in self._scan_assets()
+        ]
 
     def get_model_schema(
         self,

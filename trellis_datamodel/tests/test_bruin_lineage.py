@@ -284,3 +284,25 @@ class TestLineageServiceIntegration:
 
         source = next(n for n in result["nodes"] if n["isSource"])
         assert source["sourceName"] == "crm_api"
+
+
+class TestYamlAssetLineage:
+    """An ingestr asset defined in `*.asset.yml` is a real source, not a stub."""
+
+    def test_ingestr_yaml_asset_is_a_source_node(self, adapter):
+        node = _nodes_by_id(adapter.get_lineage("prep.prep__page_views"))[
+            "raw.raw__page_views"
+        ]
+
+        assert node["is_source"] is True
+        assert node["resource_type"] == "source"
+        assert node["source_name"] == "segment"
+        assert node["folder"] == "00_ingest"
+
+    def test_ingestr_yaml_asset_feeds_the_downstream_source_systems(self, adapter):
+        assert adapter.get_source_systems_for_model("prep.prep__page_views") == [
+            "segment"
+        ]
+        assert adapter.get_source_systems_for_models(["prep.prep__page_views"]) == {
+            "prep.prep__page_views": ["segment"]
+        }

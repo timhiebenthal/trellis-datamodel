@@ -1,0 +1,8 @@
+name: raw.raw__countries
+type: duckdb.seed
+parameters:
+  path: countries.csv
+columns:
+  - name: country_code
+    type: varchar
+    primary_key: true

@@ -71,6 +71,8 @@ def save_model_schema_from_request(
             tags=tags,
         )
         return output_path
+    except ValidationError:
+        raise
     except Exception as e:
         raise FileOperationError(f"Error saving schema: {str(e)}") from e
 
@@ -202,6 +204,8 @@ def get_model_schema(model_name: str, version: int | None = None) -> dict[str, A
         }
     except FileNotFoundError as e:
         raise NotFoundError(f"Model schema not found: {str(e)}") from e
+    except ValidationError:
+        raise
     except ValueError as e:
         raise NotFoundError(f"Model not found: {str(e)}") from e
     except Exception as e:
@@ -247,6 +251,8 @@ def update_model_schema(
         return output_path
     except FileNotFoundError as e:
         raise NotFoundError(f"Model schema not found: {str(e)}") from e
+    except ValidationError:
+        raise
     except ValueError as e:
         raise NotFoundError(f"Model not found: {str(e)}") from e
     except Exception as e:

@@ -416,3 +416,58 @@ class TestWriteBruinAsset:
             write_bruin_asset(
                 file_path, asset={"name": "core.x"}, sql_body="-- TODO\n"
             )
+
+
+class TestRewriteYamlAsset:
+    """A standalone `*.asset.yml` is rewritten as a whole YAML document."""
+
+    CONTENT = (
+        "# Replicated by ingestr.\n"
+        "name: raw.raw__events\n"
+        "type: ingestr\n"
+        "owner: web-team  # not modelled by Trellis\n"
+        "parameters:\n"
+        "  source_connection: segment\n"
+        "columns:\n"
+        "  - name: event_id\n"
+        "    type: varchar\n"
+    )
+
+    def test_updates_keep_comments_and_unknown_keys(self, tmp_path):
+        path = tmp_path / "raw__events.asset.yml"
+        path.write_text(self.CONTENT)
+
+        rewrite_bruin_block(
+            str(path),
+            updates={
+                "description": "Raw events.",
+                "tags": ["raw"],
+                "columns": [
+                    {"name": "event_id", "data_type": "varchar"},
+                    {"name": "user_id", "data_type": "varchar"},
+                ],
+                "meta": {"origin.user_id": "System: Segment"},
+            },
+        )
+
+        content = path.read_text()
+        data = yaml.safe_load(content)
+        assert data["description"] == "Raw events."
+        assert data["tags"] == ["raw"]
+        assert [c["name"] for c in data["columns"]] == ["event_id", "user_id"]
+        assert data["meta"] == {"origin.user_id": "System: Segment"}
+        assert data["owner"] == "web-team"
+        assert data["parameters"] == {"source_connection": "segment"}
+        assert content.startswith("# Replicated by ingestr.\n")
+        assert "# not modelled by Trellis" in content
+        assert "@bruin" not in content
+
+    def test_rewritten_file_parses_back_as_the_same_asset(self, tmp_path):
+        path = tmp_path / "raw__events.asset.yaml"
+        path.write_text(self.CONTENT)
+
+        rewrite_bruin_block(str(path), updates={"description": "Raw events."})
+
+        asset = parse_bruin_block(str(path))
+        assert asset.name == "raw.raw__events"
+        assert asset.description == "Raw events."

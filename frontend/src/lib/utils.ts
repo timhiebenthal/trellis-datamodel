@@ -274,9 +274,10 @@ export function extractModelNameFromUniqueId(uniqueId: string): string {
 
 /**
  * Extract the canonical folder path from a model's file_path.
- * Returns every directory component below the last "models" segment, or the
- * normalized path when no "models" segment exists. Returns null when the file
- * is directly under "models" or has no usable parent directory.
+ * Returns every directory component below the last "models" segment (or below a
+ * leading Bruin "assets" segment), or the normalized path when neither exists.
+ * Returns null when the file is directly under "models"/"assets" or has no
+ * usable parent directory.
  */
 export function getModelFolder(model: ModelInfo): string | null {
     if (!model.file_path) return null;
@@ -287,6 +288,9 @@ export function getModelFolder(model: ModelInfo): string | null {
     const modelsIndex = parts.lastIndexOf('models');
     if (modelsIndex !== -1) {
         parts = parts.slice(modelsIndex + 1);
+    } else if (parts[0] === 'assets') {
+        // Bruin: file_path is relative to the pipeline, under assets/
+        parts = parts.slice(1);
     }
     return parts.length > 0 ? parts.join('/') : null;
 }
