@@ -175,7 +175,7 @@ class TestReconcileEntityFields:
             ],
         )
         assert result[0]["description"] == "Total revenue"
-        assert result[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+        assert result[0]["origin"] == [{"DH1": "SCHEMA.TABLE.COL"}]
 
     def test_origin_only_parsed_from_manifest_description(self):
         """Origin-only description (no preceding text) is parsed correctly."""
@@ -186,10 +186,10 @@ class TestReconcileEntityFields:
             ],
         )
         assert result[0]["description"] is None
-        assert result[0]["origin"] == "DH1: SCHEMA.TABLE.COL"
+        assert result[0]["origin"] == [{"DH1": "SCHEMA.TABLE.COL"}]
 
-    def test_stale_origin_removed_when_description_changes(self):
-        """If manifest description no longer contains origin, stale origin is removed."""
+    def test_stale_origin_removed_when_no_source_carries_origin(self):
+        """Origin is dropped only if the manifest column has none from ANY source."""
         result = reconcile_entity_fields(
             existing_fields=[
                 {"name": "revenue", "datatype": "float", "description": "Old desc", "origin": "OLD_ORIGIN"},
@@ -200,6 +200,30 @@ class TestReconcileEntityFields:
         )
         assert result[0]["description"] == "New desc without origin"
         assert "origin" not in result[0]
+
+    def test_origin_kept_from_resolved_column_origin(self):
+        """A column carrying `origin` separately (get_models shape) keeps it."""
+        origin = [{"System": "CRM"}]
+        result = reconcile_entity_fields(
+            existing_fields=[
+                {"name": "revenue", "datatype": "float", "origin": "OLD_ORIGIN"},
+            ],
+            manifest_columns=[
+                {"name": "revenue", "type": "numeric", "description": "Clean", "origin": origin},
+            ],
+        )
+        assert result[0]["description"] == "Clean"
+        assert result[0]["origin"] == origin
+
+    def test_origin_from_meta_without_description(self):
+        origin = [{"System": "CRM"}]
+        result = reconcile_entity_fields(
+            existing_fields=[],
+            manifest_columns=[
+                {"name": "revenue", "type": "numeric", "meta": {"origin": origin}},
+            ],
+        )
+        assert result[0]["origin"] == origin
 
 
 class TestReconcileEntityTags:

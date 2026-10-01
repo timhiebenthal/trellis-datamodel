@@ -8,6 +8,8 @@ from typing import Dict, List, Optional, Any
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
+from trellis_datamodel.utils.column_metadata import split_description_origin
+
 
 class YamlHandler:
     """Handler for reading and writing DBT schema YAML files with round-trip capabilities."""
@@ -585,38 +587,6 @@ class YamlHandler:
 
         model["columns"] = new_columns
 
-    _ORIGIN_SEPARATOR = " | Origin: "
-    _ORIGIN_PREFIX = "Origin: "
-
-    @staticmethod
-    def _parse_description_with_origin(
-        raw_description: str | None,
-    ) -> tuple[str | None, str | None]:
-        """Split a schema.yml description into (description, origin).
-
-        The write paths embed origin into the description as:
-          - "desc | Origin: value"  (both present)
-          - "Origin: value"         (only origin, no description)
-
-        This method reverses that encoding so the origin round-trips
-        through a dedicated field instead of staying glued to the
-        description.
-        """
-        if not raw_description:
-            return raw_description, None
-
-        sep_idx = raw_description.find(YamlHandler._ORIGIN_SEPARATOR)
-        if sep_idx != -1:
-            desc = raw_description[:sep_idx]
-            origin = raw_description[sep_idx + len(YamlHandler._ORIGIN_SEPARATOR) :]
-            return (desc or None), (origin or None)
-
-        if raw_description.startswith(YamlHandler._ORIGIN_PREFIX):
-            origin = raw_description[len(YamlHandler._ORIGIN_PREFIX) :]
-            return None, (origin or None)
-
-        return raw_description, None
-
     def get_columns(self, model: CommentedMap) -> List[Dict[str, Any]]:
         """
         Extract columns from a model as a list of dicts.
@@ -632,7 +602,7 @@ class YamlHandler:
 
         for col in columns:
             raw_description = col.get("description")
-            description, origin = self._parse_description_with_origin(raw_description)
+            description, origin = split_description_origin(raw_description)
 
             col_dict = {
                 "name": col.get("name"),
