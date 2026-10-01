@@ -21,6 +21,7 @@ from trellis_datamodel.exceptions import FileOperationError, NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.utils.yaml_handler import YamlHandler
+from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
@@ -98,20 +99,8 @@ def _canonicalize_catalog_type(raw_type: str | None) -> str | None:
 def _resolve_origin_from_column(
     col_data: dict[str, Any], description: str | None
 ) -> tuple[str | None, list[dict[str, str]]]:
-    meta = col_data.get("meta") or {}
-    raw_origin = meta.get("origin")
-    if isinstance(raw_origin, tuple):
-        raw_origin = [
-            dict(entry) if isinstance(entry, Mapping) else entry
-            for entry in raw_origin
-        ]
-    origin = parse_origin(raw_origin)
-    desc = description
-    if not origin and desc and " | Origin: " in desc:
-        prefix, suffix = desc.split(" | Origin: ", 1)
-        origin = parse_origin(suffix)
-        desc = prefix or None
-    return desc, origin
+    desc, origin = resolve_column_metadata(col_data, description)
+    return desc, origin or []
 
 
 class DbtCoreAdapter:

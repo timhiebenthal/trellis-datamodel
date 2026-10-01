@@ -23,6 +23,7 @@ from trellis_datamodel.models.entity_keys import (
     set_model_ref,
     set_physical_datatype,
 )
+from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.structured_data import load_yaml_or_json
 
 
@@ -68,38 +69,6 @@ _TEXT_PREFIXES = (
 # — including an unparameterized NUMBER, where the catalog does not report the
 # scale — is treated as float, the wider of the two buckets.
 _NUMERIC_BASES = ("number", "numeric", "decimal", "dec", "bignumeric")
-
-_ORIGIN_SEPARATOR = " | Origin: "
-_ORIGIN_PREFIX = "Origin: "
-
-
-def _parse_description_with_origin(
-    raw_description: str | None,
-) -> tuple[str | None, str | None]:
-    """Split a description into (description, origin).
-
-    The write paths embed origin into the description as:
-      - "desc | Origin: value"  (both present)
-      - "Origin: value"         (only origin, no description)
-
-    This reverses that encoding so origin round-trips through a
-    dedicated field.
-    """
-    if not raw_description:
-        return raw_description, None
-
-    sep_idx = raw_description.find(_ORIGIN_SEPARATOR)
-    if sep_idx != -1:
-        desc = raw_description[:sep_idx]
-        origin = raw_description[sep_idx + len(_ORIGIN_SEPARATOR) :]
-        return (desc or None), (origin or None)
-
-    if raw_description.startswith(_ORIGIN_PREFIX):
-        origin = raw_description[len(_ORIGIN_PREFIX) :]
-        return None, (origin or None)
-
-    return raw_description, None
-
 
 def _split_column_type(column_type: str) -> tuple[str, list[str]]:
     """Split a raw warehouse type into its lowercase base name and parameters.
@@ -205,17 +174,15 @@ def reconcile_entity_fields(
         # downgrade a precise type to the bucket's generic default (#111).
         set_physical_datatype(field, col.get("type"))
         desc = col.get("description")
+        parsed_desc, origin = resolve_column_metadata(col)
         if desc is not None:
-            # Parse origin from description if embedded
-            parsed_desc, parsed_origin = _parse_description_with_origin(desc)
             field["description"] = parsed_desc
-            if parsed_origin is not None:
-                field["origin"] = parsed_origin
-            elif "origin" in field:
-                # Remove stale origin if description no longer contains it
-                del field["origin"]
-        elif "description" not in field:
-            pass  # keep absent rather than writing None
+        if origin:
+            field["origin"] = origin
+        elif desc is not None and "origin" in field:
+            # No source (meta, resolved origin, description) carries origin
+            # anymore: drop the stale one.
+            del field["origin"]
 
         result.append(field)
 
