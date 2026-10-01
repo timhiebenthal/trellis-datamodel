@@ -1,0 +1,48 @@
+{
+  "version": 0.1,
+  "entities": [
+    {
+      "id": "customer",
+      "label": "Customer",
+      "description": "A buyer",
+      "drafted_fields": [
+        {
+          "name": "customer_id",
+          "datatype": "int",
+          "description": "Key",
+          "origin": [
+            {
+              "system": "SAP"
+            },
+            {
+              "table": "KNA1"
+            }
+          ]
+        }
+      ],
+      "position": {
+        "x": 10,
+        "y": 20
+      },
+      "width": 300,
+      "panel_height": 200,
+      "collapsed": false,
+      "tags": [
+        "core",
+        "pii"
+      ],
+      "entity_type": "dimension",
+      "roles": [
+        {
+          "label": "Buyer",
+          "role": "buyer",
+          "source": "user"
+        }
+      ],
+      "source_system": [
+        "SAP"
+      ]
+    }
+  ],
+  "relationships": []
+}

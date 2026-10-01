@@ -1,0 +1,26 @@
+{
+  "version": 0.1,
+  "entities": [
+    {
+      "id": "orders",
+      "label": "Orders",
+      "model_ref": "model.proj.orders",
+      "position": {
+        "x": 10,
+        "y": 20
+      },
+      "width": 300,
+      "panel_height": 200,
+      "collapsed": false,
+      "entity_type": "fact",
+      "roles": [
+        {
+          "label": "Order",
+          "role": "order",
+          "source": "dbt"
+        }
+      ]
+    }
+  ],
+  "relationships": []
+}
