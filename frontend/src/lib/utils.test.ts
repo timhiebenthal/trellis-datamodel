@@ -111,6 +111,23 @@ describe('getModelFolder', () => {
     it('handles absolute paths containing a models segment', () => {
         expect(getModelFolder(createModel('/workspace/project/models/3-entity/dim_account.sql'))).toBe('3-entity');
     });
+
+    it('strips a leading Bruin assets segment', () => {
+        expect(getModelFolder(createModel('assets/02_core/dim__customer.sql'))).toBe('02_core');
+        expect(getModelFolder(createModel('assets/00_ingest/raw__page_views.asset.yml'))).toBe('00_ingest');
+    });
+
+    it('keeps nested folders below a Bruin assets segment', () => {
+        expect(getModelFolder(createModel('assets/a/b/x.sql'))).toBe('a/b');
+    });
+
+    it('returns null for a Bruin asset directly under assets', () => {
+        expect(getModelFolder(createModel('assets/x.sql'))).toBeNull();
+    });
+
+    it('does not strip an assets folder below dbt models', () => {
+        expect(getModelFolder(createModel('models/assets/x.sql'))).toBe('assets');
+    });
 });
 
 describe('detectFieldSemantics', () => {

@@ -1,8 +1,9 @@
 """
-@bruin block rewriter for SQL and Python source files.
+Rewriter for Bruin asset definitions.
 
 Parses, modifies, and serializes @bruin YAML comment blocks inline,
-preserving surrounding source code exactly.
+preserving surrounding source code exactly. A standalone ``*.asset.yml`` asset
+is rewritten as a whole YAML document with the same round-trip guarantees.
 """
 
 import os
@@ -13,6 +14,8 @@ from typing import Any, Dict, List
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+from trellis_datamodel.utils.bruin_parser import is_yaml_asset
 
 
 # Regex patterns matching the parser's conventions
@@ -135,36 +138,12 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
-def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
-    """Rewrite the @bruin block in a source file with merged updates.
-
-    Args:
-        file_path: Path to the SQL or Python source file.
-        updates: Dict with keys like 'description', 'tags', 'columns',
-                 'meta'.
-                 Columns may use either 'data_type' or 'type'.
-
-    Returns:
-        Path to the modified file.
-
-    Raises:
-        ValueError: If no @bruin block is found in the file.
-    """
-    path = Path(file_path)
-    original_content = path.read_text(encoding="utf-8")
-
-    pattern = _get_pattern(str(path))
-    match = pattern.search(original_content)
-    if not match:
-        raise ValueError("No @bruin block found in file")
-
-    # --- Parse existing YAML with round-trip preservation ---
-    yaml_rt = _yaml()
-    parsed = yaml_rt.load(match.group(1))
+def _apply_updates(yaml_rt: YAML, yaml_str: str, updates: dict) -> str:
+    """Load *yaml_str* round-trip, apply *updates* and return the new YAML."""
+    parsed = yaml_rt.load(yaml_str)
     if parsed is None:
         parsed = CommentedMap()
 
-    # --- Apply updates ---
     if updates.get("description") is not None:
         parsed["description"] = updates["description"]
 
@@ -177,7 +156,40 @@ def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
     if updates.get("meta") is not None:
         _replace_meta(parsed, updates["meta"])
 
-    new_yaml_str = _dump_to_str(yaml_rt, parsed)
+    return _dump_to_str(yaml_rt, parsed)
+
+
+def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
+    """Rewrite an asset's definition with merged updates.
+
+    Args:
+        file_path: Path to the SQL or Python source file, or to a standalone
+                   ``.asset.yml``/``.asset.yaml`` file (rewritten whole).
+        updates: Dict with keys like 'description', 'tags', 'columns',
+                 'meta'.
+                 Columns may use either 'data_type' or 'type'.
+
+    Returns:
+        Path to the modified file.
+
+    Raises:
+        ValueError: If no @bruin block is found in a source file.
+    """
+    path = Path(file_path)
+    original_content = path.read_text(encoding="utf-8")
+    yaml_rt = _yaml()
+
+    if is_yaml_asset(str(path)):
+        new_yaml_str = _apply_updates(yaml_rt, original_content, updates)
+        _atomic_write(path, f"{new_yaml_str}\n")
+        return path
+
+    pattern = _get_pattern(str(path))
+    match = pattern.search(original_content)
+    if not match:
+        raise ValueError("No @bruin block found in file")
+
+    new_yaml_str = _apply_updates(yaml_rt, match.group(1), updates)
 
     replacement = _wrap_block(
         new_yaml_str,

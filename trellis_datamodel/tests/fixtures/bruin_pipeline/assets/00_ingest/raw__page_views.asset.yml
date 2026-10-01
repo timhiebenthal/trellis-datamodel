@@ -1,0 +1,14 @@
+# Page views replicated from Segment by ingestr.
+name: raw.raw__page_views
+type: ingestr
+connection: test_duckdb
+parameters:
+  source_connection: segment
+  source_table: public.page_views
+  destination: duckdb
+owner: web-team  # a key Trellis does not model
+columns:
+  - name: page_view_id
+    type: varchar
+  - name: customer_id
+    type: varchar

@@ -200,6 +200,22 @@ describe('Sidebar — filtering through the UI', () => {
         expect(screen.queryByText('orders')).toBeNull();
         expect(screen.queryByText('stg_users')).toBeNull();
     });
+
+    it('groups Bruin assets by their folder below assets/', () => {
+        activeFramework.set('bruin');
+        frameworkModels.set([
+            {
+                ...mockModels[0],
+                unique_id: 'core.dim__customer',
+                name: 'dim__customer',
+                file_path: 'assets/02_core/dim__customer.sql',
+            },
+        ]);
+        render(Sidebar, { props: {} });
+
+        expect(screen.getAllByText('02_core').length).toBeGreaterThan(0);
+        expect(screen.queryByText('assets')).toBeNull();
+    });
 });
 
 describe('isFeatureAvailable', () => {

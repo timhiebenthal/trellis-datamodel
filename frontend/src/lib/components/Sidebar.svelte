@@ -184,7 +184,7 @@
             const dir = lastSlash !== -1 ? p.substring(0, lastSlash) : "";
 
             let parts = dir.split("/").filter((x) => x !== "." && x !== "");
-            if (parts[0] === "models") parts.shift();
+            if (parts[0] === "models" || parts[0] === "assets") parts.shift();
 
             let current = rootObj;
             for (const part of parts) {

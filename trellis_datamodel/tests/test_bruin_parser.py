@@ -308,8 +308,11 @@ class TestScanFixturePipeline:
             "core.fct__order",
             "prep.prep__customers",
             "prep.prep__orders",
+            "prep.prep__page_views",
+            "raw.raw__countries",
             "raw.raw__customers",
             "raw.raw__orders",
+            "raw.raw__page_views",
         ]
 
     def test_malformed_asset_is_skipped_not_fatal(self, bruin_pipeline):
@@ -341,3 +344,66 @@ class TestScanFixturePipeline:
     def test_mapping_depends_normalized(self, bruin_pipeline):
         assets = {a.name: a for a in scan_pipeline_assets(bruin_pipeline, [])}
         assert assets["prep.prep__orders"].depends == ["raw.raw__orders"]
+
+    def test_yaml_assets_are_parsed_with_their_type(self, bruin_pipeline):
+        assets = {a.name: a for a in scan_pipeline_assets(bruin_pipeline, [])}
+
+        page_views = assets["raw.raw__page_views"]
+        assert page_views.type == "ingestr"
+        assert page_views.parameters["source_connection"] == "segment"
+        assert page_views.file_path.endswith("raw__page_views.asset.yml")
+        assert assets["raw.raw__countries"].type == "duckdb.seed"
+
+    def test_malformed_yaml_asset_is_skipped_with_a_warning(
+        self, bruin_pipeline, caplog
+    ):
+        caplog.set_level(logging.WARNING)
+
+        names = [a.name for a in scan_pipeline_assets(bruin_pipeline, [])]
+
+        assert "core.broken__yaml" not in names
+        assert "broken__yaml.asset.yml" in caplog.text
+
+
+class TestParseYamlAsset:
+    """Standalone `<name>.asset.yml` files: the whole file is the asset."""
+
+    def test_whole_file_is_the_asset_definition(self, tmp_path):
+        path = tmp_path / "raw__events.asset.yml"
+        path.write_text(
+            "name: raw.raw__events\n"
+            "type: ingestr\n"
+            "depends:\n"
+            "  - raw.raw__users\n"
+            "columns:\n"
+            "  - name: event_id\n"
+            "    type: varchar\n"
+        )
+
+        asset = parse_bruin_block(str(path))
+
+        assert asset.name == "raw.raw__events"
+        assert asset.type == "ingestr"
+        assert asset.depends == ["raw.raw__users"]
+        assert asset.columns == [{"name": "event_id", "type": "varchar"}]
+
+    def test_asset_yaml_suffix_is_accepted(self, tmp_path):
+        path = tmp_path / "seed.asset.yaml"
+        path.write_text("name: raw.seed\ntype: duckdb.seed\n")
+
+        assert parse_bruin_block(str(path)).name == "raw.seed"
+
+    def test_plain_yml_file_is_not_an_asset(self, tmp_path):
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        (assets_dir / "notes.yml").write_text("name: not.an_asset\n")
+
+        assert scan_pipeline_assets(str(tmp_path), []) == []
+
+    def test_non_mapping_yaml_asset_is_skipped(self, tmp_path, caplog):
+        path = tmp_path / "list.asset.yml"
+        path.write_text("- just\n- a list\n")
+        caplog.set_level(logging.WARNING)
+
+        assert parse_bruin_block(str(path)) is None
+        assert "list.asset.yml" in caplog.text

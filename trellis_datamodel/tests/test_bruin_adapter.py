@@ -45,8 +45,11 @@ class TestGetModels:
             "fct__order",
             "prep__customers",
             "prep__orders",
+            "prep__page_views",
+            "raw__countries",
             "raw__customers",
             "raw__orders",
+            "raw__page_views",
         ]
 
     def test_splits_dotted_name_into_schema_and_table(self, adapter):
@@ -449,3 +452,141 @@ class TestInferEntityTypes:
 
         # Clearing dbt's namespace must leave Bruin's entry intact.
         assert "bruin" in entity_type_inference._CACHES
+
+
+class TestYamlAssets:
+    """Standalone `*.asset.yml` assets (ingestr, seed, ...) are models too."""
+
+    def test_are_listed_with_their_columns(self, adapter):
+        models = {m["unique_id"]: m for m in adapter.get_models()}
+
+        page_views = models["raw.raw__page_views"]
+        assert [c["name"] for c in page_views["columns"]] == [
+            "page_view_id",
+            "customer_id",
+        ]
+        assert [c["name"] for c in models["raw.raw__countries"]["columns"]] == [
+            "country_code"
+        ]
+
+    def test_schema_is_readable_by_name(self, adapter):
+        schema = adapter.get_model_schema("raw.raw__page_views")
+
+        assert schema["model_name"] == "raw__page_views"
+        assert schema["file_path"].endswith("raw__page_views.asset.yml")
+
+    def test_are_classified_by_entity_type_inference(self, adapter, monkeypatch):
+        from trellis_datamodel import config as cfg
+        from trellis_datamodel.adapters import entity_type_inference
+
+        monkeypatch.setattr(cfg.DIMENSIONAL_MODELING_CONFIG, "enabled", True)
+        entity_type_inference.reset_cache()
+
+        assert "raw__page_views" in adapter.infer_entity_types()
+
+    def test_save_model_schema_writes_into_the_yaml_file(self, writable_adapter):
+        path = writable_adapter.save_model_schema(
+            "raw.raw__page_views", columns=None, description="Page views."
+        )
+
+        content = open(path).read()
+        assert yaml.safe_load(content)["description"] == "Page views."
+        assert content.startswith("# Page views replicated from Segment")
+
+
+class TestModelFilePath:
+    def test_is_relative_to_the_pipeline_and_posix(self, adapter):
+        models = {m["unique_id"]: m for m in adapter.get_models()}
+
+        assert models["core.dim__customer"]["file_path"] == (
+            "assets/02_core/dim__customer.sql"
+        )
+        assert models["raw.raw__page_views"]["file_path"] == (
+            "assets/00_ingest/raw__page_views.asset.yml"
+        )
+
+
+def _write_asset(assets_dir, folder, name):
+    path = assets_dir / folder / f"{name.split('.')[-1]}.sql"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"/* @bruin\nname: {name}\ntype: duckdb.sql\n"
+        f"columns:\n  - name: id\n    type: varchar\n@bruin */\nSELECT 1 AS id;\n"
+    )
+    return path
+
+
+@pytest.fixture
+def twin_adapter(tmp_path):
+    """A pipeline where `raw.customers` and `core.customers` share a short name."""
+    assets_dir = tmp_path / "pipeline" / "assets"
+    _write_asset(assets_dir, "00_raw", "raw.customers")
+    _write_asset(assets_dir, "02_core", "core.customers")
+    _write_asset(assets_dir, "02_core", "core.orders")
+    data_model_path = tmp_path / "data_model.yml"
+    data_model_path.write_text(
+        yaml.safe_dump(
+            {
+                "entities": [
+                    {"id": "customer", "model_ref": "core.customers"},
+                    {"id": "order", "model_ref": "core.orders"},
+                ]
+            }
+        )
+    )
+    return BruinAdapter(
+        pipeline_path=str(tmp_path / "pipeline"),
+        data_model_path=str(data_model_path),
+        asset_paths=[],
+    )
+
+
+class TestShortNameAmbiguity:
+    def test_full_name_picks_the_right_twin(self, twin_adapter):
+        raw = twin_adapter.get_model_schema("raw.customers")["file_path"]
+        core = twin_adapter.get_model_schema("core.customers")["file_path"]
+
+        assert raw.endswith(os.path.join("00_raw", "customers.sql"))
+        assert core.endswith(os.path.join("02_core", "customers.sql"))
+
+    def test_unique_short_name_still_resolves(self, twin_adapter):
+        assert twin_adapter.get_model_schema("orders")["model_name"] == "orders"
+
+    def test_ambiguous_short_name_read_is_an_error_naming_both(self, twin_adapter):
+        from trellis_datamodel.exceptions import ValidationError
+
+        with pytest.raises(ValidationError) as excinfo:
+            twin_adapter.get_model_schema("customers")
+
+        assert "core.customers" in str(excinfo.value)
+        assert "raw.customers" in str(excinfo.value)
+
+    def test_ambiguous_short_name_writes_nothing(self, twin_adapter, tmp_path):
+        from trellis_datamodel.exceptions import ValidationError
+
+        assets_dir = tmp_path / "pipeline" / "assets"
+        before = {
+            p: p.read_text() for p in assets_dir.rglob("*.sql")
+        }
+
+        with pytest.raises(ValidationError, match="raw.customers"):
+            twin_adapter.save_model_schema(
+                "customers", columns=None, description="Which one?"
+            )
+        with pytest.raises(ValidationError, match="core.customers"):
+            twin_adapter.save_schema_file(
+                "customer", "customers", [{"name": "id", "data_type": "varchar"}]
+            )
+
+        assert {p: p.read_text() for p in assets_dir.rglob("*.sql")} == before
+
+    def test_entity_map_keeps_full_names_and_drops_an_ambiguous_alias(
+        self, twin_adapter
+    ):
+        model_to_entity = twin_adapter._get_model_to_entity_map()
+
+        assert model_to_entity["core.customers"] == "customer"
+        assert "customers" not in model_to_entity
+        assert model_to_entity["orders"] == "order"
+        # The unbound twin must not be attributed to the bound one's entity.
+        assert twin_adapter._resolve_entity("raw.customers", model_to_entity) is None

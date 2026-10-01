@@ -1,4 +1,10 @@
-"""Parser for @bruin comment blocks in SQL and Python source files."""
+"""Parser for Bruin asset definitions.
+
+An asset is either a SQL or Python file carrying an embedded @bruin comment
+block, or a standalone ``<name>.asset.yml`` / ``.asset.yaml`` file whose whole
+content is the definition (the only form for ingestr, seed, sensor and
+dashboard assets).
+"""
 
 import logging
 import os
@@ -21,6 +27,18 @@ PYTHON_BRUIN_PATTERN = re.compile(
     r'"""\s*@bruin\s*\n(.*?)\n\s*@bruin\s*"""',
     re.DOTALL,
 )
+
+YAML_ASSET_SUFFIXES = (".asset.yml", ".asset.yaml")
+
+
+def is_yaml_asset(file_path: str) -> bool:
+    """Whether *file_path* is a standalone Bruin YAML asset."""
+    return str(file_path).lower().endswith(YAML_ASSET_SUFFIXES)
+
+
+def _is_asset_file(file_path: str) -> bool:
+    """Whether the scanner should parse *file_path* as an asset."""
+    return _detect_pattern(file_path) is not None or is_yaml_asset(file_path)
 
 
 @dataclass
@@ -84,17 +102,27 @@ def _normalize_depends(raw: Any) -> list[str]:
     return names
 
 
+def _asset_yaml(file_path: str, content: str) -> Optional[str]:
+    """The asset definition's YAML text: the whole file for a YAML asset, else
+    the @bruin block, or None when the file carries no definition."""
+    if is_yaml_asset(file_path):
+        return content
+    pattern = _detect_pattern(file_path)
+    match = pattern.search(content) if pattern else None
+    return match.group(1) if match else None
+
+
 def parse_bruin_block(file_path: str) -> Optional[BruinAsset]:
-    """Parse a @bruin block from a SQL or Python file.
+    """Parse a Bruin asset definition from an asset file.
 
     Args:
-        file_path: Path to the source file.
+        file_path: Path to a ``.sql``/``.py`` file with a @bruin block, or to a
+            standalone ``.asset.yml``/``.asset.yaml`` file.
 
     Returns:
-        A BruinAsset if a valid @bruin block is found and parsed, or None.
+        A BruinAsset if a valid definition is found and parsed, or None.
     """
-    pattern = _detect_pattern(file_path)
-    if pattern is None:
+    if not _is_asset_file(file_path):
         return None
 
     try:
@@ -104,23 +132,19 @@ def parse_bruin_block(file_path: str) -> Optional[BruinAsset]:
         logger.warning("Failed to read file %s: %s", file_path, e)
         return None
 
-    match = pattern.search(content)
-    if match is None:
-        return None
-
-    yaml_str = match.group(1).strip()
+    yaml_str = (_asset_yaml(file_path, content) or "").strip()
     if not yaml_str:
         return None
 
     try:
         data = yaml.safe_load(yaml_str)
     except yaml.YAMLError as e:
-        logger.warning("Malformed YAML in @bruin block in %s: %s", file_path, e)
+        logger.warning("Malformed YAML in Bruin asset %s: %s", file_path, e)
         return None
 
     if not isinstance(data, dict):
         logger.warning(
-            "Malformed @bruin block in %s: YAML did not produce a mapping", file_path
+            "Malformed Bruin asset %s: YAML did not produce a mapping", file_path
         )
         return None
 
@@ -146,10 +170,10 @@ def parse_bruin_block(file_path: str) -> Optional[BruinAsset]:
 def scan_pipeline_assets(
     pipeline_path: str, asset_paths: list[str]
 ) -> list[BruinAsset]:
-    """Scan a pipeline's assets directory for @bruin blocks.
+    """Scan a pipeline's assets directory for asset definitions.
 
-    Walks ``pipeline_path/assets/`` recursively and parses each ``.sql`` and
-    ``.py`` file.  When ``asset_paths`` is non-empty, only files whose relative
+    Walks ``pipeline_path/assets/`` recursively and parses each ``.sql``,
+    ``.py``, ``.asset.yml`` and ``.asset.yaml`` file.  When ``asset_paths`` is non-empty, only files whose relative
     subdirectory (under ``assets/``) matches one of the given path fragments are
     included.
 
@@ -182,8 +206,7 @@ def scan_pipeline_assets(
                 continue
 
         for filename in filenames:
-            ext = os.path.splitext(filename)[1].lower()
-            if ext not in (".sql", ".py"):
+            if not _is_asset_file(filename):
                 continue
 
             file_path = os.path.join(dirpath, filename)
