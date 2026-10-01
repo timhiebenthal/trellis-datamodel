@@ -35,6 +35,7 @@ REQUIRED_PROTOCOL_METHODS = {
     "get_source_systems_for_model",
     "get_source_systems_for_models",
     "get_project_status",
+    "validate_project_path",
 }
 
 

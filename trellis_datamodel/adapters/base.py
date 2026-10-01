@@ -367,3 +367,17 @@ class TransformationAdapter(Protocol):
         """
         ...
 
+    def validate_project_path(self) -> str:
+        """
+        Check that the configured project path is set and exists.
+
+        Schema reads and writes call this first, so a misconfigured project is
+        reported under the active framework's own config key.
+
+        Returns:
+            The validated project path.
+
+        Raises:
+            ConfigurationError: If the path is not configured or does not exist.
+        """
+        ...

@@ -1,5 +1,5 @@
 """
-Path validation utilities for trellis.yml and dbt project paths.
+Path validation utilities for trellis.yml paths.
 
 Centralizes validation logic to avoid duplication across routes and services.
 """
@@ -9,29 +9,6 @@ from pathlib import Path
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ConfigurationError, FileOperationError, ValidationError
-
-
-def validate_dbt_project_path() -> str:
-    """
-    Validate that dbt_project_path is configured and exists.
-
-    Returns:
-        The validated dbt_project_path
-
-    Raises:
-        ConfigurationError: If path is not configured or doesn't exist
-    """
-    if not cfg.DBT_PROJECT_PATH:
-        raise ConfigurationError(
-            "dbt_project_path is not configured. Please set it in trellis.yml"
-        )
-
-    if not os.path.exists(cfg.DBT_PROJECT_PATH):
-        raise ConfigurationError(
-            f"dbt_project_path does not exist: {cfg.DBT_PROJECT_PATH}"
-        )
-
-    return cfg.DBT_PROJECT_PATH
 
 
 def validate_data_model_path() -> str:
