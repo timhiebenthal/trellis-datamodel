@@ -2,8 +2,11 @@
 Tests for BruinAdapter relationship inference and sync.
 
 Bruin declares references natively as `columns[].foreign_key: {table, column}`,
-so relationships round-trip: inference reads them, sync writes them, and a
-relationship deleted in Trellis has its foreign_key pruned.
+so relationships round-trip: inference reads them and sync writes them.
+
+Sync prunes like dbt: a foreign_key is removed only from a column that is an
+end of a payload relationship but no longer holds that relationship's key.
+Foreign keys on any other column, including hand-written ones, are kept.
 """
 
 import os
@@ -13,6 +16,7 @@ import pytest
 import yaml
 
 from trellis_datamodel.adapters.bruin import BruinAdapter
+from trellis_datamodel.services.fk_placement import place_foreign_key
 
 
 DATA_MODEL = {
@@ -84,30 +88,30 @@ class TestInferRelationships:
         relationships = adapter.infer_relationships()
 
         pairs = {(r["source"], r["target"]) for r in relationships}
-        assert ("order", "customer") in pairs
-        assert ("order", "product") in pairs
+        assert ("customer", "order") in pairs
+        assert ("product", "order") in pairs
 
     def test_carries_the_joining_fields(self, adapter):
         relationship = next(
             r
             for r in adapter.infer_relationships()
-            if (r["source"], r["target"]) == ("order", "customer")
+            if (r["source"], r["target"]) == ("customer", "order")
         )
 
         assert relationship["source_field"] == "customer_id"
         assert relationship["target_field"] == "customer_id"
-        assert relationship["source_model_name"] == "fct__order"
-        assert relationship["target_model_name"] == "dim__customer"
+        assert relationship["source_model_name"] == "dim__customer"
+        assert relationship["target_model_name"] == "fct__order"
 
     def test_resolves_a_dotted_foreign_key_target(self, adapter):
         """fct__order references core.dim__customer by its full name."""
         assert any(
-            r["target"] == "customer" for r in adapter.infer_relationships()
+            r["source"] == "customer" for r in adapter.infer_relationships()
         )
 
     def test_resolves_a_short_name_foreign_key_target(self, adapter):
         """fct__order references dim__product by its short name."""
-        assert any(r["target"] == "product" for r in adapter.infer_relationships())
+        assert any(r["source"] == "product" for r in adapter.infer_relationships())
 
     def test_unbound_entities_excluded_by_default(self, bruin_pipeline, tmp_path):
         """With nothing bound, there is nothing to infer."""
@@ -133,7 +137,7 @@ class TestInferRelationships:
             (r["source"], r["target"])
             for r in adapter.infer_relationships(include_unbound=True)
         }
-        assert ("fct__order", "dim__customer") in pairs
+        assert ("dim__customer", "fct__order") in pairs
 
     def test_incomplete_foreign_key_is_skipped(self, tmp_path):
         """A foreign_key missing its column cannot be resolved."""
@@ -202,10 +206,11 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
-                    "source_field": "amount",
-                    "target_field": "customer_id",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "amount",
                 }
             ],
         )
@@ -217,11 +222,6 @@ class TestSyncRelationships:
             "column": "customer_id",
         }
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Bruin writes the FK on the source asset regardless of type; "
-        "the shared FK placement rule puts one_to_many FK on the target.",
-    )
     def test_one_to_many_places_fk_on_target_asset(self, writable_adapter):
         writable_adapter.sync_relationships(
             entities=DATA_MODEL["entities"],
@@ -248,10 +248,11 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "product",
-                    "source_field": "amount",
-                    "target_field": "product_id",
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
+                    "source_field": "product_id",
+                    "target_field": "amount",
                 }
             ],
         )
@@ -259,23 +260,34 @@ class TestSyncRelationships:
         columns = _columns(self._fct_path(writable_adapter))
         assert columns["amount"]["foreign_key"]["table"] == "core.dim__product"
 
-    def test_prunes_a_removed_relationship(self, writable_adapter):
-        """Entity model wins: no relationship means no foreign_key."""
+    def test_does_not_prune_foreign_keys_when_the_payload_has_no_relationships(
+        self, writable_adapter
+    ):
+        """Like dbt: a column in no payload relationship is not managed."""
         writable_adapter.sync_relationships(
             entities=DATA_MODEL["entities"], relationships=[]
         )
 
         columns = _columns(self._fct_path(writable_adapter))
-        assert "foreign_key" not in columns["customer_id"]
-        assert "foreign_key" not in columns["product_id"]
+        assert columns["customer_id"]["foreign_key"] == {
+            "table": "core.dim__customer",
+            "column": "customer_id",
+        }
+        assert columns["product_id"]["foreign_key"] == {
+            "table": "dim__product",
+            "column": "product_id",
+        }
 
-    def test_keeps_a_relationship_that_still_exists(self, writable_adapter):
+    def test_does_not_prune_a_foreign_key_whose_relationship_left_the_payload(
+        self, writable_adapter
+    ):
         writable_adapter.sync_relationships(
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 }
@@ -287,8 +299,107 @@ class TestSyncRelationships:
             "table": "core.dim__customer",
             "column": "customer_id",
         }
-        # The other one was not in the payload, so it goes.
-        assert "foreign_key" not in columns["product_id"]
+        # Not in the payload, so not managed: kept exactly as written.
+        assert columns["product_id"]["foreign_key"] == {
+            "table": "dim__product",
+            "column": "product_id",
+        }
+
+    def test_keeps_a_hand_written_foreign_key_to_an_unbound_asset(
+        self, writable_adapter
+    ):
+        """dim__product has no entity, so Trellis never created its key."""
+        entities = [e for e in DATA_MODEL["entities"] if e["id"] != "product"]
+
+        writable_adapter.sync_relationships(
+            entities=entities,
+            relationships=[
+                {
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "customer_id",
+                }
+            ],
+        )
+
+        assert _columns(self._fct_path(writable_adapter))["product_id"][
+            "foreign_key"
+        ] == {"table": "dim__product", "column": "product_id"}
+
+    def test_keeps_a_foreign_key_to_a_bound_asset_outside_the_payload(
+        self, writable_adapter
+    ):
+        """customer_id -> core.dim__customer is in no payload relationship."""
+        writable_adapter.sync_relationships(
+            entities=DATA_MODEL["entities"],
+            relationships=[
+                {
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
+                    "source_field": "product_id",
+                    "target_field": "product_id",
+                }
+            ],
+        )
+
+        assert _columns(self._fct_path(writable_adapter))["customer_id"][
+            "foreign_key"
+        ] == {"table": "core.dim__customer", "column": "customer_id"}
+
+    def test_keeps_the_fk_column_of_a_relationship_naming_an_unbound_entity(
+        self, writable_adapter
+    ):
+        """The placement still claims product_id, so it is not stale.
+
+        Bruin cannot write a reference to an asset no entity is bound to, but
+        the key already there is the one the relationship describes.
+        """
+        entities = [e for e in DATA_MODEL["entities"] if e["id"] != "product"]
+
+        writable_adapter.sync_relationships(
+            entities=entities,
+            relationships=[
+                {
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
+                    "source_field": "product_id",
+                    "target_field": "product_id",
+                }
+            ],
+        )
+
+        assert _columns(self._fct_path(writable_adapter))["product_id"][
+            "foreign_key"
+        ] == {"table": "dim__product", "column": "product_id"}
+
+    def test_prunes_a_stale_foreign_key_on_a_managed_column(self, writable_adapter):
+        """many_to_one moves the key to dim__customer; the old one goes."""
+        writable_adapter.sync_relationships(
+            entities=DATA_MODEL["entities"],
+            relationships=[
+                {
+                    "type": "many_to_one",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "customer_id",
+                }
+            ],
+        )
+
+        dim_path = writable_adapter._find_asset("core.dim__customer").file_path
+        assert _columns(dim_path)["customer_id"]["foreign_key"] == {
+            "table": "core.fct__order",
+            "column": "customer_id",
+        }
+        fct_columns = _columns(self._fct_path(writable_adapter))
+        assert "foreign_key" not in fct_columns["customer_id"]
+        # Unrelated to the payload, so it stays.
+        assert fct_columns["product_id"]["foreign_key"]["table"] == "dim__product"
 
     def test_round_trips_through_inference(self, writable_adapter):
         """What sync writes, inference must read back."""
@@ -296,19 +407,26 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 }
             ],
         )
 
-        inferred = writable_adapter.infer_relationships()
+        # product_id's key is outside the payload, so it is kept and read back too.
+        inferred = [
+            r
+            for r in writable_adapter.infer_relationships()
+            if "customer" in (r["source"], r["target"])
+        ]
 
         assert len(inferred) == 1
-        assert (inferred[0]["source"], inferred[0]["target"]) == ("order", "customer")
+        assert (inferred[0]["source"], inferred[0]["target"]) == ("customer", "order")
         assert inferred[0]["source_field"] == "customer_id"
+        assert inferred[0]["target_field"] == "customer_id"
 
     def test_adds_a_column_the_asset_does_not_declare(self, writable_adapter):
         """A relationship on an undocumented column must not be lost."""
@@ -316,10 +434,11 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
-                    "source_field": "undocumented_id",
-                    "target_field": "customer_id",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "undocumented_id",
                 }
             ],
         )
@@ -359,14 +478,16 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 },
                 {
-                    "source": "order",
-                    "target": "product",
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
                     "source_field": "product_id",
                     "target_field": "product_id",
                 },
@@ -413,20 +534,23 @@ class TestSyncRelationships:
             entities=DATA_MODEL["entities"],
             relationships=[
                 {
-                    "source": "order",
-                    "target": "not_an_entity",
-                    "source_field": "amount",
-                    "target_field": "id",
+                    "type": "one_to_many",
+                    "source": "not_an_entity",
+                    "target": "order",
+                    "source_field": "id",
+                    "target_field": "amount",
                 },
                 {
-                    "source": "order",
-                    "target": "customer",
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
                     "source_field": "customer_id",
                     "target_field": "customer_id",
                 },
                 {
-                    "source": "order",
-                    "target": "product",
+                    "type": "one_to_many",
+                    "source": "product",
+                    "target": "order",
                     "source_field": "product_id",
                     "target_field": "product_id",
                 },
@@ -436,6 +560,119 @@ class TestSyncRelationships:
         # Only the unresolvable one was dropped, so nothing else changed.
         assert updated == []
         assert "foreign_key" not in _columns(self._fct_path(writable_adapter))["amount"]
+
+    def test_push_then_pull_returns_the_same_single_edge(self, writable_adapter):
+        """A canvas edge customer -> order must come back as itself, once."""
+        edge = {
+            "type": "one_to_many",
+            "source": "customer",
+            "target": "order",
+            "source_field": "customer_id",
+            "target_field": "customer_id",
+        }
+        writable_adapter.sync_relationships(
+            entities=DATA_MODEL["entities"], relationships=[edge]
+        )
+
+        dim_path = writable_adapter._find_asset("core.dim__customer").file_path
+        assert "foreign_key" not in _columns(dim_path)["customer_id"]
+        assert _columns(self._fct_path(writable_adapter))["customer_id"][
+            "foreign_key"
+        ] == {"table": "core.dim__customer", "column": "customer_id"}
+
+        # product_id's key is outside the payload, so it is kept; leave it out.
+        inferred = writable_adapter.infer_relationships()
+        assert [
+            (r["source"], r["target"], r["source_field"], r["target_field"])
+            for r in inferred
+            if "customer" in (r["source"], r["target"])
+        ] == [("customer", "order", "customer_id", "customer_id")]
+
+
+# The asset each entity in DATA_MODEL is bound to, by its declared name.
+_ASSET_OF = {"customer": "core.dim__customer", "order": "core.fct__order"}
+
+
+@pytest.mark.parametrize(
+    "rel_type",
+    [
+        "one_to_many",
+        "one_to_zero_or_many",
+        "zero_or_one_to_many",
+        "zero_or_many_to_many",
+        "many_to_one",
+        "many_to_many",
+        "zero_or_many_to_one",
+        "one_to_one",
+        "unknown_type",
+        "",
+    ],
+)
+def test_push_places_fk_where_the_shared_rule_says(writable_adapter, rel_type):
+    """Bruin push follows `place_foreign_key`, exactly like dbt."""
+    writable_adapter.sync_relationships(
+        entities=DATA_MODEL["entities"],
+        relationships=[
+            {
+                "type": rel_type,
+                "source": "customer",
+                "target": "order",
+                "source_field": "src_key",
+                "target_field": "tgt_key",
+            }
+        ],
+    )
+
+    placement = place_foreign_key(
+        rel_type, "customer", "src_key", "order", "tgt_key"
+    )
+    fk_path = writable_adapter._find_asset(_ASSET_OF[placement.fk_entity]).file_path
+    ref_path = writable_adapter._find_asset(_ASSET_OF[placement.ref_entity]).file_path
+
+    assert _columns(fk_path)[placement.fk_field]["foreign_key"] == {
+        "table": _ASSET_OF[placement.ref_entity],
+        "column": placement.ref_field,
+    }
+    assert placement.ref_field not in _columns(ref_path)
+
+
+def test_infer_emits_the_dbt_convention(tmp_path):
+    """source = referenced asset, target = FK holder, fields to match."""
+    assets = tmp_path / "pipeline" / "assets" / "core"
+    assets.mkdir(parents=True)
+    (assets / "a.sql").write_text(
+        "/* @bruin\n"
+        "name: core.a\n"
+        "columns:\n"
+        "  - name: b_id\n"
+        "    foreign_key:\n"
+        "      table: core.b\n"
+        "      column: id\n"
+        "@bruin */\n"
+    )
+    (assets / "b.sql").write_text(
+        "/* @bruin\nname: core.b\ncolumns:\n  - name: id\n@bruin */\n"
+    )
+    adapter = BruinAdapter(
+        pipeline_path=str(tmp_path / "pipeline"),
+        data_model_path="",
+        asset_paths=[],
+    )
+
+    assert adapter.infer_relationships(include_unbound=True) == [
+        {
+            "source": "b",
+            "target": "a",
+            "label": "",
+            "type": "one_to_many",
+            "source_field": "id",
+            "target_field": "b_id",
+            "source_model_name": "b",
+            "source_model_version": None,
+            "target_model_name": "a",
+            "target_model_version": None,
+        }
+    ]
 
 
 @pytest.mark.xfail(

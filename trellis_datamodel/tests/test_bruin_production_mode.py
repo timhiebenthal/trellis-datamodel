@@ -105,15 +105,23 @@ class TestBruinSchemaRoutesWithoutDbtProjectPath:
 
         _assert_not_rejected_for_dbt(response)
         pairs = {(r["source"], r["target"]) for r in response.json()["relationships"]}
-        assert ("order", "customer") in pairs
+        # dbt and canvas convention: the referenced asset is the source.
+        assert ("customer", "order") in pairs
 
     def test_sync_tests(self, bruin_production_app, bruin_pipeline_copy):
         response = bruin_production_app.post("/api/sync-tests")
 
         _assert_not_rejected_for_dbt(response)
         files = response.json()["files"]
-        assert files
         assert all(f.startswith(bruin_pipeline_copy) for f in files)
+        # The fixture already holds the relationship's key, so there is nothing
+        # to rewrite, and the hand-written key to the unbound dim__product
+        # asset must survive the push.
+        order_asset = os.path.join(
+            bruin_pipeline_copy, "assets", "02_core", "fct__order.sql"
+        )
+        with open(order_asset) as f:
+            assert "dim__product" in f.read()
 
     def test_post_schema_scaffolds_an_asset(self, bruin_production_app, bruin_pipeline_copy):
         response = bruin_production_app.post(

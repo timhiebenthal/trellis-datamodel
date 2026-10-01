@@ -251,4 +251,35 @@ class TestSchemaEndpoints:
         pairs = {
             (r["source"], r["target"]) for r in response.json()["relationships"]
         }
-        assert ("order", "customer") in pairs
+        assert ("customer", "order") in pairs
+
+    def test_push_then_pull_returns_the_canvas_edge_once(
+        self, bruin_app, bruin_pipeline_copy, tmp_path
+    ):
+        """Push a canvas edge customer -> order, then Pull: one edge, same shape."""
+        edge = {
+            "type": "one_to_many",
+            "source": "customer",
+            "target": "order",
+            "source_field": "customer_id",
+            "target_field": "customer_id",
+        }
+        data_model_path = tmp_path / "data_model.yml"
+        data_model = yaml.safe_load(data_model_path.read_text())
+        data_model["relationships"] = [edge]
+        data_model_path.write_text(yaml.dump(data_model))
+
+        assert bruin_app.post("/api/sync-tests").status_code == 200
+
+        core = os.path.join(bruin_pipeline_copy, "assets", "02_core")
+        with open(os.path.join(core, "dim__customer.sql")) as f:
+            assert "foreign_key" not in f.read()
+        with open(os.path.join(core, "fct__order.sql")) as f:
+            assert "table: core.dim__customer" in f.read()
+
+        response = bruin_app.get("/api/infer-relationships")
+        assert response.status_code == 200
+        assert [
+            (r["source"], r["target"], r["source_field"], r["target_field"])
+            for r in response.json()["relationships"]
+        ] == [("customer", "order", "customer_id", "customer_id")]
