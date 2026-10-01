@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { render, screen, cleanup, fireEvent } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
 import { FRAMEWORK_DISPLAY_KEYS, isFeatureAvailable, missingArtifactHints } from '$lib/utils/framework-display';
@@ -160,6 +160,45 @@ describe('Sidebar — framework-driven header', () => {
         const icon = document.querySelector('img[alt="Bruin icon"]') as HTMLImageElement | null;
         expect(icon).toBeTruthy();
         expect(icon?.getAttribute('src')).toBe('https://getbruin.com/favicon.ico');
+    });
+});
+
+describe('Sidebar — filtering through the UI', () => {
+    beforeEach(() => {
+        cleanup();
+        activeFramework.set('dbt-core');
+        frameworkModels.set(mockModels);
+        folderFilter.set([]);
+        tagFilter.set([]);
+        nodes.set([]);
+    });
+
+    it('shows only models in the folder picked from the folder dropdown', async () => {
+        render(Sidebar, { props: {} });
+
+        expect(screen.getByText('users')).toBeTruthy();
+        expect(screen.getByText('orders')).toBeTruthy();
+        expect(screen.getByText('stg_users')).toBeTruthy();
+
+        await fireEvent.change(screen.getByRole('combobox', { name: /Filter by Folder/ }), {
+            target: { value: '2_int/staging' }
+        });
+
+        expect(screen.getByText('stg_users')).toBeTruthy();
+        expect(screen.queryByText('users')).toBeNull();
+        expect(screen.queryByText('orders')).toBeNull();
+    });
+
+    it('shows only models carrying the tag picked from the tag dropdown', async () => {
+        render(Sidebar, { props: {} });
+
+        await fireEvent.change(screen.getByRole('combobox', { name: /Filter by Tag/ }), {
+            target: { value: 'pii' }
+        });
+
+        expect(screen.getByText('users')).toBeTruthy();
+        expect(screen.queryByText('orders')).toBeNull();
+        expect(screen.queryByText('stg_users')).toBeNull();
     });
 });
 

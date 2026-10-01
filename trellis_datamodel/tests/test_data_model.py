@@ -670,6 +670,39 @@ class TestSaveDataModel:
         assert saved["entities"][0]["id"] == "dim_employee"
         assert saved["entities"][0]["roles"] == ["Sales Agent"]
 
+    def test_structured_roles_round_trip_through_api(
+        self, test_client, temp_data_model_path
+    ):
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim_employee",
+                    "label": "Employee",
+                    "entity_type": "dimension",
+                    "roles": [
+                        {"label": "Sales Agent", "role": "sales_agent", "source": "user"},
+                        {"label": "Approver", "role": "approver", "source": "dbt"},
+                    ],
+                }
+            ],
+            "relationships": [],
+        }
+        response = test_client.post("/api/data-model", json=payload)
+        assert response.status_code == 200
+
+        expected_roles = [
+            {"label": "Sales Agent", "role": "sales_agent", "source": "user"},
+            {"label": "Approver", "role": "approver", "source": "dbt"},
+        ]
+
+        with open(temp_data_model_path, "r") as f:
+            saved = yaml.safe_load(f)
+        assert saved["entities"][0]["roles"] == expected_roles
+
+        loaded = test_client.get("/api/data-model").json()
+        assert loaded["entities"][0]["roles"] == expected_roles
+
 
 def test_get_data_model_normalizes_origin(test_client, temp_data_model_path):
     """Legacy string origin in data_model.yml is returned as a structured list."""
