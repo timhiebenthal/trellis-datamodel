@@ -20,6 +20,7 @@ from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import FileOperationError, NotFoundError
 from trellis_datamodel.models.entity_keys import get_model_ref, get_physical_datatype
 from trellis_datamodel.observability import timed_phase
+from trellis_datamodel.services.fk_placement import place_foreign_key
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.origin import parse_origin
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
@@ -1163,38 +1164,13 @@ class DbtCoreAdapter:
             if not source_field or not target_field:
                 continue
 
-            # Determine which side has the "many" cardinality (where FK should be)
-            # Relationship types ending in "_to_many" or starting with "many_to_" have FK on target/source respectively
-            # For one_to_one, FK is typically on source (FK holder → referenced table per spec)
-            if rel_type in (
-                "one_to_many",
-                "one_to_zero_or_many",
-                "zero_or_one_to_many",
-                "zero_or_many_to_many",
-            ):
-                # FK on target (target is the "many" side)
-                fk_entity = target_id
-                fk_field = target_field
-                ref_entity = source_id
-                ref_field = source_field
-            elif rel_type in ("many_to_one", "many_to_many", "zero_or_many_to_one"):
-                # FK on source (source is the "many" side)
-                fk_entity = source_id
-                fk_field = source_field
-                ref_entity = target_id
-                ref_field = target_field
-            elif rel_type == "one_to_one":
-                # For one_to_one, FK is on source (FK holder → referenced table per spec)
-                fk_entity = source_id
-                fk_field = source_field
-                ref_entity = target_id
-                ref_field = target_field
-            else:
-                # Fallback: assume FK on target (default behavior)
-                fk_entity = target_id
-                fk_field = target_field
-                ref_entity = source_id
-                ref_field = source_field
+            placement = place_foreign_key(
+                rel_type, source_id, source_field, target_id, target_field
+            )
+            fk_entity = placement.fk_entity
+            fk_field = placement.fk_field
+            ref_entity = placement.ref_entity
+            ref_field = placement.ref_field
 
             fk_by_entity.setdefault(fk_entity, []).append(
                 {
@@ -1393,31 +1369,13 @@ class DbtCoreAdapter:
             if not source_field or not target_field:
                 continue
 
-            if rel_type in (
-                "one_to_many",
-                "one_to_zero_or_many",
-                "zero_or_one_to_many",
-                "zero_or_many_to_many",
-            ):
-                fk_entity = target_id
-                fk_field = target_field
-                ref_entity = source_id
-                ref_field = source_field
-            elif rel_type in ("many_to_one", "many_to_many", "zero_or_many_to_one"):
-                fk_entity = source_id
-                fk_field = source_field
-                ref_entity = target_id
-                ref_field = target_field
-            elif rel_type == "one_to_one":
-                fk_entity = source_id
-                fk_field = source_field
-                ref_entity = target_id
-                ref_field = target_field
-            else:
-                fk_entity = target_id
-                fk_field = target_field
-                ref_entity = source_id
-                ref_field = source_field
+            placement = place_foreign_key(
+                rel_type, source_id, source_field, target_id, target_field
+            )
+            fk_entity = placement.fk_entity
+            fk_field = placement.fk_field
+            ref_entity = placement.ref_entity
+            ref_field = placement.ref_field
 
             # Track all fields involved in relationships for this entity
             if source_id == entity_id:

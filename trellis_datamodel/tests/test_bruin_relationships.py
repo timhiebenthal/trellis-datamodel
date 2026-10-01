@@ -217,6 +217,31 @@ class TestSyncRelationships:
             "column": "customer_id",
         }
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Bruin writes the FK on the source asset regardless of type; "
+        "the shared FK placement rule puts one_to_many FK on the target.",
+    )
+    def test_one_to_many_places_fk_on_target_asset(self, writable_adapter):
+        writable_adapter.sync_relationships(
+            entities=DATA_MODEL["entities"],
+            relationships=[
+                {
+                    "type": "one_to_many",
+                    "source": "customer",
+                    "target": "order",
+                    "source_field": "customer_id",
+                    "target_field": "amount",
+                }
+            ],
+        )
+
+        columns = _columns(self._fct_path(writable_adapter))
+        assert columns["amount"]["foreign_key"] == {
+            "table": "core.dim__customer",
+            "column": "customer_id",
+        }
+
     def test_writes_the_targets_own_name_spelling(self, writable_adapter):
         """dim__product is bound by short name but declares itself dotted."""
         writable_adapter.sync_relationships(
