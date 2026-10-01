@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   referenced asset as `source` and the foreign-key holder as `target`, and Push places
   each `foreign_key` by relationship type (a one-to-many lands on the "many" asset), so
   Pull after Push returns one edge instead of two. No migration needed: Bruin had no users.
+- **Bruin push no longer deletes foreign keys it did not create**: like dbt, Push only
+  removes a `foreign_key` from a column that is an end of a data-model relationship but no
+  longer holds its key (e.g. after a type change moved the key). Hand-written keys on
+  columns outside any data-model relationship, including keys to unbound assets, are kept.
 
 
 ## [0.23.1] - 2026-08-18
