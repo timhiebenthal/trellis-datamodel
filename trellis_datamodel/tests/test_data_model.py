@@ -273,10 +273,10 @@ def test_batched_enrichment_matches_legacy_results_for_primary_and_additional_mo
     assert entities["draft"]["source_system"] == ["mock"]
 
 
-def test_data_model_request_does_not_reopen_manifest_or_catalog_per_entity(
+def test_data_model_request_uses_batch_source_system_lookup_once(
     test_client, temp_data_model_path, monkeypatch
 ):
-    """The request uses one indexed artifact read instead of one per entity."""
+    """The request calls the batch adapter lookup once instead of once per entity."""
     import trellis_datamodel.routes.data_model as data_model_route
     import trellis_datamodel.services.lineage as lineage_service
 
@@ -669,6 +669,39 @@ class TestSaveDataModel:
 
         assert saved["entities"][0]["id"] == "dim_employee"
         assert saved["entities"][0]["roles"] == ["Sales Agent"]
+
+    def test_structured_roles_round_trip_through_api(
+        self, test_client, temp_data_model_path
+    ):
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim_employee",
+                    "label": "Employee",
+                    "entity_type": "dimension",
+                    "roles": [
+                        {"label": "Sales Agent", "role": "sales_agent", "source": "user"},
+                        {"label": "Approver", "role": "approver", "source": "dbt"},
+                    ],
+                }
+            ],
+            "relationships": [],
+        }
+        response = test_client.post("/api/data-model", json=payload)
+        assert response.status_code == 200
+
+        expected_roles = [
+            {"label": "Sales Agent", "role": "sales_agent", "source": "user"},
+            {"label": "Approver", "role": "approver", "source": "dbt"},
+        ]
+
+        with open(temp_data_model_path, "r") as f:
+            saved = yaml.safe_load(f)
+        assert saved["entities"][0]["roles"] == expected_roles
+
+        loaded = test_client.get("/api/data-model").json()
+        assert loaded["entities"][0]["roles"] == expected_roles
 
 
 def test_get_data_model_normalizes_origin(test_client, temp_data_model_path):
