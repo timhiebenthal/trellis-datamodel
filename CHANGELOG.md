@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Collapsing a group node no longer strands its children**: clicking a folder
+  group or domain-zone header used to hide the child entities and then stop
+  responding - the group never switched to its compact badge, and no further click
+  brought the children back without a page reload. Collapse wrote the flag to the
+  SvelteFlow node store while the canvas re-derives that store from `nodes` on
+  every change, so the flag was wiped by the same click that set it. The flag and
+  the children's hidden state are now written in one `nodes` pass.
+
 ## [0.24.1] - 2026-10-15
 
 ### Fixed
