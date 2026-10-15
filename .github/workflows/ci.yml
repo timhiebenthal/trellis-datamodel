@@ -58,7 +58,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        # Playwright's --shard splits by test count, so names reflect the suite at the
+        # time of split (shard 1 ≈ business-events, bus-matrix, canvas, config;
+        # shard 2 ≈ positioning, filters, exposures, lineage). Re-check with
+        # `npx playwright test --list --shard=N/2` when specs are added.
+        include:
+          - shard: 1
+            name: matrix-events-canvas
+          - shard: 2
+            name: layout-filters-lineage
+    name: e2e (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
 
