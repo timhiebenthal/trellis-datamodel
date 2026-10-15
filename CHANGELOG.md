@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-10-15
+
 ### Fixed
 - **Server loads its own config at startup**: running the app directly (e.g.
   `uvicorn trellis_datamodel.server:app --reload`) now applies `trellis.yml`
