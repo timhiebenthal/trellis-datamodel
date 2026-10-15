@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Opening the canvas no longer unbinds entities (#141)**: a save payload that
+  omits `model_ref` is now "no opinion" instead of "unbind". An auto-save racing
+  a concurrent session (a second window or a restart) used to post entities
+  built from an older GET - `JSON.stringify` had dropped the undefined
+  `model_ref` key - and `POST /api/data-model` treated the omission as an
+  intentional unbind, silently stripping the binding from every entity and
+  turning push into a success that updated 0 files. The frontend always sends
+  an explicit `model_ref: null` when the user unbinds, and JSON.stringify keeps
+  `null`, so that path is unchanged. `entity_type` gets the same contract:
+  auto-save omits it whenever `modeling_style` is `entity_model`, which used to
+  erase a hand-set dimension/fact on every pass. A pushed Bruin asset whose
+  bound entity's `model_ref` matches no asset now logs a warning instead of
+  silently disappearing from the push.
 - **Collapsing a group node no longer strands its children**: clicking a folder
   group or domain-zone header used to hide the child entities and then stop
   responding - the group never switched to its compact badge, and no further click

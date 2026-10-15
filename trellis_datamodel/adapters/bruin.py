@@ -794,16 +794,31 @@ class BruinAdapter:
     def _entity_to_asset_map(
         self, entities: list[dict[str, Any]], assets: list[BruinAsset]
     ) -> dict[str, BruinAsset]:
-        """Map each entity id to the asset it is bound to, if any."""
+        """Map each entity id to the asset it is bound to, if any.
+
+        Unbound entities (no model_ref) are normal and skip quietly. A bound
+        entity whose model_ref matches no asset is NOT normal: push would
+        answer "success: 0 files" for it, so it is surfaced as a warning
+        instead (#141).
+        """
         mapping: dict[str, BruinAsset] = {}
         for entity in entities:
             entity_id = entity.get("id")
+            if not entity_id:
+                continue
             model_ref = get_model_ref(entity)
-            if not entity_id or not model_ref:
+            if not model_ref:
                 continue
             asset = self._lookup_asset(assets, model_ref)
-            if asset is not None:
-                mapping[entity_id] = asset
+            if asset is None:
+                logger.warning(
+                    "Push skipped entity '%s': model_ref '%s' does not match "
+                    "any asset in the pipeline.",
+                    entity_id,
+                    model_ref,
+                )
+                continue
+            mapping[entity_id] = asset
         return mapping
 
     @staticmethod
