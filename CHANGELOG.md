@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SvelteFlow node store while the canvas re-derives that store from `nodes` on
   every change, so the flag was wiped by the same click that set it. The flag and
   the children's hidden state are now written in one `nodes` pass.
+- **E2E boot cost (issue #142)**: `frontend/tests/ensure-e2e-trellis-config.ts` now
+  runs the full CI-parity dbt pipeline (generate data → `dbt run` → `dbt docs
+  generate`) once per run behind a lock file instead of a bare `dbt compile` that
+  could never satisfy its own freshness check (`dbt compile` cannot produce
+  `catalog.json`, so the old guard recompiled on every process). Artifact
+  staleness is now checked against source mtimes. Both test servers are reused
+  locally (frontend: `reuseExistingServer: !process.env.CI`, matching the
+  backend), and the e2e npm script no longer boots the servers twice
+  (`test:smoke` moved to an explicit CI step).
 
 ## [0.24.1] - 2026-10-15
 

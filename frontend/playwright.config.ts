@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 // Run before webServer: Playwright starts webServers before globalSetup, so the backend
 // must see a valid trellis.yml on first boot (see ensure-e2e-trellis-config.ts).
-ensureE2ETrellisConfig();
+await ensureE2ETrellisConfig();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -63,12 +63,14 @@ export default defineConfig({
         },
         {
             // Frontend dev server on 5174 — avoids colliding with `make frontend` on 5173.
+            // Reuses a running dev server locally (spawned by ensure-e2e-trellis-config or
+            // manually), matching the backend; Playwright owns the server on CI.
             command: 'npm run dev -- --port 5174',
             env: {
                 VITE_DEV_API_TARGET: 'http://localhost:8000',
             },
             url: 'http://localhost:5174',
-            reuseExistingServer: false,
+            reuseExistingServer: !process.env.CI,
         },
     ],
 });

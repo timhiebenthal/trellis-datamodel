@@ -13,7 +13,7 @@
     "test": "npm run check && npm run test:smoke && npm run test:unit -- --run && npm run test:e2e",
     "test:unit": "vitest",
     "test:smoke": "playwright test tests/smoke.spec.ts",
-    "test:e2e": "npm run check && npm run test:smoke && playwright test"
+    "test:e2e": "npm run check && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

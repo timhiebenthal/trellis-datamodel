@@ -6,8 +6,13 @@ on:
     branches:
       - main
 
+# Job layout (see GitHub issue #142): the E2E suite is the long pole (3m38s serial).
+# It runs as its own sharded matrix job - each shard gets its own backend + frontend
+# on its own runner, so no shared mutable state — and in parallel with the unit job
+# instead of after it.
 jobs:
   test:
+    name: unit (pytest-check-vitest-build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,14 +38,79 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm ci
 
-      - name: Install Playwright browsers
-        run: cd frontend && npx playwright install --with-deps
-
       - name: Run Python tests
         run: uv run pytest
 
+      - name: Run frontend type check
+        run: cd frontend && npm run check
+
       - name: Run frontend unit tests
         run: cd frontend && npm run test:unit
+
+      - name: Build static files
+        run: |
+          cd frontend
+          npm run build
+          rm -rf ../trellis_datamodel/static/*
+          cp -r build/* ../trellis_datamodel/static/
+
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Playwright's --shard splits by test count, so names reflect the suite at the
+        # time of split (shard 1 ≈ business-events, bus-matrix, canvas, config;
+        # shard 2 ≈ positioning, filters, exposures, lineage). Re-check with
+        # `npx playwright test --list --shard=N/2` when specs are added.
+        include:
+          - shard: 1
+            name: matrix-events-canvas
+          - shard: 2
+            name: layout-filters-lineage
+    name: e2e (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install Python dependencies
+        run: uv sync --dev --extra dbt-example
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Install Playwright OS dependencies
+        run: cd frontend && npx playwright install-deps
+
+      - name: Get installed Playwright version
+        id: playwright-version
+        working-directory: frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: cd frontend && npx playwright install
 
       # dbt_company_dummy/data/*.csv is gitignored, so CI must regenerate the mock data
       # before dbt can materialize anything. Playwright tests need catalog.json (column
@@ -55,12 +125,9 @@ jobs:
           uvx --from dbt-duckdb dbt run --project-dir dbt_company_dummy --profiles-dir dbt_company_dummy --vars "data_path: $DATA_PATH"
           uvx --from dbt-duckdb dbt docs generate --project-dir dbt_company_dummy --profiles-dir dbt_company_dummy --vars "data_path: $DATA_PATH"
 
-      - name: Run frontend e2e tests
-        run: cd frontend && npm run test:e2e
+      - name: Run frontend smoke tests (shard 1 only)
+        if: matrix.shard == 1
+        run: cd frontend && npm run test:smoke
 
-      - name: Build static files
-        run: |
-          cd frontend
-          npm run build
-          rm -rf ../trellis_datamodel/static/*
-          cp -r build/* ../trellis_datamodel/static/
+      - name: Run frontend e2e tests (shard ${{ matrix.shard }}/2)
+        run: cd frontend && npx playwright test --shard=${{ matrix.shard }}/2
