@@ -334,3 +334,86 @@ test.describe('Canvas Navigation And Default Filters', () => {
         }
     });
 });
+
+test.describe('Group Node Collapse/Expand', () => {
+    test('group node can collapse and expand children', async ({ page, request }) => {
+        // Three real dbt_company_dummy models so each entity resolves to a folder.
+        // All three live in `models/3_core/all/`, which renders exactly one group
+        // node with id `group-3_core-all` and header label `all`.
+        const GROUP_TEST_DATA_MODEL: DataModelPayload = {
+            version: 0.1,
+            entities: [
+                {
+                    id: 'entity1',
+                    label: 'Entity 1',
+                    domain: 'Sales',
+                    entity_type: 'fact',
+                    model_ref: 'model.company_dummy.dim_sale',
+                    position: { x: 0, y: 0 },
+                },
+                {
+                    id: 'entity2',
+                    label: 'Entity 2',
+                    domain: 'Sales',
+                    entity_type: 'dimension',
+                    model_ref: 'model.company_dummy.dim_customer',
+                    position: { x: 200, y: 0 },
+                },
+                {
+                    id: 'entity3',
+                    label: 'Entity 3',
+                    domain: 'Sales',
+                    entity_type: 'dimension',
+                    model_ref: 'model.company_dummy.dim_product',
+                    position: { x: 400, y: 0 },
+                },
+            ],
+            relationships: [],
+        };
+
+        await resetDataModel(request, GROUP_TEST_DATA_MODEL);
+        await openFreshCanvas(page, '/canvas');
+
+        // The group node is positioned above its children (negative y), so it can
+        // render underneath the app header. Fit the view to bring it into the pane.
+        await page.locator('.svelte-flow__controls-fitview').click();
+
+        // Scope to the single expected group via its stable node id.
+        const groupNode = page.locator(
+            '.svelte-flow__node-group[data-id="group-3_core-all"]',
+        );
+        await expect(groupNode).toBeVisible({ timeout: 10000 });
+
+        // Iconify exposes the icon set as a class (`iconify--lucide`) but not the
+        // individual icon name, so identify the chevrons by their lucide path.
+        const chevronRight = groupNode.locator('svg:has(path[d^="m9 18"])');
+        const chevronDown = groupNode.locator('svg:has(path[d^="m6 9"])');
+        // The compact collapsed badge is the only header rendering `text-xs`.
+        const compactBadge = groupNode.locator('[role="button"][class*="text-xs"]');
+
+        // Count visible entity nodes before collapse
+        const entityNodes = page.locator('.svelte-flow__node-entity');
+        const initialEntityCount = await entityNodes.count();
+        expect(initialEntityCount).toBe(3);
+        await expect(chevronDown).toBeVisible({ timeout: 3000 });
+
+        // Click group header to collapse
+        const groupHeader = groupNode.locator('[role="button"]').first();
+        await groupHeader.click();
+
+        // After collapse: all grouped children should be hidden and the group
+        // should render as the compact badge with a chevron-right.
+        await expect(entityNodes).toHaveCount(0, { timeout: 5000 });
+        await expect(compactBadge).toBeVisible({ timeout: 3000 });
+        await expect(chevronRight).toBeVisible({ timeout: 3000 });
+
+        // Click the compact badge explicitly to expand (wrapper centre is position dependent)
+        await compactBadge.click();
+
+        // After expand: children should be visible again and the expanded header
+        // (chevron-down) should be back.
+        await expect(entityNodes).toHaveCount(initialEntityCount, { timeout: 5000 });
+        await expect(chevronDown).toBeVisible({ timeout: 3000 });
+        await expect(chevronRight).not.toBeVisible({ timeout: 3000 });
+    });
+});
