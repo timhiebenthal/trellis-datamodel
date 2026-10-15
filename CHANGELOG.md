@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Server loads its own config at startup**: running the app directly (e.g.
+  `uvicorn trellis_datamodel.server:app --reload`) now applies `trellis.yml`
+  (honoring `TRELLIS_CONFIG_PATH` or the cwd config) instead of silently serving
+  dbt-core defaults. Launching through `trellis serve`/`run` is unchanged.
+
 ## [0.24.0] - 2026-10-15
 
 ### Fixed
