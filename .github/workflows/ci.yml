@@ -12,6 +12,7 @@ on:
 # instead of after it.
 jobs:
   test:
+    name: unit (pytest-check-vitest-build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
