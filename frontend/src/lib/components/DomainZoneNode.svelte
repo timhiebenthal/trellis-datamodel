@@ -65,14 +65,21 @@
     }
 
     function toggleCollapse() {
-        const newCollapsed = !isCollapsed;
-        updateNodeData(id, { collapsed: newCollapsed });
+        // Derive the current state from $nodes (the source of truth) so a stale
+        // prop can never invert the toggle.
+        const currentCollapsed =
+            $nodes.find(n => n.id === id)?.data?.collapsed ?? isCollapsed;
+        const newCollapsed = !currentCollapsed;
 
         // Get child node IDs
         const childIds = new Set($nodes.filter(n => n.parentId === id).map(n => n.id));
 
-        // Hide/show child nodes
+        // Persist the group's own collapsed state and hide/show children in a
+        // single $nodes pass, since $nodes is re-derived into the display store.
         $nodes = $nodes.map(n => {
+            if (n.id === id) {
+                return { ...n, data: { ...n.data, collapsed: newCollapsed } };
+            }
             if (n.parentId === id) {
                 return { ...n, hidden: newCollapsed };
             }
