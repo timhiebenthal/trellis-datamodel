@@ -350,10 +350,13 @@ def _split_model_and_layout(
     }
 
     # Preserve existing roles when older clients omit the field.
+    existing_entities_by_id: Dict[str, Dict[str, Any]] = {}
     existing_roles_by_id: Dict[str, Any] = {}
     if existing_model_data:
         for existing_entity in existing_model_data.get("entities", []):
             existing_entity_id = existing_entity.get("id")
+            if existing_entity_id:
+                existing_entities_by_id[existing_entity_id] = existing_entity
             if existing_entity_id and "roles" in existing_entity:
                 existing_roles_by_id[existing_entity_id] = existing_entity.get("roles")
 
@@ -410,6 +413,19 @@ def _split_model_and_layout(
             model_entity["description"] = entity["description"]
         if MODEL_REF_KEY in entity or LEGACY_MODEL_REF_KEY in entity:
             set_model_ref(model_entity, get_model_ref(entity))
+        elif get_model_ref(existing_entities_by_id.get(entity_id, {})):
+            # #141: an omitted model_ref is "no opinion", not an unbind. An
+            # auto-save racing a concurrent session posts entities built from
+            # an older GET, where JSON.stringify has already dropped the key
+            # (undefined) — dropping the on-disk binding here silently
+            # unbound every entity and made push a no-op. The frontend always
+            # telegraphs an intentional unbind as an explicit `model_ref:
+            # null` (EntityNode.unbind), and JSON.stringify keeps null, so
+            # the explicit-clear path above is unchanged.
+            set_model_ref(
+                model_entity,
+                get_model_ref(existing_entities_by_id[entity_id]),
+            )
         if "additional_models" in entity:
             model_entity["additional_models"] = entity["additional_models"]
         if "drafted_fields" in entity:
@@ -446,6 +462,14 @@ def _split_model_and_layout(
             model_entity["domains"] = entity["domains"]
         if "entity_type" in entity:
             model_entity["entity_type"] = entity["entity_type"]
+        elif current_entity := existing_entities_by_id.get(entity_id):
+            # #141: auto-save omits entity_type whenever modeling_style is
+            # entity_model, so omission is "no opinion" there — dropping a
+            # user-set dimension/fact during such a save would erase it on
+            # every pass. Explicit edits send the key with a value (or the
+            # frontend's 'unclassified'), so they keep winning below.
+            if "entity_type" in current_entity:
+                model_entity["entity_type"] = current_entity["entity_type"]
         if "annotation_type" in entity:
             model_entity["annotation_type"] = entity["annotation_type"]
         if "roles" in entity:

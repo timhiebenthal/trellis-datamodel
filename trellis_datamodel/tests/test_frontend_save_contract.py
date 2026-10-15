@@ -255,3 +255,104 @@ class TestPushedTagsContract:
         assert "pushed_tags" not in saved
         assert saved["ui_tags"] == ["finance"]
         assert "pushed_tags" not in _loaded_entity(test_client, "orders")
+
+
+class TestOmittedMeansPreserve:
+    """#141: a save payload that omits `model_ref` / `entity_type` must not
+    unbind entities or erase their type.
+
+    An auto-save racing a concurrent session (or a stale window) posts entities
+    built from an older GET; JSON.stringify drops undefined keys, so a bound
+    entity can arrive without `model_ref`. Absence must mean "no opinion", not
+    "unbind" — the frontend always telegraphs an intentional unbind as an
+    explicit `model_ref: null` (EntityNode.unbind), which JSON.stringify keeps.
+    Same contract for `entity_type`: auto-save omits it whenever
+    modeling_style is entity_model, so absence must not drop a type a user set.
+    """
+
+    def _seed_bound(self, path: str, entity_type: str | None = None) -> None:
+        entity = {
+            "id": "dim__game",
+            "label": "Game",
+            "description": "One row per NBA game.",
+            "model_ref": "core.dim__game",
+        }
+        if entity_type is not None:
+            entity["entity_type"] = entity_type
+        _seed(path, [entity])
+
+    def _post_omitting(self, test_client, key: str) -> dict:
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim__game",
+                    "label": "Game",
+                    "description": "One row per NBA game.",
+                    "drafted_fields": [],
+                }
+            ],
+            "relationships": [],
+        }
+        assert key not in payload["entities"][0]
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+
+    def test_omitted_model_ref_preserves_binding(
+        self, test_client, temp_data_model_path
+    ):
+        self._seed_bound(temp_data_model_path)
+        self._post_omitting(test_client, "model_ref")
+
+        saved = _saved_entity(temp_data_model_path, "dim__game")
+        assert saved["model_ref"] == "core.dim__game"
+
+        # The backend stays bound for the push path too: bruin's
+        # _entity_to_asset_map reads from the file, so push keeps working.
+        response = test_client.post("/api/sync-tests")
+        assert response.status_code == 200
+
+    def test_null_model_ref_still_unbinds(self, test_client, temp_data_model_path):
+        """Explicit null = the user clicked Unbind; absence = no opinion."""
+        self._seed_bound(temp_data_model_path)
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {"id": "dim__game", "label": "Game", "model_ref": None}
+            ],
+            "relationships": [],
+        }
+        assert "model_ref" in payload["entities"][0]
+
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+
+        saved = _saved_entity(temp_data_model_path, "dim__game")
+        assert saved.get("model_ref") is None
+
+    def test_omitted_entity_type_preserved(
+        self, test_client, temp_data_model_path
+    ):
+        self._seed_bound(temp_data_model_path, entity_type="dimension")
+        self._post_omitting(test_client, "entity_type")
+
+        saved = _saved_entity(temp_data_model_path, "dim__game")
+        assert saved["entity_type"] == "dimension"
+
+    def test_explicit_entity_type_still_taken_from_payload(
+        self, test_client, temp_data_model_path
+    ):
+        self._seed_bound(temp_data_model_path, entity_type="dimension")
+        payload = {
+            "version": 0.1,
+            "entities": [
+                {
+                    "id": "dim__game",
+                    "label": "Game",
+                    "entity_type": "fact",
+                }
+            ],
+            "relationships": [],
+        }
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+
+        saved = _saved_entity(temp_data_model_path, "dim__game")
+        assert saved["entity_type"] == "fact"
