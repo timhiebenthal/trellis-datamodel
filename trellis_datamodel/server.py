@@ -6,6 +6,7 @@ This is the FastAPI application that serves the API and frontend.
 
 from importlib.resources import files
 import os
+from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
@@ -14,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from trellis_datamodel import config as cfg
+from trellis_datamodel.config import load_config, find_config_file
 from trellis_datamodel.exceptions import (
     DomainError,
     NotFoundError,
@@ -227,9 +229,20 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(business_events_router)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load configuration at startup if not already loaded."""
+    # Skip if config already loaded (CLI path) or in test mode
+    if not cfg.CONFIG_PATH and not os.environ.get("DATAMODEL_TEST_DIR"):
+        config_path = find_config_file()
+        if config_path:
+            load_config(config_path)
+    yield
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    app = FastAPI(title="Trellis Data", version="0.1.0")
+    app = FastAPI(title="Trellis Data", version="0.1.0", lifespan=lifespan)
 
     _configure_cors(app)
     app.add_middleware(_RequestTimingMiddleware)
