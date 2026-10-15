@@ -55,6 +55,9 @@ jobs:
           uvx --from dbt-duckdb dbt run --project-dir dbt_company_dummy --profiles-dir dbt_company_dummy --vars "data_path: $DATA_PATH"
           uvx --from dbt-duckdb dbt docs generate --project-dir dbt_company_dummy --profiles-dir dbt_company_dummy --vars "data_path: $DATA_PATH"
 
+      - name: Run frontend smoke tests
+        run: cd frontend && npm run test:smoke
+
       - name: Run frontend e2e tests
         run: cd frontend && npm run test:e2e
 
