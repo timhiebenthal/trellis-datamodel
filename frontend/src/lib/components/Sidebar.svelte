@@ -621,7 +621,7 @@
                 class="mt-auto pt-2 flex items-center gap-1.5 text-[10px] text-gray-400 select-none"
                 title="trellis-datamodel version"
             >
-                <Icon icon="lucide:git-branch" class="w-3 h-3 flex-shrink-0" />
+                <Icon icon="lucide:tag" class="w-3 h-3 flex-shrink-0" />
                 <span class="truncate">trellis v{trellisVersion}</span>
             </div>
         {/if}
