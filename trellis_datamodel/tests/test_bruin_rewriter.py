@@ -428,15 +428,15 @@ class TestRewriteKeyOrder:
         assert self._lines(path)[2:4] == ["meta:", "  owner_team: growth"]
 
     def test_existing_key_keeps_its_position(self, tmp_path):
-        """A hand-placed description stays put; only new keys are inserted."""
+        """A hand-placed description in canonical order stays put."""
         path = tmp_path / "dim__player.sql"
         path.write_text(
             "/* @bruin\n"
             "name: core.dim__player\n"
             "type: duckdb.sql\n"
+            "description: Player dimension.\n"
             "materialization:\n"
             "  type: table\n"
-            "description: Player dimension.\n"
             "columns:\n"
             "  - name: player_id\n"
             "    type: varchar\n"
@@ -446,10 +446,117 @@ class TestRewriteKeyOrder:
 
         rewrite_bruin_block(str(path), updates={"description": "Updated dimension."})
 
-        assert self._lines(path)[4:6] == [
+        assert self._lines(path)[2:4] == [
             "description: Updated dimension.",
-            "columns:",
+            "materialization:",
         ]
+
+    def test_stale_bottom_description_is_promoted_to_the_header(self, tmp_path):
+        """A description left below columns by a pre-#149 push moves up.
+
+        #149 only placed *new* keys; an existing key kept its position, so
+        files that received a bottom description before the fix kept it there
+        forever - every later push updated the value at the bottom (seen in
+        nba-data's dim__player.sql). A key that is provably out of canonical
+        order is relocated on push instead.
+        """
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "connection: nba_duckdb\n"
+            "type: duckdb.sql\n"
+            "\n"
+            "depends:\n"
+            "  - prep.prep__player\n"
+            "\n"
+            "materialization:\n"
+            "  type: table\n"
+            "  strategy: create+replace\n"
+            "\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: bigint\n"
+            "description: Player dimension.\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"description": "Player dimension."})
+
+        lines = self._lines(path)
+        assert lines[0] == "name: core.dim__player"
+        assert "description: Player dimension." in lines[:5]
+        assert lines.index("description: Player dimension.") < lines.index("depends:")
+
+    def test_stale_bottom_tags_are_promoted(self, tmp_path):
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "materialization:\n"
+            "  type: table\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: varchar\n"
+            "tags:\n"
+            "  - core\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"tags": ["core", "entity"]})
+
+        lines = self._lines(path)
+        assert lines[2:4] == ["tags:", "  - core"]
+        assert lines[4:6] == ["  - entity", "materialization:"]
+
+    def test_relocation_is_idempotent(self, tmp_path):
+        """A healed block is not churned by the next push."""
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "materialization:\n"
+            "  type: table\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: varchar\n"
+            "description: Player dimension.\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"description": "Player dimension."})
+        healed = path.read_text()
+        rewrite_bruin_block(str(path), updates={"description": "Player dimension."})
+
+        assert path.read_text() == healed
+
+    def test_stale_bottom_meta_is_promoted(self, tmp_path):
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "materialization:\n"
+            "  type: table\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: varchar\n"
+            "meta:\n"
+            "  origin: trellis\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"meta": {"origin": "trellis"}})
+
+        lines = self._lines(path)
+        assert lines[2:4] == ["meta:", "  origin: trellis"]
+        assert lines.index("meta:") < lines.index("materialization:")
 
     def test_asset_yml_new_description_goes_into_the_header(self, tmp_path):
         path = tmp_path / "raw__events.asset.yml"

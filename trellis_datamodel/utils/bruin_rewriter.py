@@ -65,25 +65,51 @@ _BRUIN_KEY_ORDER = (
 _KEY_RANK = {key: index for index, key in enumerate(_BRUIN_KEY_ORDER)}
 
 
-def _set_key(parsed: CommentedMap, key: str, value: Any) -> None:
-    """Assign *key* to *parsed*, placing a new key in Bruin's field order.
+def _rank(key: str) -> int:
+    return _KEY_RANK.get(key, len(_BRUIN_KEY_ORDER))
 
-    An existing key keeps its position - and any comment on it - because
-    assignment never reorders. A new key is inserted at the index of the first
-    existing key that comes after it, so a pushed description sits in the header
-    instead of being appended below ``columns``.
+
+def _insert_index(parsed: CommentedMap, rank: int) -> int:
+    """Index where a key of *rank* belongs in Bruin's field order."""
+    for index, existing in enumerate(parsed):
+        if _rank(existing) > rank:
+            return index
+    return len(parsed)
+
+
+def _is_misplaced(parsed: CommentedMap, key: str) -> bool:
+    """True when *key* sits after a key that canonical order puts later.
+
+    This is how a pre-#149 push leaves a file: the description lands below
+    ``columns`` and in-place updates keep it there forever. Relocating such a
+    key on push heals the file; a key already in canonical order is never
+    touched, so well-formed blocks see no churn.
+    """
+    rank = _rank(key)
+    for existing in parsed:
+        if existing == key:
+            return False
+        if _rank(existing) > rank:
+            return True
+    return False
+
+
+def _set_key(parsed: CommentedMap, key: str, value: Any) -> None:
+    """Assign *key* to *parsed*, placing it in Bruin's field order.
+
+    An existing key keeps its position - and any comment on it - as long as
+    that position respects the canonical order; only its value changes. A new
+    key is inserted at the index of the first existing key that comes after
+    it, so a pushed description sits in the header instead of being appended
+    below ``columns``. An existing key that is provably out of order (stale
+    position from an older push) is relocated to the same spot.
     """
     if key in parsed:
         parsed[key] = value
-        return
-
-    rank = _KEY_RANK.get(key, len(_BRUIN_KEY_ORDER))
-    position = len(parsed)
-    for index, existing in enumerate(parsed):
-        if _KEY_RANK.get(existing, len(_BRUIN_KEY_ORDER)) > rank:
-            position = index
-            break
-    parsed.insert(position, key, value)
+        if not _is_misplaced(parsed, key):
+            return
+        del parsed[key]
+    parsed.insert(_insert_index(parsed, _rank(key)), key, value)
 
 
 def _yaml() -> YAML:
@@ -158,7 +184,9 @@ def _normalize_columns(columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def _replace_meta(parsed: CommentedMap, meta: Dict[str, Any]) -> None:
     """Make the asset-level `meta` equal *meta*, editing the existing map in
     place so comments on the keys that stay are kept. An empty *meta* drops
-    the key altogether rather than leaving `meta: {}` behind."""
+    the key altogether rather than leaving `meta: {}` behind. A `meta` key
+    left below `columns` by a pre-#149 push is relocated like any other
+    misplaced header key."""
     if not meta:
         parsed.pop("meta", None)
         return
@@ -171,6 +199,9 @@ def _replace_meta(parsed: CommentedMap, meta: Dict[str, Any]) -> None:
     for key, value in meta.items():
         if current.get(key) != value:
             current[key] = value
+    if "meta" in parsed and _is_misplaced(parsed, "meta"):
+        del parsed["meta"]
+        parsed.insert(_insert_index(parsed, _rank("meta")), "meta", current)
 
 
 def _atomic_write(path: Path, content: str) -> None:
