@@ -1,5 +1,7 @@
 <script lang="ts">
     import { normalizeTags } from '$lib/utils';
+    import { activeFramework } from '$lib/stores';
+    import { getFrameworkCopy } from '$lib/utils/framework-display';
 
     let { tags = [], readOnlyTags = [], canEdit = true, isBatchMode = false, onUpdate }: {
         tags?: string[];
@@ -10,6 +12,8 @@
         isBatchMode?: boolean;
         onUpdate: (newTags: string[]) => void;
     } = $props();
+
+    let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
 
     let tagInput = $state('');
     let showTagInput = $state(false);
@@ -75,7 +79,7 @@
             class:text-blue-700={!isReadOnly}
             class:bg-gray-100={isReadOnly}
             class:text-gray-600={isReadOnly}
-            title={isReadOnly ? 'Managed by dbt (schema.yml) — cannot be removed here' : undefined}
+            title={isReadOnly ? frameworkCopy.managedTagHint : undefined}
         >
             {tag}
             {#if canEdit && !isReadOnly}

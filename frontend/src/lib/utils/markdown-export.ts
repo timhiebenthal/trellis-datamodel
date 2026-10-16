@@ -33,7 +33,8 @@ export function formatEntityAsMarkdown(
 	edges: any[],
 	allNodes: Node[],
 	entityId: string,
-	isDimensional: boolean = true
+	isDimensional: boolean = true,
+	modelColumnLabel: string = 'Model'
 ): string {
 	const lines: string[] = [];
 
@@ -50,7 +51,7 @@ export function formatEntityAsMarkdown(
 	lines.push(`**Tags:** ${entity.tags?.join(', ') || '-'}`);
 	lines.push(`**Source Systems:** ${entity.source_system?.join(', ') || '-'}`);
 	lines.push(`**Description:** ${entity.description || '-'}`);
-	lines.push(`**dbt Model:** ${readModelRef(entity) || '-'}`);
+	lines.push(`**${modelColumnLabel}:** ${readModelRef(entity) || '-'}`);
 	lines.push(`**Additional Models:** ${entity.additional_models?.join(', ') || '-'}`);
 	lines.push('');
 

@@ -4,6 +4,8 @@
     import Icon from '@iconify/svelte';
     import * as XLSX from 'xlsx';
     import { readModelRef } from '$lib/utils/entity-compat';
+    import { activeFramework } from '$lib/stores';
+    import { getFrameworkCopy, formatModelHint } from '$lib/utils/framework-display';
     import Tooltip from '$lib/components/Tooltip.svelte';
 
     interface Dimension {
@@ -32,6 +34,7 @@
     let connections = $state<Connection[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
     let connectionLookup = $state<Map<string, boolean>>(new Map());
 
     // Filters
@@ -482,7 +485,7 @@
                                             <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
                                             <span
                                                 class="flex-shrink-0 inline-block w-2 h-2 rounded-full {readModelRef(fact) ? 'bg-primary-600' : 'border border-gray-300'}"
-                                                title={readModelRef(fact) ? `Built with dbt: ${readModelRef(fact)!.split('.').pop()}` : 'Not yet built with dbt'}
+                                                title={readModelRef(fact) ? formatModelHint(frameworkCopy.builtHint, readModelRef(fact)!.split('.').pop() ?? '') : frameworkCopy.unbuiltHint}
                                             ></span>
                                             <span class="truncate">{fact.label}</span>
                                             {#if factVisibleDimensionCounts.get(fact.id) !== undefined}
@@ -521,7 +524,7 @@
                                                 <Icon icon="lucide:list" class="w-4 h-4 text-green-600 flex-shrink-0" />
                                                 <span
                                                     class="flex-shrink-0 inline-block w-2 h-2 rounded-full {readModelRef(dimension) ? 'bg-primary-600' : 'border border-gray-300'}"
-                                                    title={readModelRef(dimension) ? `Built with dbt: ${readModelRef(dimension)!.split('.').pop()}` : 'Not yet built with dbt'}
+                                                    title={readModelRef(dimension) ? formatModelHint(frameworkCopy.builtHint, readModelRef(dimension)!.split('.').pop() ?? '') : frameworkCopy.unbuiltHint}
                                                 ></span>
                                                 <span class="truncate">{dimension.label}</span>
                                                 <Tooltip text={`${dimensionVisibleFactCounts.get(dimension.id) ?? 0} related facts`}>

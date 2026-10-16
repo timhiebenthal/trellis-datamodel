@@ -7,6 +7,7 @@
     import { frameworkModels, nodes } from '$lib/stores';
     import { normalizeTags } from '$lib/utils';
     import { readModelRef } from '$lib/utils/entity-compat';
+    import { getFrameworkCopy } from '$lib/utils/framework-display';
 
     let loading = true;
     let saving = false;
@@ -85,6 +86,7 @@
     // Bruin pipeline has no manifest, so showing both sets would invite a user
     // to fill in config nothing reads.
     $: selectedFramework = config.framework || 'dbt-core';
+    $: frameworkCopy = getFrameworkCopy(selectedFramework);
 
     onMount(async () => {
         await loadConfig();
@@ -918,7 +920,7 @@
                                         Push Warning Enabled
                                     </label>
                                     <p class="text-xs text-gray-500">
-                                        Show a warning for undescribed entities/attributes when you push to dbt.
+                                        {frameworkCopy.pushWarningDescription}
                                     </p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
@@ -1088,7 +1090,7 @@
                             <div class="bg-white border border-amber-200 rounded-lg p-4">
                                 <div class="flex items-center gap-2 mb-4">
                                     <h3 class="text-base font-semibold text-amber-900">Lineage</h3>
-                                    <Tooltip text="Visualize data lineage across your dbt models. Configure layers to organize models by transformation stages (e.g., staging, intermediate, marts).">
+                                    <Tooltip text={frameworkCopy.lineageTooltip}>
                                         <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
                                     </Tooltip>
                                 </div>

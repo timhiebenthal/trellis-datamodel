@@ -10,7 +10,7 @@
     type Props = {
         open: boolean;
         attributeNames?: string[]; // For single entity (Save to YAML)
-        entitiesWithAttributes?: EntityWithUndescribedAttributes[]; // For multiple entities (Push to dbt)
+        entitiesWithAttributes?: EntityWithUndescribedAttributes[]; // For multiple entities (Push to the framework)
         onConfirm: () => void;
         onCancel: () => void;
     };

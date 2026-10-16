@@ -21,6 +21,7 @@
         closeSourceEditorModal,
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
+        activeFramework,
     } from "$lib/stores";
     import type { ModelInfo, DraftedField, EntityData, EntityRole } from "$lib/types";
     import {
@@ -42,6 +43,7 @@
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
     import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
+    import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
     import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
@@ -104,6 +106,7 @@
     let activeModelId = $derived(allBoundModels[activeModelIndex] || boundModelName);
     let isBound = $derived(!!boundModelName);
     let isCollapsed = $derived(data.collapsed ?? false);
+    let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
     const DEFAULT_WIDTH = 320;
     const DEFAULT_PANEL_HEIGHT = 200;
     const MIN_WIDTH = 280;
@@ -1144,7 +1147,7 @@
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"
-                    title="Draft mode (not bound to dbt model)"
+                    title={frameworkCopy.unboundHint}
                 ></div>
                 {#if exposuresEnabled && hasExposuresData}
                     <button
@@ -1314,7 +1317,7 @@
                             <!-- Add model button -->
                             <button
                                 class="px-2 py-1 text-[10px] rounded border border-dashed border-gray-300 text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center gap-1 flex-shrink-0"
-                                title="Drag a dbt model from the sidebar to add it"
+                                title={frameworkCopy.addModelTooltip}
                             >
                                 <Icon icon="lucide:plus" class="w-3 h-3" />
                             </button>
@@ -1390,11 +1393,11 @@
                                             class:bg-primary-500={field.origin === 'dbt'}
                                             data-origin={field.origin}
                                             aria-label={field.origin === 'dbt'
-                                                ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                             title={field.origin === 'dbt'
-                                                ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                             role="img"
                                         ></span>
 
@@ -1649,11 +1652,11 @@
                                                 class:bg-primary-500={field.origin === 'dbt'}
                                                 data-origin={field.origin}
                                                 aria-label={field.origin === 'dbt'
-                                                    ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                    : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                    ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                    : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                                 title={field.origin === 'dbt'
-                                                    ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                    : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                    ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                    : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                                 role="img"
                                             ></span>
 
@@ -1861,7 +1864,7 @@
                         <div
                             class="mt-2 text-[10px] text-gray-400 text-center border border-dashed border-gray-300 rounded p-3 bg-gray-50 pointer-events-none"
                         >
-                            Drag dbt model here
+                            {frameworkCopy.emptyBindingHint}
                         </div>
                     {/if}
                 {/if}

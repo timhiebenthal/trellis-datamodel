@@ -51,6 +51,21 @@ describe('markdown-export utilities', () => {
 	});
 
 	describe('formatEntityAsMarkdown - Complete Entity', () => {
+		it('labels the bound model with the framework-aware column name', () => {
+			const result = formatEntityAsMarkdown(
+				mockEntity,
+				mockAttributes,
+				mockEdges,
+				mockNodes,
+				'customer',
+				true,
+				'dbt Model'
+			);
+
+			expect(result).toContain('**dbt Model:** model.project.customer');
+			expect(result).not.toContain('**Model:**');
+		});
+
 		it('should generate markdown with all fields populated', () => {
 			const result = formatEntityAsMarkdown(mockEntity, mockAttributes, mockEdges, mockNodes, 'customer');
 
@@ -64,7 +79,7 @@ describe('markdown-export utilities', () => {
 			expect(result).toContain('**Tags:** pii, core');
 			expect(result).toContain('**Source Systems:** CRM, ERP');
 			expect(result).toContain('**Description:** Main customer entity');
-			expect(result).toContain('**dbt Model:** model.project.customer');
+			expect(result).toContain('**Model:** model.project.customer');
 			expect(result).toContain('**Additional Models:** model.project.customer_history');
 
 			// Check attributes section
@@ -129,7 +144,7 @@ describe('markdown-export utilities', () => {
 			expect(result).toContain('**Tags:** -');
 			expect(result).toContain('**Source Systems:** -');
 			expect(result).toContain('**Description:** -');
-			expect(result).toContain('**dbt Model:** -');
+			expect(result).toContain('**Model:** -');
 			expect(result).toContain('**Additional Models:** -');
 		});
 	});

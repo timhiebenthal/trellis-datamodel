@@ -51,7 +51,9 @@
                     {#each [
                         { label: "Config file", value: info.config_path || "Not found" },
                         { label: "Framework", value: info.framework },
-                        { label: "dbt project path", value: info.dbt_project_path },
+                        // Only dbt-core reports a project path; the backend omits the key for
+                        // other frameworks, so the row would otherwise render empty and dbt-worded.
+                        ...(info.dbt_project_path ? [{ label: "dbt project path", value: info.dbt_project_path }] : []),
                         { label: "Manifest path", value: info.manifest_path, exists: info.manifest_exists },
                         { label: "Catalog path", value: info.catalog_path, exists: info.catalog_exists },
                         { label: "Data model path", value: info.data_model_path, exists: info.data_model_exists },

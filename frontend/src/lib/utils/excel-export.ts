@@ -171,7 +171,11 @@ export function formatRelationshipKeys(
  * @returns Configured XLSX worksheet with bold headers and column widths
  * @note Cell styling (bold headers) requires SheetJS Pro. Community Edition ignores the .s property.
  */
-export function generateOverviewSheet(entity: EntityData, isDimensional: boolean = true): XLSX.WorkSheet {
+export function generateOverviewSheet(
+	entity: EntityData,
+	isDimensional: boolean = true,
+	modelColumnLabel: string = 'Model'
+): XLSX.WorkSheet {
 	// Create 2-column array: Field | Value
 	const overviewData: (string | undefined)[][] = [
 		['Field', 'Value'],
@@ -182,7 +186,7 @@ export function generateOverviewSheet(entity: EntityData, isDimensional: boolean
 		['Tags', entity.tags?.join(', ') || '-'],
 		['Source Systems', entity.source_system?.join(', ') || '-'],
 		['Description', entity.description || '-'],
-		['dbt Model', readModelRef(entity) || '-'],
+		[modelColumnLabel, readModelRef(entity) || '-'],
 		['Additional Models', entity.additional_models?.join(', ') || '-']
 	];
 
@@ -322,11 +326,12 @@ export function exportEntityToExcel(
 	edges: any[],
 	allNodes: Node[],
 	entityId: string,
-	isDimensional: boolean = true
+	isDimensional: boolean = true,
+	modelColumnLabel: string = 'Model'
 ): void {
 	try {
 		// Generate three sheets using generators
-		const overviewSheet = generateOverviewSheet(entity, isDimensional);
+		const overviewSheet = generateOverviewSheet(entity, isDimensional, modelColumnLabel);
 		const attributesSheet = generateAttributesSheet(attributes);
 		const relationshipsSheet = generateRelationshipsSheet(edges, entityId, allNodes);
 
