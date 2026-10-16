@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **The UI no longer claims dbt under another framework (#139)**: with
+- **The toolbar and canvas no longer claim dbt under another framework (#139)**: with
   `framework: bruin` the sidebar header switched to "Bruin Assets" while the
   toolbar still read "Pull from dbt" / "Push to dbt", the canvas and entity
   placeholders said "Drag dbt model(s) here", the draft badge said "not bound to
