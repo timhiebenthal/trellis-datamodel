@@ -40,7 +40,7 @@ build/
 frontend/tests/test_data_model.yml
 frontend/tests/.trellis-test/
 
-# Cursor directory (contains mcp.json and symlinks to .ai_agent, git-untracked)
+# Cursor directory (contains mcp.json and agent skills/commands source, git-untracked)
 .cursor
 .cursor/
 /specs/

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Copy .ai_agent/commands into .cursor/commands (flat) for Cursor slash-command discovery.
+# Copy .agents/commands into .cursor/commands (flat) for Cursor slash-command discovery.
 # Cursor does not reliably follow symlinks or scan subdirectories under .cursor/commands/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="${ROOT}/.ai_agent/commands"
+SRC="${ROOT}/.agents/commands"
 DEST="${ROOT}/.cursor/commands"
 
 if [[ ! -d "$SRC" ]]; then
@@ -37,4 +37,4 @@ while IFS= read -r -d '' file; do
 	count=$((count + 1))
 done < <(find "$SRC" -name '*.md' -type f -print0)
 
-echo "Synced ${count} command(s) from .ai_agent/commands to .cursor/commands"
+echo "Synced ${count} command(s) from .agents/commands to .cursor/commands"

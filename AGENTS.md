@@ -2,7 +2,7 @@
 
 ## Project Structure
 - `trellis_datamodel/`: Python backend (Typer CLI + FastAPI) — adapters/, routes/, services/, models/, utils/, static/; tests in `trellis_datamodel/tests/`.
-- `frontend/`: SvelteKit + TypeScript + Tailwind; tests in `frontend/tests/` (Vitest unit, Playwright smoke/E2E); agent commands synced from `.ai_agent/commands/` into `.cursor/commands/` via `make setup`.
+- `frontend/`: SvelteKit + TypeScript + Tailwind; tests in `frontend/tests/` (Vitest unit, Playwright smoke/E2E); agent skills live in `.agents/skills/`, commands in `.agents/commands/` (synced into `.cursor/commands/` via `make setup`).
 - `resources/`, `scripts/`, `dbt_built/`, `dbt_company_dummy/`, `dist/`, `trellis.yml` (default config).
 
 ## Build & Test Commands
