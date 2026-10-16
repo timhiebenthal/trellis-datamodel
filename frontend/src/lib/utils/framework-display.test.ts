@@ -19,6 +19,10 @@ describe('getFrameworkCopy', () => {
                 'Sync entity & field-definitions and relationship-tests to dbt schema.yml files',
             emptyBindingHint: 'Drag dbt model here',
             unboundHint: 'Draft mode (not bound to dbt model)',
+            addModelTooltip: 'Drag a dbt model from the sidebar to add it',
+            emptyCanvasHint:
+                'Drag dbt models from the sidebar or create new entities to begin building your data model.',
+            noRelationshipsMessage: 'No relationships in dbt',
         });
     });
 
@@ -28,6 +32,8 @@ describe('getFrameworkCopy', () => {
         expect(copy.pullLabel).toBe('Pull from Bruin');
         expect(copy.pushLabel).toBe('Push to Bruin');
         expect(copy.emptyBindingHint).toBe('Drag Bruin asset here');
+        expect(copy.emptyCanvasHint).toContain('Bruin assets');
+        expect(copy.noRelationshipsMessage).toBe('No relationships in Bruin');
 
         for (const text of Object.values(copy)) {
             expect(text.toLowerCase()).not.toContain('dbt');
@@ -47,7 +53,9 @@ describe('getFrameworkCopy', () => {
         }
     });
 
-    it('falls back to neutral copy when no framework is configured yet', () => {
+    it('returns neutral copy for undefined/null input', () => {
+        // The layout coerces a missing framework to 'dbt-core' before it reaches
+        // the store, so this only guards the getter's own contract.
         expect(getFrameworkCopy(undefined)).toEqual(DEFAULT_FRAMEWORK_COPY);
         expect(getFrameworkCopy(null)).toEqual(DEFAULT_FRAMEWORK_COPY);
     });
@@ -55,6 +63,7 @@ describe('getFrameworkCopy', () => {
     it('offers copy for exactly the frameworks it offers branding for', () => {
         // Entries may only be added alongside a working adapter, so the two maps
         // cannot drift apart and leave a branded framework with dbt-agnostic copy.
-        expect(FRAMEWORK_COPY_KEYS).toEqual(FRAMEWORK_DISPLAY_KEYS);
+        // Sorted because only set membership matters, not declaration order.
+        expect([...FRAMEWORK_COPY_KEYS].sort()).toEqual([...FRAMEWORK_DISPLAY_KEYS].sort());
     });
 });

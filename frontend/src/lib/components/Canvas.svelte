@@ -24,8 +24,10 @@
         frameworkModels,
         domainFilter,
         tagFilter,
+        activeFramework,
     } from "$lib/stores";
     import { getParallelOffset, generateSlug } from "$lib/utils";
+    import { getFrameworkCopy } from "$lib/utils/framework-display";
     import { DimensionalModelPositioner, GroupSizeCalculator } from "$lib/services/position-calculator";
     import EntityNode from "./EntityNode.svelte";
     import GroupNode from "./GroupNode.svelte";
@@ -74,6 +76,8 @@
 
     const hasExposuresDataStore = writable(hasExposuresData);
     setContext("hasExposuresData", hasExposuresDataStore);
+
+    const frameworkCopy = $derived(getFrameworkCopy($activeFramework));
 
     $effect(() => {
         lineageEnabledStore.set(lineageEnabled);
@@ -689,8 +693,7 @@
                         Start Designing
                     </h3>
                     <p class="text-slate-600 mb-6">
-                        Drag dbt models from the sidebar or create new entities
-                        to begin building your data model.
+                        {frameworkCopy.emptyCanvasHint}
                     </p>
                     <button
                         class="bg-[#0f172a] text-white px-6 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition-colors shadow-md pointer-events-auto flex items-center justify-center gap-2 mx-auto"

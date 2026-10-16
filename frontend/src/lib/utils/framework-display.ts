@@ -73,6 +73,12 @@ export interface FrameworkCopy {
     emptyBindingHint: string;
     /** Tooltip on the draft badge of an entity that is not bound to a model. */
     unboundHint: string;
+    /** Tooltip on the entity's "add model" button. */
+    addModelTooltip: string;
+    /** Empty-canvas prompt telling the user where models come from. */
+    emptyCanvasHint: string;
+    /** Toast after a pull that found nothing in the project. */
+    noRelationshipsMessage: string;
 }
 
 const FRAMEWORK_COPY: Record<string, FrameworkCopy> = {
@@ -85,6 +91,10 @@ const FRAMEWORK_COPY: Record<string, FrameworkCopy> = {
             "Sync entity & field-definitions and relationship-tests to dbt schema.yml files",
         emptyBindingHint: "Drag dbt model here",
         unboundHint: "Draft mode (not bound to dbt model)",
+        addModelTooltip: "Drag a dbt model from the sidebar to add it",
+        emptyCanvasHint:
+            "Drag dbt models from the sidebar or create new entities to begin building your data model.",
+        noRelationshipsMessage: "No relationships in dbt",
     },
     bruin: {
         // Bruin keeps metadata inline in @bruin blocks, not in schema.yml files.
@@ -96,6 +106,10 @@ const FRAMEWORK_COPY: Record<string, FrameworkCopy> = {
             "Sync entity & field-definitions and relationship-tests to Bruin asset definitions",
         emptyBindingHint: "Drag Bruin asset here",
         unboundHint: "Draft mode (not bound to Bruin asset)",
+        addModelTooltip: "Drag a Bruin asset from the sidebar to add it",
+        emptyCanvasHint:
+            "Drag Bruin assets from the sidebar or create new entities to begin building your data model.",
+        noRelationshipsMessage: "No relationships in Bruin",
     },
 };
 
@@ -117,6 +131,10 @@ export const DEFAULT_FRAMEWORK_COPY: FrameworkCopy = {
         "Sync entity & field-definitions and relationship-tests to the configured framework",
     emptyBindingHint: "Drag a model here",
     unboundHint: "Draft mode (not bound to a model)",
+    addModelTooltip: "Drag a model from the sidebar to add it",
+    emptyCanvasHint:
+        "Drag models from the sidebar or create new entities to begin building your data model.",
+    noRelationshipsMessage: "No relationships in the configured framework",
 };
 
 export function getFrameworkCopy(framework: string | undefined | null): FrameworkCopy {

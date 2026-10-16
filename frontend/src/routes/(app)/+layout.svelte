@@ -405,7 +405,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                     }, 3000);
                 }
             } else {
-                syncMessage = "No relationships in dbt";
+                syncMessage = frameworkCopy.noRelationshipsMessage;
                 setTimeout(() => {
                     syncMessage = null;
                 }, 3000);

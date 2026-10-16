@@ -8,14 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **Toolbar no longer claims dbt under another framework (#139)**: with
+- **The UI no longer claims dbt under another framework (#139)**: with
   `framework: bruin` the sidebar header switched to "Bruin Assets" while the
-  toolbar still read "Pull from dbt" / "Push to dbt" and the entity placeholder
-  said "Drag dbt model here". The pull/push labels and tooltips, the entity
-  placeholder, and the unbound-entity tooltip now come from the same
-  `framework-display` module as the header. dbt renders byte-for-byte as before;
-  Bruin gets Bruin wording, and a framework Trellis has no adapter for gets
-  neutral wording rather than silently inheriting dbt's.
+  toolbar still read "Pull from dbt" / "Push to dbt", the canvas and entity
+  placeholders said "Drag dbt model(s) here", the draft badge said "not bound to
+  dbt model", and an empty pull reported "No relationships in dbt". The pull/push
+  labels and tooltips, both placeholders, the draft-badge tooltip, and the
+  empty-pull toast now come from the same `framework-display` module as the
+  header. dbt renders byte-for-byte as before; Bruin gets Bruin wording (assets,
+  not schema.yml files), and a framework Trellis has no adapter for gets neutral
+  wording rather than silently inheriting dbt's.
 - **Resizing a canvas group node now works (#140)**: dragging the width or height
   handle tinted the handle and switched the cursor to `ew-resize` / `ns-resize`,
   but the group kept its size during and after the drag. The handler wrote the new

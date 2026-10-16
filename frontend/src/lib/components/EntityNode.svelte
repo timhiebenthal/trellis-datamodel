@@ -1317,7 +1317,7 @@
                             <!-- Add model button -->
                             <button
                                 class="px-2 py-1 text-[10px] rounded border border-dashed border-gray-300 text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center gap-1 flex-shrink-0"
-                                title="Drag a dbt model from the sidebar to add it"
+                                title={frameworkCopy.addModelTooltip}
                             >
                                 <Icon icon="lucide:plus" class="w-3 h-3" />
                             </button>
