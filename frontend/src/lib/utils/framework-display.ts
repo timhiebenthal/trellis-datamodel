@@ -79,6 +79,30 @@ export interface FrameworkCopy {
     emptyCanvasHint: string;
     /** Toast after a pull that found nothing in the project. */
     noRelationshipsMessage: string;
+    /** Tooltip on a field already materialized in a model. `{model}` is the model name. */
+    materializedHint: string;
+    /** Tooltip on a field drafted in Trellis but not yet written back. `{model}` is the model name. */
+    unmaterializedHint: string;
+    /** Heading above the list of models bound to an entity (the count is appended by the caller). */
+    boundModelsHeading: string;
+    /** Note that materialized columns cannot be edited in the detail modal. */
+    materializedColumnsNote: string;
+    /** Tooltip on a read-only tag the framework owns. */
+    managedTagHint: string;
+    /** Tooltip on a model that has already been built. `{model}` is the model name. */
+    builtHint: string;
+    /** Tooltip on a model that has not been built yet. */
+    unbuiltHint: string;
+    /** Legend explaining the "built" check mark in the entity list filters. */
+    builtLegendHint: string;
+    /** Short form of the built legend, shown after the check icon. */
+    builtLegendShort: string;
+    /** Description of the push-warning setting on the config page. */
+    pushWarningDescription: string;
+    /** Tooltip over the lineage section on the config page. */
+    lineageTooltip: string;
+    /** Column label naming the bound model in exported files. */
+    modelColumnLabel: string;
 }
 
 const FRAMEWORK_COPY: Record<string, FrameworkCopy> = {
@@ -95,6 +119,21 @@ const FRAMEWORK_COPY: Record<string, FrameworkCopy> = {
         emptyCanvasHint:
             "Drag dbt models from the sidebar or create new entities to begin building your data model.",
         noRelationshipsMessage: "No relationships in dbt",
+        materializedHint: "Materialized in dbt model {model}",
+        unmaterializedHint:
+            "Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into {model}'s schema.yml.",
+        boundModelsHeading: "Bound dbt Models",
+        materializedColumnsNote: "— dbt columns are read-only",
+        managedTagHint: "Managed by dbt (schema.yml) — cannot be removed here",
+        builtHint: "Built with dbt: {model}",
+        unbuiltHint: "Not yet built with dbt",
+        builtLegendHint: "Entities with this mark are already built with dbt",
+        builtLegendShort: "= built with dbt",
+        pushWarningDescription:
+            "Show a warning for undescribed entities/attributes when you push to dbt.",
+        lineageTooltip:
+            "Visualize data lineage across your dbt models. Configure layers to organize models by transformation stages (e.g., staging, intermediate, marts).",
+        modelColumnLabel: "dbt Model",
     },
     bruin: {
         // Bruin keeps metadata inline in @bruin blocks, not in schema.yml files.
@@ -110,6 +149,21 @@ const FRAMEWORK_COPY: Record<string, FrameworkCopy> = {
         emptyCanvasHint:
             "Drag Bruin assets from the sidebar or create new entities to begin building your data model.",
         noRelationshipsMessage: "No relationships in Bruin",
+        materializedHint: "Materialized in Bruin asset {model}",
+        unmaterializedHint:
+            "Drafted in Trellis — not yet materialized in Bruin. Click 'Materialize' to write into {model}'s asset definition.",
+        boundModelsHeading: "Bound Bruin Assets",
+        materializedColumnsNote: "— Bruin asset columns are read-only",
+        managedTagHint: "Managed by Bruin (asset metadata) — cannot be removed here",
+        builtHint: "Built with Bruin: {model}",
+        unbuiltHint: "Not yet built with Bruin",
+        builtLegendHint: "Entities with this mark are already built with Bruin",
+        builtLegendShort: "= built with Bruin",
+        pushWarningDescription:
+            "Show a warning for undescribed entities/attributes when you push to Bruin.",
+        lineageTooltip:
+            "Visualize data lineage across your Bruin assets. Configure layers to organize assets by transformation stages (e.g., staging, intermediate, marts).",
+        modelColumnLabel: "Bruin Asset",
     },
 };
 
@@ -135,7 +189,32 @@ export const DEFAULT_FRAMEWORK_COPY: FrameworkCopy = {
     emptyCanvasHint:
         "Drag models from the sidebar or create new entities to begin building your data model.",
     noRelationshipsMessage: "No relationships in the configured framework",
+    materializedHint: "Materialized in {model}",
+    unmaterializedHint:
+        "Drafted in Trellis — not yet materialized. Click 'Materialize' to write into {model}'s definition.",
+    boundModelsHeading: "Bound Models",
+    materializedColumnsNote: "— bound columns are read-only",
+    managedTagHint: "Managed by the configured framework — cannot be removed here",
+    builtHint: "Built: {model}",
+    unbuiltHint: "Not yet built",
+    builtLegendHint: "Entities with this mark are already built",
+    builtLegendShort: "= built",
+    pushWarningDescription:
+        "Show a warning for undescribed entities/attributes when you push to the configured framework.",
+    lineageTooltip:
+        "Visualize data lineage across your models. Configure layers to organize models by transformation stages (e.g., staging, intermediate, marts).",
+    modelColumnLabel: "Model",
 };
+
+/**
+ * Fill the `{model}` placeholder in a copy template.
+ *
+ * Copy that names the bound model can't live in the map as a finished string,
+ * so it carries the placeholder and the component supplies the name.
+ */
+export function formatModelHint(template: string, model: string): string {
+    return template.replace("{model}", model);
+}
 
 export function getFrameworkCopy(framework: string | undefined | null): FrameworkCopy {
     if (!framework) return DEFAULT_FRAMEWORK_COPY;

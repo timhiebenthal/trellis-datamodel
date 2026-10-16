@@ -313,11 +313,11 @@ export async function syncDbtTests(): Promise<{ message: string }> {
         });
 
         if (!res.ok) {
-            throw new Error(`Failed to sync dbt tests: ${res.status}`);
+            throw new Error(`Failed to sync relationship tests: ${res.status}`);
         }
         return await res.json();
     } catch (e) {
-        console.error("Error syncing dbt tests:", e);
+        console.error("Error syncing relationship tests:", e);
         throw e;
     }
 }
@@ -1233,7 +1233,7 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
         const res = await fetch(`${API_BASE}/reconcile`, { method: 'POST' });
         if (!res.ok) {
             if (res.status === 404) return { status: 'success', changed: false };
-            throw new Error(`Failed to reconcile dbt: ${res.status}`);
+            throw new Error(`Failed to reconcile models: ${res.status}`);
         }
         const result = await res.json();
         return {
@@ -1241,7 +1241,7 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
             changed: result.changed,
         };
     } catch (e) {
-        console.error('Error reconciling dbt:', e);
+        console.error('Error reconciling models:', e);
         return { status: 'success', changed: false };
     }
 }

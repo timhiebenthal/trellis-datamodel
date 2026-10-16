@@ -4,6 +4,7 @@ import {
     FRAMEWORK_COPY_KEYS,
     FRAMEWORK_DISPLAY_KEYS,
     getFrameworkCopy,
+    formatModelHint,
 } from './framework-display';
 
 describe('getFrameworkCopy', () => {
@@ -23,6 +24,21 @@ describe('getFrameworkCopy', () => {
             emptyCanvasHint:
                 'Drag dbt models from the sidebar or create new entities to begin building your data model.',
             noRelationshipsMessage: 'No relationships in dbt',
+            materializedHint: 'Materialized in dbt model {model}',
+            unmaterializedHint:
+                "Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into {model}'s schema.yml.",
+            boundModelsHeading: 'Bound dbt Models',
+            materializedColumnsNote: '— dbt columns are read-only',
+            managedTagHint: 'Managed by dbt (schema.yml) — cannot be removed here',
+            builtHint: 'Built with dbt: {model}',
+            unbuiltHint: 'Not yet built with dbt',
+            builtLegendHint: 'Entities with this mark are already built with dbt',
+            builtLegendShort: '= built with dbt',
+            pushWarningDescription:
+                'Show a warning for undescribed entities/attributes when you push to dbt.',
+            lineageTooltip:
+                'Visualize data lineage across your dbt models. Configure layers to organize models by transformation stages (e.g., staging, intermediate, marts).',
+            modelColumnLabel: 'dbt Model',
         });
     });
 
@@ -34,6 +50,9 @@ describe('getFrameworkCopy', () => {
         expect(copy.emptyBindingHint).toBe('Drag Bruin asset here');
         expect(copy.emptyCanvasHint).toContain('Bruin assets');
         expect(copy.noRelationshipsMessage).toBe('No relationships in Bruin');
+        expect(copy.boundModelsHeading).toBe('Bound Bruin Assets');
+        expect(copy.materializedHint).toBe('Materialized in Bruin asset {model}');
+        expect(copy.modelColumnLabel).toBe('Bruin Asset');
 
         for (const text of Object.values(copy)) {
             expect(text.toLowerCase()).not.toContain('dbt');
@@ -65,5 +84,15 @@ describe('getFrameworkCopy', () => {
         // cannot drift apart and leave a branded framework with dbt-agnostic copy.
         // Sorted because only set membership matters, not declaration order.
         expect([...FRAMEWORK_COPY_KEYS].sort()).toEqual([...FRAMEWORK_DISPLAY_KEYS].sort());
+    });
+});
+
+describe('formatModelHint', () => {
+    it('substitutes the bound model name into the placeholder', () => {
+        expect(formatModelHint('Built with dbt: {model}', 'orders')).toBe('Built with dbt: orders');
+    });
+
+    it('leaves a template without the placeholder untouched', () => {
+        expect(formatModelHint('Not yet built with dbt', 'orders')).toBe('Not yet built with dbt');
     });
 });

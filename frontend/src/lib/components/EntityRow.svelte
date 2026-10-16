@@ -2,11 +2,12 @@
 	import Icon from "@iconify/svelte";
 	import { goto } from "$app/navigation";
 	import type { Entity, ModelInfo } from "$lib/types";
-	import { entityDetailModal, entitySelection, modelingStyle } from "$lib/stores";
+	import { entityDetailModal, entitySelection, modelingStyle, activeFramework } from "$lib/stores";
 	import DomainBadge from "./DomainBadge.svelte";
 	import { readModelRef } from "$lib/utils/entity-compat";
 	import { bindEntityToModel } from "$lib/utils/entity-binding";
 	import { getEntityDetailPath } from "$lib/utils/entity-list-route";
+	import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
 
 	type Props = {
 		entity: Entity;
@@ -177,6 +178,7 @@
 
 	// Bound model reference (prefers new `model_ref`, falls back to legacy `dbt_model`)
 	const boundModelRef = $derived(readModelRef(entity));
+	const frameworkCopy = $derived(getFrameworkCopy($activeFramework));
 </script>
 
 <div
@@ -225,7 +227,7 @@
 		<!-- dbt build status badge — reserved slot so later badges stay aligned whether or not the entity is bound. Uses the same check icon/color as the "Bound" filter in the sidebar for consistency. -->
 		<span
 			class="flex-shrink-0 inline-flex items-center justify-center w-4 text-primary-600"
-			title={boundModelRef ? `Built with dbt: ${boundModelRef.split('.').pop()}` : undefined}
+			title={boundModelRef ? formatModelHint(frameworkCopy.builtHint, boundModelRef.split('.').pop() ?? '') : undefined}
 		>
 			{#if boundModelRef}
 				<Icon icon="lucide:check" class="h-3.5 w-3.5" aria-hidden="true" />

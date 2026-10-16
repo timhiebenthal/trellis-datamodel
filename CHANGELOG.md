@@ -8,15 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **The toolbar and canvas no longer claim dbt under another framework (#139)**: with
+- **The UI no longer claims dbt under another framework (#139)**: with
   `framework: bruin` the sidebar header switched to "Bruin Assets" while the
-  toolbar still read "Pull from dbt" / "Push to dbt", the canvas and entity
-  placeholders said "Drag dbt model(s) here", the draft badge said "not bound to
-  dbt model", and an empty pull reported "No relationships in dbt". The pull/push
-  labels and tooltips, both placeholders, the draft-badge tooltip, and the
-  empty-pull toast now come from the same `framework-display` module as the
-  header. dbt renders byte-for-byte as before; Bruin gets Bruin wording (assets,
-  not schema.yml files), and a framework Trellis has no adapter for gets neutral
+  rest of the app still spoke dbt - the toolbar read "Pull from dbt" / "Push to
+  dbt", the canvas and entity placeholders said "Drag dbt model(s) here", bound
+  fields were "Materialized in dbt model X" with the dbt logo, the detail modal
+  said "Bound dbt Models" and "dbt columns are read-only", tags were "Managed by
+  dbt", the entity list and bus matrix said "Built with dbt", the config page
+  described a push "to dbt", exports wrote a "dbt Model" column, and a failed
+  push reported "Failed to sync dbt tests". All of that copy plus the
+  bound-field icon now comes from the same `framework-display` module as the
+  header; exports take the column label and the API errors are framework-neutral.
+  dbt renders byte-for-byte as before; Bruin gets Bruin wording (assets, not
+  schema.yml files), and a framework Trellis has no adapter for gets neutral
   wording rather than silently inheriting dbt's.
 - **Resizing a canvas group node now works (#140)**: dragging the width or height
   handle tinted the handle and switched the cursor to `ew-resize` / `ns-resize`,

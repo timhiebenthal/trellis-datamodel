@@ -43,7 +43,7 @@
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
     import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
-    import { getFrameworkCopy } from "$lib/utils/framework-display";
+    import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
     import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
@@ -1393,11 +1393,11 @@
                                             class:bg-primary-500={field.origin === 'dbt'}
                                             data-origin={field.origin}
                                             aria-label={field.origin === 'dbt'
-                                                ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                             title={field.origin === 'dbt'
-                                                ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                             role="img"
                                         ></span>
 
@@ -1652,11 +1652,11 @@
                                                 class:bg-primary-500={field.origin === 'dbt'}
                                                 data-origin={field.origin}
                                                 aria-label={field.origin === 'dbt'
-                                                    ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                    : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                    ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                    : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                                 title={field.origin === 'dbt'
-                                                    ? `Materialized in dbt model ${modelDetails?.name ?? ''}`
-                                                    : `Drafted in Trellis — not yet materialized in dbt. Click 'Materialize' to write into ${modelDetails?.name ?? ''}'s schema.yml.`}
+                                                    ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
+                                                    : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
                                                 role="img"
                                             ></span>
 

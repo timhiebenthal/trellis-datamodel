@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
-	import { nodes, edges, entityDetailModal, pushHistory, frameworkModels, modelingStyle } from '$lib/stores';
+	import { nodes, edges, entityDetailModal, pushHistory, frameworkModels, modelingStyle, activeFramework } from '$lib/stores';
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry, ModelInfo } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
@@ -15,6 +15,7 @@
 	import type { AutoSaveService } from '$lib/services/auto-save';
 	import { exportEntityToExcel, formatRelationshipType, formatRelationshipKeys } from '$lib/utils/excel-export';
 	import { formatEntityAsMarkdown } from '$lib/utils/markdown-export';
+	import { getFrameworkCopy, getFrameworkDisplay, formatModelHint } from '$lib/utils/framework-display';
 	import { goto } from '$app/navigation';
 	import DropIndicator from './DropIndicator.svelte';
 	import ModelBindingPicker from './ModelBindingPicker.svelte';
@@ -37,6 +38,8 @@
 	let showSourceSuggestions = $state(false);
 	let activeSourceSuggestionIndex = $state(0);
 	let showAllDomains = $state(false);
+	let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
+	let frameworkDisplay = $derived(getFrameworkDisplay($activeFramework));
 	let showAllTags = $state(false);
 	let showAllSourceSystems = $state(false);
 	let filteredSourceSuggestions = $derived(
@@ -857,7 +860,8 @@
 				$edges,
 				$nodes,
 				entityId,
-				$modelingStyle === 'dimensional_model'
+				$modelingStyle === 'dimensional_model',
+				frameworkCopy.modelColumnLabel
 			);
 
 			// Success - file downloads automatically
@@ -881,7 +885,8 @@
 				$edges,
 				$nodes,
 				entityId,
-				$modelingStyle === 'dimensional_model'
+				$modelingStyle === 'dimensional_model',
+				frameworkCopy.modelColumnLabel
 			);
 			await navigator.clipboard.writeText(markdown);
 			
@@ -1089,7 +1094,7 @@
 								<div class="flex items-center gap-1.5 shrink-0 text-primary-700">
 									<Icon icon="lucide:layers" class="h-4 w-4 shrink-0 text-primary-600" />
 									<span class="text-xs font-semibold">
-										Bound dbt Models ({boundModels.length})
+										{frameworkCopy.boundModelsHeading} ({boundModels.length})
 									</span>
 								</div>
 								{#each boundModels as model}
@@ -1498,7 +1503,7 @@
 					<div>
 						<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
 							Attributes ({mergedFields.length})
-							{#if isBoundEntity}<span class="font-normal normal-case text-xs text-gray-400 ml-1">— dbt columns are read-only</span>{/if}
+							{#if isBoundEntity}<span class="font-normal normal-case text-xs text-gray-400 ml-1">{frameworkCopy.materializedColumnsNote}</span>{/if}
 						</label>
 
 						{#if materializeWarnings.length > 0}
@@ -1612,10 +1617,15 @@
 													{#if field.origin === 'dbt'}
 														<span
 															class="inline-flex items-center text-gray-400"
-															aria-label={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
-															title={`Materialized in dbt model '${boundModel?.name ?? ''}'`}
+															aria-label={formatModelHint(frameworkCopy.materializedHint, `'${boundModel?.name ?? ''}'`)}
+															title={formatModelHint(frameworkCopy.materializedHint, `'${boundModel?.name ?? ''}'`)}
 														>
-															<Icon icon="simple-icons:dbt" class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+															<img
+																src={frameworkDisplay.icon}
+																alt={frameworkDisplay.alt}
+																class="h-3.5 w-3.5 opacity-70"
+																aria-hidden="true"
+															/>
 														</span>
 													{/if}
 													{#if field.originRefs?.length}
