@@ -7,11 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.4b3] - 2026-10-16
+
 ### Added
 - **Sidebar footer shows the running version**: `/api/config-info` now carries
   `trellis_version`, and the canvas sidebar pins a muted `trellis v<version>`
   row to its bottom edge, so the running build is visible without opening the
   config page.
+
+### Fixed
+- **The Bruin heal now fires without a value edit (#149 follow-up)**: the b2
+  build only relocated a bottom `description` when the pushed text differed
+  from the asset's. Files whose value was already in sync - every asset in
+  nba-data - never triggered it, so a push looked like it did nothing. The push
+  now detects a header key stranded below the `columns` layer from the block's
+  own key order and re-asserts its current value, which relocates it. Ordering
+  above the column body is left alone (`connection` before `description` is a
+  valid hand-arranged layout), a value-unchanged push of a clean block still
+  touches no file, and the write path is byte-stable on repeat.
+
+## [0.24.4b2] - 2026-10-16
+
+### Fixed
+- **Bruin push heals header keys left at the bottom (#149 follow-up)**: #149
+  placed *newly added* `description`, `tags` and `meta` keys at their Bruin
+  field position, but an existing key kept its position by design - so files
+  that received a bottom `description` before the fix kept it there forever,
+  and every later push updated the value at the bottom (seen in nba-data's
+  `dim__player.sql`). A key that is provably out of canonical order is now
+  relocated on push. A key already in canonical order is never touched, and a
+  healed block is stable under further pushes.
 
 ## [0.24.4b1] - 2026-10-16
 

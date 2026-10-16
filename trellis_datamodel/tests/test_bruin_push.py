@@ -149,6 +149,31 @@ class TestDescription:
         assert description_at < lines.index("materialization:")
         assert description_at < lines.index("columns:")
 
+    def test_push_heals_a_description_stuck_at_the_bottom(self, adapter, customer_path):
+        """A pre-#149 push left descriptions below `columns`, value-synced:
+        later pushes updated the value in place, so nothing ever differed and
+        the key stayed stale. The next push relocates the key even when the
+        pushed description equals what the asset already carries."""
+        content = open(customer_path).read()
+        stale = content.replace("description: One row per customer.\n", "", 1)
+        stale = stale.replace("@bruin */", "description: One row per customer.\n@bruin */", 1)
+        with open(customer_path, "w") as f:
+            f.write(stale)
+
+        adapter.sync_relationships([_customer(description="One row per customer.")], [])
+
+        lines = open(customer_path).read().splitlines()
+        assert lines.index("description: One row per customer.") < lines.index(
+            "connection: test_duckdb"
+        )
+
+    def test_unchanged_push_stays_a_no_op(self, adapter, customer_path):
+        """A clean block never triggers a rewrite: pushing the description it
+        already carries touches no file."""
+        customer = _customer(description="One row per customer.")
+
+        assert adapter.sync_relationships([customer], []) == []
+
 
 class TestDraftedColumns:
     def test_drafted_field_missing_from_the_asset_is_added(
