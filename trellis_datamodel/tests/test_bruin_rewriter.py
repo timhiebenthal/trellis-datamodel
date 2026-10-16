@@ -337,6 +337,176 @@ class TestRewriteTags:
         assert _parsed_block(file_path.read_text())["tags"] == ["core", "entity"]
 
 
+class TestRewriteKeyOrder:
+    """A newly added header key lands where Bruin's formatter puts it.
+
+    ruamel appends a key it has not seen before, which used to drop a pushed
+    description below ``columns``. Bruin orders the fields
+    ``name, type, enabled, description, ...`` and groups ``description`` in the
+    top header, so a new description/tags/meta must be inserted, not appended.
+    """
+
+    BLOCK = (
+        "/* @bruin\n"
+        "name: core.dim__player\n"
+        "type: duckdb.sql\n"
+        "materialization:\n"
+        "  type: table\n"
+        "columns:\n"
+        "  - name: player_id\n"
+        "    type: varchar\n"
+        "@bruin */\n"
+        "SELECT * FROM players;\n"
+    )
+
+    def _lines(self, path) -> list[str]:
+        return _extract_bruin_block(path.read_text()).splitlines()
+
+    def test_new_description_goes_into_the_header(self, tmp_path):
+        path = tmp_path / "dim__player.sql"
+        path.write_text(self.BLOCK)
+
+        rewrite_bruin_block(str(path), updates={"description": "Player dimension."})
+
+        assert self._lines(path) == [
+            "name: core.dim__player",
+            "type: duckdb.sql",
+            "description: Player dimension.",
+            "materialization:",
+            "  type: table",
+            "columns:",
+            "  - name: player_id",
+            "    type: varchar",
+        ]
+
+    def test_new_description_precedes_an_existing_connection(self, tmp_path):
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "connection: test_duckdb\n"
+            "materialization:\n"
+            "  type: table\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"description": "Player dimension."})
+
+        assert self._lines(path)[:4] == [
+            "name: core.dim__player",
+            "type: duckdb.sql",
+            "description: Player dimension.",
+            "connection: test_duckdb",
+        ]
+
+    def test_new_tags_go_above_materialization(self, tmp_path):
+        path = tmp_path / "dim__player.sql"
+        path.write_text(self.BLOCK)
+
+        rewrite_bruin_block(
+            str(path),
+            updates={"description": "Player dimension.", "tags": ["core", "entity"]},
+        )
+
+        assert self._lines(path)[:6] == [
+            "name: core.dim__player",
+            "type: duckdb.sql",
+            "description: Player dimension.",
+            "tags:",
+            "  - core",
+            "  - entity",
+        ]
+
+    def test_new_meta_goes_above_materialization(self, tmp_path):
+        path = tmp_path / "dim__player.sql"
+        path.write_text(self.BLOCK)
+
+        rewrite_bruin_block(str(path), updates={"meta": {"owner_team": "growth"}})
+
+        assert self._lines(path)[2:4] == ["meta:", "  owner_team: growth"]
+
+    def test_existing_key_keeps_its_position(self, tmp_path):
+        """A hand-placed description stays put; only new keys are inserted."""
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "materialization:\n"
+            "  type: table\n"
+            "description: Player dimension.\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: varchar\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"description": "Updated dimension."})
+
+        assert self._lines(path)[4:6] == [
+            "description: Updated dimension.",
+            "columns:",
+        ]
+
+    def test_asset_yml_new_description_goes_into_the_header(self, tmp_path):
+        path = tmp_path / "raw__events.asset.yml"
+        path.write_text(
+            "name: raw.raw__events\n"
+            "type: ingestr\n"
+            "parameters:\n"
+            "  source_connection: segment\n"
+            "columns:\n"
+            "  - name: event_id\n"
+            "    type: varchar\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"description": "Raw events."})
+
+        assert path.read_text().splitlines()[:3] == [
+            "name: raw.raw__events",
+            "type: ingestr",
+            "description: Raw events.",
+        ]
+
+    def test_header_keys_land_in_scaffold_order(self, tmp_path):
+        """The push path must agree with `_scaffold_asset`'s header layout."""
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "materialization:\n"
+            "  type: table\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(
+            str(path),
+            updates={
+                "description": "Player dimension.",
+                "tags": ["core"],
+                "columns": [{"name": "player_id", "type": "varchar"}],
+            },
+        )
+
+        assert _extract_bruin_block(path.read_text()) == (
+            "name: core.dim__player\n"
+            "type: duckdb.sql\n"
+            "description: Player dimension.\n"
+            "tags:\n"
+            "  - core\n"
+            "materialization:\n"
+            "  type: table\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: varchar"
+        )
+
+
 class TestRewriteNoBruinBlock:
     """Test error handling when no @bruin block exists."""
 

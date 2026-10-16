@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Bruin push writes a new asset description into the header (#149)**: pushing
+  a description onto an asset that had none assigned the key onto the
+  round-trip mapping, and ruamel appends a key it has not seen before, so the
+  description - and a newly added `tags` - landed at the bottom of the `@bruin`
+  block, below `columns`. That is a one-off diff on the next push and out of
+  step with both Bruin's own `bruin format` and Trellis' scaffold path, which
+  keep `description` in the top header. New `description`, `tags` and `meta`
+  keys are now inserted at their Bruin field position (`name, type, enabled,
+  description, start_date, connection, tags, ...`) via `CommentedMap.insert`;
+  a key the block already carries keeps its position and comments, and an
+  untouched asset stays byte-identical. Applies to inline `@bruin` blocks and
+  standalone `*.asset.yml` assets alike.
+
 ## [0.24.2] - 2026-10-16
 
 ### Fixed

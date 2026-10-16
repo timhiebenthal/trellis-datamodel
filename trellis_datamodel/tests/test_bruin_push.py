@@ -134,6 +134,21 @@ class TestDescription:
 
         assert _block(customer_path)["description"] == "One row per customer."
 
+    def test_first_description_lands_in_the_header(self, adapter, customer_path):
+        """A description pushed onto an asset without one must not sink below
+        `columns` (#149)."""
+        content = open(customer_path).read()
+        with open(customer_path, "w") as f:
+            f.write(content.replace("description: One row per customer.\n", "", 1))
+
+        adapter.sync_relationships([_customer(description="Every customer.")], [])
+
+        lines = open(customer_path).read().splitlines()
+        description_at = lines.index("description: Every customer.")
+        assert description_at < lines.index("connection: test_duckdb")
+        assert description_at < lines.index("materialization:")
+        assert description_at < lines.index("columns:")
+
 
 class TestDraftedColumns:
     def test_drafted_field_missing_from_the_asset_is_added(
