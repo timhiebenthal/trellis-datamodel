@@ -210,6 +210,7 @@ export interface EntityWizardData {
 
 export interface ConfigInfo {
     config_path?: string | null;
+    trellis_version?: string;
     framework: string;
     project_path: string;
     project_path_exists: boolean;

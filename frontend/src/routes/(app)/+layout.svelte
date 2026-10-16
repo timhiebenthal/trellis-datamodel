@@ -1224,7 +1224,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     </header>
 
     <main class="flex-1 flex overflow-hidden relative">
-        <Sidebar width={280} {loading} />
+        <Sidebar width={280} {loading} trellisVersion={configInfo?.trellis_version ?? null} />
         {@render children()}
     </main>
 

@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 import os
 
+from trellis_datamodel import __version__
 from trellis_datamodel import config as cfg
 from trellis_datamodel.config import find_config_file
 from trellis_datamodel.adapters import get_adapter
@@ -102,6 +103,7 @@ async def get_config_info():
 
     return {
         "config_path": config_path,
+        "trellis_version": __version__,
         "framework": status["framework"],
         "project_path": status["project_path"],
         "project_path_exists": status["project_path_exists"],
