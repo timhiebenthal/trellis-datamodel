@@ -792,3 +792,66 @@ class TestEntityModelGeneration:
         assert "fact" in entity_types
         assert "dimension" in entity_types
         assert "entity" not in entity_types
+
+
+class TestModelBinding:
+    """Generated entities bind to an existing model when the match is unambiguous.
+
+    Regression: regeneration from a business event created unbound entity twins
+    (no model_ref) even though matching pipeline assets existed. Unbound
+    entities cannot inherit a folder, which broke canvas grouping.
+    """
+
+    MODELS = [
+        {"unique_id": "core.dim__player", "name": "dim__player"},
+        {"unique_id": "core.dim__team", "name": "dim__team"},
+        {"unique_id": "core.dim__game", "name": "dim__game"},
+        {"unique_id": "core.dim__action", "name": "dim__action"},
+        {"unique_id": "core.fact__play_by_plays", "name": "fact__play_by_plays"},
+    ]
+
+    def _entity(self, id, label=None, **extra):
+        entity = {"id": id, "label": label or id.replace("_", " ").title(), "entity_type": "dimension"}
+        entity.update(extra)
+        return entity
+
+    def test_binds_by_normalized_short_name(self):
+        entities = [
+            self._entity("player"),
+            self._entity("team"),
+            self._entity("play_by_plays"),
+        ]
+        bound = entity_generator.bind_entities_to_models(entities, self.MODELS)
+        by_id = {e["id"]: e for e in bound}
+        assert by_id["player"]["model_ref"] == "core.dim__player"
+        assert by_id["team"]["model_ref"] == "core.dim__team"
+        assert by_id["play_by_plays"]["model_ref"] == "core.fact__play_by_plays"
+
+    def test_binds_by_label_when_id_does_not_match(self):
+        entities = [self._entity("new_player_2", label="Player")]
+        bound = entity_generator.bind_entities_to_models(entities, self.MODELS)
+        assert bound[0]["model_ref"] == "core.dim__player"
+
+    def test_skips_ambiguous_matches(self):
+        models = [
+            {"unique_id": "core.dim__player", "name": "dim__player"},
+            {"unique_id": "core.stg__player", "name": "stg__player"},
+        ]
+        entities = [self._entity("player")]
+        bound = entity_generator.bind_entities_to_models(entities, models)
+        assert "model_ref" not in bound[0]
+
+    def test_keeps_existing_binding(self):
+        entities = [self._entity("player", model_ref="core.dim__player")]
+        bound = entity_generator.bind_entities_to_models(entities, self.MODELS)
+        assert bound[0]["model_ref"] == "core.dim__player"
+
+    def test_no_models_leaves_entities_unbound(self):
+        entities = [self._entity("player")]
+        bound = entity_generator.bind_entities_to_models(entities, [])
+        assert "model_ref" not in bound[0]
+
+    def test_original_list_not_mutated(self):
+        entities = [self._entity("player")]
+        entity_generator.bind_entities_to_models(entities, self.MODELS)
+        assert "model_ref" not in entities[0]

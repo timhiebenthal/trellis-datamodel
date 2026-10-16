@@ -45,6 +45,7 @@ import {
     mergeRelationshipIntoEdges,
     formatModelNameForLabel,
     getLabelPrefixesFromConfig,
+    nextExpandCollapseState,
 } from "$lib/utils";
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
@@ -569,7 +570,10 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     }
 
     function toggleAllEntities() {
-        allExpanded = !allExpanded;
+        // Derive the action from what is actually rendered, not from the
+        // persisted toggle flag: if the flag and the canvas ever desync, a
+        // blind toggle would appear to do nothing.
+        allExpanded = nextExpandCollapseState($nodes);
         applyExpandCollapseState(allExpanded);
         // Persist to localStorage
         localStorage.setItem(STORAGE_KEY, String(allExpanded));

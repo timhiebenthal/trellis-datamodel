@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.4b1] - 2026-10-16
+
+### Fixed
+- **Business-event generation binds matching models**: entities generated from
+  a business event now bind to an existing pipeline asset when the match is
+  unambiguous (entity id or label vs asset short name). Unbound entities could
+  not inherit a folder, so folder groups hugged a single bound child while the
+  remaining entities floated outside the group.
+- **Entity header clicks toggle collapse outside the label**: the header label
+  input stretched across the whole header and swallowed clicks, so only the
+  chevron sliver toggled an entity. The input now sizes to its content and the
+  free header area toggles.
+- **Canvas fits the viewport after boot**: the viewport stayed pinned at the
+  world origin, so content saved at negative or wide coordinates rendered
+  offscreen and the canvas filter bar covered whatever sat at the origin
+  (typically the folder group header).
+- **Expand-all acts on the rendered state**: the navbar toggle derives expand
+  vs collapse from the entities on the canvas instead of a persisted flag that
+  could desync, so a click can no longer no-op.
+
 ## [0.24.3] - 2026-10-16
 
 ### Fixed

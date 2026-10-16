@@ -1114,7 +1114,8 @@
                 ondblclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => e.stopPropagation()}
                 onkeyup={(e) => e.stopPropagation()}
-                class="font-bold inline-input bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm"
+                class="font-bold inline-input bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm min-w-0 max-w-full flex-shrink"
+                style={`width: ${Math.max((data.label?.length ?? 0) + 2, 8)}ch`}
                 placeholder="Entity Name"
             />
         </div>

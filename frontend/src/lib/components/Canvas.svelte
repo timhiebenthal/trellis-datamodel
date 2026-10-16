@@ -35,6 +35,7 @@
     import EntityCreationWizard from "./EntityCreationWizard.svelte";
     import EventFilterBanner from "./EventFilterBanner.svelte";
     import CanvasFilterBar from "./CanvasFilterBar.svelte";
+    import CanvasFitView from "./CanvasFitView.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
     import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
@@ -603,6 +604,8 @@
         <Controls />
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <MiniMap />
+
+        <CanvasFitView active={!deferHeavyCanvasContent} />
 
         <div class="absolute top-4 right-4 z-10 shadow-lg">
             <button
