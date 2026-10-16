@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The canvas entry spinner is back and the entry load is ~7x faster**: the
+  canvas route rendered a lone placeholder entity box in the top-left after
+  core data published, and deferred the canvas bundle behind a fixed 2000 ms
+  timer. The bundle now loads in parallel with the boot requests and the shared
+  loading spinner stays up until the canvas is mounted. On the production build
+  the canvas appears in ~0.3s instead of ~2.3s, with no placeholder box.
+
 ## [0.24.4b3] - 2026-10-16
 
 ### Added
