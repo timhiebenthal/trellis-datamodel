@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.3] - 2026-10-16
+
 ### Fixed
 - **Bruin push writes a new asset description into the header (#149)**: pushing
   a description onto an asset that had none assigned the key onto the
