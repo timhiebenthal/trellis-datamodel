@@ -1,4 +1,10 @@
-.PHONY: setup backend frontend dev prod help build-package sync-cursor-commands
+.PHONY: setup backend frontend dev prod preview help build-package sync-cursor-commands
+
+# Used by `make preview`: the project to serve and the port to serve it on.
+PROJECT ?=
+PORT ?= 8089
+CONFIG ?=
+WHEEL = $(lastword $(sort $(wildcard $(CURDIR)/dist/trellis_datamodel-*.whl)))
 
 help:
 	@echo "Trellis Data Makefile"
@@ -11,6 +17,7 @@ help:
 	@echo "  make dev          - Start both backend and frontend (requires two terminals)"
 	@echo "  make prod         - Build frontend and run production backend server"
 	@echo "  make build-package - Build frontend and package for distribution"
+	@echo "  make preview       - Build the wheel and serve another local project (PROJECT=path [PORT=8089])"
 	@echo "  make test-smoke    - Quick smoke test (catches 500 errors, runtime crashes)"
 	@echo "  make test-unit     - Run unit tests"
 	@echo "  make test-e2e      - Run E2E tests (auto-starts backend with test data)"
@@ -64,6 +71,20 @@ build-package:
 	@echo "Building Python package..."
 	uv build
 	@echo "Package built! Find wheels in dist/"
+
+# Preview the local build inside another project on this machine.
+# Builds the wheel, installs it into that project's env, and serves it there.
+# Usage: make preview PROJECT=../nba-data [PORT=8089] [CONFIG=trellis.yml]
+preview: build-package
+	@if [ -z "$(PROJECT)" ]; then \
+		echo "Usage: make preview PROJECT=/path/to/project [PORT=8089]"; \
+		exit 1; \
+	fi
+	@if [ -z "$(WHEEL)" ]; then echo "No wheel found in dist/"; exit 1; fi
+	@echo "Installing $(WHEEL) into $(PROJECT)..."
+	cd "$(PROJECT)" && uv pip install --reinstall "$(WHEEL)"
+	@echo "Serving $(PROJECT) at http://localhost:$(PORT)"
+	cd "$(PROJECT)" && uv run --no-sync trellis run -p $(PORT) $(if $(CONFIG),-c $(CONFIG))
 
 publish:
 	@echo "Publishing package to PyPI..."

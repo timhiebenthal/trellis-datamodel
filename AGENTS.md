@@ -9,6 +9,7 @@
 - `make setup` — `uv sync` + `npm install`.
 - `make backend` — FastAPI :8089. `make frontend` — Vite :5173. `make dev` prints both. `trellis run -p 8089` bundled app.
 - `make build-package` — frontend build → `trellis_datamodel/static/` → wheels in `dist/`.
+- `make preview PROJECT=/path/to/project` — build the wheel, install it into that project's env (`uv pip install --reinstall`), and serve it (`uv run --no-sync trellis run`). Default way to preview a change against a real project on this machine.
 - Backend: `uv run pytest`. Frontend: `cd frontend && npm run test:smoke|check|test:unit|test:e2e`, or `npm run test` for all. Make equivalents: `make test-smoke|test-unit|test-e2e|test-all`.
 
 ## Coding Style
