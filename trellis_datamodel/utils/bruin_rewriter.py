@@ -36,6 +36,55 @@ def _get_pattern(file_path: str) -> re.Pattern:
     return SQL_BRUIN_PATTERN
 
 
+# Bruin's own `Asset` struct orders the block's fields (bruin-data/bruin
+# `pkg/pipeline/pipeline.go`) and its writer groups `description` in the top
+# header, right after `name`/`type`. ruamel appends a key it has not seen
+# before, so a freshly pushed `description` used to land below `columns`. This
+# is the order new keys are placed in; keys the block already carries keep their
+# own position and comments.
+_BRUIN_KEY_ORDER = (
+    "name",
+    "type",
+    "enabled",
+    "description",
+    "start_date",
+    "connection",
+    "tags",
+    "domains",
+    "meta",
+    "materialization",
+    "depends",
+    "columns",
+    "custom_checks",
+    "routing",
+    "secrets",
+    "parameters",
+    "hooks",
+)
+_KEY_RANK = {key: index for index, key in enumerate(_BRUIN_KEY_ORDER)}
+
+
+def _set_key(parsed: CommentedMap, key: str, value: Any) -> None:
+    """Assign *key* to *parsed*, placing a new key in Bruin's field order.
+
+    An existing key keeps its position - and any comment on it - because
+    assignment never reorders. A new key is inserted at the index of the first
+    existing key that comes after it, so a pushed description sits in the header
+    instead of being appended below ``columns``.
+    """
+    if key in parsed:
+        parsed[key] = value
+        return
+
+    rank = _KEY_RANK.get(key, len(_BRUIN_KEY_ORDER))
+    position = len(parsed)
+    for index, existing in enumerate(parsed):
+        if _KEY_RANK.get(existing, len(_BRUIN_KEY_ORDER)) > rank:
+            position = index
+            break
+    parsed.insert(position, key, value)
+
+
 def _yaml() -> YAML:
     """A round-trip YAML instance configured to match Bruin's block style."""
     yaml_rt = YAML()
@@ -116,7 +165,8 @@ def _replace_meta(parsed: CommentedMap, meta: Dict[str, Any]) -> None:
         return
     current = parsed.get("meta")
     if not isinstance(current, dict):
-        current = parsed["meta"] = CommentedMap()
+        current = CommentedMap()
+        _set_key(parsed, "meta", current)
     for key in [key for key in current if key not in meta]:
         del current[key]
     for key, value in meta.items():
@@ -145,10 +195,10 @@ def _apply_updates(yaml_rt: YAML, yaml_str: str, updates: dict) -> str:
         parsed = CommentedMap()
 
     if updates.get("description") is not None:
-        parsed["description"] = updates["description"]
+        _set_key(parsed, "description", updates["description"])
 
     if updates.get("tags") is not None:
-        parsed["tags"] = updates["tags"]
+        _set_key(parsed, "tags", updates["tags"])
 
     if updates.get("columns") is not None:
         parsed["columns"] = _normalize_columns(updates["columns"])
