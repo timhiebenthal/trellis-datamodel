@@ -49,7 +49,7 @@ import {
 import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
 import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
-import { isFeatureAvailable } from "$lib/utils/framework-display";
+import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-display";
     import { applyDagreLayout } from "$lib/layout";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import ConfigInfoModal from "$lib/components/ConfigInfoModal.svelte";
@@ -95,6 +95,10 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
     let needsSync = $state(false);
     let saving = $state(false);
     let bootGraphIndex: BootGraphIndex | null = null;
+
+    // Framework-aware wording for the pull/push controls, sourced from the same
+    // branding module the sidebar header uses.
+    let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
 
     // Update derived values once autoSaveService is initialized
     $effect(() => {
@@ -1180,10 +1184,10 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 onclick={handleInferFromDbt}
                 disabled={syncing || loading}
                 class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
-                title="Import relationship tests from dbt yml files"
+                title={frameworkCopy.pullTooltip}
             >
                 <Icon icon="lucide:download" class="w-3.5 h-3.5" />
-                Pull from dbt
+                {frameworkCopy.pullLabel}
             </button>
 
             <button
@@ -1195,16 +1199,16 @@ import { isFeatureAvailable } from "$lib/utils/framework-display";
                 class:bg-amber-600={needsSync}
                 class:hover:bg-amber-700={needsSync}
                 class:animate-pulse={needsSync}
-                title={needsSync 
-                    ? "⚠️ Changes in data model need to be pushed to dbt schema files" 
-                    : "Sync entity & field-definitions and relationship-tests to dbt schema.yml files"}
+                title={needsSync
+                    ? frameworkCopy.pushDirtyTooltip
+                    : frameworkCopy.pushCleanTooltip}
             >
                 {#if syncing}
                     <Icon icon="lucide:loader-2" class="w-3.5 h-3.5 animate-spin" />
                 {:else}
                     <Icon icon="lucide:upload" class="w-3.5 h-3.5" />
                 {/if}
-                Push to dbt
+                {frameworkCopy.pushLabel}
                 {#if needsSync && !syncing}
                     <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>

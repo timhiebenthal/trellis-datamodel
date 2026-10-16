@@ -21,6 +21,7 @@
         closeSourceEditorModal,
         openDeleteConfirmModal,
         closeDeleteConfirmModal,
+        activeFramework,
     } from "$lib/stores";
     import type { ModelInfo, DraftedField, EntityData, EntityRole } from "$lib/types";
     import {
@@ -42,6 +43,7 @@
     import { mergeFields } from "$lib/utils/merged-fields";
     import type { MergedField } from "$lib/utils/merged-fields";
     import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
+    import { getFrameworkCopy } from "$lib/utils/framework-display";
     import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";
     import { goto } from "$app/navigation";
@@ -104,6 +106,7 @@
     let activeModelId = $derived(allBoundModels[activeModelIndex] || boundModelName);
     let isBound = $derived(!!boundModelName);
     let isCollapsed = $derived(data.collapsed ?? false);
+    let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
     const DEFAULT_WIDTH = 320;
     const DEFAULT_PANEL_HEIGHT = 200;
     const MIN_WIDTH = 280;
@@ -1144,7 +1147,7 @@
             {:else}
                 <div
                     class="w-2 h-2 rounded-full bg-amber-500"
-                    title="Draft mode (not bound to dbt model)"
+                    title={frameworkCopy.unboundHint}
                 ></div>
                 {#if exposuresEnabled && hasExposuresData}
                     <button
@@ -1861,7 +1864,7 @@
                         <div
                             class="mt-2 text-[10px] text-gray-400 text-center border border-dashed border-gray-300 rounded p-3 bg-gray-50 pointer-events-none"
                         >
-                            Drag dbt model here
+                            {frameworkCopy.emptyBindingHint}
                         </div>
                     {/if}
                 {/if}
