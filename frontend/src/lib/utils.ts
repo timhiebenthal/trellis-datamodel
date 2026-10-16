@@ -5,7 +5,7 @@ import type {
     ModelSchema,
     ModelSchemaColumn,
 } from './types';
-import type { Edge } from '@xyflow/svelte';
+import type { Edge, Node } from '@xyflow/svelte';
 
 /**
  * Calculate parallel offset for multiple edges between the same pair of nodes.
@@ -90,15 +90,30 @@ export function toTitleCase(text: string): string {
 }
 
 /**
+ * Decide the next expand/collapse state for the navbar toggle.
+ *
+ * The decision is derived from what is actually rendered, not from the
+ * persisted toggle flag: if the flag and the canvas ever desync (the flag
+ * starts as `true` before localStorage loads, and boot may re-collapse), a
+ * blind toggle would no-op. Anything collapsed means the next action is
+ * "expand"; otherwise "collapse".
+ */
+export function nextExpandCollapseState(nodes: Node[]): boolean {
+    const entityNodes = nodes.filter((n) => n.type === 'entity');
+    if (entityNodes.length === 0) return true;
+    return entityNodes.some((n) => (n.data as { collapsed?: boolean })?.collapsed ?? false);
+}
+
+/**
  * Strip configured entity prefixes from a label.
- * 
+ *
  * Uses ENTITY_PREFIXES from config-info API response.
  * Strips the first matching prefix from the label while preserving original casing of the remaining text.
- * 
+ *
  * @param label - The label to strip prefixes from (e.g., "tbl_customer")
  * @param prefixes - Array of prefixes to strip (e.g., ["tbl_", "entity_"])
  * @returns Label with first matching prefix removed (e.g., "customer")
- * 
+ *
  * @example
  * stripEntityPrefixes("tbl_customer", ["tbl_"]) // "customer"
  * stripEntityPrefixes("TBL_CUSTOMER", ["tbl_"]) // "CUSTOMER" (case-insensitive match, original casing preserved)
