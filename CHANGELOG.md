@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.4b4] - 2026-10-16
+
 ### Fixed
 - **The canvas entry spinner is back and the entry load is ~7x faster**: the
   canvas route rendered a lone placeholder entity box in the top-left after
