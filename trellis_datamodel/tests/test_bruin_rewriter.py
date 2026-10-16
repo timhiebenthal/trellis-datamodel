@@ -641,3 +641,102 @@ class TestRewriteYamlAsset:
         asset = parse_bruin_block(str(path))
         assert asset.name == "raw.raw__events"
         assert asset.description == "Raw events."
+
+
+class TestRewriteQuotingRoundTrip:
+    """A rewrite must not change a value, nor churn quoting it did not edit (#148).
+
+    The writer and the reader once used different YAML resolutions: ruamel
+    (YAML 1.2) left strings like ``yes`` unquoted, and PyYAML (YAML 1.1) read
+    them back as booleans. These pin both halves of the fix.
+    """
+
+    # Descriptions that a YAML 1.1 reader resolves to a boolean or a base-60
+    # number unless they are quoted. `1.0`, `2024-01-01` and `a: b` were already
+    # protected by ruamel; `yes`/`on` and `1:30` were the silent holes.
+    AMBIGUOUS = ["yes", "no", "on", "off", "1.0", "2024-01-01", "a: b", "1:30"]
+
+    def test_ambiguous_values_survive_a_columns_rewrite(self, tmp_path):
+        """A pushed value must re-read as the same string, not a coerced type."""
+        columns = "\n".join(
+            f'  - name: c{i}\n    type: varchar\n    description: "{value}"'
+            for i, value in enumerate(self.AMBIGUOUS)
+        )
+        file_path = tmp_path / "t.sql"
+        file_path.write_text(
+            "/* @bruin\nname: core.t\ncolumns:\n" + columns + "\n@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        # Force the whole columns list through the rewriter, as a push onto the
+        # entity does whenever any drafted field changes.
+        asset = parse_bruin_block(str(file_path))
+        rewrite_bruin_block(
+            str(file_path),
+            updates={"columns": [dict(c) for c in asset.columns]},
+        )
+
+        # `_parsed_block` reads with yaml.safe_load - PyYAML, the YAML 1.1
+        # reader that used to turn "yes" into True and 1:30 into 90.
+        reread = _parsed_block(file_path.read_text())
+        assert [c["description"] for c in reread["columns"]] == self.AMBIGUOUS
+
+    def test_untouched_columns_keep_their_quote_style(self, tmp_path):
+        """Quoting on columns the edit did not touch must not change."""
+        file_path = tmp_path / "dim__game.sql"
+        file_path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__game\n"
+            "columns:\n"
+            "  - name: game_id\n"
+            "    type: varchar\n"
+            '    description: "Game ID"\n'
+            "  - name: game_name\n"
+            "    type: varchar\n"
+            "    description: 'Game name'\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        # Add one drafted column; the two existing ones are carried through
+        # unchanged and their quoting should come out byte-identical.
+        asset = parse_bruin_block(str(file_path))
+        rewrite_bruin_block(
+            str(file_path),
+            updates={
+                "columns": [dict(c) for c in asset.columns]
+                + [{"name": "release_date", "type": "date", "description": "Release"}]
+            },
+        )
+
+        updated = file_path.read_text()
+        assert 'description: "Game ID"' in updated
+        assert "description: 'Game name'" in updated
+
+    def test_pushed_plain_value_that_looks_like_a_bool_is_quoted(self, tmp_path):
+        """A value from the JSON API carries no quote style; it must be quoted."""
+        file_path = tmp_path / "t.sql"
+        file_path.write_text(
+            "/* @bruin\nname: core.t\ncolumns:\n  - name: c1\n    type: varchar\n"
+            "@bruin */\nSELECT 1;\n"
+        )
+
+        rewrite_bruin_block(
+            str(file_path),
+            updates={
+                "columns": [
+                    {"name": "c1", "data_type": "varchar", "description": "yes"}
+                ]
+            },
+        )
+
+        assert _parsed_block(file_path.read_text())["columns"][0]["description"] == "yes"
+
+    def test_pushed_asset_description_that_looks_like_a_bool_is_quoted(self, tmp_path):
+        """Asset-level fields are quoted by the same rule as columns."""
+        file_path = tmp_path / "t.sql"
+        file_path.write_text("/* @bruin\nname: core.t\n@bruin */\nSELECT 1;\n")
+
+        rewrite_bruin_block(str(file_path), updates={"description": "on"})
+
+        assert _parsed_block(file_path.read_text())["description"] == "on"

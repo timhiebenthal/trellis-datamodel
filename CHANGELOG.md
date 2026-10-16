@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a key the block already carries keeps its position and comments, and an
   untouched asset stays byte-identical. Applies to inline `@bruin` blocks and
   standalone `*.asset.yml` assets alike.
+- **A Bruin push no longer strips column quotes or silently coerces values
+  (#148)**: rewriting the `columns:` list routed every description through the
+  writer's YAML 1.2 resolver, which leaves a plain `yes`/`no`/`on`/`off` or a
+  base-60 number like `1:30` unquoted, while the reader's PyYAML 1.1 resolver
+  reads those back as booleans and integers. A `description: "yes"` could return
+  as `true`, and every quoted description was de-quoted into a noisy diff. The
+  writer now quotes any plain string PyYAML's resolver would read as a
+  non-string, and the reader shares the writer's quote-preserving ruamel config,
+  so columns a push did not touch keep their exact quoting and every value
+  survives the round trip. Unquoted `yes`/`on` now read as strings, matching
+  Bruin's own `yaml.v3` reader.
 
 ## [0.24.2] - 2026-10-16
 

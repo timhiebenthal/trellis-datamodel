@@ -202,6 +202,41 @@ class TestParseParameters:
         assert parse_bruin_block(str(file_path)).parameters == {}
 
 
+class TestParseBruinBlockYamlSemantics:
+    """The parser reads YAML 1.2, matching Bruin's own yaml.v3 reader (#148).
+
+    The old PyYAML reader resolved ``yes``/``on`` to booleans and ``1:30`` to a
+    number; ruamel treats them as strings, so a quoted description survives a
+    round trip through Trellis unchanged.
+    """
+
+    def test_ambiguous_scalars_read_as_strings(self, tmp_path):
+        file_path = tmp_path / "t.sql"
+        file_path.write_text(
+            "/* @bruin\n"
+            "name: core.t\n"
+            "columns:\n"
+            "  - name: quoted\n"
+            "    type: varchar\n"
+            '    description: "yes"\n'
+            "  - name: plain\n"
+            "    type: varchar\n"
+            "    description: yes\n"
+            "  - name: base60\n"
+            "    type: varchar\n"
+            '    description: "1:30"\n'
+            "@bruin */\n"
+        )
+
+        columns = {
+            c["name"]: c["description"]
+            for c in parse_bruin_block(str(file_path)).columns
+        }
+
+        assert columns == {"quoted": "yes", "plain": "yes", "base60": "1:30"}
+        assert all(isinstance(value, str) for value in columns.values())
+
+
 class TestScanPipelineAssets:
     """Tests for scan_pipeline_assets()."""
 

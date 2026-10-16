@@ -12,7 +12,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-import yaml
+from ruamel.yaml import YAMLError
+
+from trellis_datamodel.utils.bruin_yaml import bruin_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +139,8 @@ def parse_bruin_block(file_path: str) -> Optional[BruinAsset]:
         return None
 
     try:
-        data = yaml.safe_load(yaml_str)
-    except yaml.YAMLError as e:
+        data = bruin_yaml().load(yaml_str)
+    except YAMLError as e:
         logger.warning("Malformed YAML in Bruin asset %s: %s", file_path, e)
         return None
 

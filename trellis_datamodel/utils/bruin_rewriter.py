@@ -16,6 +16,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from trellis_datamodel.utils.bruin_parser import is_yaml_asset
+from trellis_datamodel.utils.bruin_yaml import bruin_yaml
 
 
 # Regex patterns matching the parser's conventions
@@ -86,14 +87,12 @@ def _set_key(parsed: CommentedMap, key: str, value: Any) -> None:
 
 
 def _yaml() -> YAML:
-    """A round-trip YAML instance configured to match Bruin's block style."""
-    yaml_rt = YAML()
-    yaml_rt.preserve_quotes = True
-    yaml_rt.default_flow_style = False
-    yaml_rt.width = 4096
-    yaml_rt.indent(mapping=2, sequence=4, offset=2)
-    yaml_rt.indentless_sequences = False
-    return yaml_rt
+    """A round-trip YAML instance configured to match Bruin's block style.
+
+    Shares its configuration (and its quoting rules) with the parser so the two
+    cannot drift; see :mod:`trellis_datamodel.utils.bruin_yaml`.
+    """
+    return bruin_yaml()
 
 
 def _dump_to_str(yaml_rt: YAML, data: Any) -> str:
