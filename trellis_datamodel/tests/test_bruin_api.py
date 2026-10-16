@@ -133,6 +133,13 @@ class TestConfigInfoEndpoint:
             os.path.abspath(os.path.join(bruin_pipeline_copy, "assets"))
         ]
 
+    def test_advertises_trellis_version(self, bruin_app):
+        """The sidebar footer shows the running version from this field."""
+        version = bruin_app.get("/api/config-info").json()["trellis_version"]
+
+        assert isinstance(version, str)
+        assert version
+
 
 class TestLineageEndpoint:
     def test_returns_lineage_for_a_bruin_asset(self, bruin_app):

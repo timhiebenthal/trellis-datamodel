@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Sidebar footer shows the running version**: `/api/config-info` now carries
+  `trellis_version`, and the canvas sidebar pins a muted `trellis v<version>`
+  row to its bottom edge, so the running build is visible without opening the
+  config page.
+
 ## [0.24.4b1] - 2026-10-16
 
 ### Fixed

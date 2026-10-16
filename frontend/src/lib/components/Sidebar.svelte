@@ -20,9 +20,10 @@
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
 
-    const { width = 260, loading = false } = $props<{
+    const { width = 260, loading = false, trellisVersion = null } = $props<{
         width?: number;
         loading?: boolean;
+        trellisVersion?: string | null;
     }>();
 
     let searchTerm = $state("");
@@ -614,5 +615,15 @@
                 {/if}
             {/if}
         </div>
+
+        {#if trellisVersion}
+            <div
+                class="mt-auto pt-2 flex items-center gap-1.5 text-[10px] text-gray-400 select-none"
+                title="trellis-datamodel version"
+            >
+                <Icon icon="lucide:tag" class="w-3 h-3 flex-shrink-0" />
+                <span class="truncate">trellis v{trellisVersion}</span>
+            </div>
+        {/if}
     {/if}
 </aside>
