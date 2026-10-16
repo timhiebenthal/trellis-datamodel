@@ -1,10 +1,11 @@
 <script lang="ts">
-    import { type NodeProps } from "@xyflow/svelte";
+    import { useSvelteFlow, type NodeProps } from "@xyflow/svelte";
     import { nodes } from "$lib/stores";
     import Icon from "@iconify/svelte";
 
     let { data, id, selected }: NodeProps = $props();
 
+    const { updateNodeData } = useSvelteFlow();
     let isCollapsed = $derived(data.collapsed ?? false);
 
     // Resize constants
@@ -24,13 +25,8 @@
         event.stopPropagation();
         event.preventDefault();
 
-        // `$nodes` is the source of truth: Canvas re-derives its bound
-        // `displayNodes` from `$nodes` on every change, so a size written to the
-        // display store alone is reverted before the reverse sync can copy it back
-        // (#140). Mark as manually resized so the auto-fit pass leaves it alone.
-        $nodes = $nodes.map(n => n.id === id
-            ? { ...n, data: { ...n.data, manuallyResized: true } }
-            : n);
+        // Mark as manually resized to prevent auto-resize from overriding
+        updateNodeData(id, { manuallyResized: true });
 
         const startX = event.clientX;
         const startY = event.clientY;
@@ -38,41 +34,24 @@
         const initialHeight = nodeHeight;
 
         function onMove(moveEvent: PointerEvent) {
-            let next: number;
             if (type === "width") {
                 const delta = moveEvent.clientX - startX;
-                next = Math.min(
+                const next = Math.min(
                     MAX_WIDTH,
                     Math.max(MIN_WIDTH, initialWidth + delta)
                 );
+                updateNodeData(id, { width: next, manuallyResized: true });
             } else {
                 const delta = moveEvent.clientY - startY;
-                next = Math.min(
+                const next = Math.min(
                     MAX_HEIGHT,
                     Math.max(MIN_HEIGHT, initialHeight + delta)
                 );
+                updateNodeData(id, { height: next, manuallyResized: true });
             }
 
-            // Write the new size into `$nodes` in the same pass as the child
-            // touches, otherwise the re-derivation drops it (#140).
-            $nodes = $nodes.map(n => {
-                if (n.id === id) {
-                    return {
-                        ...n,
-                        data: {
-                            ...n.data,
-                            ...(type === "width" ? { width: next } : { height: next }),
-                            manuallyResized: true,
-                        },
-                    };
-                }
-                // Force nodes store update to trigger edge recalculation
-                // Touch child nodes to ensure edges re-render
-                if (n.parentId === id) {
-                    return { ...n };
-                }
-                return n;
-            });
+            // Force nodes store update to trigger edge recalculation
+            $nodes = $nodes.map(n => n.parentId === id ? { ...n } : n);
         }
 
         function onUp() {
@@ -163,12 +142,12 @@
             <span class="px-2 py-1 rounded text-xs font-medium" style="background-color: {domainColor}60; color: {domainColor};">{childCount}</span>
         </div>
         <div
-            class="width-resize-handle nodrag nopan"
+            class="width-resize-handle"
             onpointerdown={(event) => startDimensionResize(event, "width")}
             title="Drag to resize width"
         ></div>
         <div
-            class="height-resize-handle nodrag nopan"
+            class="height-resize-handle"
             onpointerdown={(event) => startDimensionResize(event, "height")}
             title="Drag to resize height"
         ></div>

@@ -18,10 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   copy it back. One value living in two stores, with the derived one winning.
   The new size and the `manuallyResized` flag are now written into `nodes` in a
   single pass, which also keeps the auto-fit-children pass from snapping the
-  group back to fit its children. The same fix is applied to
-  `DomainZoneNode.svelte`, which shares the pattern (that component is not
-  registered as a node type yet). Both sets of resize handles also carry
-  `nodrag`/`nopan`, so a handle press can never arm a node drag.
+  group back to fit its children. The resize handles on the group and entity
+  nodes also carry `nodrag`/`nopan`, so a handle press can never arm a node drag.
 - **Opening the canvas no longer unbinds entities (#141)**: a save payload that
   omits `model_ref` is now "no opinion" instead of "unbind". An auto-save racing
   a concurrent session (a second window or a restart) used to post entities

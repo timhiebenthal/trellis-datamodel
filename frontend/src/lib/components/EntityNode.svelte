@@ -1871,14 +1871,14 @@
 
 
     <div
-        class="width-resize-handle"
+        class="width-resize-handle nodrag nopan"
         onpointerdown={(event) => startDimensionResize(event, "width")}
         title="Drag to resize width"
     ></div>
 
     {#if $viewMode === "logical"}
         <div
-            class="height-resize-handle"
+            class="height-resize-handle nodrag nopan"
             onpointerdown={(event) => startDimensionResize(event, "height")}
             title="Drag to show more columns"
         ></div>
