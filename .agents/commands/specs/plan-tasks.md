@@ -130,7 +130,7 @@ Brief description
 
 ## Guidelines
 
-- Reference `.cursor/project.md`
+- Reference `.agents/project.md`
 - Make tasks concrete
 - Include file/symbol when reduces ambiguity
 - Include testing tasks

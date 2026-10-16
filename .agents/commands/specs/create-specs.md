@@ -83,7 +83,7 @@ What feature does, why needed.
 Fill using:
 - `/spar-idea` output
 - User input
-- `.cursor/project.md` (tech stack)
+- `.agents/project.md` (tech stack)
 - Codebase patterns
 
 ## Step 4: Save Specification
@@ -113,7 +113,7 @@ NEXT STEP → Run `/plan-tasks`.
 ## Guidelines
 
 - Be specific, not prescriptive
-- Reference `.cursor/project.md`
+- Reference `.agents/project.md`
 - Follow codebase patterns
 - Keep focused — avoid scope creep
 - Make requirements testable

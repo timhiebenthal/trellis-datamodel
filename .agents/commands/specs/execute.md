@@ -28,7 +28,7 @@ If no parameters: Ask user what to execute. Do NOT assume "all tasks".
 
 Also read:
 - Spec: `specs/[spec-name]/spec.md` (context)
-- Project: `.cursor/project.md` (tech stack)
+- Project: `.agents/project.md` (tech stack)
 
 Understand: tasks, order, dependencies, requested streams.
 
@@ -61,7 +61,7 @@ Dispatch one subagent per independent stream. Each subagent receives:
 
 1. Full stream task list (exact checkboxes from tasks.md)
 2. Relevant spec section(s) for that stream's scope
-3. Tech stack from `.cursor/project.md`
+3. Tech stack from `.agents/project.md`
 4. TDD iron law: NO production code without failing test first. RED → verify fail → GREEN → verify pass → REFACTOR.
 5. Verification iron law: NO completion claims without running command and showing output.
 6. Instruction to update tasks.md checkboxes for its stream when done

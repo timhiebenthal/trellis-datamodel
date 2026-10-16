@@ -12,7 +12,7 @@ Validate and refine new idea. Goal: analyze project state, challenge idea, ask c
 ## Step 1: Analyze Current Project State
 
 Read:
-- `.cursor/project.md` — mission + tech stack
+- `.agents/project.md` — mission + tech stack
 - Codebase structure — current implementation
 - Recent changes — if related to existing features
 
@@ -63,4 +63,4 @@ Save format:
 - Focus on clarity and feasibility
 - Keep questions actionable
 - Don't skip challenging phase
-- Reference `.cursor/project.md`
+- Reference `.agents/project.md`
