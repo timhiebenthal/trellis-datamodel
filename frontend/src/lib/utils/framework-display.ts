@@ -213,7 +213,8 @@ export const DEFAULT_FRAMEWORK_COPY: FrameworkCopy = {
  * so it carries the placeholder and the component supplies the name.
  */
 export function formatModelHint(template: string, model: string): string {
-    return template.replace("{model}", model);
+    // A function replacement keeps `$&`/`$'` sequences in the model name literal.
+    return template.replace("{model}", () => model);
 }
 
 export function getFrameworkCopy(framework: string | undefined | null): FrameworkCopy {

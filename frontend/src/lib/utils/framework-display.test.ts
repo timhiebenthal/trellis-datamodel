@@ -56,6 +56,7 @@ describe('getFrameworkCopy', () => {
 
         for (const text of Object.values(copy)) {
             expect(text.toLowerCase()).not.toContain('dbt');
+            expect(text.toLowerCase()).not.toContain('schema.yml');
         }
     });
 
