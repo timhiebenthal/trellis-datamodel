@@ -10,7 +10,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
@@ -77,21 +77,52 @@ def _insert_index(parsed: CommentedMap, rank: int) -> int:
     return len(parsed)
 
 
-def _is_misplaced(parsed: CommentedMap, key: str) -> bool:
-    """True when *key* sits after a key that canonical order puts later.
+_BODY_RANK = _KEY_RANK["columns"]
 
-    This is how a pre-#149 push leaves a file: the description lands below
-    ``columns`` and in-place updates keep it there forever. Relocating such a
-    key on push heals the file; a key already in canonical order is never
-    touched, so well-formed blocks see no churn.
+
+def _follows_the_body(ranks_before: "Iterable[int]", rank: int) -> bool:
+    """True when a header key (rank above the body) trails the column body.
+
+    Only that pattern is stale: a pre-#149 push appended a new key at the very
+    end of the block, so the file carries ``description`` below ``columns`` and
+    in-place updates keep it there forever. Anything else - ``connection``
+    before ``description``, say - is a hand-arranged but sensible layout and
+    must never be churned.
+    """
+    return rank < _BODY_RANK and any(earlier >= _BODY_RANK for earlier in ranks_before)
+
+
+def _is_misplaced(parsed: CommentedMap, key: str) -> bool:
+    """True when *key* sits below the column body in *parsed*.
+
+    Relocating such a key on push heals the file; keys above the body are
+    never touched, so well-formed blocks see no churn.
     """
     rank = _rank(key)
+    ranks_before: "list[int]" = []
     for existing in parsed:
         if existing == key:
-            return False
-        if _rank(existing) > rank:
-            return True
+            return _follows_the_body(ranks_before, rank)
+        ranks_before.append(_rank(existing))
     return False
+
+
+def misplaced_header_keys(keys: "Iterable[str]") -> "list[str]":
+    """Header keys in *keys* that sit below the column body.
+
+    Same rule the rewriter enforces on write, exposed so callers that see a
+    block only as its key list (the asset parser keeps no positions) can
+    detect a stale push layout: a pre-#149 push left ``description`` below
+    ``columns`` with the value already in sync, and value-diff-only updates
+    never moved it.
+    """
+    misplaced: "list[str]" = []
+    ranks_before: "list[int]" = []
+    for key in keys:
+        if _follows_the_body(ranks_before, _rank(key)):
+            misplaced.append(key)
+        ranks_before.append(_rank(key))
+    return misplaced
 
 
 def _set_key(parsed: CommentedMap, key: str, value: Any) -> None:

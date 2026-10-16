@@ -60,6 +60,10 @@ class BruinAsset:
     meta: dict = field(default_factory=dict)
     custom_checks: list[dict] = field(default_factory=list)
     file_path: str = ""
+    # Top-level key order of the @bruin block as written on disk. Lets the
+    # push path detect a stale header layout (a pre-#149 push left
+    # `description` below `columns`) without re-parsing the file.
+    key_order: list[str] = field(default_factory=list)
 
 
 def _detect_pattern(file_path: str) -> Optional[re.Pattern]:
@@ -166,6 +170,7 @@ def parse_bruin_block(file_path: str) -> Optional[BruinAsset]:
         meta=data.get("meta") if isinstance(data.get("meta"), dict) else {},
         custom_checks=data.get("custom_checks", []),
         file_path=file_path,
+        key_order=list(data.keys()),
     )
 
 

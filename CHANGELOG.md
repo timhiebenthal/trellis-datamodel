@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   row to its bottom edge, so the running build is visible without opening the
   config page.
 
+## [0.24.4b3] - 2026-10-16
+
+### Fixed
+- **The Bruin heal now fires without a value edit (#149 follow-up)**: the b2
+  build only relocated a bottom `description` when the pushed text differed
+  from the asset's. Files whose value was already in sync - every asset in
+  nba-data - never triggered it, so a push looked like it did nothing. The push
+  now detects a header key stranded below the `columns` layer from the block's
+  own key order and re-asserts its current value, which relocates it. Ordering
+  above the column body is left alone (`connection` before `description` is a
+  valid hand-arranged layout), a value-unchanged push of a clean block still
+  touches no file, and the write path is byte-stable on repeat.
+
 ## [0.24.4b2] - 2026-10-16
 
 ### Fixed

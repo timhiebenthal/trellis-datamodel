@@ -8,6 +8,7 @@ import yaml
 
 from trellis_datamodel.utils.bruin_parser import parse_bruin_block
 from trellis_datamodel.utils.bruin_rewriter import (
+    misplaced_header_keys,
     rewrite_bruin_block,
     write_bruin_asset,
 )
@@ -488,6 +489,51 @@ class TestRewriteKeyOrder:
         assert lines[0] == "name: core.dim__player"
         assert "description: Player dimension." in lines[:5]
         assert lines.index("description: Player dimension.") < lines.index("depends:")
+
+    def test_a_sensible_order_above_the_body_is_never_churned(self, tmp_path):
+        """`connection` before `description` is hand-arranged, not stale.
+
+        #149 only ever appended keys at the very bottom - below `columns`. A
+        block that orders keys slightly differently but keeps them all above
+        the column body must survive a push untouched.
+        """
+        path = tmp_path / "dim__player.sql"
+        path.write_text(
+            "/* @bruin\n"
+            "name: core.dim__player\n"
+            "connection: nba_duckdb\n"
+            "description: Player dimension.\n"
+            "type: duckdb.sql\n"
+            "materialization:\n"
+            "  type: table\n"
+            "columns:\n"
+            "  - name: player_id\n"
+            "    type: varchar\n"
+            "@bruin */\n"
+            "SELECT 1;\n"
+        )
+
+        rewrite_bruin_block(str(path), updates={"description": "Player dimension."})
+
+        assert self._lines(path)[:5] == [
+            "name: core.dim__player",
+            "connection: nba_duckdb",
+            "description: Player dimension.",
+            "type: duckdb.sql",
+            "materialization:",
+        ]
+
+    def test_misplaced_header_keys_flags_only_keys_below_the_body(self):
+        assert (
+            misplaced_header_keys(
+                ["name", "connection", "description", "type", "columns"]
+            )
+            == []
+        )
+        assert misplaced_header_keys(["name", "columns", "description"]) == [
+            "description"
+        ]
+        assert misplaced_header_keys(["name", "type", "columns"]) == []
 
     def test_stale_bottom_tags_are_promoted(self, tmp_path):
         path = tmp_path / "dim__player.sql"

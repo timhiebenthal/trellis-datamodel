@@ -42,6 +42,7 @@ from trellis_datamodel.utils.bruin_parser import (
     scan_pipeline_assets,
 )
 from trellis_datamodel.utils.bruin_rewriter import (
+    misplaced_header_keys,
     rewrite_bruin_block,
     write_bruin_asset,
 )
@@ -727,8 +728,14 @@ class BruinAdapter:
     def _entity_updates(asset: BruinAsset, entity: dict[str, Any]) -> dict[str, Any]:
         """The description, tags and origin `meta` an entity pushes onto its asset.
 
-        Holds only what differs from the asset. Sets `entity["pushed_tags"]`
-        whenever the entity has an opinion on tags (`ui_tags` is not None).
+        Holds only what differs from the asset - plus a relocation of any
+        header key a stale layout left out of order (a pre-#149 push wrote
+        `description` below `columns` with the value already in sync, so a
+        value-diff alone never healed the file). An out-of-order key is
+        re-asserted with its current value, which makes the rewriter move it
+        into Bruin's field order without changing any content. Sets
+        `entity["pushed_tags"]` whenever the entity has an opinion on tags
+        (`ui_tags` is not None).
         """
         updates: dict[str, Any] = {}
 
@@ -749,6 +756,15 @@ class BruinAdapter:
         meta = _push_origin_meta(asset.meta, entity.get("drafted_fields"))
         if meta != asset.meta:
             updates["meta"] = meta
+
+        for stale_key in misplaced_header_keys(asset.key_order):
+            current: Any = getattr(asset, stale_key, None)
+            if stale_key == "columns":
+                continue  # columns are rewritten wholesale; never relocated
+            if stale_key == "description":
+                current = description or asset.description
+            if current:
+                updates.setdefault(stale_key, current)
 
         return updates
 
