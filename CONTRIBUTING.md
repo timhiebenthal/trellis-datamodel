@@ -69,6 +69,38 @@ make build-package
 ```
 This builds the frontend, copies static assets to `trellis_datamodel/static/`, and runs `uv build`. Install the wheel from `dist/` with `pip install dist/trellis_datamodel-*.whl`.
 
+### Preview a change against another local project
+
+When the trellis checkout and the project you model live on the same machine, this is the default way to preview a change. It runs the wheel you just built inside that project's own environment, so the project keeps its pinned dbt/Bruin tooling, and the published package is never touched.
+
+```bash
+# from the trellis checkout, one command
+make preview PROJECT=../nba-data            # PORT=8089, CONFIG=trellis.yml by default
+```
+
+`make preview` runs the three steps below in order:
+
+```bash
+make build-package                          # 1. fresh wheel in dist/
+cd ../nba-data                              # 2. into the project
+uv pip install --reinstall ~/git_repos/trellis-datamodel/dist/trellis_datamodel-*.whl
+uv run --no-sync trellis run -p 8089        # 3. serve it
+```
+
+Two flags matter:
+
+- `--reinstall` because a local wheel usually carries the same version as the published beta, so uv would otherwise consider it already satisfied.
+- `--no-sync` so `uv run` does not replace the local wheel with the version pinned in the project's lock.
+
+To skip the install entirely, run the wheel from a throwaway environment instead:
+
+```bash
+uvx --from ~/git_repos/trellis-datamodel/dist/trellis_datamodel-*.whl \
+  trellis run -p 8089 -c ../nba-data/trellis.yml
+```
+
+`trellis run` writes entity positions back to the project's data model and canvas layout files the first time it lays out unsaved entities. Preview on a clean checkout, or be ready to `git checkout --` those two files afterwards.
+
 ### `trellis run` CLI
 ```bash
 trellis run [OPTIONS]

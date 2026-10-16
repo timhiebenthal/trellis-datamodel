@@ -52,18 +52,25 @@
 
     type CanvasComponent = typeof import('$lib/components/Canvas.svelte').default;
     let CanvasComponent = $state<CanvasComponent | null>(null);
-    const firstEntity = $derived($nodes.find((node) => node.type === 'entity'));
 
+    // Start loading the canvas chunk immediately so it overlaps the layout's boot
+    // requests. Waiting for `loading` to clear (or deferring by a fixed delay)
+    // leaves an empty viewport after core data publishes.
     $effect(() => {
-        if (loading || CanvasComponent) {
+        if (CanvasComponent) {
             return;
         }
-        const timer = window.setTimeout(() => {
-            void import('$lib/components/Canvas.svelte').then((module) => {
-                CanvasComponent = module.default;
+        let active = true;
+        void import('$lib/components/Canvas.svelte')
+            .then((module) => {
+                if (active) CanvasComponent = module.default;
+            })
+            .catch((error) => {
+                console.error('Failed to load canvas', error);
             });
-        }, firstEntity ? 2000 : 0);
-        return () => window.clearTimeout(timer);
+        return () => {
+            active = false;
+        };
     });
 
 </script>
@@ -73,8 +80,11 @@
     <meta name="description" content="Visual data modeling canvas - design and document your data models" />
 </svelte:head>
 
-{#if loading}
-    <div class="flex-1 h-full relative w-full flex items-center justify-center">
+{#if loading || !CanvasComponent}
+    <div
+        class="flex-1 h-full relative w-full flex items-center justify-center"
+        data-testid="canvas-loading"
+    >
         <div class="text-center">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
             <p class="text-sm text-gray-600">Loading data model...</p>
@@ -82,20 +92,14 @@
     </div>
 {:else}
     <div class="flex-1 h-full relative w-full" data-testid="canvas-ready">
-        {#if CanvasComponent}
-            <CanvasComponent
-                guidanceConfig={guidanceConfig}
-                lineageEnabled={lineageEnabled}
-                exposuresEnabled={exposuresEnabled}
-                hasExposuresData={hasExposuresData}
-                filteredEntityIds={filteredEntityIds}
-                filterEventText={filterEventText}
-                urlEntityFilterActive={urlEntityFilterActive}
-            />
-        {:else if firstEntity}
-            <div class="svelte-flow__node svelte-flow__node-entity absolute left-4 top-4 rounded border border-slate-300 bg-white px-4 py-3 shadow-sm">
-                {firstEntity.data?.label ?? firstEntity.id}
-            </div>
-        {/if}
+        <CanvasComponent
+            guidanceConfig={guidanceConfig}
+            lineageEnabled={lineageEnabled}
+            exposuresEnabled={exposuresEnabled}
+            hasExposuresData={hasExposuresData}
+            filteredEntityIds={filteredEntityIds}
+            filterEventText={filterEventText}
+            urlEntityFilterActive={urlEntityFilterActive}
+        />
     </div>
 {/if}
