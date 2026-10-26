@@ -1,6 +1,6 @@
 # Apache Ossie Export - Tasks
 
-Plan: `tasks/plan.md`. Spec: `SPEC.md`.
+Plan: `plan.md`. Spec: `spec.md`.
 
 Rules for every task: no production code without a failing test first; no completion claim without running the verification command and showing its output. Check the box only when the task is fully functional, never when a stub remains.
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Write one Apache Ossie `0.2.0.dev0` semantic model document from the entities bound in `data_model.yml`, triggered from the existing Push button when `ossie.enabled` is set. The exporter lives in a single service module with a pinned version constant, so a spec bump stays a localized change. Spec: `SPEC.md`.
+Write one Apache Ossie `0.2.0.dev0` semantic model document from the entities bound in `data_model.yml`, triggered from the existing Push button when `ossie.enabled` is set. The exporter lives in a single service module with a pinned version constant, so a spec bump stays a localized change. Spec: `spec.md`.
 
 ## Architecture Decisions
 
