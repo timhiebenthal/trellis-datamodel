@@ -42,16 +42,16 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Add an `OssieConfig` dataclass beside the existing per-block configs in `config.py`, resolve its file path, publish module-level globals, and wire it into `load_config` and the test-mode branch. Default file is `semantic_model.yml` in the directory of the resolved `DATA_MODEL_PATH`; an explicit `ossie.file` resolves with the same base-directory rules as `data_model_file`.
 
 **Acceptance criteria:**
-- [ ] `OssieConfig` carries `enabled: bool = False`, `file: str = ""`, `database: str = ""`, `schema: str = ""`
-- [ ] Module globals `OSSIE_CONFIG` (or equivalent) exist in both the `_TEST_DIR` and production branches of `config.py`
-- [ ] `load_config` populates it, and `reload_config` picks up a changed value without a restart
-- [ ] With `ossie.file: ""`, the resolved path is `<dirname(DATA_MODEL_PATH)>/semantic_model.yml`
-- [ ] With `ossie.file: "docs/semantic.yml"`, the path resolves relative to `dbt_project_path` when set, else to the config file directory
-- [ ] A non-dict `ossie:` value logs a warning and falls back to defaults rather than raising, matching how `lineage` is handled
+- [x] `OssieConfig` carries `enabled: bool = False`, `file: str = ""`, `database: str = ""`, `schema: str = ""`
+- [x] Module globals `OSSIE_CONFIG` (or equivalent) exist in both the `_TEST_DIR` and production branches of `config.py`
+- [x] `load_config` populates it, and `reload_config` picks up a changed value without a restart
+- [x] With `ossie.file: ""`, the resolved path is `<dirname(DATA_MODEL_PATH)>/semantic_model.yml`
+- [x] With `ossie.file: "docs/semantic.yml"`, the path resolves relative to `dbt_project_path` when set, else to the config file directory
+- [x] A non-dict `ossie:` value logs a warning and falls back to defaults rather than raising, matching how `lineage` is handled
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_config.py -q` passes
-- [ ] A new test asserts the three path cases above and the malformed-block fallback
+- [x] `uv run pytest trellis_datamodel/tests/test_config.py -q` passes
+- [x] A new test asserts the three path cases above and the malformed-block fallback
 
 **Dependencies:** None
 

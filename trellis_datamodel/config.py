@@ -54,6 +54,16 @@ class SourceChipsConfig:
     source_sources: str = "both"  # Options: "manual", "lineage", "both"
 
 
+@dataclass
+class OssieConfig:
+    """Configuration for Apache Ossie semantic model export."""
+
+    enabled: bool = False
+    file: str = ""  # resolved absolute path to the generated document
+    database: str = ""  # overrides the adapter's database segment; empty omits it
+    schema: str = ""  # overrides the adapter's schema segment; empty uses it
+
+
 # Global configuration objects (set by load_config)
 GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
@@ -103,6 +113,9 @@ if _TEST_DIR:
     Bus_MATRIX_ENABLED: bool = False
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
+    OSSIE_CONFIG: OssieConfig = OssieConfig(
+        file=os.path.join(_TEST_DIR, "semantic_model.yml")
+    )
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
     ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
@@ -132,6 +145,7 @@ else:
     Bus_MATRIX_ENABLED: bool = False
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
+    OSSIE_CONFIG: OssieConfig = OssieConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
     ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 
@@ -367,6 +381,24 @@ def _load_business_events_config(config: dict[str, Any]) -> bool:
     return enabled
 
 
+def _load_ossie_config(config: dict[str, Any]) -> tuple[bool, str, str]:
+    """Load Ossie export settings, ignoring a malformed block."""
+    ossie_config = config.get("ossie")
+    if not isinstance(ossie_config, dict):
+        if ossie_config is not None:
+            logger.warning("'ossie' must be a mapping. Ignoring provided value.")
+        return False, "", ""
+
+    source = ossie_config.get("source")
+    database = ""
+    schema = ""
+    if isinstance(source, dict):
+        database = str(source.get("database") or "")
+        schema = str(source.get("schema") or "")
+
+    return bool(ossie_config.get("enabled", False)), database, schema
+
+
 def _load_canvas_navigation_config(
     config: dict[str, Any],
 ) -> tuple[str, dict[str, list[str]]]:
@@ -417,6 +449,27 @@ def _resolve_business_events_path(
 
     return os.path.abspath(
         os.path.join(_resolve_base_path(config_path), "business_events.yml")
+    )
+
+
+def _resolve_ossie_file_path(
+    config_path: str, project_path: str, data_model_path: str, config: dict[str, Any]
+) -> str:
+    """Resolve the Ossie document, defaulting to the data_model.yml directory."""
+    ossie_config = config.get("ossie")
+    if isinstance(ossie_config, dict):
+        ossie_file = ossie_config.get("file")
+        if ossie_file:
+            base_dir = project_path or _resolve_base_path(config_path)
+            return _resolve_path(base_dir, ossie_file)
+
+    # Default: same directory as data_model.yml
+    if data_model_path:
+        data_model_dir = os.path.dirname(data_model_path)
+        return os.path.abspath(os.path.join(data_model_dir, "semantic_model.yml"))
+
+    return os.path.abspath(
+        os.path.join(_resolve_base_path(config_path), "semantic_model.yml")
     )
 
 
@@ -536,7 +589,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, OSSIE_CONFIG, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
 
     # Skip loading config file in test mode (paths already set via environment)
     # unless a config file is explicitly selected (TRELLIS_CONFIG_PATH or CLI --config).
@@ -628,6 +681,17 @@ def load_config(config_path: Optional[str] = None) -> None:
     BUSINESS_EVENTS_ENABLED = _load_business_events_config(config)
     BUSINESS_EVENTS_PATH = _resolve_business_events_path(
         CONFIG_PATH, DATA_MODEL_PATH, config
+    )
+
+    # 17. Ossie semantic model export configuration
+    ossie_enabled, ossie_database, ossie_schema = _load_ossie_config(config)
+    OSSIE_CONFIG = OssieConfig(
+        enabled=ossie_enabled,
+        file=_resolve_ossie_file_path(
+            CONFIG_PATH, DBT_PROJECT_PATH, DATA_MODEL_PATH, config
+        ),
+        database=ossie_database,
+        schema=ossie_schema,
     )
 
 
