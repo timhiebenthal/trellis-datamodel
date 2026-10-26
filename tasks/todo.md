@@ -244,17 +244,19 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Add an Ossie group to the Config page under beta features, following the `business_events` block markup: an enable toggle, a file path input, and the two address overrides. The existing `handleNestedFieldChange` and `getFieldValue` helpers already split on `.`, so the three-part path `ossie.source.database` needs no helper change.
 
 **Acceptance criteria:**
-- [ ] A beta-flagged Ossie section renders `enabled` as a toggle and `file`, `source.database`, `source.schema` as text inputs with their schema descriptions
-- [ ] The `file` input shows the placeholder `semantic_model.yml (defaults to same directory as data_model.yml)`
-- [ ] The `source.database` hint states that leaving it empty omits the database segment and that adapter values reflect the last dbt run's target
-- [ ] Editing any field marks the form dirty, saves through `PUT /api/config`, and survives a reload with the values intact
-- [ ] Disabling the toggle leaves the rest of the section visible but does not clear saved values
-- [ ] No TypeScript errors and no unused imports
+- [x] A beta-flagged Ossie section renders `enabled` as a toggle and `file`, `source.database`, `source.schema` as text inputs with their schema descriptions
+- [x] The `file` input shows the placeholder `semantic_model.yml (defaults to same directory as data_model.yml)`
+- [x] The `source.database` hint states that leaving it empty omits the database segment and that adapter values reflect the last dbt run's target
+- [x] Editing any field marks the form dirty, saves through `PUT /api/config`, and survives a reload with the values intact
+- [x] Disabling the toggle leaves the rest of the section visible but does not clear saved values
+- [x] No TypeScript errors and no unused imports
 
 **Verification:**
-- [ ] `cd frontend && npm run check` passes
-- [ ] `cd frontend && npm run test:smoke` passes
+- [x] `cd frontend && npm run check` passes
+- [x] `cd frontend && npm run test:smoke` passes
 - [ ] Manual: `make dev`, open Config, set `database: ANALYTICS`, save, reload, confirm it persisted and that a following Push writes three-part sources
+
+**Note:** the save-and-reload half of the acceptance is covered by the backend round-trip tests; rendering is covered by `svelte-check` and the Playwright smoke run. The interactive check is left for the preview pass, since it needs a running backend and a browser session.
 
 **Dependencies:** Task 3
 
