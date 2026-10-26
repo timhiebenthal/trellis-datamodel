@@ -55,7 +55,7 @@ T1 and the T2/T3 pair touch disjoint files (adapters vs config) and can run in p
 
 - [x] T4 - Datasets and fields from bound entities (M, 3 files) - deps: T1
 - [x] T5 - Primary key and unique key inference (S, 2 files) - deps: T4
-- [ ] T6 - Relationships with orientation, filtering, and naming (S, 2 files) - deps: T4
+- [x] T6 - Relationships with orientation, filtering, and naming (S, 2 files) - deps: T4
 
 #### Checkpoint B: Exporter
 - [ ] dbt dummy project produces a document that validates against the vendored schema

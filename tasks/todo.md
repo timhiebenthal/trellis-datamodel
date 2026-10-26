@@ -173,18 +173,20 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Emit `relationships[]` with `from` on the many side, orienting each entry through `services/fk_placement.place_foreign_key` so the rule stays in one place, and filter out everything Ossie would reject.
 
 **Acceptance criteria:**
-- [ ] Orientation delegates to `place_foreign_key`, with a test per relationship type in `_FK_ON_SOURCE` and `_FK_ON_TARGET`
-- [ ] `from_columns` and `to_columns` each hold exactly one field name
-- [ ] A relationship is skipped when either endpoint is a draft entity, either `model_ref` fails to resolve, either `source_field`/`target_field` is missing, or the referenced field is absent from the target dataset's fields
-- [ ] Each skip produces a warning naming the entities and the reason
-- [ ] Identical `(from, to, from_columns, to_columns)` tuples collapse to one entry
-- [ ] Names are `<from>_to_<to>`; a collision appends `_<from_column>`, and a surviving collision appends a numeric suffix
-- [ ] Entries are sorted by `(from, to, from_columns)` for stable output
-- [ ] The dbt dummy's duplicated `product -> sale` pair yields one relationship, and its `procurement` links yield none
+- [x] Orientation delegates to `place_foreign_key`, with a test per relationship type in `_FK_ON_SOURCE` and `_FK_ON_TARGET`
+- [x] `from_columns` and `to_columns` each hold exactly one field name
+- [x] A relationship is skipped when either endpoint is a draft entity, either `model_ref` fails to resolve, either `source_field`/`target_field` is missing, or the referenced field is absent from the target dataset's fields
+- [x] Each skip produces a warning naming the entities and the reason
+- [x] Identical `(from, to, from_columns, to_columns)` tuples collapse to one entry
+- [x] Names are `<from>_to_<to>`; a collision appends `_<from_column>`, and a surviving collision appends a numeric suffix
+- [x] Entries are sorted by `(from, to, from_columns)` for stable output
+- [x] The duplicated `product -> sale` pair yields one relationship, and `procurement` links yield none
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q -k relationship` passes
-- [ ] The golden documents still validate
+- [x] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q -k relationship` passes
+- [x] The golden documents still validate
+
+**Note:** the duplicated-edge and draft-link cases are proven with fixture data rather than `dbt_company_dummy/data_model.yml`, since that project's manifest is gitignored; a manual run against it produced 6 relationships, no validation errors, and warnings for the draft `procurement` links.
 
 **Dependencies:** Task 4
 
@@ -198,10 +200,12 @@ Rules for every task: no production code without a failing test first; no comple
 
 ## Checkpoint B: Exporter
 
-- [ ] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q` passes
-- [ ] dbt dummy output validates against the vendored schema; Bruin fixture output validates too
-- [ ] Neither output contains a draft entity, and neither contains a relationship to one
-- [ ] Re-running the exporter on unchanged input produces identical bytes (`cmp` on two runs)
+- [x] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q` passes
+- [x] dbt dummy output validates against the vendored schema; Bruin fixture output validates too
+- [x] Neither output contains a draft entity, and neither contains a relationship to one
+- [x] Re-running the exporter on unchanged input produces identical bytes (`cmp` on two runs)
+
+**Note:** the dbt dummy check was run manually against `dbt_company_dummy/target/manifest.json` (10 datasets, 6 relationships, no validation errors, warnings for the draft `procurement` links). That artifact is gitignored, so the committed suite uses a dbt-shaped fixture plus the real Bruin fixture pipeline instead.
 
 ---
 

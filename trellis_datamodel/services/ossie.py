@@ -3,9 +3,6 @@
 Writes one flat `0.2.0.dev0` document from the entities bound in
 `data_model.yml`. The spec is a draft, so the version is pinned in one constant
 and the whole mapping lives here rather than leaking into routes or adapters.
-
-Datasets, fields and key inference are implemented here. Relationships are
-filled by a later task.
 """
 
 from dataclasses import dataclass, field
@@ -266,6 +263,163 @@ def _build_dataset(
     return dataset
 
 
+def _relationship_label(relationship: dict[str, Any]) -> str:
+    """Identify a relationship by its endpoint entity ids, for warning text."""
+    source = (relationship.get("source") or "").strip()
+    target = (relationship.get("target") or "").strip()
+    rel_type = (relationship.get("type") or "").strip() or "untyped"
+    return f'relationship "{source}" -> "{target}" ({rel_type})'
+
+
+def _endpoint_problem(
+    entity_id: str,
+    role: str,
+    label: str,
+    emitted: dict[str, str],
+    entities_by_id: dict[str, dict[str, Any]],
+) -> str | None:
+    """Why a relationship endpoint produced no dataset, or None when it did."""
+    if entity_id in emitted:
+        return None
+    entity = entities_by_id.get(entity_id)
+    if entity is None:
+        return (
+            f'{label} skipped: {role} entity "{entity_id}" is not in the data model'
+        )
+    model_ref = get_model_ref(entity)
+    if not model_ref:
+        return (
+            f'{label} skipped: {role} entity "{entity_id}" is a draft entity '
+            "(no model_ref)"
+        )
+    return (
+        f'{label} skipped: {role} entity "{entity_id}" references model '
+        f'"{model_ref}", which the adapter does not report'
+    )
+
+
+def _build_relationships(
+    entities: list[dict],
+    relationships: list[dict],
+    emitted: dict[str, str],
+    field_names: dict[str, set[str]],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Orient, filter, deduplicate and name every relationship worth emitting.
+
+    `emitted` maps an entity id to the dataset name actually written, and
+    `field_names` maps that same entity id to its dataset's field names. A
+    relationship survives only when both endpoints became datasets, both field
+    names are present, and both fields are declared: Ossie resolves column
+    lists against declared fields, so a dangling name is a hard error upstream.
+    """
+    warnings: list[str] = []
+    entities_by_id = {
+        (entity.get("id") or "").strip(): entity for entity in entities
+    }
+
+    entries: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+
+    for relationship in relationships:
+        label = _relationship_label(relationship)
+        source = (relationship.get("source") or "").strip()
+        target = (relationship.get("target") or "").strip()
+
+        problem = _endpoint_problem(source, "source", label, emitted, entities_by_id)
+        if problem is None:
+            problem = _endpoint_problem(
+                target, "target", label, emitted, entities_by_id
+            )
+        if problem is not None:
+            warnings.append(problem)
+            continue
+
+        source_field = (relationship.get("source_field") or "").strip()
+        target_field = (relationship.get("target_field") or "").strip()
+        missing = [
+            name
+            for name, value in (
+                ("source_field", source_field),
+                ("target_field", target_field),
+            )
+            if not value
+        ]
+        if missing:
+            warnings.append(f"{label} skipped: {' and '.join(missing)} is empty")
+            continue
+
+        placement = place_foreign_key(
+            relationship.get("type") or "",
+            source,
+            source_field,
+            target,
+            target_field,
+        )
+
+        declarations = (
+            ("fk", placement.fk_entity, placement.fk_field),
+            ("ref", placement.ref_entity, placement.ref_field),
+        )
+        absent: str | None = None
+        for role, entity_id, field_name in declarations:
+            if field_name not in field_names.get(entity_id, set()):
+                role_name = "from" if role == "fk" else "to"
+                absent = (
+                    f'{label} skipped: {role_name}_columns field "{field_name}" '
+                    f'is not declared on dataset "{emitted[entity_id]}" '
+                    f'(entity "{entity_id}")'
+                )
+                break
+        if absent is not None:
+            warnings.append(absent)
+            continue
+
+        key = (
+            emitted[placement.fk_entity],
+            emitted[placement.ref_entity],
+            placement.fk_field,
+            placement.ref_field,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append(
+            {
+                "from": key[0],
+                "to": key[1],
+                "from_columns": [key[2]],
+                "to_columns": [key[3]],
+            }
+        )
+
+    # `to_columns` only breaks ties, so input order cannot leak into the file.
+    entries.sort(
+        key=lambda entry: (
+            entry["from"],
+            entry["to"],
+            tuple(entry["from_columns"]),
+            tuple(entry["to_columns"]),
+        )
+    )
+
+    used: set[str] = set()
+    named: list[dict[str, Any]] = []
+    for entry in entries:
+        base = f'{entry["from"]}_to_{entry["to"]}'
+        name = base
+        if name in used:
+            name = f'{base}_{entry["from_columns"][0]}'
+        if name in used:
+            suffix = 2
+            while f"{name}_{suffix}" in used:
+                suffix += 1
+            name = f"{name}_{suffix}"
+        used.add(name)
+        named.append({"name": name, **entry})
+
+    return named, warnings
+
+
 def _resolve_name(project_name: str) -> str:
     """Project name, falling back to the data model file stem."""
     name = (project_name or "").strip()
@@ -315,6 +469,8 @@ def export_ossie(
     }
 
     datasets: list[dict[str, Any]] = []
+    emitted: dict[str, str] = {}
+    field_names: dict[str, set[str]] = {}
     for entity in entities:
         entity_id = entity.get("id") or ""
         model_ref = get_model_ref(entity)
@@ -333,9 +489,14 @@ def export_ossie(
             )
             continue
 
-        datasets.append(
-            _build_dataset(entity, entity_id, model, model_schemas, relationships)
+        dataset = _build_dataset(
+            entity, entity_id, model, model_schemas, relationships
         )
+        datasets.append(dataset)
+        emitted[entity_id.strip()] = dataset["name"]
+        field_names[entity_id.strip()] = {
+            field["name"] for field in dataset["fields"]
+        }
 
     datasets.sort(key=lambda dataset: dataset["name"])
 
@@ -345,12 +506,16 @@ def export_ossie(
         )
         return OssieExport(path=None, warnings=warnings)
 
+    relationship_entries, relationship_warnings = _build_relationships(
+        entities, relationships, emitted, field_names
+    )
+    warnings.extend(relationship_warnings)
+
     document: dict[str, Any] = {
         "version": OSSIE_VERSION,
         "name": _resolve_name(project_name),
         "datasets": datasets,
-        # Task 6 fills relationships from the `relationships` argument.
-        "relationships": [],
+        "relationships": relationship_entries,
         "metrics": [],
     }
 
