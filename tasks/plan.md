@@ -53,7 +53,7 @@ T1 and the T2/T3 pair touch disjoint files (adapters vs config) and can run in p
 
 ### Phase 2: Exporter
 
-- [ ] T4 - Datasets and fields from bound entities (M, 3 files) - deps: T1
+- [x] T4 - Datasets and fields from bound entities (M, 3 files) - deps: T1
 - [ ] T5 - Primary key and unique key inference (S, 2 files) - deps: T4
 - [ ] T6 - Relationships with orientation, filtering, and naming (S, 2 files) - deps: T4
 

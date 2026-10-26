@@ -106,24 +106,26 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Create `services/ossie.py` with the pinned version constant, the type map, and the dataset/field builders, and wire the atomic write through `YamlHandler.save_file`. Resolve bound models through the adapter's model list indexed by `unique_id`. Return a small `OssieExport` dataclass carrying `path` and `warnings`, because the push integration needs to surface skipped entities. Vendor the official schema into the test fixtures and validate against it in both directions.
 
 **Acceptance criteria:**
-- [ ] `export_ossie(entities, relationships, project_name, models) -> OssieExport` writes one file and returns its path plus accumulated warnings
-- [ ] The document has `version: 0.2.0.dev0`, the passed `name`, `datasets`, `relationships`, and `metrics: []`
-- [ ] No dataset carries a `metrics` key
-- [ ] Only entities with a resolvable `model_ref` become datasets; a draft entity or an unresolvable ref is skipped and produces a warning naming the entity and the missing model
-- [ ] `source` joins non-empty parts from `ossie.source.database`, `ossie.source.schema`, the model's schema, and the model's table; with no database configured the result is `main.dim_customer`
-- [ ] Fields are the model's columns in order, then drafted-only fields sorted by name, deduplicated by name with the model winning; blank draft names skipped
-- [ ] `datatype` follows the spec's type table; an unmappable type omits the key rather than emitting `Opaque`
-- [ ] `dimension.is_time` is `true` exactly for `Date`, `Time`, `DateTime`, `DateTimeTz`
-- [ ] Each field's `expression.dialects` holds one `ANSI_SQL` entry whose expression is the column name
-- [ ] Empty descriptions are omitted rather than emitted as `""`
-- [ ] Datasets and fields come out in the deterministic order the plan specifies, and a second run over the same input is byte-identical
-- [ ] The write is atomic: no partial file survives a simulated dump failure
-- [ ] `tests/fixtures/ossie/ossie-schema.json` is the vendored `0.2.0.dev0` schema, and a negative test proves the validator rejects a deliberately broken document
+- [x] `export_ossie(entities, relationships, project_name, models) -> OssieExport` writes one file and returns its path plus accumulated warnings
+- [x] The document has `version: 0.2.0.dev0`, the passed `name`, `datasets`, `relationships`, and `metrics: []`
+- [x] No dataset carries a `metrics` key
+- [x] Only entities with a resolvable `model_ref` become datasets; a draft entity or an unresolvable ref is skipped and produces a warning naming the entity and the missing model
+- [x] `source` joins non-empty parts from `ossie.source.database`, `ossie.source.schema`, the model's schema, and the model's table; with no database configured the result is `main.dim_customer`
+- [x] Fields are the model's columns in order, then drafted-only fields sorted by name, deduplicated by name with the model winning; blank draft names skipped
+- [x] `datatype` follows the spec's type table; an unmappable type omits the key rather than emitting `Opaque`
+- [x] `dimension.is_time` is `true` exactly for `Date`, `Time`, `DateTime`, `DateTimeTz`
+- [x] Each field's `expression.dialects` holds one `ANSI_SQL` entry whose expression is the column name
+- [x] Empty descriptions are omitted rather than emitted as `""`
+- [x] Datasets and fields come out in the deterministic order the plan specifies, and a second run over the same input is byte-identical
+- [x] The write is atomic: no partial file survives a simulated dump failure
+- [x] `tests/fixtures/ossie/ossie-schema.json` is the vendored `0.2.0.dev0` schema, and a negative test proves the validator rejects a deliberately broken document
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q` passes
-- [ ] The dbt dummy golden document validates, and so does the Bruin fixture document
-- [ ] `uv run pytest -q` passes
+- [x] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q` passes
+- [x] The dbt-shaped golden document validates, and so does the Bruin fixture document
+- [x] `uv run pytest -q` passes
+
+**Note:** the dbt case is a hand-built dbt-shaped model list, not a run against `dbt_company_dummy/target/manifest.json`: that artifact is gitignored (`dbt_company_dummy/.gitignore`), so a test depending on it would vanish in CI. The Bruin case does drive the real committed fixture pipeline through `BruinAdapter.get_models()`.
 
 **Dependencies:** Task 1
 
