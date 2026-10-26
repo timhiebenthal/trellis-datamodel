@@ -64,11 +64,22 @@ class OssieConfig:
     schema: str = ""  # overrides the adapter's schema segment; empty uses it
 
 
+@dataclass
+class MetricsConfig:
+    """Configuration for the metric tree canvas."""
+
+    enabled: bool = False
+    file: str = ""  # resolved absolute path to metric_tree.yml
+    layout_file: str = ""  # resolved absolute path to metric_layout.yml
+    expression_dialect: str = "ANSI_SQL"
+
+
 # Global configuration objects (set by load_config)
 GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
 DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
 ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 SOURCE_CHIPS_CONFIG: SourceChipsConfig = SourceChipsConfig()
+METRICS_CONFIG: MetricsConfig = MetricsConfig()
 
 if _TEST_DIR:
     # Test mode: use temp directory paths
@@ -116,6 +127,10 @@ if _TEST_DIR:
     OSSIE_CONFIG: OssieConfig = OssieConfig(
         file=os.path.join(_TEST_DIR, "semantic_model.yml")
     )
+    METRICS_CONFIG: MetricsConfig = MetricsConfig(
+        file=os.path.join(_TEST_DIR, "metric_tree.yml"),
+        layout_file=os.path.join(_TEST_DIR, "metric_layout.yml"),
+    )
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
     ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
@@ -146,6 +161,7 @@ else:
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
     OSSIE_CONFIG: OssieConfig = OssieConfig()
+    METRICS_CONFIG: MetricsConfig = MetricsConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
     ENTITY_MODELING_CONFIG: EntityModelingConfig = EntityModelingConfig()
 
@@ -399,6 +415,21 @@ def _load_ossie_config(config: dict[str, Any]) -> tuple[bool, str, str]:
     return bool(ossie_config.get("enabled", False)), database, schema
 
 
+def _load_metrics_config(config: dict[str, Any]) -> tuple[bool, str]:
+    """Load metric tree settings, ignoring a malformed block."""
+    metrics_config = config.get("metrics")
+    if not isinstance(metrics_config, dict):
+        if metrics_config is not None:
+            logger.warning("'metrics' must be a mapping. Ignoring provided value.")
+        return False, "ANSI_SQL"
+
+    dialect = metrics_config.get("expression_dialect") or "ANSI_SQL"
+    if not isinstance(dialect, str):
+        dialect = "ANSI_SQL"
+
+    return bool(metrics_config.get("enabled", False)), dialect
+
+
 def _load_canvas_navigation_config(
     config: dict[str, Any],
 ) -> tuple[str, dict[str, list[str]]]:
@@ -471,6 +502,30 @@ def _resolve_ossie_file_path(
     return os.path.abspath(
         os.path.join(_resolve_base_path(config_path), "semantic_model.yml")
     )
+
+
+def _resolve_metrics_file_path(
+    config_path: str,
+    project_path: str,
+    data_model_path: str,
+    config: dict[str, Any],
+    key: str,
+    default_name: str,
+) -> str:
+    """Resolve a metric tree file, defaulting to the data_model.yml directory."""
+    metrics_config = config.get("metrics")
+    if isinstance(metrics_config, dict):
+        configured_file = metrics_config.get(key)
+        if configured_file:
+            base_dir = project_path or _resolve_base_path(config_path)
+            return _resolve_path(base_dir, str(configured_file))
+
+    # Default: same directory as data_model.yml
+    if data_model_path:
+        data_model_dir = os.path.dirname(data_model_path)
+        return os.path.abspath(os.path.join(data_model_dir, default_name))
+
+    return os.path.abspath(os.path.join(_resolve_base_path(config_path), default_name))
 
 
 def _load_modeling_style(config: dict[str, Any]) -> str:
@@ -589,7 +644,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, OSSIE_CONFIG, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, OSSIE_CONFIG, METRICS_CONFIG, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
 
     # Skip loading config file in test mode (paths already set via environment)
     # unless a config file is explicitly selected (TRELLIS_CONFIG_PATH or CLI --config).
@@ -692,6 +747,29 @@ def load_config(config_path: Optional[str] = None) -> None:
         ),
         database=ossie_database,
         schema=ossie_schema,
+    )
+
+    # 18. Metric tree configuration
+    metrics_enabled, metrics_dialect = _load_metrics_config(config)
+    METRICS_CONFIG = MetricsConfig(
+        enabled=metrics_enabled,
+        file=_resolve_metrics_file_path(
+            CONFIG_PATH,
+            DBT_PROJECT_PATH,
+            DATA_MODEL_PATH,
+            config,
+            "file",
+            "metric_tree.yml",
+        ),
+        layout_file=_resolve_metrics_file_path(
+            CONFIG_PATH,
+            DBT_PROJECT_PATH,
+            DATA_MODEL_PATH,
+            config,
+            "layout_file",
+            "metric_layout.yml",
+        ),
+        expression_dialect=metrics_dialect,
     )
 
 

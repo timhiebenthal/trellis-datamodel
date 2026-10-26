@@ -24,6 +24,7 @@ def _prepare_config(monkeypatch):
     monkeypatch.setattr(cfg, "BRUIN_ASSET_PATHS", [])
     monkeypatch.setattr(cfg, "BRUIN_DEFAULT_ASSET_TYPE", "duckdb.sql")
     monkeypatch.setattr(cfg, "OSSIE_CONFIG", cfg.OssieConfig())
+    monkeypatch.setattr(cfg, "METRICS_CONFIG", cfg.MetricsConfig())
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -654,6 +655,151 @@ def test_ossie_non_dict_falls_back_to_defaults(monkeypatch, tmp_path, caplog):
     assert cfg.OSSIE_CONFIG.database == ""
     assert cfg.OSSIE_CONFIG.schema == ""
     assert any("'ossie'" in record.message for record in caplog.records)
+
+
+def test_metrics_defaults_to_disabled(monkeypatch, tmp_path):
+    """No metrics block leaves the feature off with default files and dialect."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: dbt-core
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.METRICS_CONFIG.enabled is False
+    assert cfg.METRICS_CONFIG.expression_dialect == "ANSI_SQL"
+    assert cfg.METRICS_CONFIG.file == os.path.abspath(tmp_path / "metric_tree.yml")
+    assert cfg.METRICS_CONFIG.layout_file == os.path.abspath(
+        tmp_path / "metric_layout.yml"
+    )
+
+
+def test_metrics_nested_config_populates_values(monkeypatch, tmp_path):
+    """A declared block populates enablement, paths and dialect."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        metrics:
+          enabled: true
+          expression_dialect: OSSIE_SQL_2026
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.METRICS_CONFIG.enabled is True
+    assert cfg.METRICS_CONFIG.expression_dialect == "OSSIE_SQL_2026"
+
+
+def test_metrics_relative_paths_resolve_under_project_path(monkeypatch, tmp_path):
+    """Explicit relative files resolve against dbt_project_path."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        metrics:
+          file: docs/metrics.yml
+          layout_file: docs/layout.yml
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.METRICS_CONFIG.file == os.path.abspath(tmp_path / "docs" / "metrics.yml")
+    assert cfg.METRICS_CONFIG.layout_file == os.path.abspath(
+        tmp_path / "docs" / "layout.yml"
+    )
+
+
+def test_metrics_absolute_paths_are_preserved(monkeypatch, tmp_path):
+    """Absolute paths are used verbatim."""
+    _prepare_config(monkeypatch)
+    absolute_file = str(tmp_path / "elsewhere" / "metrics.yml")
+    absolute_layout = str(tmp_path / "elsewhere" / "layout.yml")
+    config_path = _write_config(
+        tmp_path,
+        f"""
+        dbt_project_path: .
+        metrics:
+          file: {absolute_file}
+          layout_file: {absolute_layout}
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.METRICS_CONFIG.file == absolute_file
+    assert cfg.METRICS_CONFIG.layout_file == absolute_layout
+
+
+def test_metrics_non_dict_falls_back_to_defaults(monkeypatch, tmp_path, caplog):
+    """A malformed metrics block warns instead of raising."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        metrics: "yes"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.METRICS_CONFIG.enabled is False
+    assert cfg.METRICS_CONFIG.expression_dialect == "ANSI_SQL"
+    assert cfg.METRICS_CONFIG.file == os.path.abspath(tmp_path / "metric_tree.yml")
+    assert any("'metrics'" in record.message for record in caplog.records)
+
+
+def test_normalize_nested_config_omits_metrics_when_absent():
+    """Saving an unrelated setting must not inject the opt-in block."""
+    from trellis_datamodel.services.config_service import _normalize_nested_config
+
+    normalized = _normalize_nested_config(
+        {"framework": "dbt-core", "dbt_project_path": "."}
+    )
+
+    assert "metrics" not in normalized
+
+
+def test_normalize_nested_config_emits_metrics_when_declared():
+    """A declared block is normalised with its defaults filled in."""
+    from trellis_datamodel.services.config_service import _normalize_nested_config
+
+    normalized = _normalize_nested_config(
+        {"dbt_project_path": ".", "metrics": {"enabled": True}}
+    )
+
+    assert normalized["metrics"] == {
+        "enabled": True,
+        "file": "",
+        "layout_file": "",
+        "expression_dialect": "ANSI_SQL",
+    }
+
+
+def test_normalize_nested_config_falls_back_for_malformed_metrics():
+    """A non-dict block normalises to the defaults instead of raising."""
+    from trellis_datamodel.services.config_service import _normalize_nested_config
+
+    normalized = _normalize_nested_config({"dbt_project_path": ".", "metrics": "yes"})
+
+    assert normalized["metrics"] == {
+        "enabled": False,
+        "file": "",
+        "layout_file": "",
+        "expression_dialect": "ANSI_SQL",
+    }
 
 
 def test_reload_config_picks_up_ossie_changes(monkeypatch, tmp_path):

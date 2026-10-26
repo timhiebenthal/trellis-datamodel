@@ -103,6 +103,14 @@ class OssieConfig(BaseModel):
     source: OssieSourceConfig = Field(default_factory=OssieSourceConfig)
 
 
+class MetricsConfig(BaseModel):
+    """Metric tree canvas configuration (beta)."""
+    enabled: bool = False
+    file: str = ""
+    layout_file: str = ""
+    expression_dialect: str = "ANSI_SQL"
+
+
 class CanvasDefaultFilters(BaseModel):
     """Project-wide default filters for the Canvas."""
     domains: List[str] = Field(default_factory=list)
@@ -135,6 +143,7 @@ class ConfigSchema(BaseModel):
     exposures: ExposuresConfig = Field(default_factory=ExposuresConfig)
     business_events: BusinessEventsConfig = Field(default_factory=BusinessEventsConfig)
     ossie: OssieConfig = Field(default_factory=OssieConfig)
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     dimensional_modeling: Optional[DimensionalModelingConfig] = Field(default=None)
     entity_modeling: Optional[EntityModelingConfig] = Field(default=None)
 
