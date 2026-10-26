@@ -18,6 +18,7 @@ import trellis_datamodel.services.schema as schema_service
 from trellis_datamodel.adapters.base import ColumnInfo, ModelInfo
 from trellis_datamodel.adapters.bruin import BruinAdapter
 from trellis_datamodel.exceptions import FileOperationError
+from trellis_datamodel.models.metric import MetricEntry, MetricTreeFile
 from trellis_datamodel.services.ossie import (
     DEFAULT_FILENAME,
     FIELD_DIALECT,
@@ -1468,3 +1469,408 @@ class TestPushIntegration:
 
         warning = next(w for w in result.warnings if 'model "customer"' in w)
         assert "schema" in warning
+
+
+# The document today's exporter writes for one product and one sale dataset.
+# Captured before metric emission landed; metric preservation must not alter it.
+GOLDEN_NO_METRICS = """version: 0.2.0.dev0
+name: company
+datasets:
+  - name: dim_product
+    source: main.dim_product
+    description: Product catalog
+    primary_key:
+      - product_id
+    fields:
+      - name: product_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: product_id
+        datatype: String
+        dimension:
+          is_time: false
+      - name: product_name
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: product_name
+        datatype: String
+        dimension:
+          is_time: false
+  - name: fct_sale
+    source: main.fct_sale
+    fields:
+      - name: sale_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: sale_id
+        datatype: String
+        dimension:
+          is_time: false
+      - name: product_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: product_id
+        datatype: String
+        dimension:
+          is_time: false
+relationships:
+  - name: fct_sale_to_dim_product
+    from: fct_sale
+    to: dim_product
+    from_columns:
+      - product_id
+    to_columns:
+      - product_id
+metrics: []
+"""
+
+
+def draft(metric_id, expression="sum(amount)", dataset_ref=None, description=None):
+    """A drafted metric as metric_tree.yml stores it."""
+    entry = {
+        "id": metric_id,
+        "label": metric_id.replace("_", " ").title(),
+        "expression": expression,
+    }
+    if description:
+        entry["description"] = description
+    if dataset_ref:
+        entry["dataset_ref"] = dataset_ref
+    return entry
+
+
+def configure_metrics(
+    monkeypatch, tmp_path, *, enabled=True, metrics=None, dialect="ANSI_SQL"
+):
+    """Point `metrics.*` at tmp_path, writing the tree there when one is given."""
+    tree_path = Path(tmp_path) / "metric_tree.yml"
+    if metrics is not None:
+        tree_path.write_text(
+            yaml.safe_dump(
+                {"version": 0.1, "metrics": list(metrics), "influences": []}
+            )
+        )
+    monkeypatch.setattr(
+        cfg,
+        "METRICS_CONFIG",
+        cfg.MetricsConfig(
+            enabled=enabled,
+            file=str(tree_path),
+            layout_file=str(Path(tmp_path) / "metric_layout.yml"),
+            expression_dialect=dialect,
+        ),
+    )
+    return tree_path
+
+
+def export_product_and_sale(
+    tmp_path,
+    monkeypatch,
+    *,
+    metrics=None,
+    enabled=True,
+    existing=None,
+    dialect="ANSI_SQL",
+    tree=None,
+    filename=DEFAULT_FILENAME,
+):
+    """Export a fixed two-dataset model with the given metric tree state."""
+    path = Path(tmp_path) / filename
+    monkeypatch.setattr(cfg, "OSSIE_CONFIG", cfg.OssieConfig(file=str(path)))
+    configure_metrics(
+        monkeypatch, tmp_path, enabled=enabled, metrics=metrics, dialect=dialect
+    )
+    if existing is not None:
+        path.write_text(yaml.safe_dump(existing, sort_keys=False))
+    result = export_ossie(
+        [PRODUCT_ENTITY, SALE_ENTITY],
+        [],
+        "company",
+        [PRODUCT_MODEL, SALE_MODEL],
+        metric_tree=tree,
+    )
+    return path, result
+
+
+FOREIGN_EXISTING = {
+    "version": "0.2.0.dev0",
+    "name": "company",
+    "datasets": [
+        {
+            "name": "fct_sale",
+            "source": "main.fct_sale",
+            "fields": [],
+            "metrics": [
+                {
+                    "name": "manual_orders",
+                    "description": "Kept by hand",
+                    "expression": {
+                        "dialects": [
+                            {"dialect": "ANSI_SQL", "expression": "count(*)"}
+                        ]
+                    },
+                    "datatype": "Integer",
+                    "ai_context": {"synonyms": ["orders"]},
+                    "custom_extensions": [
+                        {"vendor_name": "ACME", "data": "opaque"}
+                    ],
+                }
+            ],
+        },
+        {"name": "dim_product", "source": "main.dim_product", "fields": []},
+    ],
+    "relationships": [],
+    "metrics": [
+        {
+            "name": "model_margin",
+            "expression": {
+                "dialects": [
+                    {"dialect": "ANSI_SQL", "expression": "sum(amount) - sum(cost)"}
+                ]
+            },
+            "custom_extensions": [{"vendor_name": "ACME", "data": "opaque"}],
+        }
+    ],
+}
+
+
+class TestMetricEmission:
+    def test_dataset_ref_lands_under_that_dataset(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, _ = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[
+                draft("revenue", "sum(amount)", "sale", "Booked revenue."),
+                draft("orders", "count(*)", "sale"),
+            ],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        datasets = {dataset["name"]: dataset for dataset in document["datasets"]}
+        assert [m["name"] for m in datasets["fct_sale"]["metrics"]] == [
+            "orders",
+            "revenue",
+        ]
+        assert datasets["fct_sale"]["metrics"][1] == {
+            "name": "revenue",
+            "description": "Booked revenue.",
+            "expression": {
+                "dialects": [
+                    {"dialect": "ANSI_SQL", "expression": "sum(amount)"}
+                ]
+            },
+        }
+        assert "description" not in datasets["fct_sale"]["metrics"][0]
+        # The dataset carries metrics after its fields, and only when non-empty.
+        assert list(datasets["fct_sale"])[-1] == "metrics"
+        assert "metrics" not in datasets["dim_product"]
+        assert document["metrics"] == []
+
+    def test_draft_without_dataset_ref_lands_at_root_sorted_by_name(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, _ = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[draft("revenue"), draft("margin", "avg(price)")],
+            dialect="OSSIE_SQL_2026",
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert [m["name"] for m in document["metrics"]] == ["margin", "revenue"]
+        assert document["metrics"][0]["expression"] == {
+            "dialects": [{"dialect": "OSSIE_SQL_2026", "expression": "avg(price)"}]
+        }
+        assert "datatype" not in document["metrics"][0]
+        assert all("metrics" not in dataset for dataset in document["datasets"])
+
+    def test_existing_metrics_survive_at_both_levels(self, validator, tmp_path, monkeypatch):
+        path, _ = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[draft("revenue", "sum(amount)", "sale"), draft("margin")],
+            existing=FOREIGN_EXISTING,
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        datasets = {dataset["name"]: dataset for dataset in document["datasets"]}
+        assert [m["name"] for m in datasets["fct_sale"]["metrics"]] == [
+            "revenue",
+            "manual_orders",
+        ]
+        preserved = datasets["fct_sale"]["metrics"][1]
+        assert list(preserved) == [
+            "name",
+            "description",
+            "expression",
+            "datatype",
+            "ai_context",
+            "custom_extensions",
+        ]
+        assert preserved["datatype"] == "Integer"
+        assert preserved["ai_context"] == {"synonyms": ["orders"]}
+        assert preserved["custom_extensions"] == [
+            {"vendor_name": "ACME", "data": "opaque"}
+        ]
+
+        assert [m["name"] for m in document["metrics"]] == [
+            "margin",
+            "model_margin",
+        ]
+        root_preserved = document["metrics"][1]
+        assert root_preserved["custom_extensions"] == [
+            {"vendor_name": "ACME", "data": "opaque"}
+        ]
+        assert "datatype" not in root_preserved
+
+    def test_disabled_emits_nothing_and_still_preserves(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, _ = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[draft("revenue", "sum(amount)", "sale"), draft("margin")],
+            enabled=False,
+            existing=FOREIGN_EXISTING,
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        datasets = {dataset["name"]: dataset for dataset in document["datasets"]}
+        assert [m["name"] for m in datasets["fct_sale"]["metrics"]] == [
+            "manual_orders"
+        ]
+        assert [m["name"] for m in document["metrics"]] == ["model_margin"]
+        assert "metrics" not in datasets["dim_product"]
+
+    def test_unresolvable_dataset_ref_warns_and_falls_back_to_the_root(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[draft("orphan", "sum(x)", "ghost")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert [m["name"] for m in document["metrics"]] == ["orphan"]
+        assert all("metrics" not in dataset for dataset in document["datasets"])
+
+        warning = next(w for w in result.warnings if "orphan" in w)
+        assert "ghost" in warning
+        assert "root" in warning
+
+    def test_preserved_metric_of_a_vanished_dataset_moves_to_the_root(
+        self, validator, tmp_path, monkeypatch
+    ):
+        existing = {
+            "version": "0.2.0.dev0",
+            "name": "company",
+            "datasets": [
+                {
+                    "name": "legacy",
+                    "source": "main.legacy",
+                    "fields": [],
+                    "metrics": [
+                        {
+                            "name": "legacy_orders",
+                            "expression": {
+                                "dialects": [
+                                    {"dialect": "ANSI_SQL", "expression": "count(*)"}
+                                ]
+                            },
+                        }
+                    ],
+                }
+            ],
+            "relationships": [],
+            "metrics": [],
+        }
+
+        path, result = export_product_and_sale(
+            tmp_path, monkeypatch, existing=existing
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert "legacy" not in {dataset["name"] for dataset in document["datasets"]}
+        assert [m["name"] for m in document["metrics"]] == ["legacy_orders"]
+        warning = next(w for w in result.warnings if "legacy_orders" in w)
+        assert "legacy" in warning
+        assert "root" in warning
+
+    def test_second_push_is_byte_identical(self, tmp_path, monkeypatch):
+        metrics = [
+            draft("revenue", "sum(amount)", "sale", "Booked revenue."),
+            draft("orders", "count(*)", "sale"),
+            draft("margin"),
+        ]
+        path, _ = export_product_and_sale(
+            tmp_path, monkeypatch, metrics=metrics, existing=FOREIGN_EXISTING
+        )
+        first = path.read_bytes()
+
+        export_product_and_sale(
+            tmp_path, monkeypatch, metrics=metrics, existing=None
+        )
+
+        assert path.read_bytes() == first
+
+    def test_explicit_tree_argument_wins_over_the_file(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, _ = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[draft("from_file")],
+            tree=MetricTreeFile(
+                metrics=[MetricEntry(id="from_argument", label="Arg", expression="sum(x)")]
+            ),
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert [m["name"] for m in document["metrics"]] == ["from_argument"]
+
+    def test_no_metric_tree_file_matches_the_pre_change_golden(
+        self, tmp_path, monkeypatch
+    ):
+        path = Path(tmp_path) / DEFAULT_FILENAME
+        monkeypatch.setattr(cfg, "OSSIE_CONFIG", cfg.OssieConfig(file=str(path)))
+        configure_metrics(monkeypatch, tmp_path, enabled=False)
+
+        export_ossie(
+            [
+                {
+                    "id": "product",
+                    "description": "Product catalog",
+                    "model_ref": "model.company.dim_product",
+                },
+                SALE_ENTITY,
+            ],
+            [
+                relationship(
+                    "sale", "product", "many_to_one", "product_id", "product_id"
+                )
+            ],
+            "company",
+            [PRODUCT_MODEL, SALE_MODEL],
+        )
+
+        assert path.read_text() == GOLDEN_NO_METRICS
