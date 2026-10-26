@@ -44,12 +44,12 @@ T1 and the T2/T3 pair touch disjoint files (adapters vs config) and can run in p
 
 - [x] T1 - `project_name` on `ProjectStatus` (S, 5 files) - deps: none
 - [x] T2 - `OssieConfig` backend plumbing (S, 3 files) - deps: none
-- [ ] T3 - Ossie config on the API surface (M, 5 files) - deps: T2
+- [x] T3 - Ossie config on the API surface (M, 5 files) - deps: T2
 
 #### Checkpoint A: Foundation
-- [ ] `uv run pytest trellis_datamodel/tests/test_adapter_protocol_surface.py trellis_datamodel/tests/test_config_api.py -q` passes
-- [ ] `uv run pytest -q` passes
-- [ ] `GET /api/config` returns an `ossie` block with four fields and `ossie.enabled` listed in `beta_flags`
+- [x] `uv run pytest trellis_datamodel/tests/test_adapter_protocol_surface.py trellis_datamodel/tests/test_config.py trellis_datamodel/tests/test_config_api.py -q` passes
+- [x] `uv run pytest -q` passes
+- [x] `GET /api/config` returns an `ossie` block with four fields and `ossie.enabled` listed in `beta_flags`
 
 ### Phase 2: Exporter
 

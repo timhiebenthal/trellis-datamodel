@@ -1,5 +1,5 @@
 """Pydantic models for API request/response schemas."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Dict, Any, Union, Literal
 from enum import Enum
 
@@ -82,6 +82,27 @@ class BusinessEventsConfig(BaseModel):
     file: str = Field(default="", description="Path to business events YAML file")
 
 
+class OssieSourceConfig(BaseModel):
+    """Address segments for the Ossie dataset names (beta).
+
+    The wire key is `schema`, but the attribute is `schema_name`: pydantic
+    warns when a field shadows `BaseModel.schema`. The alias keeps the YAML
+    and JSON spelling unchanged, so nothing consuming the config sees the
+    difference.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    database: str = ""
+    schema_name: str = Field(default="", alias="schema")
+
+
+class OssieConfig(BaseModel):
+    """Apache Ossie semantic model export configuration (beta)."""
+    enabled: bool = False
+    file: str = ""
+    source: OssieSourceConfig = Field(default_factory=OssieSourceConfig)
+
+
 class CanvasDefaultFilters(BaseModel):
     """Project-wide default filters for the Canvas."""
     domains: List[str] = Field(default_factory=list)
@@ -113,6 +134,7 @@ class ConfigSchema(BaseModel):
     entity_creation_guidance: EntityCreationGuidance = Field(default_factory=EntityCreationGuidance)
     exposures: ExposuresConfig = Field(default_factory=ExposuresConfig)
     business_events: BusinessEventsConfig = Field(default_factory=BusinessEventsConfig)
+    ossie: OssieConfig = Field(default_factory=OssieConfig)
     dimensional_modeling: Optional[DimensionalModelingConfig] = Field(default=None)
     entity_modeling: Optional[EntityModelingConfig] = Field(default=None)
 

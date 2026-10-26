@@ -68,17 +68,17 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Expose the Ossie block through `/api/config` so the Config page can render it: pydantic model on `ConfigSchema`, field metadata entries, beta flags, and a normalization branch so a `PUT` persists the nested `source` block instead of dropping it. Add a commented block to `trellis.yml.example`.
 
 **Acceptance criteria:**
-- [ ] `ConfigSchema` gains `ossie: OssieConfig` with `enabled`, `file`, `database`, `schema` nested under `source`
-- [ ] `_FIELD_DEFINITIONS` describes `ossie.enabled`, `ossie.file`, `ossie.source.database`, `ossie.source.schema`, each `beta=True`
-- [ ] The `ossie.source.database` description states that adapter-derived values reflect the target that last ran dbt, so the field exists to override them
-- [ ] `_BETA_FIELDS` lists all four paths, and `GET /api/config` reports them in `beta_flags`
-- [ ] `_normalize_nested_config` has an `ossie` branch preserving `enabled`, `file`, and the nested `source.database` / `source.schema` strings
-- [ ] A `PUT` followed by a `GET` round-trips the nested block without losing `source`
-- [ ] `trellis.yml.example` documents the block, including the default filename and the dev-target caveat
+- [x] `ConfigSchema` gains `ossie: OssieConfig` with `enabled`, `file`, `database`, `schema` nested under `source`
+- [x] `_FIELD_DEFINITIONS` describes `ossie.enabled`, `ossie.file`, `ossie.source.database`, `ossie.source.schema`, each `beta=True`
+- [x] The `ossie.source.database` description states that adapter-derived values reflect the target that last ran dbt, so the field exists to override them
+- [x] `_BETA_FIELDS` lists all four paths, and `GET /api/config` reports them in `beta_flags`
+- [x] `_normalize_nested_config` has an `ossie` branch preserving `enabled`, `file`, and the nested `source.database` / `source.schema` strings
+- [x] A `PUT` followed by a `GET` round-trips the nested block without losing `source`
+- [x] `trellis.yml.example` documents the block, including the default filename and the dev-target caveat
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_config_api.py -q` passes
-- [ ] New tests cover the round-trip and the beta listing
+- [x] `uv run pytest trellis_datamodel/tests/test_config_api.py -q` passes
+- [x] New tests cover the round-trip and the beta listing
 - [ ] `curl -s localhost:8089/api/config | python3 -m json.tool` shows the block (manual, after `make backend`)
 
 **Dependencies:** Task 2
@@ -95,9 +95,9 @@ Rules for every task: no production code without a failing test first; no comple
 
 ## Checkpoint A: Foundation
 
-- [ ] `uv run pytest trellis_datamodel/tests/test_adapter_protocol_surface.py trellis_datamodel/tests/test_config.py trellis_datamodel/tests/test_config_api.py -q` passes
-- [ ] `uv run pytest -q` passes
-- [ ] `GET /api/config` returns the `ossie` block and lists `ossie.enabled` in `beta_flags`
+- [x] `uv run pytest trellis_datamodel/tests/test_adapter_protocol_surface.py trellis_datamodel/tests/test_config.py trellis_datamodel/tests/test_config_api.py -q` passes
+- [x] `uv run pytest -q` passes
+- [x] `GET /api/config` returns the `ossie` block and lists `ossie.enabled` in `beta_flags`
 
 ---
 
