@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0b1] - 2026-10-26
+
 ### Added
 - **Ossie semantic model export (beta, opt-in):** a new `ossie` block in
   `trellis.yml` - `enabled`, `file`, `source.database` and `source.schema` - lets
