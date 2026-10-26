@@ -47,6 +47,7 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
+from trellis_datamodel.utils.structured_data import load_yaml_or_json
 from . import entity_type_inference
 from .artifact_snapshot import clear_snapshots
 from .base import (
@@ -1123,8 +1124,20 @@ class BruinAdapter:
         else:
             error = None
 
+        project_name = ""
+        if pipeline_exists:
+            try:
+                definition = load_yaml_or_json(pipeline_definition)
+            except Exception:
+                definition = None
+            if isinstance(definition, dict) and definition.get("name"):
+                project_name = definition["name"]
+            else:
+                project_name = os.path.basename(os.path.normpath(self.pipeline_path))
+
         return ProjectStatus(
             framework=FRAMEWORK_NAME,
+            project_name=project_name,
             artifacts_present=assets_found > 0,
             artifacts={
                 "pipeline": {

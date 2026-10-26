@@ -11,17 +11,17 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Add `project_name: str` to the `ProjectStatus` TypedDict and populate it in both adapters, so the exporter can name the Ossie document without reading framework artifacts itself. The dbt adapter reads `manifest.metadata.project_name`; the Bruin adapter reads `name` from `pipeline.yml` in the pipeline directory and falls back to the pipeline directory name. `FakeAdapter` returns `"fake"`.
 
 **Acceptance criteria:**
-- [ ] `ProjectStatus` declares `project_name`, documented as the framework's own project or pipeline identity
-- [ ] `DbtCoreAdapter.get_project_status()` returns `"company_dummy"` against `dbt_company_dummy/target/manifest.json`
-- [ ] `DbtCoreAdapter` returns `""` when the manifest is missing, alongside its existing error rather than raising
-- [ ] `BruinAdapter.get_project_status()` returns `"trellis_test_pipeline"` against `tests/fixtures/bruin_pipeline`
-- [ ] `BruinAdapter` falls back to the pipeline directory basename when `pipeline.yml` has no `name`
-- [ ] `FakeAdapter.get_project_status()` returns `"fake"`
-- [ ] `/api/config-status` and `/api/config-info` response shapes are unchanged: both enumerate keys explicitly and neither gains `project_name`
+- [x] `ProjectStatus` declares `project_name`, documented as the framework's own project or pipeline identity
+- [x] `DbtCoreAdapter.get_project_status()` returns `"company_dummy"` against `dbt_company_dummy/target/manifest.json`
+- [x] `DbtCoreAdapter` returns `""` when the manifest is missing, alongside its existing error rather than raising
+- [x] `BruinAdapter.get_project_status()` returns `"trellis_test_pipeline"` against `tests/fixtures/bruin_pipeline`
+- [x] `BruinAdapter` falls back to the pipeline directory basename when `pipeline.yml` has no `name`
+- [x] `FakeAdapter.get_project_status()` returns `"fake"`
+- [x] `/api/config-status` and `/api/config-info` response shapes are unchanged: both enumerate keys explicitly and neither gains `project_name`
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_adapter_protocol_surface.py trellis_datamodel/tests/test_dbt_adapter_surface.py trellis_datamodel/tests/test_bruin_adapter.py -q` passes
-- [ ] `uv run pytest trellis_datamodel/tests/test_manifest.py trellis_datamodel/tests/test_config_api.py -q` passes, proving the two status routes ignore the new field
+- [x] `uv run pytest trellis_datamodel/tests/test_adapter_protocol_surface.py trellis_datamodel/tests/test_dbt_adapter_surface.py trellis_datamodel/tests/test_bruin_adapter.py -q` passes
+- [x] `uv run pytest trellis_datamodel/tests/test_manifest.py trellis_datamodel/tests/test_config_api.py -q` passes, proving the two status routes ignore the new field
 
 **Dependencies:** None
 

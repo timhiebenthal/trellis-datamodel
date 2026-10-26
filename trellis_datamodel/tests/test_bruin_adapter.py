@@ -342,6 +342,24 @@ class TestGetProjectStatus:
         assert status["project_path_exists"] is True
         assert status["error"] is None
 
+    def test_reports_project_name_from_pipeline_definition(self, adapter):
+        assert adapter.get_project_status()["project_name"] == "trellis_test_pipeline"
+
+    def test_project_name_falls_back_to_directory_basename(
+        self, bruin_pipeline_copy, tmp_path
+    ):
+        pipeline_definition = os.path.join(bruin_pipeline_copy, "pipeline.yml")
+        with open(pipeline_definition, "w") as f:
+            yaml.dump({"schedule": "daily"}, f)
+
+        adapter = BruinAdapter(
+            pipeline_path=bruin_pipeline_copy,
+            data_model_path=str(tmp_path / "data_model.yml"),
+            asset_paths=[],
+        )
+
+        assert adapter.get_project_status()["project_name"] == "pipeline"
+
     def test_reports_pipeline_and_assets_artifacts(self, adapter):
         artifacts = adapter.get_project_status()["artifacts"]
 

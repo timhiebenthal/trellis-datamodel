@@ -42,7 +42,7 @@ T1 and the T2/T3 pair touch disjoint files (adapters vs config) and can run in p
 
 ### Phase 1: Foundation
 
-- [ ] T1 - `project_name` on `ProjectStatus` (S, 5 files) - deps: none
+- [x] T1 - `project_name` on `ProjectStatus` (S, 5 files) - deps: none
 - [ ] T2 - `OssieConfig` backend plumbing (S, 3 files) - deps: none
 - [ ] T3 - Ossie config on the API surface (M, 5 files) - deps: T2
 

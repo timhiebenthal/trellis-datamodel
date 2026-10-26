@@ -17,6 +17,12 @@ class TestGetConfigStatus:
         assert data["manifest_exists"] is True
         assert "dbt_project_path" in data
 
+    def test_does_not_expose_adapter_project_name(self, test_client, mock_manifest):
+        """The route enumerates keys explicitly, so adapter additions stay internal."""
+        data = test_client.get("/api/config-status").json()
+
+        assert "project_name" not in data
+
 
 class TestGetConfigInfo:
     """Tests for GET /api/config-info endpoint."""
@@ -34,6 +40,12 @@ class TestGetConfigInfo:
         data = response.json()
         assert data["lineage_enabled"] is True
         assert data["lineage_layers"] == ["one", "two"]
+
+    def test_does_not_expose_adapter_project_name(self, test_client, mock_manifest):
+        """The route enumerates keys explicitly, so adapter additions stay internal."""
+        data = test_client.get("/api/config-info").json()
+
+        assert "project_name" not in data
 
     def test_includes_bus_matrix_field(self, test_client, monkeypatch):
         import sys

@@ -1876,8 +1876,19 @@ class DbtCoreAdapter:
         else:
             error = None
 
+        project_name = ""
+        if manifest_exists:
+            try:
+                snapshot = self._get_artifact_snapshot()
+                project_name = (
+                    snapshot.manifest.get("metadata", {}).get("project_name") or ""
+                )
+            except Exception:
+                project_name = ""
+
         return ProjectStatus(
             framework=FRAMEWORK_NAME,
+            project_name=project_name,
             artifacts_present=manifest_exists,
             artifacts={
                 "manifest": {

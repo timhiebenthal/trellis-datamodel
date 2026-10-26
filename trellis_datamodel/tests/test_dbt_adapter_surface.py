@@ -18,6 +18,7 @@ from trellis_datamodel.exceptions import FileOperationError, NotFoundError
 
 
 MANIFEST = {
+    "metadata": {"project_name": "company_dummy"},
     "nodes": {
         "model.proj.dim__customer": {
             "unique_id": "model.proj.dim__customer",
@@ -275,6 +276,16 @@ class TestGetProjectStatus:
         # No catalog was written, and that is not an error — it is optional.
         assert status["artifacts"]["catalog"]["exists"] is False
         assert status["error"] is None
+
+    def test_reports_project_name_from_manifest(self, adapter):
+        status = adapter.get_project_status()
+
+        assert status["project_name"] == "company_dummy"
+
+    def test_missing_manifest_has_empty_project_name(self, adapter):
+        os.remove(adapter.manifest_path)
+
+        assert adapter.get_project_status()["project_name"] == ""
 
     def test_reports_resolved_model_paths(self, adapter):
         status = adapter.get_project_status()
