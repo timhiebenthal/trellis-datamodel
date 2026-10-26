@@ -9,6 +9,7 @@ from trellis_datamodel.models.metric import MetricTreeUpdate
 from trellis_datamodel.services.metric_tree import (
     load_metric_tree,
     merge_layout,
+    resolve_catalog,
     save_metric_tree,
 )
 
@@ -28,12 +29,8 @@ def _ensure_metrics_enabled() -> None:
 
 
 def _build_catalog() -> list[dict[str, Any]]:
-    """Return the bindable plus read-only metric catalog.
-
-    Placeholder until catalog resolution lands: this is the single call site
-    the GET response reads, so filling it in needs no change elsewhere.
-    """
-    return []
+    """Return the bindable plus read-only metric catalog from semantic_model.yml."""
+    return resolve_catalog()
 
 
 @router.get("/metric-tree")

@@ -1,8 +1,10 @@
 """Tests for /api/metric-tree and the `metrics_enabled` config-info flag."""
 
 import os
+from pathlib import Path
 
 import pytest
+import yaml
 
 import trellis_datamodel.config as cfg
 from trellis_datamodel.utils.structured_data import load_yaml_or_json
@@ -114,7 +116,19 @@ class TestGetMetricTree:
 class TestPostMetricTree:
     """POST validates, splits layout out and writes both files."""
 
-    def test_round_trip_writes_both_files(self, test_client, metrics_paths):
+    def test_round_trip_writes_both_files(
+        self, test_client, metrics_paths, temp_data_model_path
+    ):
+        Path(temp_data_model_path).write_text(
+            yaml.safe_dump(
+                {
+                    "version": 0.1,
+                    "entities": [{"id": "fct__order", "label": "Order fact"}],
+                    "relationships": [],
+                }
+            )
+        )
+
         response = test_client.post("/api/metric-tree", json=_payload())
 
         assert response.status_code == 200

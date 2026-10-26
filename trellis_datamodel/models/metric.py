@@ -37,6 +37,13 @@ class MetricEntry(BaseModel):
     position: Position | None = Field(
         None, description="Canvas position supplied by the client, split into metric_layout.yml"
     )
+    # Read-only resolution state for the API, attached at load time. Never
+    # authored by a client and never written: `save_metric_tree` excludes it
+    # from the document it dumps.
+    unresolved: bool | None = Field(
+        None,
+        description="True when the binding or dataset_ref no longer resolves; read only",
+    )
 
 
 class Influence(BaseModel):
