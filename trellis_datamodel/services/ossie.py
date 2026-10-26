@@ -4,8 +4,8 @@ Writes one flat `0.2.0.dev0` document from the entities bound in
 `data_model.yml`. The spec is a draft, so the version is pinned in one constant
 and the whole mapping lives here rather than leaking into routes or adapters.
 
-Relationships and keys are filled by later tasks; this module currently emits
-datasets and fields only.
+Datasets, fields and key inference are implemented here. Relationships are
+filled by a later task.
 """
 
 from dataclasses import dataclass, field
@@ -13,11 +13,12 @@ from pathlib import Path
 from typing import Any
 
 import trellis_datamodel.config as cfg
-from trellis_datamodel.adapters.base import ModelInfo
+from trellis_datamodel.adapters.base import ColumnSchema, ModelInfo, ModelSchema
 from trellis_datamodel.models.entity_keys import (
     get_model_ref,
     get_physical_datatype,
 )
+from trellis_datamodel.services.fk_placement import place_foreign_key
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 
 OSSIE_VERSION = "0.2.0.dev0"
@@ -168,8 +169,80 @@ def _build_source(model: ModelInfo) -> str:
     return ".".join(part for part in (database, schema, table) if part)
 
 
+def _test_names(column: ColumnSchema) -> set[str]:
+    """Test names on a dbt-shaped column, dict- or string-shaped."""
+    names: set[str] = set()
+    for test in column.get("data_tests") or []:
+        if isinstance(test, dict):
+            names.update(str(key).strip().lower() for key in test)
+        elif isinstance(test, str):
+            names.add(test.strip().lower())
+    return names
+
+
+def _is_key_candidate(column: ColumnSchema) -> bool:
+    """Bruin's `primary_key: true`, or dbt's unique *and* not_null pair.
+
+    `unique` alone does not identify rows, so it is not a candidate.
+    """
+    if column.get("primary_key") is True:
+        return True
+    names = _test_names(column)
+    return "unique" in names and "not_null" in names
+
+
+def _key_candidates(
+    entity_id: str,
+    schema: ModelSchema | None,
+    relationships: list[dict],
+) -> list[str]:
+    """Distinct candidate field names, metadata first, then the FK fallback."""
+    candidates: list[str] = []
+    for column in (schema or {}).get("columns") or []:
+        name = (column.get("name") or "").strip()
+        if name and name not in candidates and _is_key_candidate(column):
+            candidates.append(name)
+
+    if candidates:
+        return candidates
+
+    # No framework metadata: the referenced side of an inbound relationship is
+    # the only evidence of uniqueness available.
+    for relationship in relationships:
+        placement = place_foreign_key(
+            relationship.get("type") or "",
+            relationship.get("source") or "",
+            relationship.get("source_field") or "",
+            relationship.get("target") or "",
+            relationship.get("target_field") or "",
+        )
+        if placement.ref_entity != entity_id:
+            continue
+        name = (placement.ref_field or "").strip()
+        if name and name not in candidates:
+            candidates.append(name)
+    return candidates
+
+
+def _key_entries(candidates: list[str]) -> dict[str, Any]:
+    """One candidate is the primary key; independent candidates are unique keys.
+
+    A multi-element `primary_key` would mean one composite key, which is not
+    what independent unique columns describe.
+    """
+    if len(candidates) == 1:
+        return {"primary_key": [candidates[0]]}
+    if candidates:
+        return {"unique_keys": [[candidate] for candidate in candidates]}
+    return {}
+
+
 def _build_dataset(
-    entity: dict[str, Any], model: ModelInfo
+    entity: dict[str, Any],
+    entity_id: str,
+    model: ModelInfo,
+    model_schemas: dict[str, ModelSchema] | None,
+    relationships: list[dict],
 ) -> dict[str, Any]:
     dataset: dict[str, Any] = {
         "name": (model.get("name") or model.get("unique_id") or "").strip(),
@@ -178,7 +251,18 @@ def _build_dataset(
     description = entity.get("description")
     if description:
         dataset["description"] = description
-    dataset["fields"] = _build_fields(entity, model)
+
+    fields = _build_fields(entity, model)
+    field_names = {field["name"] for field in fields}
+    schema = (model_schemas or {}).get(model.get("unique_id") or "")
+    candidates = [
+        candidate
+        for candidate in _key_candidates(entity_id, schema, relationships)
+        if candidate in field_names
+    ]
+    dataset.update(_key_entries(candidates))
+
+    dataset["fields"] = fields
     return dataset
 
 
@@ -211,8 +295,13 @@ def export_ossie(
     relationships: list[dict],
     project_name: str,
     models: list[ModelInfo],
+    model_schemas: dict[str, ModelSchema] | None = None,
 ) -> OssieExport:
     """Write one Ossie document for every entity bound to an adapter model.
+
+    `model_schemas` is keyed by `unique_id` and carries the column metadata the
+    key rules need; the exporter never calls an adapter itself. When a model has
+    no entry, key inference falls back to inbound relationships.
 
     Returns the written path (None when no dataset resolved) plus warnings for
     every skipped entity, so the push flow can explain an empty document.
@@ -244,7 +333,9 @@ def export_ossie(
             )
             continue
 
-        datasets.append(_build_dataset(entity, model))
+        datasets.append(
+            _build_dataset(entity, entity_id, model, model_schemas, relationships)
+        )
 
     datasets.sort(key=lambda dataset: dataset["name"])
 

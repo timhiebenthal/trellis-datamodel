@@ -144,17 +144,19 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Fill `primary_key` and `unique_keys` on each dataset from framework metadata, without ever producing an accidental composite key.
 
 **Acceptance criteria:**
-- [ ] Candidates come from Bruin columns with `primary_key: true` and from dbt columns carrying both a `unique` and a `not_null` test
-- [ ] Exactly one candidate yields `primary_key: [<field>]` and no `unique_keys`
-- [ ] Two or more candidates yield `unique_keys: [[a], [b]]` and no `primary_key`
-- [ ] With no metadata candidate, the `to_columns` field of a relationship pointing at the dataset is used as a single candidate
-- [ ] With nothing available, both keys are omitted
-- [ ] A candidate naming a field that is not in the dataset's fields is dropped rather than emitted
-- [ ] The dbt dummy project's `dim_product` gets a key from its tests, and `procurement` stays absent because it is a draft entity
+- [x] Candidates come from Bruin columns with `primary_key: true` and from dbt columns carrying both a `unique` and a `not_null` test
+- [x] Exactly one candidate yields `primary_key: [<field>]` and no `unique_keys`
+- [x] Two or more candidates yield `unique_keys: [[a], [b]]` and no `primary_key`
+- [x] With no metadata candidate, the `to_columns` field of a relationship pointing at the dataset is used as a single candidate
+- [x] With nothing available, both keys are omitted
+- [x] A candidate naming a field that is not in the dataset's fields is dropped rather than emitted
+- [x] The Bruin fixture's `dim__customer` gets `primary_key: ["customer_id"]` from its asset header
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q -k key` passes
-- [ ] The golden documents still validate
+- [x] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q -k key` passes
+- [x] The golden documents still validate
+
+**Note:** key metadata is not on `ModelInfo.columns`, so `export_ossie` gained an optional `model_schemas` argument keyed by `unique_id`. Task 7 supplies it from `adapter.get_model_schema`, keeping adapter I/O out of the exporter. The dbt-dummy acceptance line was exercised through a dbt-shaped schema fixture plus the real Bruin fixture, because the dummy manifest is gitignored.
 
 **Dependencies:** Task 4
 

@@ -1,4 +1,4 @@
-"""Tests for the Apache Ossie exporter (Task 4: datasets and fields).
+"""Tests for the Apache Ossie exporter (Tasks 4-5: datasets, fields, keys).
 
 Every emitted document is validated against the vendored official
 `0.2.0.dev0` schema, so a stale schema cannot silently pass everything.
@@ -80,6 +80,27 @@ def model(
 def read_yaml(path):
     with open(path) as f:
         return yaml.safe_load(f)
+
+
+def model_schema(*columns):
+    """A ModelSchema-shaped dict, as an adapter's get_model_schema returns."""
+    return {"model_name": "dim_product", "columns": list(columns)}
+
+
+def bruin_column(name, primary_key=False):
+    """A ColumnSchema as `_asset_to_model_schema` shapes it for Bruin."""
+    entry = {"name": name, "data_type": "varchar", "description": ""}
+    if primary_key:
+        entry["primary_key"] = True
+    return entry
+
+
+def dbt_column(name, tests):
+    """A ColumnSchema as `YamlHandler.get_columns` shapes it for dbt."""
+    return {"name": name, "data_type": "varchar", "data_tests": list(tests)}
+
+
+UNIQUE_AND_NOT_NULL = [{"unique": {}}, {"not_null": {}}]
 
 
 class TestHandBuiltDocument:
@@ -265,6 +286,313 @@ class TestDraftedFieldMerging:
         assert "datatype" not in by_name["mystery"]
 
 
+class TestKeyInference:
+    def test_bruin_primary_key_column_becomes_the_primary_key(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {
+                "id": "product",
+                "description": "Product catalog",
+                "model_ref": "model.company.dim_product",
+            }
+        ]
+        models = [
+            model(
+                columns=[
+                    column("product_id", "varchar"),
+                    column("product_name", "text"),
+                ]
+            )
+        ]
+        schemas = {
+            "model.company.dim_product": model_schema(
+                bruin_column("product_id", primary_key=True),
+                bruin_column("product_name"),
+            )
+        }
+
+        export_ossie(entities, [], "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+
+        assert dataset["primary_key"] == ["product_id"]
+        assert "unique_keys" not in dataset
+        # Key sits after source/description and before fields.
+        assert list(dataset) == [
+            "name",
+            "source",
+            "description",
+            "primary_key",
+            "fields",
+        ]
+
+    def test_two_candidates_become_independent_unique_keys(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [
+            model(
+                columns=[
+                    column("product_id", "varchar"),
+                    column("sku", "varchar"),
+                ]
+            )
+        ]
+        schemas = {
+            "model.company.dim_product": model_schema(
+                dbt_column("product_id", UNIQUE_AND_NOT_NULL),
+                dbt_column("sku", UNIQUE_AND_NOT_NULL),
+            )
+        }
+
+        export_ossie(entities, [], "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+
+        assert dataset["unique_keys"] == [["product_id"], ["sku"]]
+        assert "primary_key" not in dataset
+
+    def test_unique_test_alone_is_not_a_candidate(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [
+            model(
+                columns=[
+                    column("product_id", "varchar"),
+                    column("sku", "varchar"),
+                ]
+            )
+        ]
+        schemas = {
+            "model.company.dim_product": model_schema(
+                dbt_column("product_id", [{"unique": {}}]),
+                bruin_column("sku"),
+            )
+        }
+
+        export_ossie(entities, [], "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+
+        assert "primary_key" not in dataset
+        assert "unique_keys" not in dataset
+
+    def test_bare_string_test_entries_count_as_key_candidates(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [model(columns=[column("product_id", "varchar")])]
+        schemas = {
+            "model.company.dim_product": model_schema(
+                dbt_column("product_id", ["unique", "not_null"]),
+            )
+        }
+
+        export_ossie(entities, [], "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["datasets"][0]["primary_key"] == ["product_id"]
+
+    def test_relationship_reference_side_is_the_fallback_key(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "customer", "model_ref": "model.company.dim_customer"},
+            {"id": "sale", "model_ref": "model.company.fct_sale"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[column("customer_id", "varchar")],
+            ),
+            model(
+                unique_id="model.company.fct_sale",
+                name="fct_sale",
+                columns=[column("customer_id", "varchar")],
+            ),
+        ]
+        relationships = [
+            {
+                "source": "sale",
+                "target": "customer",
+                "type": "many_to_one",
+                "source_field": "customer_id",
+                "target_field": "customer_id",
+            }
+        ]
+
+        export_ossie(entities, relationships, "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        datasets = {d["name"]: d for d in document["datasets"]}
+
+        assert datasets["dim_customer"]["primary_key"] == ["customer_id"]
+        assert "primary_key" not in datasets["fct_sale"]
+        assert "unique_keys" not in datasets["fct_sale"]
+
+    def test_metadata_wins_over_the_relationship_fallback(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "customer", "model_ref": "model.company.dim_customer"},
+            {"id": "sale", "model_ref": "model.company.fct_sale"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[
+                    column("customer_key", "varchar"),
+                    column("customer_id", "varchar"),
+                ],
+            ),
+            model(
+                unique_id="model.company.fct_sale",
+                name="fct_sale",
+                columns=[column("customer_id", "varchar")],
+            ),
+        ]
+        relationships = [
+            {
+                "source": "sale",
+                "target": "customer",
+                "type": "many_to_one",
+                "source_field": "customer_id",
+                "target_field": "customer_id",
+            }
+        ]
+        schemas = {
+            "model.company.dim_customer": model_schema(
+                bruin_column("customer_key", primary_key=True),
+                bruin_column("customer_id"),
+            )
+        }
+
+        export_ossie(entities, relationships, "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        datasets = {d["name"]: d for d in document["datasets"]}
+
+        assert datasets["dim_customer"]["primary_key"] == ["customer_key"]
+
+    def test_candidate_absent_from_fields_is_dropped(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [model(columns=[column("product_id", "varchar")])]
+        schemas = {
+            "model.company.dim_product": model_schema(
+                bruin_column("product_id", primary_key=True),
+                bruin_column("legacy_id", primary_key=True),
+            )
+        }
+
+        export_ossie(entities, [], "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+
+        # The phantom candidate is dropped before counting, so one remains.
+        assert dataset["primary_key"] == ["product_id"]
+        assert "unique_keys" not in dataset
+
+    def test_only_absent_candidates_leave_both_keys_off(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [model(columns=[column("product_id", "varchar")])]
+        schemas = {
+            "model.company.dim_product": model_schema(
+                bruin_column("legacy_id", primary_key=True),
+            )
+        }
+
+        export_ossie(entities, [], "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+
+        assert "primary_key" not in dataset
+        assert "unique_keys" not in dataset
+
+    def test_nothing_available_omits_both_keys(self, validator, tmp_path, monkeypatch):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [model(columns=[column("product_id", "varchar")])]
+
+        export_ossie(entities, [], "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+
+        assert "primary_key" not in dataset
+        assert "unique_keys" not in dataset
+
+    def test_both_key_shapes_validate(self, validator, tmp_path, monkeypatch):
+        entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
+        models = [
+            model(
+                columns=[
+                    column("product_id", "varchar"),
+                    column("sku", "varchar"),
+                ]
+            )
+        ]
+
+        single = configure(monkeypatch, tmp_path / "single.yml")
+        export_ossie(
+            entities,
+            [],
+            "company",
+            models,
+            {
+                "model.company.dim_product": model_schema(
+                    bruin_column("product_id", primary_key=True),
+                    bruin_column("sku"),
+                )
+            },
+        )
+        validate(validator, read_yaml(single))
+
+        multiple = configure(monkeypatch, tmp_path / "multiple.yml")
+        export_ossie(
+            entities,
+            [],
+            "company",
+            models,
+            {
+                "model.company.dim_product": model_schema(
+                    bruin_column("product_id", primary_key=True),
+                    bruin_column("sku", primary_key=True),
+                )
+            },
+        )
+        validate(validator, read_yaml(multiple))
+
+
 class TestSourceQualification:
     def _source(self, tmp_path, monkeypatch, **overrides):
         path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME, **overrides)
@@ -427,6 +755,39 @@ class TestBruinGolden:
         )
         assert customer["source"] == "core.dim__customer"
         assert customer["description"] == "One row per customer."
+
+    def test_fixture_pipeline_keys_come_from_column_metadata(
+        self, validator, tmp_path, monkeypatch, bruin_pipeline
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        adapter = BruinAdapter(
+            pipeline_path=bruin_pipeline,
+            data_model_path="",
+            asset_paths=[],
+        )
+        models = adapter.get_models()
+        entities = [
+            {
+                "id": m["name"],
+                "description": m["description"] or "",
+                "model_ref": m["unique_id"],
+            }
+            for m in models
+        ]
+        schemas = {
+            m["unique_id"]: adapter.get_model_schema(m["name"]) for m in models
+        }
+
+        export_ossie(entities, [], "trellis_test_pipeline", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        customer = next(
+            d for d in document["datasets"] if d["name"] == "dim__customer"
+        )
+        assert customer["primary_key"] == ["customer_id"]
+        assert "unique_keys" not in customer
+
 
 
 class TestNegativeValidation:
