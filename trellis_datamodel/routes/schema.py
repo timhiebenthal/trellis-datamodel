@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from trellis_datamodel import config as cfg
 from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.models.schemas import (
     FileOperationResponse,
@@ -41,11 +42,20 @@ async def save_model_schema_endpoint(request: ModelSchemaRequest):
 @router.post("/sync-tests", response_model=SyncTestsResponse)
 async def sync_framework_tests_endpoint():
     """Sync relationship tests from data model to schema files."""
-    updated_files = sync_framework_tests()
+    outcome = sync_framework_tests()
+
+    message = f"Updated {len(outcome.files)} file(s)"
+    if outcome.ossie_path is not None:
+        message += f", wrote {outcome.ossie_path.name}"
+    elif cfg.OSSIE_CONFIG.enabled:
+        # Only explain the absence when the user asked for the export; a
+        # disabled feature should not shape the message at all.
+        message += "; no semantic model was written"
 
     return SyncTestsResponse(
-        message=f"Updated {len(updated_files)} file(s)",
-        files=[str(f) for f in updated_files],
+        message=message,
+        files=[str(f) for f in outcome.files],
+        warnings=outcome.warnings,
     )
 
 

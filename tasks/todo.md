@@ -210,17 +210,17 @@ Rules for every task: no production code without a failing test first; no comple
 **Description:** Call the exporter from `sync_framework_tests` when `ossie.enabled` is set, after framework files are written and pushed tags are persisted, and surface the result through `/api/sync-tests`.
 
 **Acceptance criteria:**
-- [ ] With `ossie.enabled: true`, one `POST /api/sync-tests` writes the framework schema files and `semantic_model.yml`
-- [ ] With `ossie.enabled: false`, no file is created and the previous file is left untouched
-- [ ] With zero resolvable bound entities, no file is written and `message` says why
-- [ ] `SyncTestsResponse` gains `warnings: List[str] = []`, populated from the exporter
-- [ ] `files` includes the Ossie path, and `message` names the written file
-- [ ] If the framework push succeeds and the Ossie write fails, the raised error states that the framework files were updated and the Ossie file was not
-- [ ] Framework-file writing and tag persistence are unchanged when Ossie is disabled, proven by the existing `test_dbt_schema.py` and `test_bruin_push.py` suites passing untouched
+- [x] With `ossie.enabled: true`, one `POST /api/sync-tests` writes the framework schema files and `semantic_model.yml`
+- [x] With `ossie.enabled: false`, no file is created and the previous file is left untouched
+- [x] With zero resolvable bound entities, no file is written and `message` says why
+- [x] `SyncTestsResponse` gains `warnings: List[str] = []`, populated from the exporter
+- [x] `files` includes the Ossie path, and `message` names the written file
+- [x] If the framework push succeeds and the Ossie write fails, the raised error states that the framework files were updated and the Ossie file was not
+- [x] Framework-file writing and tag persistence are unchanged when Ossie is disabled, proven by the existing `test_dbt_schema.py` and `test_bruin_push.py` suites passing untouched
 
 **Verification:**
-- [ ] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q -k push` passes
-- [ ] `uv run pytest trellis_datamodel/tests/test_dbt_schema.py trellis_datamodel/tests/test_bruin_push.py -q` passes
+- [x] `uv run pytest trellis_datamodel/tests/test_ossie_export.py -q -k push` passes
+- [x] `uv run pytest trellis_datamodel/tests/test_dbt_schema.py trellis_datamodel/tests/test_bruin_push.py -q` passes
 - [ ] Manual: `make preview PROJECT=dbt_company_dummy` then press Push; the file appears beside `data_model.yml`
 
 **Dependencies:** Tasks 4, 5, 6

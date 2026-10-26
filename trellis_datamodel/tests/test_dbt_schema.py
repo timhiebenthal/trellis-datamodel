@@ -522,8 +522,8 @@ class TestFrameworkNeutralServiceFunctionNames:
         with open(temp_data_model_path, "w") as f:
             yaml.dump(data_model, f)
 
-        updated_files = sync_framework_tests()
-        assert len(updated_files) == 2  # One for each entity
+        result = sync_framework_tests()
+        assert len(result.files) == 2  # One for each entity
 
 
 class TestSaveDbtSchema:

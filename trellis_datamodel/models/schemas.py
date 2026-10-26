@@ -176,6 +176,7 @@ class SuccessResponse(BaseModel):
 class SyncTestsResponse(SuccessResponse):
     """Response for sync-dbt-tests endpoint."""
     files: List[str] = []
+    warnings: List[str] = Field(default_factory=list)
 
 
 class FileOperationResponse(SuccessResponse):

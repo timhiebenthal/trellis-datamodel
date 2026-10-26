@@ -1,4 +1,5 @@
-"""Tests for the Apache Ossie exporter (Tasks 4-5: datasets, fields, keys).
+"""Tests for the Apache Ossie exporter (Tasks 4-6: datasets, fields, keys,
+relationships) and its push integration (Task 7).
 
 Every emitted document is validated against the vendored official
 `0.2.0.dev0` schema, so a stale schema cannot silently pass everything.
@@ -13,8 +14,10 @@ import pytest
 import yaml
 
 import trellis_datamodel.config as cfg
+import trellis_datamodel.services.schema as schema_service
 from trellis_datamodel.adapters.base import ColumnInfo, ModelInfo
 from trellis_datamodel.adapters.bruin import BruinAdapter
+from trellis_datamodel.exceptions import FileOperationError
 from trellis_datamodel.services.ossie import (
     DEFAULT_FILENAME,
     FIELD_DIALECT,
@@ -22,6 +25,7 @@ from trellis_datamodel.services.ossie import (
     OssieExport,
     export_ossie,
 )
+from trellis_datamodel.tests.conftest import FakeAdapter
 
 SCHEMA_PATH = Path(__file__).parent / "fixtures" / "ossie" / "ossie-schema.json"
 
@@ -101,6 +105,33 @@ def dbt_column(name, tests):
 
 
 UNIQUE_AND_NOT_NULL = [{"unique": {}}, {"not_null": {}}]
+
+
+def relationship(
+    source, target, type_="many_to_one", source_field="id", target_field="id"
+):
+    """A relationship as `data_model.yml` stores it: source/target are entity ids."""
+    return {
+        "source": source,
+        "target": target,
+        "type": type_,
+        "source_field": source_field,
+        "target_field": target_field,
+    }
+
+
+PRODUCT_MODEL = model(
+    unique_id="model.company.dim_product",
+    name="dim_product",
+    columns=[column("product_id", "varchar"), column("product_name", "text")],
+)
+SALE_MODEL = model(
+    unique_id="model.company.fct_sale",
+    name="fct_sale",
+    columns=[column("sale_id", "varchar"), column("product_id", "varchar")],
+)
+PRODUCT_ENTITY = {"id": "product", "model_ref": "model.company.dim_product"}
+SALE_ENTITY = {"id": "sale", "model_ref": "model.company.fct_sale"}
 
 
 class TestHandBuiltDocument:
@@ -593,6 +624,424 @@ class TestKeyInference:
         validate(validator, read_yaml(multiple))
 
 
+class TestRelationships:
+    def _export(
+        self,
+        tmp_path,
+        monkeypatch,
+        relationships,
+        entities=None,
+        models=None,
+        filename=DEFAULT_FILENAME,
+    ):
+        path = configure(monkeypatch, tmp_path / filename)
+        result = export_ossie(
+            [PRODUCT_ENTITY, SALE_ENTITY] if entities is None else entities,
+            relationships,
+            "company",
+            [PRODUCT_MODEL, SALE_MODEL] if models is None else models,
+        )
+        return path, result
+
+    def test_one_to_many_puts_from_on_the_many_side(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """The canvas stores `product -> sale`; the sale side holds the FK."""
+        path, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            [
+                relationship(
+                    "product", "sale", "one_to_many", "product_id", "product_id"
+                )
+            ],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert document["relationships"] == [
+            {
+                "name": "fct_sale_to_dim_product",
+                "from": "fct_sale",
+                "to": "dim_product",
+                "from_columns": ["product_id"],
+                "to_columns": ["product_id"],
+            }
+        ]
+        assert list(document["relationships"][0]) == [
+            "name",
+            "from",
+            "to",
+            "from_columns",
+            "to_columns",
+        ]
+
+    def test_many_to_one_keeps_from_on_the_source(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """The FK sits on the source, so `from` is the source dataset."""
+        path, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            [
+                relationship(
+                    "sale", "product", "many_to_one", "product_id", "product_id"
+                )
+            ],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        entry = document["relationships"][0]
+        assert entry["name"] == "fct_sale_to_dim_product"
+        assert entry["from"] == "fct_sale"
+        assert entry["to"] == "dim_product"
+
+    def test_one_to_one_puts_from_on_the_source(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """`one_to_one` places the FK on the source, matching place_foreign_key."""
+        path, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            [relationship("sale", "product", "one_to_one", "product_id", "product_id")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        entry = document["relationships"][0]
+        assert entry["from"] == "fct_sale"
+        assert entry["to"] == "dim_product"
+
+    def test_draft_endpoint_is_skipped_with_a_warning(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [
+                relationship(
+                    "sale", "product", "many_to_one", "product_id", "product_id"
+                )
+            ],
+            entities=[{"id": "product", "model_ref": None}, SALE_ENTITY],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+
+        warning = next(
+            w for w in result.warnings if "relationship" in w and '"product"' in w
+        )
+        assert '"sale"' in warning
+        assert "draft" in warning
+
+    def test_unresolvable_endpoint_is_skipped_with_a_warning(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [relationship("sale", "ghost", "many_to_one", "product_id", "product_id")],
+            entities=[
+                PRODUCT_ENTITY,
+                SALE_ENTITY,
+                {"id": "ghost", "model_ref": "model.company.ghost"},
+            ],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+
+        warning = next(
+            w for w in result.warnings if "relationship" in w and '"ghost"' in w
+        )
+        assert "model.company.ghost" in warning
+        assert "does not report" in warning
+
+    def test_empty_source_field_is_skipped_with_a_warning(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [relationship("sale", "product", "many_to_one", "", "product_id")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+
+        warning = next(w for w in result.warnings if '"sale"' in w and '"product"' in w)
+        assert "source_field" in warning
+
+    def test_empty_target_field_is_skipped_with_a_warning(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [relationship("sale", "product", "many_to_one", "product_id", "")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+
+        warning = next(w for w in result.warnings if '"sale"' in w and '"product"' in w)
+        assert "target_field" in warning
+
+    def test_referenced_field_absent_from_the_dataset_is_skipped(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [
+                relationship(
+                    "sale", "product", "many_to_one", "product_id", "missing_id"
+                )
+            ],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+
+        warning = next(w for w in result.warnings if "missing_id" in w)
+        assert "dim_product" in warning
+        assert '"sale"' in warning
+
+    def test_fk_field_absent_from_the_dataset_is_skipped(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [relationship("sale", "product", "many_to_one", "legacy_id", "product_id")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+
+        warning = next(w for w in result.warnings if "legacy_id" in w)
+        assert "fct_sale" in warning
+
+    def test_duplicate_tuples_collapse_to_one_entry(
+        self, validator, tmp_path, monkeypatch
+    ):
+        duplicate = relationship(
+            "sale", "product", "many_to_one", "product_id", "product_id"
+        )
+        path, _ = self._export(tmp_path, monkeypatch, [duplicate, dict(duplicate)])
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert len(document["relationships"]) == 1
+
+    def test_same_dataset_pair_gets_distinct_names(
+        self, validator, tmp_path, monkeypatch
+    ):
+        customer = model(
+            unique_id="model.company.dim_customer",
+            name="dim_customer",
+            columns=[
+                column("customer_id", "varchar"),
+                column("shipping_customer_id", "varchar"),
+            ],
+        )
+        sale = model(
+            unique_id="model.company.fct_sale",
+            name="fct_sale",
+            columns=[
+                column("customer_id", "varchar"),
+                column("shipping_customer_id", "varchar"),
+            ],
+        )
+        relationships = [
+            relationship(
+                "sale",
+                "customer",
+                "many_to_one",
+                "shipping_customer_id",
+                "shipping_customer_id",
+            ),
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "customer_id"
+            ),
+        ]
+
+        path, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            relationships,
+            entities=[
+                {"id": "customer", "model_ref": "model.company.dim_customer"},
+                SALE_ENTITY,
+            ],
+            models=[customer, sale],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert [entry["name"] for entry in document["relationships"]] == [
+            "fct_sale_to_dim_customer",
+            "fct_sale_to_dim_customer_shipping_customer_id",
+        ]
+        assert [entry["from_columns"] for entry in document["relationships"]] == [
+            ["customer_id"],
+            ["shipping_customer_id"],
+        ]
+
+    def test_surviving_collision_gets_a_numeric_suffix(
+        self, validator, tmp_path, monkeypatch
+    ):
+        customer = model(
+            unique_id="model.company.dim_customer",
+            name="dim_customer",
+            columns=[
+                column("customer_id", "varchar"),
+                column("legacy_customer_id", "varchar"),
+                column("old_customer_id", "varchar"),
+            ],
+        )
+        sale = model(
+            unique_id="model.company.fct_sale",
+            name="fct_sale",
+            columns=[column("customer_id", "varchar")],
+        )
+        # Same dataset pair and same foreign-key column, three referenced columns.
+        relationships = [
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "old_customer_id"
+            ),
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "customer_id"
+            ),
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "legacy_customer_id"
+            ),
+        ]
+
+        path, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            relationships,
+            entities=[
+                {"id": "customer", "model_ref": "model.company.dim_customer"},
+                SALE_ENTITY,
+            ],
+            models=[customer, sale],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert [entry["name"] for entry in document["relationships"]] == [
+            "fct_sale_to_dim_customer",
+            "fct_sale_to_dim_customer_customer_id",
+            "fct_sale_to_dim_customer_customer_id_2",
+        ]
+
+    def test_order_is_stable_and_document_validates(
+        self, validator, tmp_path, monkeypatch
+    ):
+        customer = model(
+            unique_id="model.company.dim_customer",
+            name="dim_customer",
+            columns=[column("customer_id", "varchar")],
+        )
+        sale = model(
+            unique_id="model.company.fct_sale",
+            name="fct_sale",
+            columns=[
+                column("customer_id", "varchar"),
+                column("product_id", "varchar"),
+            ],
+        )
+        relationships = [
+            relationship("sale", "product", "many_to_one", "product_id", "product_id"),
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "customer_id"
+            ),
+        ]
+
+        first, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            relationships,
+            entities=[
+                PRODUCT_ENTITY,
+                SALE_ENTITY,
+                {"id": "customer", "model_ref": "model.company.dim_customer"},
+            ],
+            models=[PRODUCT_MODEL, sale, customer],
+            filename="first.yml",
+        )
+        second, _ = self._export(
+            tmp_path,
+            monkeypatch,
+            relationships,
+            entities=[
+                PRODUCT_ENTITY,
+                SALE_ENTITY,
+                {"id": "customer", "model_ref": "model.company.dim_customer"},
+            ],
+            models=[PRODUCT_MODEL, sale, customer],
+            filename="second.yml",
+        )
+
+        document = read_yaml(first)
+        validate(validator, document)
+        assert [entry["name"] for entry in document["relationships"]] == [
+            "fct_sale_to_dim_customer",
+            "fct_sale_to_dim_product",
+        ]
+        assert first.read_bytes() == second.read_bytes()
+
+    def test_bruin_foreign_key_blocks_orient_from_the_referencing_asset(
+        self, validator, tmp_path, monkeypatch, bruin_pipeline
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        adapter = BruinAdapter(
+            pipeline_path=bruin_pipeline,
+            data_model_path="",
+            asset_paths=[],
+        )
+        models = adapter.get_models()
+        # Unbound inference keeps asset short names, which become entity ids.
+        relationships = adapter.infer_relationships(include_unbound=True)
+        by_name = {m["name"]: m for m in models}
+        entity_ids = sorted(
+            {r["source"] for r in relationships}
+            | {r["target"] for r in relationships}
+        )
+        entities = [
+            {"id": entity_id, "model_ref": by_name[entity_id]["unique_id"]}
+            for entity_id in entity_ids
+        ]
+
+        result = export_ossie(entities, relationships, "trellis_test_pipeline", models)
+
+        assert result.path == path
+        document = read_yaml(path)
+        validate(validator, document)
+
+        by_pair = {(e["from"], e["to"]): e for e in document["relationships"]}
+        entry = by_pair[("fct__order", "dim__customer")]
+        assert entry["from"] == "fct__order"
+        assert entry["to"] == "dim__customer"
+        assert entry["from_columns"] == ["customer_id"]
+        assert entry["to_columns"] == ["customer_id"]
+
+
 class TestSourceQualification:
     def _source(self, tmp_path, monkeypatch, **overrides):
         path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME, **overrides)
@@ -827,3 +1276,195 @@ class TestNegativeValidation:
         }
         # `datasets` has minItems: 1.
         assert not validator.is_valid(empty)
+
+
+class PushAdapter(FakeAdapter):
+    """A fake adapter that performs the framework write a real push performs.
+
+    It keeps a written schema file so `SyncOutcome.files` can be told apart from
+    the Ossie document, and can be told to fail a specific model's schema read.
+    """
+
+    def __init__(self, output_dir, models=None):
+        super().__init__(models=models)
+        self.output_dir = Path(output_dir)
+        self.push_count = 0
+        self.failing_schemas: set[str] = set()
+
+    def sync_relationships(self, entities, relationships):
+        self.push_count += 1
+        path = self.output_dir / "framework_schema.yml"
+        path.write_text(f"push: {self.push_count}\n")
+        return [path]
+
+    def get_model_schema(self, model_name, version=None):
+        if model_name in self.failing_schemas:
+            raise FileNotFoundError(f"no schema file for {model_name}")
+        return super().get_model_schema(model_name, version=version)
+
+
+CUSTOMER_MODEL = {
+    "unique_id": "model.fake.customer",
+    "name": "customer",
+    "version": None,
+    "schema": "main",
+    "table": "dim_customer",
+    "columns": [
+        {"name": "customer_id", "type": "varchar", "description": "Customer ID"}
+    ],
+    "description": "Customers",
+    "materialization": "table",
+    "file_path": "models/dim_customer.sql",
+    "tags": [],
+}
+CUSTOMER_ENTITY = {
+    "id": "customer",
+    "label": "Customer",
+    "model_ref": "model.fake.customer",
+}
+
+
+def install_push(
+    monkeypatch, output_dir, adapter, *, enabled=True, filename=DEFAULT_FILENAME
+):
+    """Point the Ossie output at `output_dir` and route the push at `adapter`."""
+    path = Path(output_dir) / filename
+    monkeypatch.setattr(
+        cfg,
+        "OSSIE_CONFIG",
+        cfg.OssieConfig(enabled=enabled, file=str(path)),
+    )
+    monkeypatch.setattr(schema_service, "get_adapter", lambda: adapter)
+    return path
+
+
+def write_data_model(path, entities, relationships=()):
+    Path(path).write_text(
+        yaml.safe_dump(
+            {
+                "version": 0.1,
+                "entities": list(entities),
+                "relationships": list(relationships),
+            }
+        )
+    )
+
+
+class TestPushIntegration:
+    def test_enabled_push_writes_a_valid_document(
+        self, validator, monkeypatch, tmp_path, temp_data_model_path
+    ):
+        path = install_push(
+            monkeypatch, tmp_path, PushAdapter(tmp_path, [dict(CUSTOMER_MODEL)])
+        )
+        write_data_model(temp_data_model_path, [dict(CUSTOMER_ENTITY)])
+
+        result = schema_service.sync_framework_tests()
+
+        assert isinstance(result, schema_service.SyncOutcome)
+        assert result.ossie_path == path
+        assert path.exists()
+        assert path in result.files
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["name"] == "fake"
+        assert [d["name"] for d in document["datasets"]] == ["customer"]
+
+    def test_disabled_push_leaves_an_existing_document_untouched(
+        self, monkeypatch, tmp_path, temp_data_model_path
+    ):
+        path = install_push(
+            monkeypatch,
+            tmp_path,
+            PushAdapter(tmp_path, [dict(CUSTOMER_MODEL)]),
+            enabled=False,
+        )
+        path.write_text("name: previous\n")
+        os.utime(path, (1_000_000_000, 1_000_000_000))
+        before = path.stat()
+
+        def boom(*args, **kwargs):
+            raise AssertionError("the exporter must not run while disabled")
+
+        monkeypatch.setattr(schema_service, "export_ossie", boom)
+        write_data_model(temp_data_model_path, [dict(CUSTOMER_ENTITY)])
+
+        result = schema_service.sync_framework_tests()
+
+        assert result.ossie_path is None
+        assert result.warnings == []
+        assert path.read_bytes() == b"name: previous\n"
+        after = path.stat()
+        assert after.st_mtime_ns == before.st_mtime_ns
+        assert after.st_size == before.st_size
+
+    def test_zero_bound_entities_writes_nothing_and_says_why(
+        self, monkeypatch, tmp_path, temp_data_model_path
+    ):
+        path = install_push(
+            monkeypatch, tmp_path, PushAdapter(tmp_path, [dict(CUSTOMER_MODEL)])
+        )
+        write_data_model(temp_data_model_path, [{"id": "draft", "label": "Draft"}])
+
+        result = schema_service.sync_framework_tests()
+
+        assert result.ossie_path is None
+        assert not path.exists()
+        assert any("not bound" in w for w in result.warnings)
+        assert any("nothing was written" in w for w in result.warnings)
+
+    def test_export_failure_says_framework_files_were_updated(
+        self, monkeypatch, tmp_path, temp_data_model_path
+    ):
+        adapter = PushAdapter(tmp_path, [dict(CUSTOMER_MODEL)])
+        install_push(monkeypatch, tmp_path, adapter)
+        write_data_model(temp_data_model_path, [dict(CUSTOMER_ENTITY)])
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("disk full")
+
+        monkeypatch.setattr(schema_service, "export_ossie", boom)
+
+        with pytest.raises(FileOperationError) as excinfo:
+            schema_service.sync_framework_tests()
+
+        message = str(excinfo.value)
+        assert adapter.push_count == 1
+        assert "framework schema files were updated" in message.lower()
+        assert "was not written" in message
+        assert "disk full" in message
+
+    def test_sync_tests_endpoint_returns_warnings_and_the_written_path(
+        self, test_client, monkeypatch, tmp_path, temp_data_model_path
+    ):
+        path = install_push(
+            monkeypatch, tmp_path, PushAdapter(tmp_path, [dict(CUSTOMER_MODEL)])
+        )
+        write_data_model(temp_data_model_path, [dict(CUSTOMER_ENTITY)])
+
+        response = test_client.post("/api/sync-tests")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["warnings"] == []
+        assert str(path) in body["files"]
+        assert DEFAULT_FILENAME in body["message"]
+        assert path.exists()
+
+    def test_unreadable_model_schema_is_only_a_warning(
+        self, validator, monkeypatch, tmp_path, temp_data_model_path
+    ):
+        adapter = PushAdapter(tmp_path, [dict(CUSTOMER_MODEL)])
+        adapter.failing_schemas = {"customer"}
+        path = install_push(monkeypatch, tmp_path, adapter)
+        write_data_model(temp_data_model_path, [dict(CUSTOMER_ENTITY)])
+
+        result = schema_service.sync_framework_tests()
+
+        assert result.ossie_path == path
+        assert path.exists()
+        validate(validator, read_yaml(path))
+
+        warning = next(w for w in result.warnings if 'model "customer"' in w)
+        assert "schema" in warning

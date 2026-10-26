@@ -65,7 +65,7 @@ T1 and the T2/T3 pair touch disjoint files (adapters vs config) and can run in p
 
 ### Phase 3: Wiring
 
-- [ ] T7 - Push integration and response warnings (S, 4 files) - deps: T4, T5, T6
+- [x] T7 - Push integration and response warnings (S, 4 files) - deps: T4, T5, T6
 - [ ] T8 - Ossie section on the Config page (M, 2 files) - deps: T3
 
 #### Checkpoint C: Wiring
