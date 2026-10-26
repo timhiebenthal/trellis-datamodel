@@ -7,6 +7,7 @@ from .exposures import router as exposures_router
 from .lineage import router as lineage_router
 from .bus_matrix import router as bus_matrix_router
 from .business_events import router as business_events_router
+from .metric_tree import router as metric_tree_router
 from .reconcile import router as reconcile_router
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "lineage_router",
     "bus_matrix_router",
     "business_events_router",
+    "metric_tree_router",
     "reconcile_router",
 ]
 
