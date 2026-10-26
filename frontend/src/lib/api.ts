@@ -27,6 +27,8 @@ import type {
     ConfigSchema,
     ConfigGetResponse,
     ConfigUpdateResponse,
+    MetricCatalogEntry,
+    MetricTreeFile,
 } from './types';
 import { parseServerTiming, recordBootRequest } from './boot-diagnostics';
 import type { ReconciliationResult } from './boot-loader';
@@ -1246,3 +1248,52 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
     }
 }
 
+/**
+ * Metric Tree API functions
+ */
+
+/**
+ * Fetch the metric tree document with layout merged into each metric.
+ * @returns Promise containing the tree plus the semantic-model catalog
+ */
+export async function getMetricTree(): Promise<
+    MetricTreeFile & { catalog: MetricCatalogEntry[] }
+> {
+    try {
+        const res = await fetch(`${API_BASE}/metric-tree`);
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Failed to fetch metric tree: ${res.status} - ${errorText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error fetching metric tree:', e);
+        throw e;
+    }
+}
+
+/**
+ * Save the metric tree document. Positions are sent on each metric and split
+ * into metric_layout.yml by the backend.
+ * @param payload - version, metrics and influences to persist
+ * @returns Promise containing the status and any validation warnings
+ */
+export async function saveMetricTree(
+    payload: MetricTreeFile
+): Promise<{ status: string; warnings: string[] }> {
+    try {
+        const res = await fetch(`${API_BASE}/metric-tree`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Failed to save metric tree: ${res.status} - ${errorText}`);
+        }
+        return await res.json();
+    } catch (e) {
+        console.error('Error saving metric tree:', e);
+        throw e;
+    }
+}

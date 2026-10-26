@@ -121,6 +121,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     let exposuresDefaultLayout = $state<'dashboards-as-rows' | 'entities-as-rows'>('dashboards-as-rows');
     let busMatrixEnabled = $state(false);
     let businessEventsEnabled = $state(false);
+    let metricsEnabled = $state(false);
     let hasExposuresData = $state(false);
     let guidanceConfig = $state<GuidanceConfig>({
         entity_wizard_enabled: true,
@@ -653,6 +654,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                 exposuresDefaultLayout = info?.exposures_default_layout ?? 'dashboards-as-rows';
                 busMatrixEnabled = info?.bus_matrix_enabled ?? false;
                 businessEventsEnabled = info?.business_events_enabled ?? false;
+                metricsEnabled = info?.metrics_enabled ?? false;
                 $modelingStyle = info?.modeling_style ?? 'entity_model';
                 $activeFramework = info?.framework ?? 'dbt-core';
                 $labelPrefixes = getLabelPrefixesFromConfig(info ?? null);
@@ -1068,6 +1070,20 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                 >
                     <Icon icon="lucide:calendar-check" class="w-3.5 h-3.5" />
                     Business Events
+                </a>
+            {/if}
+            {#if metricsEnabled}
+                <a
+                    href="/metrics-tree"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class:bg-white={$page.url.pathname === '/metrics-tree'}
+                    class:text-primary-600={$page.url.pathname === '/metrics-tree'}
+                    class:shadow-sm={$page.url.pathname === '/metrics-tree'}
+                    class:text-gray-500={$page.url.pathname !== '/metrics-tree'}
+                    class:hover:text-gray-900={$page.url.pathname !== '/metrics-tree'}
+                >
+                    <Icon icon="lucide:trending-up" class="w-3.5 h-3.5" />
+                    Metric Tree
                 </a>
             {/if}
             <a
