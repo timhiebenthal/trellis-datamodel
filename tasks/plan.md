@@ -76,12 +76,12 @@ T1 and the T2/T3 pair touch disjoint files (adapters vs config) and can run in p
 
 ### Phase 4: Close
 
-- [ ] T9 - End-to-end API test, changelog, config example (S, 4 files) - deps: T7, T8
+- [x] T9 - End-to-end API test, changelog, config example (S, 4 files) - deps: T7, T8
 
 #### Checkpoint D: Complete
-- [ ] `uv run pytest -q` passes
-- [ ] `cd frontend && npm run check && npm run test:smoke` passes
-- [ ] Every success criterion in the spec has a test or a manual check recorded in the PR body
+- [x] `uv run pytest -q` passes
+- [x] `cd frontend && npm run check && npm run test:smoke` passes
+- [x] Every success criterion in the spec has a test or a manual check recorded in the PR body
 
 ## Risks and Mitigations
 

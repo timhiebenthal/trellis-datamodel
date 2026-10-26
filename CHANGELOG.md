@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Ossie semantic model export (beta, opt-in):** a new `ossie` block in
+  `trellis.yml` - `enabled`, `file`, `source.database` and `source.schema` - lets
+  the existing Push write an Apache Ossie document alongside the framework
+  schema files, to `semantic_model.yml` beside `data_model.yml` by default. Only
+  entities bound to a model are exported; a draft entity, and any relationship
+  touching one, is skipped and named in the push response's warnings. The output
+  targets Ossie `0.2.0.dev0`, which is still a draft, so the version is pinned in
+  one constant and validation against the vendored schema guards the shape. The
+  `source.database` and `source.schema` overrides exist because the address
+  segments an adapter reports describe the target of the last dbt run - usually a
+  developer's dev database and per-user schema, not the deployed one.
+
 ## [0.24.4] - 2026-10-16
 
 ### Fixed

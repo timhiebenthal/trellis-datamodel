@@ -83,6 +83,17 @@ canvas:
 
 From Entity List, **Open filtered on Canvas** opens the complete current filtered result set on Canvas. An explicit Canvas URL entity filter takes precedence over project-wide domain and tag defaults.
 
+### Apache Ossie export
+
+Trellis can also write an [Apache Ossie](https://github.com/apache/ossie) semantic model. The feature is opt-in and beta:
+
+```yaml
+ossie:
+  enabled: true
+```
+
+The document is written to `semantic_model.yml` beside `data_model.yml`. Set `ossie.file` to put it somewhere else, and `ossie.source.database` / `ossie.source.schema` to override the address segments the adapter reports (those reflect whatever target last ran dbt). Only entities bound to a model are exported: draft entities, and relationships that touch them, are skipped and listed as warnings in the Push response.
+
 ## Vision
 
 trellis is built and tested around **dbt-core** today. The longer-term idea is to stay **tool-agnostic**—concepts outlive any one framework. Possible directions include dbt Fusion, Pydantic-flavored exports, or adapters for tools like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) where it makes sense. For now, the focus is a great experience with dbt-core.
