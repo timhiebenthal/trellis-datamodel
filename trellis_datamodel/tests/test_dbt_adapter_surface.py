@@ -13,8 +13,10 @@ import os
 import pytest
 import yaml
 
+import trellis_datamodel.config as cfg
 from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
 from trellis_datamodel.exceptions import FileOperationError, NotFoundError
+from trellis_datamodel.services.ossie import export_ossie
 
 
 MANIFEST = {
@@ -316,3 +318,105 @@ class TestGetProjectStatus:
             "relationships": True,
             "scaffolding": True,
         }
+
+
+class TestOssieExportSurface:
+    """The dbt path a real project takes, end to end.
+
+    `schema.yml` is the only place dbt records tests, so a `data_tests` spelling
+    the exporter cannot read makes the dbt key rule unreachable. This test
+    starts from the file and stops at the written document.
+    """
+
+    def test_data_tests_become_a_key_claim(self, tmp_path, monkeypatch):
+        project = tmp_path / "dbt_project"
+        (project / "models" / "3_core").mkdir(parents=True)
+        (project / "target").mkdir()
+        manifest = {
+            "metadata": {"project_name": "company_dummy"},
+            "nodes": {
+                "model.proj.dim__customer": {
+                    "unique_id": "model.proj.dim__customer",
+                    "resource_type": "model",
+                    "name": "dim__customer",
+                    "schema": "marts",
+                    "original_file_path": "models/3_core/dim__customer.sql",
+                    "columns": {
+                        "customer_id": {
+                            "name": "customer_id",
+                            "data_type": "varchar",
+                        },
+                        "customer_name": {
+                            "name": "customer_name",
+                            "data_type": "varchar",
+                        },
+                    },
+                    "depends_on": {"nodes": []},
+                },
+            },
+            "sources": {},
+        }
+        (project / "target" / "manifest.json").write_text(json.dumps(manifest))
+        (project / "models" / "3_core" / "dim__customer.yml").write_text(
+            yaml.safe_dump(
+                {
+                    "version": 2,
+                    "models": [
+                        {
+                            "name": "dim__customer",
+                            "columns": [
+                                {
+                                    "name": "customer_id",
+                                    "data_type": "varchar",
+                                    "description": "Customer ID",
+                                    "data_tests": ["unique", "not_null"],
+                                },
+                                {"name": "customer_name", "data_type": "varchar"},
+                            ],
+                        }
+                    ],
+                }
+            )
+        )
+
+        adapter = DbtCoreAdapter(
+            manifest_path=str(project / "target" / "manifest.json"),
+            catalog_path=str(project / "target" / "catalog.json"),
+            project_path=str(project),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=["3_core"],
+        )
+
+        output_path = tmp_path / "semantic_model.yml"
+        monkeypatch.setattr(
+            cfg, "OSSIE_CONFIG", cfg.OssieConfig(file=str(output_path))
+        )
+
+        models = adapter.get_models()
+        model_schemas = {
+            model["unique_id"]: adapter.get_model_schema(model["name"])
+            for model in models
+        }
+
+        exported = export_ossie(
+            entities=[
+                {
+                    "id": "customer",
+                    "label": "Customer",
+                    "model_ref": "model.proj.dim__customer",
+                }
+            ],
+            relationships=[],
+            project_name=adapter.get_project_status()["project_name"],
+            models=models,
+            model_schemas=model_schemas,
+        )
+
+        assert exported.path == output_path
+        document = yaml.safe_load(output_path.read_text())
+        dataset = document["datasets"][0]
+        assert dataset["name"] == "dim__customer"
+        # dbt's unique + not_null pair is the key evidence; without the YAML
+        # test names reaching the exporter, no key entry appears at all.
+        assert dataset["primary_key"] == ["customer_id"]
+
