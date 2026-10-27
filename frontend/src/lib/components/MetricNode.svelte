@@ -173,19 +173,18 @@
 </script>
 
 <div
-    class="group relative w-[248px] rounded-lg border bg-white shadow-sm transition-all hover:shadow-md"
-    class:border-slate-200={!selected}
+    class="group relative w-[248px] rounded-lg border bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+    class:border-primary-500={Boolean(binding) && !selected}
+    class:border-gray-300={!binding && !selected}
     class:border-primary-600={selected}
     class:ring-2={selected}
-    class:ring-primary-200={selected}
+    class:ring-primary-500={selected}
+    class:ring-opacity-50={selected}
     class:opacity-90={isUnresolved && !selected}
     data-testid="metric-node"
     data-metric-id={metric?.id}
     title={metric?.description || label}
 >
-    <!-- Accent rail -->
-    <span class="absolute inset-y-0 left-0 w-1 rounded-l-lg bg-primary-500" aria-hidden="true"></span>
-
     <Handle
         type="target"
         position={Position.Top}
@@ -401,16 +400,29 @@
         {/if}
     {/if}
 
-    <div class="py-2.5 pl-4 pr-2">
-        <div class="flex items-start gap-1.5">
+    <div class="flex items-start justify-between gap-2 rounded-t-lg border-b border-gray-100 bg-gray-50/50 px-3 py-2">
+        <div class="flex min-w-0 flex-1 items-start gap-1.5">
             <Icon icon="lucide:trending-up" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600" />
-            <p class="min-w-0 flex-1 text-sm font-semibold leading-snug break-words text-slate-800">
+            <p class="min-w-0 flex-1 text-sm font-bold leading-snug break-words text-slate-800">
                 {label}
             </p>
+        </div>
+        <div class="flex shrink-0 items-center gap-1.5 pt-0.5">
+            {#if binding}
+                <div
+                    class="h-2 w-2 rounded-full bg-primary-500"
+                    title="Bound to {binding.dataset}.{binding.name}"
+                ></div>
+            {:else}
+                <div
+                    class="h-2 w-2 rounded-full bg-amber-500"
+                    title="Draft metric — not bound to a semantic model metric"
+                ></div>
+            {/if}
             {#if actions?.deleteMetric}
                 <button
                     type="button"
-                    class="nodrag nopan -mt-0.5 rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
+                    class="nodrag nopan -my-0.5 rounded px-1 py-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-danger-50 hover:text-danger-600 focus:opacity-100 group-hover:opacity-100"
                     title="Remove {label} from the tree"
                     aria-label="Remove {label} from the tree"
                     data-testid="metric-node-delete"
@@ -419,39 +431,44 @@
                         actions?.deleteMetric?.(metric?.id ?? "");
                     }}
                 >
-                    <Icon icon="lucide:trash-2" class="h-3.5 w-3.5" />
+                    <Icon icon="lucide:x" class="h-3.5 w-3.5" />
                 </button>
             {/if}
         </div>
+    </div>
 
+    <div class="px-3 py-2">
         {#if expression}
-            <p class="mt-1 truncate font-mono text-[10px] leading-relaxed text-slate-400" title={expression}>
+            <p class="mb-1.5 truncate font-mono text-[10px] leading-relaxed text-slate-400" title={expression}>
                 {expression}
             </p>
         {/if}
 
-        <div class="mt-2 flex flex-wrap items-center gap-1">
+        <div class="flex flex-wrap items-center gap-1">
             {#if binding}
-                <span
-                    class="inline-flex max-w-full items-center gap-1 truncate rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-700"
+                <div
+                    class="flex w-full items-center justify-between rounded border border-primary-100 bg-primary-50 p-1.5 text-xs text-primary-600"
                     title="Bound: read from {binding.dataset}.{binding.name} in the semantic model"
                     data-testid="metric-node-bound"
                 >
-                    <Icon icon="lucide:link-2" class="h-3 w-3 shrink-0" />
-                    <span class="truncate">bound &middot; {binding.dataset}</span>
-                </span>
+                    <span class="flex min-w-0 items-center gap-1 truncate font-medium">
+                        <Icon icon="lucide:link" class="h-3 w-3 shrink-0" />
+                        <span class="sr-only">bound</span>
+                        <span class="truncate">{binding.dataset}.{binding.name}</span>
+                    </span>
+                </div>
             {:else if dataset}
                 <span
-                    class="inline-flex max-w-full items-center gap-1 truncate rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                    class="inline-flex max-w-full items-center gap-1 truncate rounded border border-gray-100 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px] text-gray-500"
                     title="Draft: dataset_ref points at {dataset}"
                     data-testid="metric-node-dataset"
                 >
-                    <Icon icon="lucide:database" class="h-3 w-3 shrink-0" />
+                    <Icon icon="lucide:database" class="h-3 w-3 shrink-0 text-gray-400" />
                     <span class="truncate">{dataset}</span>
                 </span>
             {:else}
                 <span
-                    class="inline-flex items-center gap-1 rounded border border-dashed border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-500"
+                    class="inline-flex items-center gap-1 rounded border border-dashed border-gray-300 px-1.5 py-0.5 text-[10px] font-medium text-gray-400"
                     title="No dataset bound - this metric is drafted by hand"
                     data-testid="metric-node-unbound"
                 >

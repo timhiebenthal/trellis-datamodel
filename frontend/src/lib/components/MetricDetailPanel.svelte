@@ -73,7 +73,7 @@
     {:else}
         <header class="flex items-start gap-2 border-b border-slate-200 px-4 py-3">
             <Icon
-                icon={binding ? "lucide:link-2" : "lucide:trending-up"}
+                icon={binding ? "lucide:link" : "lucide:trending-up"}
                 class="mt-0.5 h-4 w-4 shrink-0 text-primary-600"
             />
             <div class="min-w-0 flex-1">

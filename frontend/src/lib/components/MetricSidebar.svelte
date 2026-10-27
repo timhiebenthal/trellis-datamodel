@@ -60,7 +60,6 @@
     const groups = $derived(groupCatalog(filteredCatalog, metrics));
 
     function subtitle(metric: MetricEntry): string {
-        if (metric.binding) return `bound · ${metric.binding.dataset}`;
         if (metric.dataset_ref) return metric.dataset_ref;
         return "unbound";
     }
@@ -164,12 +163,26 @@
                                     data-testid="metric-sidebar-select"
                                     title={metric.description || metric.label}
                                 >
-                                    <span class="block truncate text-sm font-medium text-slate-800">
-                                        {metric.label}
+                                    <span class="flex items-center gap-1.5">
+                                        <span
+                                            class="h-2 w-2 shrink-0 rounded-full {metric.binding ? 'bg-primary-500' : 'bg-amber-500'}"
+                                            aria-hidden="true"
+                                        ></span>
+                                        <span class="truncate text-sm font-medium text-slate-800">
+                                            {metric.label}
+                                        </span>
                                     </span>
-                                    <span class="block truncate text-[11px] text-slate-500">
-                                        {subtitle(metric)}
-                                    </span>
+                                    {#if metric.binding}
+                                        <span class="mt-0.5 flex items-center gap-1 truncate pl-3.5 text-[11px] font-medium text-primary-600">
+                                            <Icon icon="lucide:link" class="h-3 w-3 shrink-0" />
+                                            <span class="sr-only">bound · </span>
+                                            <span class="truncate font-mono">{metric.binding.dataset}.{metric.binding.name}</span>
+                                        </span>
+                                    {:else}
+                                        <span class="mt-0.5 block truncate pl-3.5 text-[11px] font-mono text-slate-500">
+                                            {subtitle(metric)}
+                                        </span>
+                                    {/if}
                                 </button>
 
                                 {#if ondeletemetric}
