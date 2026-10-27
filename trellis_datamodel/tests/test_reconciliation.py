@@ -108,11 +108,13 @@ class TestReconcileEntityFields:
         result = reconcile_entity_fields(existing_fields=existing, manifest_columns=None)
         assert result == existing
 
-    def test_deterministic_order(self):
-        """dbt fields appear in manifest order, then drafts in original order."""
+    def test_existing_order_is_preserved(self):
+        """Fields already in the data model keep their position; only columns
+        the model lacks are appended, in manifest order (#152)."""
         result = reconcile_entity_fields(
             existing_fields=[
                 {"name": "draft_a", "datatype": "text"},
+                {"name": "col_a", "datatype": "text", "source": "dbt"},
                 {"name": "draft_b", "datatype": "text"},
             ],
             manifest_columns=[
@@ -121,7 +123,18 @@ class TestReconcileEntityFields:
             ],
         )
         names = [f["name"] for f in result]
-        assert names == ["col_z", "col_a", "draft_a", "draft_b"]
+        assert names == ["draft_a", "col_a", "draft_b", "col_z"]
+
+    def test_empty_existing_fields_follow_manifest_order(self):
+        """With nothing to preserve, the manifest order is the only input."""
+        result = reconcile_entity_fields(
+            existing_fields=[],
+            manifest_columns=[
+                {"name": "col_z", "type": "text"},
+                {"name": "col_a", "type": "text"},
+            ],
+        )
+        assert [f["name"] for f in result] == ["col_z", "col_a"]
 
     def test_empty_existing_empty_manifest(self):
         """Both empty — result is empty, not an error."""

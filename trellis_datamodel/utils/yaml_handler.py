@@ -475,36 +475,35 @@ class YamlHandler:
         columns_data: List[Dict[str, Any]],
     ) -> None:
         """
-        Replace the column list of a model with ``columns_data``.
+        Reconcile the column list of a model against ``columns_data``.
 
         Existing column entries are reused (preserving tests, meta, and any
         other round-tripped keys) when their ``name`` appears in
         ``columns_data``. Columns missing from the incoming list are dropped,
         so renames/deletions in the data model propagate to schema.yml.
-        Final order follows ``columns_data``.
+
+        Order: columns already in the file keep their position, and new
+        columns are appended in ``columns_data`` order. The incoming list
+        decides *which* columns exist and what they contain, never where the
+        existing ones sit - otherwise every writer with a different idea of
+        column order (manifest, data model) reshuffles the file and turns a
+        one-line edit into an unreviewable diff (see #152).
 
         ``data_type`` is applied as a hard override; ``data_type_fallback``
         only fills in a column that doesn't already declare a data_type
         (used for dbt-sourced fields, where dbt/the warehouse — not
         Trellis — owns the declared type once it exists, see #111).
         """
-        existing_by_name: Dict[str, CommentedMap] = {}
-        for col in model.get("columns", []) or []:
-            name = col.get("name") if isinstance(col, dict) else None
-            if name:
-                existing_by_name[name] = col
-
-        new_columns = CommentedSeq()
+        incoming_by_name: Dict[str, Dict[str, Any]] = {}
         for col_data in columns_data:
             col_name = col_data.get("name")
-            if not col_name:
-                continue
+            if col_name:
+                incoming_by_name[col_name] = col_data
 
-            col = existing_by_name.get(col_name)
-            if col is None:
-                col = CommentedMap()
-                col["name"] = col_name
+        new_columns = CommentedSeq()
+        placed: set[str] = set()
 
+        def apply(col: CommentedMap, col_data: Dict[str, Any]) -> CommentedMap:
             self.update_column(
                 col,
                 data_type=self._resolve_data_type(col, col_data),
@@ -512,7 +511,24 @@ class YamlHandler:
             )
             if "meta" in col_data:
                 col["meta"] = col_data["meta"]
-            new_columns.append(col)
+            placed.add(col_data["name"])
+            return col
+
+        # Existing columns keep their position in the file.
+        for col in model.get("columns", []) or []:
+            name = col.get("name") if isinstance(col, dict) else None
+            if not name or name not in incoming_by_name or name in placed:
+                continue
+            new_columns.append(apply(col, incoming_by_name[name]))
+
+        # Columns the file doesn't have yet are appended in incoming order.
+        for col_data in columns_data:
+            col_name = col_data.get("name")
+            if not col_name or col_name in placed:
+                continue
+            col = CommentedMap()
+            col["name"] = col_name
+            new_columns.append(apply(col, col_data))
 
         model["columns"] = new_columns
 
