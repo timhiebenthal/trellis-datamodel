@@ -95,6 +95,24 @@ describe('metrics-tree page', () => {
         expect(nodePositions()[1].position).not.toEqual({ x: 0, y: 0 });
     });
 
+    it('redirects to the canvas without loading the tree when the feature is disabled', async () => {
+        api.getConfigInfo.mockResolvedValue({ metrics_enabled: false });
+        const original = window.location;
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { href: '' },
+        });
+
+        try {
+            render(MetricsTreePage);
+
+            await waitFor(() => expect(window.location.href).toBe('/canvas'));
+            expect(api.getMetricTree).not.toHaveBeenCalled();
+        } finally {
+            Object.defineProperty(window, 'location', { configurable: true, value: original });
+        }
+    });
+
     it('saves an edit without remounting the canvas or moving a node', async () => {
         const { container } = render(MetricsTreePage);
         await waitFor(() => expect(flow.props).not.toBeNull());
