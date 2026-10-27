@@ -174,7 +174,7 @@ describe('MetricSidebar', () => {
         expect(added).not.toBeNull();
         expect(added.className).toContain('bg-primary-100');
 
-        await fireEvent.click(added);
+        await fireEvent.click(added.querySelector('[data-testid="metric-sidebar-select"]')!);
         expect(onselectmetric).toHaveBeenCalledWith('avg_price');
     });
 });

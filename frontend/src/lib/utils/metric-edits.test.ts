@@ -300,23 +300,32 @@ describe('groupCatalogByEntity', () => {
         { name: 'booking_hours', dataset: 'entity_booking', entity_id: 'entity_booking', bindable: true },
     ];
 
-    it('groups entries by dataset in alphabetical order with cross-dataset last', () => {
+    it('groups entries by dataset in alphabetical order with unbound drafts and cross-dataset after named entities', () => {
         const metrics: MetricEntry[] = [
             { id: 'avg_price', label: 'Avg price', binding: { dataset: 'fct__order', name: 'avg_price' } },
+            { id: 'custom_margin', label: 'Custom margin', expression: 'a - b' },
         ];
 
         const groups = groupCatalogByEntity(catalog, metrics);
 
-        expect(groups.map((g) => g.label)).toEqual(['entity_booking', 'fct__order', 'Cross-dataset']);
-        expect(groups[0].items.map((i) => ({ name: i.entry.name, status: i.status }))).toEqual([
-            { name: 'booking_hours', status: 'available' },
+        expect(groups.map((g) => g.label)).toEqual([
+            'entity_booking',
+            'fct__order',
+            'Drafts (unbound)',
+            'Cross-dataset',
         ]);
-        expect(groups[1].items.map((i) => ({ name: i.entry.name, status: i.status, boundMetricId: i.boundMetricId }))).toEqual([
-            { name: 'avg_price', status: 'added', boundMetricId: 'avg_price' },
-            { name: 'order_count', status: 'available', boundMetricId: undefined },
+        expect(groups[0].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
+            { kind: 'catalog', status: 'available' },
         ]);
-        expect(groups[2].items.map((i) => ({ name: i.entry.name, status: i.status }))).toEqual([
-            { name: 'revenue', status: 'readonly' },
+        expect(groups[1].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
+            { kind: 'tree', status: 'added' },
+            { kind: 'catalog', status: 'available' },
+        ]);
+        expect(groups[2].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
+            { kind: 'tree', status: 'draft' },
+        ]);
+        expect(groups[3].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
+            { kind: 'catalog', status: 'readonly' },
         ]);
     });
 });

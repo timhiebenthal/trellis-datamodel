@@ -225,65 +225,141 @@ export function groupCatalog(
     return groups;
 }
 
-export interface CatalogEntityItem {
-    entry: MetricCatalogEntry;
-    status: 'available' | 'added' | 'readonly';
-    boundMetricId?: string;
-}
+export type CatalogEntityItem =
+    | {
+          kind: 'tree';
+          metric: MetricEntry;
+          entry?: MetricCatalogEntry;
+          status: 'added' | 'draft';
+      }
+    | {
+          kind: 'catalog';
+          entry: MetricCatalogEntry;
+          status: 'available' | 'readonly';
+      };
 
 export interface CatalogEntityGroup {
     key: string;
     label: string;
     isCrossDataset: boolean;
+    isDraftUnbound: boolean;
+    onTreeCount: number;
     items: CatalogEntityItem[];
 }
 
 /**
- * Group catalog entries by their entity/dataset so the sidebar can render
- * collapsible entity sections instead of repeating the dataset on every row.
+ * Group tree metrics and semantic-model catalog entries by their entity/dataset
+ * into a single collapsible list per entity.
  */
 export function groupCatalogByEntity(
     catalog: MetricCatalogEntry[],
     metrics: MetricEntry[],
+    allMetrics: MetricEntry[] = metrics,
 ): CatalogEntityGroup[] {
     const byKey = new Map<string, CatalogEntityGroup>();
 
+    function ensureGroup(
+        key: string,
+        label: string,
+        opts: { isCrossDataset?: boolean; isDraftUnbound?: boolean } = {},
+    ): CatalogEntityGroup {
+        let group = byKey.get(key);
+        if (!group) {
+            group = {
+                key,
+                label,
+                isCrossDataset: Boolean(opts.isCrossDataset),
+                isDraftUnbound: Boolean(opts.isDraftUnbound),
+                onTreeCount: 0,
+                items: [],
+            };
+            byKey.set(key, group);
+        }
+        return group;
+    }
+
+    const catalogByBinding = new Map<string, MetricCatalogEntry>();
+    for (const entry of catalog) {
+        if (entry.bindable && entry.dataset) {
+            catalogByBinding.set(`${entry.dataset}::${entry.name}`, entry);
+        }
+    }
+
+    const renderedBindings = new Set<string>();
+
+    // 1. Place metrics currently on the tree into their entity group (or Drafts if unbound).
+    for (const metric of metrics) {
+        if (metric.binding) {
+            const datasetKey = metric.binding.dataset.trim();
+            const bindingKey = `${datasetKey}::${metric.binding.name}`;
+            renderedBindings.add(bindingKey);
+            const group = ensureGroup(datasetKey, datasetKey);
+            group.onTreeCount += 1;
+            group.items.push({
+                kind: 'tree',
+                metric,
+                entry: catalogByBinding.get(bindingKey),
+                status: 'added',
+            });
+        } else {
+            const datasetKey = (metric.dataset_ref ?? '').trim();
+            const group = datasetKey
+                ? ensureGroup(datasetKey, datasetKey)
+                : ensureGroup('__drafts__', 'Drafts (unbound)', { isDraftUnbound: true });
+            group.onTreeCount += 1;
+            group.items.push({
+                kind: 'tree',
+                metric,
+                status: 'draft',
+            });
+        }
+    }
+
+    // 2. Place remaining catalog entries into their entity group.
     for (const entry of catalog) {
         const datasetKey = (entry.dataset ?? entry.entity_id ?? '').trim();
         const isCrossDataset = !datasetKey;
         const key = isCrossDataset ? '__cross_dataset__' : datasetKey;
         const label = isCrossDataset ? 'Cross-dataset' : datasetKey;
 
-        const boundMetric = entry.bindable
-            ? metrics.find(
-                  (metric) =>
-                      metric.binding?.name === entry.name &&
-                      (!entry.dataset || metric.binding?.dataset === entry.dataset),
-              )
-            : undefined;
-
-        const status: CatalogEntityItem['status'] = !entry.bindable
-            ? 'readonly'
-            : boundMetric
-              ? 'added'
-              : 'available';
-
-        let group = byKey.get(key);
-        if (!group) {
-            group = { key, label, isCrossDataset, items: [] };
-            byKey.set(key, group);
+        if (entry.bindable && entry.dataset) {
+            const bindingKey = `${entry.dataset.trim()}::${entry.name}`;
+            if (renderedBindings.has(bindingKey)) {
+                continue;
+            }
+            const boundMetric = allMetrics.find(
+                (metric) =>
+                    metric.binding?.name === entry.name &&
+                    (!entry.dataset || metric.binding?.dataset === entry.dataset),
+            );
+            if (boundMetric) {
+                renderedBindings.add(bindingKey);
+                const group = ensureGroup(key, label, { isCrossDataset });
+                group.onTreeCount += 1;
+                group.items.push({
+                    kind: 'tree',
+                    metric: boundMetric,
+                    entry,
+                    status: 'added',
+                });
+                continue;
+            }
         }
 
+        const group = ensureGroup(key, label, { isCrossDataset });
         group.items.push({
+            kind: 'catalog',
             entry,
-            status,
-            boundMetricId: boundMetric?.id,
+            status: entry.bindable ? 'available' : 'readonly',
         });
     }
 
     return Array.from(byKey.values()).sort((a, b) => {
         if (a.isCrossDataset !== b.isCrossDataset) {
             return a.isCrossDataset ? 1 : -1;
+        }
+        if (a.isDraftUnbound !== b.isDraftUnbound) {
+            return a.isDraftUnbound ? 1 : -1;
         }
         return a.label.localeCompare(b.label);
     });

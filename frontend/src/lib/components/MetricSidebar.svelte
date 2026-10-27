@@ -58,7 +58,9 @@
     const filteredCatalog = $derived(
         catalog.filter((entry) => matchesCatalogEntry(entry, normalizedSearch)),
     );
-    const entityGroups = $derived(groupCatalogByEntity(filteredCatalog, metrics));
+    const entityGroups = $derived(
+        groupCatalogByEntity(filteredCatalog, filteredMetrics, metrics),
+    );
 
     function isGroupCollapsed(key: string): boolean {
         if (normalizedSearch) return false;
@@ -73,6 +75,7 @@
     }
 
     function subtitle(metric: MetricEntry): string {
+        if (metric.binding) return `bound · ${metric.binding.dataset}`;
         if (metric.dataset_ref) return metric.dataset_ref;
         return "unbound";
     }
@@ -141,97 +144,23 @@
     </div>
 
     <div class="flex-1 overflow-y-auto">
-        <section class="px-3 py-3" data-testid="metric-sidebar-tree">
-            <h4 class="px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                On this tree
-            </h4>
-
-            {#if metrics.length === 0}
-                <p class="mt-2 px-1 text-xs leading-relaxed text-slate-500">
-                    Nothing yet. Add a metric by hand, or bind one from the semantic model below.
+        <section class="px-3 py-3" data-testid="metric-sidebar-catalog">
+            {#if metrics.length === 0 && catalog.length === 0}
+                <p class="px-1 text-xs leading-relaxed text-slate-500">
+                    Nothing yet. Add a metric by hand, or bind one from the semantic model.
                 </p>
-            {:else if filteredMetrics.length === 0}
-                <p class="mt-2 px-1 text-xs italic leading-relaxed text-slate-400">
-                    No matching metrics on this tree.
-                </p>
-            {:else}
-                <ul class="mt-2 space-y-1">
-                    {#each filteredMetrics as metric (metric.id)}
-                        <li>
-                            <div
-                                class="group flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors cursor-grab active:cursor-grabbing"
-                                class:border-primary-300={selectedMetricId === metric.id}
-                                class:bg-primary-50={selectedMetricId === metric.id}
-                                class:border-slate-200={selectedMetricId !== metric.id}
-                                class:hover:border-slate-300={selectedMetricId !== metric.id}
-                                draggable="true"
-                                role="listitem"
-                                ondragstart={(event) => onDragStartMetric(event, metric)}
-                                data-testid="metric-sidebar-entry"
-                            >
-                                <button
-                                    type="button"
-                                    class="min-w-0 flex-1 text-left"
-                                    onclick={() => onselectmetric?.(metric.id)}
-                                    data-testid="metric-sidebar-select"
-                                    title={metric.description || metric.label}
-                                >
-                                    <span class="flex items-center gap-1.5">
-                                        <span
-                                            class="h-2 w-2 shrink-0 rounded-full {metric.binding ? 'bg-primary-500' : 'bg-amber-500'}"
-                                            aria-hidden="true"
-                                        ></span>
-                                        <span class="truncate text-sm font-medium text-slate-800">
-                                            {metric.label}
-                                        </span>
-                                    </span>
-                                    {#if metric.binding}
-                                        <span class="mt-0.5 flex items-center gap-1 truncate pl-3.5 text-[11px] font-medium text-primary-600">
-                                            <Icon icon="lucide:link" class="h-3 w-3 shrink-0" />
-                                            <span class="sr-only">bound · </span>
-                                            <span class="truncate font-mono">{metric.binding.dataset}.{metric.binding.name}</span>
-                                        </span>
-                                    {:else}
-                                        <span class="mt-0.5 block truncate pl-3.5 text-[11px] font-mono text-slate-500">
-                                            {subtitle(metric)}
-                                        </span>
-                                    {/if}
-                                </button>
-
-                                {#if ondeletemetric}
-                                    <button
-                                        type="button"
-                                        class="shrink-0 rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
-                                        title="Remove {metric.label} from the tree"
-                                        aria-label="Remove {metric.label} from the tree"
-                                        onclick={() => ondeletemetric?.(metric.id)}
-                                        data-testid="metric-sidebar-delete"
-                                    >
-                                        <Icon icon="lucide:trash-2" class="h-3.5 w-3.5" />
-                                    </button>
-                                {/if}
-                            </div>
-                        </li>
-                    {/each}
-                </ul>
-            {/if}
-        </section>
-
-        <section class="border-t border-slate-200 px-3 py-3" data-testid="metric-sidebar-catalog">
-            <h4 class="px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                From the semantic model
-            </h4>
-
-            {#if catalog.length === 0}
                 <p class="mt-2 px-1 text-xs leading-relaxed text-slate-500">
                     No metrics found in the semantic model yet.
                 </p>
-            {:else if filteredCatalog.length === 0}
-                <p class="mt-2 px-1 text-xs italic leading-relaxed text-slate-400">
-                    No matching metrics in the semantic model.
+            {:else if entityGroups.length === 0}
+                <p class="px-1 text-xs italic leading-relaxed text-slate-400">
+                    No matching metrics on this tree or in the semantic model.
                 </p>
             {:else}
-                <div class="mt-2 space-y-1">
+                {#if normalizedSearch && filteredMetrics.length === 0}
+                    <p class="sr-only">No matching metrics on this tree.</p>
+                {/if}
+                <div class="space-y-1.5">
                     {#each entityGroups as group (group.key)}
                         {@const collapsed = isGroupCollapsed(group.key)}
                         <div data-testid="metric-sidebar-entity-group" data-group-key={group.key}>
@@ -248,19 +177,106 @@
                                     <Icon icon="lucide:chevron-down" class="h-3 w-3 text-slate-400" />
                                 </span>
                                 <Icon
-                                    icon={group.isCrossDataset ? "lucide:layers" : "lucide:database"}
-                                    class="h-3.5 w-3.5 shrink-0 text-slate-400"
+                                    icon={group.isDraftUnbound
+                                        ? "lucide:file-edit"
+                                        : group.isCrossDataset
+                                          ? "lucide:layers"
+                                          : "lucide:database"}
+                                    class="h-3.5 w-3.5 shrink-0 {group.isDraftUnbound ? 'text-amber-500' : 'text-slate-400'}"
                                 />
                                 <span class="min-w-0 flex-1 truncate">{group.label}</span>
-                                <span class="rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium tabular-nums text-slate-500">
-                                    {group.items.length}
-                                </span>
+                                {#if group.onTreeCount > 0 && !group.isDraftUnbound}
+                                    <span
+                                        class="rounded-full bg-primary-50 px-1.5 py-0.2 text-[10px] font-semibold tabular-nums text-primary-700"
+                                        title="{group.onTreeCount} on this tree"
+                                    >
+                                        {group.onTreeCount}/{group.items.length}
+                                    </span>
+                                {:else}
+                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium tabular-nums text-slate-500">
+                                        {group.items.length}
+                                    </span>
+                                {/if}
                             </button>
 
                             {#if !collapsed}
                                 <ul class="ml-[13px] mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
-                                    {#each group.items as item (`${item.entry.dataset ?? ''}::${item.entry.name}`)}
-                                        {#if item.status === "available"}
+                                    {#each group.items as item (item.kind === "tree" ? `tree::${item.metric.id}` : `cat::${item.entry.dataset ?? ""}::${item.entry.name}`)}
+                                        {#if item.kind === "tree"}
+                                            {@const metric = item.metric}
+                                            {@const isSelected = selectedMetricId === metric.id}
+                                            {@const isBound = Boolean(metric.binding)}
+                                            <li data-testid="metric-sidebar-entry">
+                                                <div
+                                                    class="group flex items-center gap-1 rounded-md border px-2 py-1 transition-all cursor-grab active:cursor-grabbing"
+                                                    class:border-primary-500={isBound && isSelected}
+                                                    class:bg-primary-100={isBound && isSelected}
+                                                    class:ring-1={isSelected}
+                                                    class:ring-primary-400={isBound && isSelected}
+                                                    class:border-primary-200={isBound && !isSelected}
+                                                    class:bg-primary-50={isBound && !isSelected}
+                                                    class:hover:border-primary-300={isBound && !isSelected}
+                                                    class:border-amber-500={!isBound && isSelected}
+                                                    class:bg-amber-100={!isBound && isSelected}
+                                                    class:ring-amber-400={!isBound && isSelected}
+                                                    class:border-amber-200={!isBound && !isSelected}
+                                                    class:bg-amber-50={!isBound && !isSelected}
+                                                    class:hover:border-amber-300={!isBound && !isSelected}
+                                                    draggable="true"
+                                                    role="listitem"
+                                                    ondragstart={(event) => onDragStartMetric(event, metric)}
+                                                    data-testid={isBound ? "metric-sidebar-catalog-added" : undefined}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        class="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                                                        onclick={() => onselectmetric?.(metric.id)}
+                                                        data-testid="metric-sidebar-select"
+                                                        title={metric.description || (metric.binding ? `${metric.label} (${metric.binding.dataset}.${metric.binding.name})` : metric.label)}
+                                                    >
+                                                        <span
+                                                            class="h-2 w-2 shrink-0 rounded-full {isBound ? 'bg-primary-500' : 'bg-amber-500'}"
+                                                            aria-hidden="true"
+                                                        ></span>
+                                                        <span
+                                                            class="min-w-0 flex-1 truncate text-xs font-medium {isBound ? 'text-primary-900' : 'text-slate-800'}"
+                                                        >
+                                                            {metric.binding ? metric.binding.name : metric.label}
+                                                        </span>
+                                                        <span class="sr-only">
+                                                            {metric.label} {subtitle(metric)}
+                                                        </span>
+                                                    </button>
+
+                                                    {#if !isBound}
+                                                        <span class="shrink-0 rounded bg-amber-100/80 px-1 py-0.2 text-[9px] font-medium uppercase tracking-wide text-amber-700 group-hover:hidden">
+                                                            draft
+                                                        </span>
+                                                    {:else}
+                                                        <Icon
+                                                            icon="lucide:check"
+                                                            class="h-3.5 w-3.5 shrink-0 text-primary-600 {ondeletemetric ? 'group-hover:hidden' : ''}"
+                                                        />
+                                                    {/if}
+
+                                                    {#if ondeletemetric}
+                                                        <button
+                                                            type="button"
+                                                            class="hidden shrink-0 rounded p-0.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:inline-flex group-hover:inline-flex"
+                                                            title="Remove {metric.label} from the tree"
+                                                            aria-label="Remove {metric.label} from the tree"
+                                                            onclick={(event) => {
+                                                                event.stopPropagation();
+                                                                ondeletemetric?.(metric.id);
+                                                            }}
+                                                            data-testid="metric-sidebar-delete"
+                                                        >
+                                                            <Icon icon="lucide:trash-2" class="h-3 w-3" />
+                                                        </button>
+                                                    {/if}
+                                                </div>
+                                            </li>
+                                        {:else if item.status === "available"}
                                             <li>
                                                 <button
                                                     type="button"
@@ -277,34 +293,6 @@
                                                         class="h-3.5 w-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-primary-600"
                                                     />
                                                 </button>
-                                            </li>
-                                        {:else if item.status === "added"}
-                                            {@const isSelected = Boolean(item.boundMetricId && selectedMetricId === item.boundMetricId)}
-                                            <li>
-                                                <div
-                                                    class="flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2 py-1 text-left text-xs font-medium transition-colors"
-                                                    class:border-primary-400={isSelected}
-                                                    class:bg-primary-100={isSelected}
-                                                    class:text-primary-900={isSelected}
-                                                    class:border-primary-200={!isSelected}
-                                                    class:bg-primary-50={!isSelected}
-                                                    class:text-primary-700={!isSelected}
-                                                    class:hover:border-primary-300={!isSelected}
-                                                    role="button"
-                                                    tabindex="0"
-                                                    onclick={() => item.boundMetricId && onselectmetric?.(item.boundMetricId)}
-                                                    onkeydown={(e) => {
-                                                        if ((e.key === "Enter" || e.key === " ") && item.boundMetricId) {
-                                                            e.preventDefault();
-                                                            onselectmetric?.(item.boundMetricId);
-                                                        }
-                                                    }}
-                                                    title="Already on this tree — click to select"
-                                                    data-testid="metric-sidebar-catalog-added"
-                                                >
-                                                    <span class="min-w-0 flex-1 truncate">{item.entry.name}</span>
-                                                    <Icon icon="lucide:check" class="h-3.5 w-3.5 shrink-0 text-primary-600" />
-                                                </div>
                                             </li>
                                         {:else}
                                             <li
