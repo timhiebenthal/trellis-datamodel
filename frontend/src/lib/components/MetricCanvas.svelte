@@ -193,9 +193,10 @@
         {/if}
 
         <div
-            class="pointer-events-none absolute bottom-4 left-4 z-10 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm backdrop-blur-sm"
+            class="pointer-events-none absolute bottom-4 left-4 z-10 max-w-xs rounded-lg border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] leading-relaxed text-slate-500 shadow-sm backdrop-blur-sm"
         >
-            Drag from a node's right dot onto another node to record an influence.
+            Drag from a node's right dot onto another node to record an influence. Select an
+            arrow and press Backspace to remove it.
         </div>
     {/if}
 </div>
