@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { getConfigInfo, getDataModel, getMetricTree } from '$lib/api';
+    import { getConfigInfo, getMetricTree } from '$lib/api';
     import MetricCanvas from '$lib/components/MetricCanvas.svelte';
     import MetricDetailPanel from '$lib/components/MetricDetailPanel.svelte';
     import MetricSidebar from '$lib/components/MetricSidebar.svelte';
@@ -25,16 +25,18 @@
         type MetricLayout,
         type MetricRelationKind,
     } from '$lib/utils/metric-graph';
-    import type { MetricCatalogEntry, MetricEntry, MetricTreeFile } from '$lib/types';
-
-    type MetricTreeResponse = MetricTreeFile & { catalog: MetricCatalogEntry[] };
+    import type {
+        MetricCatalogEntry,
+        MetricEntry,
+        MetricTreeFile,
+        MetricTreeResponse,
+    } from '$lib/types';
 
     let loading = $state(true);
     let metricsEnabled = $state(false);
     let error = $state<string | null>(null);
     let tree = $state<MetricTreeResponse | null>(null);
     let layout = $state<MetricLayout>({});
-    let entityIds = $state<string[]>([]);
     let notice = $state<string | null>(null);
 
     // Selection drives the detail panel: which metric is open, and which field it
@@ -76,16 +78,10 @@
                 return;
             }
 
-            const [document, dataModel] = await Promise.all([
-                getMetricTree(),
-                // Only used to suggest entity ids for `dataset_ref`; a failure here
-                // must not block the canvas.
-                getDataModel().catch(() => null),
-            ]);
+            const document = await getMetricTree();
 
             tree = document;
             layout = layoutFromMetrics(document.metrics);
-            entityIds = (dataModel?.entities ?? []).map((entity) => entity.id);
 
             // The freshly loaded document counts as saved: loading must never post.
             saver.initializeBaseline(buildMetricTreePayload(tree, layout));
@@ -412,7 +408,7 @@
                     <div class="absolute bottom-4 right-4 top-16 z-20 flex">
                         <MetricDetailPanel
                             metric={selectedMetric}
-                            {entityIds}
+                            datasets={tree.datasets}
                             focus={detailFocus}
                             warnings={saveState.warnings}
                             error={saveState.error}

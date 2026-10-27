@@ -10,7 +10,7 @@
      */
     let {
         metric = null,
-        entityIds = [],
+        datasets = [],
         focus = null,
         warnings = [],
         error = null,
@@ -22,7 +22,7 @@
         onclose,
     }: {
         metric?: MetricEntry | null;
-        entityIds?: string[];
+        datasets?: string[];
         focus?: "label" | null;
         warnings?: string[];
         error?: string | null;
@@ -38,16 +38,16 @@
     let datasetDropdownRef = $state<HTMLDivElement | null>(null);
     let datasetDropdownOpen = $state(false);
     let datasetFilterActive = $state(false);
-    let activeEntityIndex = $state(-1);
+    let activeDatasetIndex = $state(-1);
 
     const binding = $derived(metric?.binding ?? null);
     const needsExpression = $derived(
         !!metric && !binding && !(metric.expression ?? "").trim(),
     );
-    const filteredEntityIds = $derived.by(() => {
+    const filteredDatasets = $derived.by(() => {
         const query = (metric?.dataset_ref ?? "").trim().toLowerCase();
-        if (!datasetFilterActive || !query) return entityIds;
-        return entityIds.filter((id) => id.toLowerCase().includes(query));
+        if (!datasetFilterActive || !query) return datasets;
+        return datasets.filter((id) => id.toLowerCase().includes(query));
     });
 
     // `focus === 'label'` is how "Add metric" lands the caret in the name field.
@@ -76,10 +76,10 @@
     });
 
     function openDatasetDropdown() {
-        if (entityIds.length === 0) return;
+        if (datasets.length === 0) return;
         datasetDropdownOpen = true;
         datasetFilterActive = false;
-        activeEntityIndex = -1;
+        activeDatasetIndex = -1;
     }
 
     function toggleDatasetDropdown() {
@@ -91,11 +91,11 @@
         }
     }
 
-    function selectDatasetEntity(entityId: string) {
-        onchange?.({ dataset_ref: entityId });
+    function selectDataset(dataset: string) {
+        onchange?.({ dataset_ref: dataset });
         datasetDropdownOpen = false;
         datasetFilterActive = false;
-        activeEntityIndex = -1;
+        activeDatasetIndex = -1;
     }
 
     function handleDatasetKeydown(event: KeyboardEvent) {
@@ -106,26 +106,26 @@
                 event.preventDefault();
             }
         } else if (event.key === "ArrowDown") {
-            if (!datasetDropdownOpen && entityIds.length > 0) {
+            if (!datasetDropdownOpen && datasets.length > 0) {
                 openDatasetDropdown();
             }
-            if (filteredEntityIds.length > 0) {
+            if (filteredDatasets.length > 0) {
                 event.preventDefault();
-                activeEntityIndex = Math.min(activeEntityIndex + 1, filteredEntityIds.length - 1);
+                activeDatasetIndex = Math.min(activeDatasetIndex + 1, filteredDatasets.length - 1);
             }
         } else if (event.key === "ArrowUp") {
-            if (datasetDropdownOpen && filteredEntityIds.length > 0) {
+            if (datasetDropdownOpen && filteredDatasets.length > 0) {
                 event.preventDefault();
-                activeEntityIndex = Math.max(activeEntityIndex - 1, 0);
+                activeDatasetIndex = Math.max(activeDatasetIndex - 1, 0);
             }
         } else if (event.key === "Enter") {
             if (
                 datasetDropdownOpen &&
-                activeEntityIndex >= 0 &&
-                activeEntityIndex < filteredEntityIds.length
+                activeDatasetIndex >= 0 &&
+                activeDatasetIndex < filteredDatasets.length
             ) {
                 event.preventDefault();
-                selectDatasetEntity(filteredEntityIds[activeEntityIndex]);
+                selectDataset(filteredDatasets[activeDatasetIndex]);
             }
         }
     }
@@ -276,7 +276,7 @@
 
                 <div>
                     <label class={labelClass} for="metric-field-dataset-{metric.id}">
-                        <span>Entity</span>
+                        <span>Dataset</span>
                         <span class="normal-case tracking-normal text-slate-400">optional</span>
                     </label>
                     <div class="relative" bind:this={datasetDropdownRef}>
@@ -287,7 +287,7 @@
                             placeholder="fct__order"
                             autocomplete="off"
                             role="combobox"
-                            aria-expanded={datasetDropdownOpen && filteredEntityIds.length > 0}
+                            aria-expanded={datasetDropdownOpen && filteredDatasets.length > 0}
                             aria-autocomplete="list"
                             aria-controls="metric-dataset-options-{metric.id}"
                             onfocus={openDatasetDropdown}
@@ -298,18 +298,18 @@
                             oninput={(event) => {
                                 datasetDropdownOpen = true;
                                 datasetFilterActive = true;
-                                activeEntityIndex = 0;
+                                activeDatasetIndex = 0;
                                 onchange?.({ dataset_ref: event.currentTarget.value });
                             }}
                             onkeydown={handleDatasetKeydown}
                             data-testid="metric-field-dataset"
                         />
-                        {#if entityIds.length > 0}
+                        {#if datasets.length > 0}
                             <button
                                 type="button"
                                 tabindex="-1"
                                 class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600"
-                                aria-label="Toggle entity options"
+                                aria-label="Toggle dataset options"
                                 onmousedown={(event) => event.preventDefault()}
                                 onclick={toggleDatasetDropdown}
                                 data-testid="metric-dataset-toggle"
@@ -323,7 +323,7 @@
                             </button>
                         {/if}
 
-                        {#if datasetDropdownOpen && filteredEntityIds.length > 0}
+                        {#if datasetDropdownOpen && filteredDatasets.length > 0}
                             <div
                                 class="absolute left-0 z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
                                 onmousedown={(event) => event.preventDefault()}
@@ -334,9 +334,9 @@
                                     class="focus:outline-none"
                                     data-testid="metric-dataset-options"
                                 >
-                                    {#each filteredEntityIds as entityId, index (entityId)}
-                                        {@const isSelected = entityId === (metric.dataset_ref ?? "")}
-                                        {@const isHighlighted = index === activeEntityIndex}
+                                    {#each filteredDatasets as dataset, index (dataset)}
+                                        {@const isSelected = dataset === (metric.dataset_ref ?? "")}
+                                        {@const isHighlighted = index === activeDatasetIndex}
                                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                                         <li
                                             role="option"
@@ -345,10 +345,10 @@
                                             isHighlighted
                                                 ? 'bg-primary-50 font-medium text-primary-700'
                                                 : ''}"
-                                            onclick={() => selectDatasetEntity(entityId)}
+                                            onclick={() => selectDataset(dataset)}
                                             data-testid="metric-dataset-option"
                                         >
-                                            <span class="block truncate font-mono text-xs">{entityId}</span>
+                                            <span class="block truncate font-mono text-xs">{dataset}</span>
                                             {#if isSelected}
                                                 <span
                                                     class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-primary-600"
@@ -363,8 +363,8 @@
                         {/if}
                     </div>
                     <p class="mt-1 text-[11px] leading-relaxed text-slate-400">
-                        The entity this metric belongs to. Free text is allowed; an entity that no
-                        longer exists is badged rather than deleted.
+                        The semantic-model dataset the metric is written under on push. Free text
+                        is allowed; a dataset that is not exported is badged rather than deleted.
                     </p>
                 </div>
             {/if}

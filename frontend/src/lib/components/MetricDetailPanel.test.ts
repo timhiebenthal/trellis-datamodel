@@ -53,10 +53,10 @@ describe('MetricDetailPanel', () => {
         expect(onchange).toHaveBeenCalledWith({ dataset_ref: 'fct__booking' });
     });
 
-    it('suggests entity ids for the dataset reference and still accepts free text', async () => {
+    it('suggests the semantic-model datasets for the dataset reference and still accepts free text', async () => {
         const onchange = vi.fn();
         const { container } = render(MetricDetailPanel, {
-            props: { metric: draft, entityIds: ['fct__order', 'dim_customer'], onchange },
+            props: { metric: draft, datasets: ['fct__order', 'dim_customer'], onchange },
         });
 
         const datasetInput = field(container, 'dataset');

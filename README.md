@@ -109,7 +109,7 @@ The `/metrics-tree` page holds two kinds of metric. A **draft metric** is author
 
 Set `metrics.file` to move it, and `metrics.expression_dialect` (`ANSI_SQL` by default) to pick the dialect label written onto emitted expressions. It is a label, not a parser: Trellis does not validate the SQL.
 
-Pushing with `ossie.enabled: true` emits the drafts into the Ossie document: a draft with a `dataset_ref` lands under that dataset's `metrics`, one without lands at the document root. Metrics Trellis did not author are preserved at both levels, including their `custom_extensions` and `ai_context`. Turning the feature off stops the emission and leaves the existing `metric_tree.yml` untouched, but the push still preserves whatever metrics are already in the Ossie document.
+Pushing with `ossie.enabled: true` emits the drafts into the Ossie document: a draft whose `dataset_ref` names an exported dataset (for example `fct_sale`) lands under that dataset's `metrics`; one without, or naming a dataset that is not exported, lands at the document root. Metrics Trellis did not author are preserved at both levels, including their `custom_extensions` and `ai_context`. Turning the feature off stops the emission and leaves the existing `metric_tree.yml` untouched, but the push still preserves whatever metrics are already in the Ossie document.
 
 ## Vision
 

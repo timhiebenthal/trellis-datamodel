@@ -43,7 +43,7 @@ The existing canvas answers "what is in the warehouse". This one answers "why di
 
 2. **Two kinds of metric, one file.**
 
-   - **Draft metric**: authored in Trellis. Carries `label`, `description`, `expression`, optional `dataset_ref`. `dataset_ref` is an entity id from `data_model.yml`.
+   - **Draft metric**: authored in Trellis. Carries `label`, `description`, `expression`, optional `dataset_ref`. `dataset_ref` is the name of a dataset a push writes to `semantic_model.yml` (the bound model's short name, version-suffixed for a versioned model) - not a data-model entity id.
    - **Bound metric**: a reference, never a copy. Carries `binding: {dataset, name}` and no `expression`, `description` or `dataset_ref`. Its definition is read from `semantic_model.yml` at load.
 
    A bound metric whose definition disappears from `semantic_model.yml` stays in the file, renders on the canvas as unresolved, and produces a warning; nothing is deleted.
@@ -79,7 +79,7 @@ The existing canvas answers "what is in the warehouse". This one answers "why di
 
    **Off means off.** With `metrics.enabled: false`: no nav entry, `/metrics-tree` and `/api/metric-tree` answer `404` with a message naming the config key, no file is read or written, and `export_ossie` emits no metrics. An existing `metric_tree.yml` is left untouched and comes back into view when the toggle is flipped. Preservation of metrics Trellis did not author stays unconditional even while disabled - a disabled feature must never damage a file that a push happens to rewrite.
 
-8. **API.** `GET /api/metric-tree` returns `{version, metrics, influences, catalog}` with layout merged into each metric, and `catalog` carrying the bindable plus read-only entries with `bindable`, `dataset`, `entity_id` and, when unbindable, `reason`. `POST /api/metric-tree` accepts `{version, metrics, influences}`, where each metric may carry an optional `position`; the backend splits positions into `metric_layout.yml`, exactly as `POST /api/data-model` splits layout today. The response is `{status, warnings}`.
+8. **API.** `GET /api/metric-tree` returns `{version, metrics, influences, catalog, datasets}` with layout merged into each metric, `catalog` carrying the bindable plus read-only entries with `bindable`, `dataset`, `entity_id` and, when unbindable, `reason`, and `datasets` listing the names a push writes (what a draft's `dataset_ref` can name). `POST /api/metric-tree` accepts `{version, metrics, influences}`, where each metric may carry an optional `position`; the backend splits positions into `metric_layout.yml`, exactly as `POST /api/data-model` splits layout today. The response is `{status, warnings}`.
 
 9. **Save validation.** Duplicate metric ids, an influence referencing an unknown id, or an influence whose effect also appears as its own driver are rejected with `422` and a message naming the offender. An unresolvable `dataset_ref`, or a binding to a metric absent from `semantic_model.yml`, is a warning - the entry is kept and the canvas badges it. Trellis does not parse SQL, so a dataset-scoped expression that really spans two datasets is the author's error, not a rejected save.
 
@@ -186,7 +186,7 @@ def load_metric_tree(path: Path) -> MetricTreeFile:
 4. With `ossie.enabled: true` and a dataset-scoped metric in `semantic_model.yml`, the sidebar lists it as bindable, adding it produces an entry with `binding` and no `expression`, and the canvas node shows the definition read from the file.
 5. A root-level Ossie metric appears read-only, with no add action.
 6. Pushing with two drafted metrics writes one under `datasets[].metrics` and one at the document root, preserves every pre-existing metric untouched, and a second push produces identical bytes.
-7. A `dataset_ref` pointing at a deleted entity saves with a warning and renders a badge.
+7. A `dataset_ref` naming a dataset that is no longer exported saves with a warning and renders a badge.
 8. `uv run pytest`, `npm run check`, `npm run test:smoke` and the new e2e pass.
 
 ## Open Questions
@@ -204,6 +204,6 @@ def load_metric_tree(path: Path) -> MetricTreeFile:
 - **Bind, never copy.** A bound metric stores `{dataset, name}` and nothing else, the way a bound entity stores `model_ref` instead of columns. Copying would make Trellis' file authoritative and drift from the semantic model, and it would make the push a write-back problem rather than a merge.
 - **One tree now, `trees[]` later.** Metric ids are global and `influences` is flat, so adding named trees later is a grouping that references ids, not a nesting of definitions. Chosen because a metric legitimately belongs to several root-cause paths and non-MECE trees were named as the eventual shape.
 
-**Known gaps.** Trellis cannot tell whether a dataset-scoped expression really stays inside its dataset; it only checks that `dataset_ref` resolves to an entity. Ossie's `Metric` has no unit, owner or target-direction field, so an agent gets name, description and expression and infers the rest.
+**Known gaps.** Trellis cannot tell whether a dataset-scoped expression really stays inside its dataset; it only checks that `dataset_ref` names an exported dataset. Ossie's `Metric` has no unit, owner or target-direction field, so an agent gets name, description and expression and infers the rest.
 
 **Dependency on #156.** The preservation fix in `export_ossie` is the only change that touches PR #156's module. If #156 changes the dataset naming rule, the entity ↔ dataset resolution in this feature changes with it, and both are covered by the same tests.

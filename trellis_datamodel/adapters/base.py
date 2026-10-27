@@ -33,6 +33,19 @@ class ModelInfo(TypedDict):
     tags: list[str]
 
 
+def semantic_dataset_name(model: ModelInfo) -> str:
+    """The semantic-model dataset name for a model: its short name, version-suffixed.
+
+    Two versions of one dbt model are two physical tables. Sharing one dataset
+    name would make every relationship keyed by that name ambiguous.
+    """
+    name = (model.get("name") or model.get("unique_id") or "").strip()
+    version = model.get("version")
+    if version is not None:
+        name = f"{name}_v{version}"
+    return name
+
+
 class ColumnSchema(TypedDict, total=False):
     """Column schema for reading/writing model definitions."""
 

@@ -1,7 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import type { MetricCatalogEntry, MetricEntry } from "$lib/types";
-    import { groupCatalogByEntity, metricLabelFromName } from "$lib/utils/metric-edits";
+    import { groupCatalogByDataset, metricLabelFromName } from "$lib/utils/metric-edits";
 
     /**
      * The catalog. Everything the sidebar shows comes from
@@ -48,12 +48,11 @@
             entry.name,
             metricLabelFromName(entry.name),
             entry.dataset,
-            entry.entity_id,
         ].some((field) => field?.toLowerCase().includes(query));
     }
 
-    const entityGroups = $derived(
-        groupCatalogByEntity(catalog, metrics, {
+    const datasetGroups = $derived(
+        groupCatalogByDataset(catalog, metrics, {
             catalog: (entry) => matchesCatalogEntry(entry, normalizedSearch),
             metric: (metric) => matchesMetric(metric, normalizedSearch),
         }),
@@ -141,21 +140,21 @@
                     No metrics yet. Add one by hand, or define metrics in the semantic model to
                     bind them here.
                 </p>
-            {:else if entityGroups.length === 0}
+            {:else if datasetGroups.length === 0}
                 <p class="px-1 text-xs italic leading-relaxed text-slate-400">
                     No matching metrics.
                 </p>
             {:else}
                 <div class="space-y-1.5">
-                    {#each entityGroups as group (group.key)}
+                    {#each datasetGroups as group (group.key)}
                         {@const collapsed = isGroupCollapsed(group.key)}
-                        <div data-testid="metric-sidebar-entity-group" data-group-key={group.key}>
+                        <div data-testid="metric-sidebar-dataset-group" data-group-key={group.key}>
                             <button
                                 type="button"
                                 class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
                                 onclick={() => toggleGroup(group.key)}
                                 aria-expanded={!collapsed}
-                                data-testid="metric-sidebar-entity-group-toggle"
+                                data-testid="metric-sidebar-dataset-group-toggle"
                             >
                                 <span
                                     class="flex h-3 w-3 shrink-0 items-center justify-center transition-transform {collapsed ? '-rotate-90' : 'rotate-0'}"
@@ -163,15 +162,15 @@
                                     <Icon icon="lucide:chevron-down" class="h-3 w-3 text-slate-400" />
                                 </span>
                                 <Icon
-                                    icon={group.kind === "no-entity"
+                                    icon={group.kind === "no-dataset"
                                         ? "lucide:pencil"
-                                        : group.kind === "cross-entity"
+                                        : group.kind === "cross-dataset"
                                           ? "lucide:layers"
                                           : "lucide:database"}
-                                    class="h-3.5 w-3.5 shrink-0 {group.kind === 'no-entity' ? 'text-amber-500' : 'text-slate-400'}"
+                                    class="h-3.5 w-3.5 shrink-0 {group.kind === 'no-dataset' ? 'text-amber-500' : 'text-slate-400'}"
                                 />
                                 <span class="min-w-0 flex-1 truncate">{group.label}</span>
-                                {#if group.onTreeCount > 0 && group.kind !== "no-entity"}
+                                {#if group.onTreeCount > 0 && group.kind !== "no-dataset"}
                                     <span
                                         class="rounded-full bg-primary-50 px-1.5 py-0.2 text-[10px] font-semibold tabular-nums text-primary-700"
                                         title="{group.onTreeCount} on this tree"
@@ -280,7 +279,7 @@
                                         {:else}
                                             <li
                                                 class="flex items-center justify-between gap-1.5 rounded-md border border-transparent px-2 py-1 text-xs text-slate-400"
-                                                title={item.entry.reason ?? "This metric cannot be bound to an entity"}
+                                                title={item.entry.reason ?? "This metric cannot be bound"}
                                                 data-readonly="true"
                                                 data-testid="metric-sidebar-catalog-readonly"
                                             >

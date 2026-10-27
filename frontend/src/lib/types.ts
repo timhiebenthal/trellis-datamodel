@@ -546,7 +546,7 @@ export interface MetricEntry {
     label: string;
     description?: string;
     expression?: string;
-    dataset_ref?: string; // entity ID from data_model.yml; drafts only
+    dataset_ref?: string; // semantic-model dataset the draft is written under; drafts only
     binding?: { dataset: string; name: string }; // semantic_model.yml reference; bound only
     position?: { x: number; y: number }; // optional runtime canvas position override
     unresolved?: boolean; // set by GET when dataset_ref or binding no longer resolves
@@ -582,6 +582,16 @@ export interface MetricCatalogEntry {
     entity_id?: string | null;
     bindable: boolean;
     reason?: string; // present when not bindable
+}
+
+/**
+ * GET /api/metric-tree: the tree plus what the sidebar and the dataset picker use.
+ * `datasets` are the ones a push writes to semantic_model.yml, so they are what a
+ * draft's `dataset_ref` can name.
+ */
+export interface MetricTreeResponse extends MetricTreeFile {
+    catalog: MetricCatalogEntry[];
+    datasets: string[];
 }
 
 /**

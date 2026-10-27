@@ -22,7 +22,8 @@ class MetricEntry(BaseModel):
         None, description="Draft metric expression; never set on a bound metric"
     )
     dataset_ref: str | None = Field(
-        None, description="Entity ID from data_model.yml; drafts only"
+        None,
+        description="Semantic-model dataset the draft is written under; drafts only",
     )
     binding: MetricBinding | None = Field(
         None, description="Bound metric reference; never set on a draft"

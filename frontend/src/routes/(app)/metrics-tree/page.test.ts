@@ -17,7 +17,6 @@ const flow = vi.hoisted(() => ({
 const api = vi.hoisted(() => ({
     getConfigInfo: vi.fn(),
     getMetricTree: vi.fn(),
-    getDataModel: vi.fn(),
     saveMetricTree: vi.fn(),
 }));
 
@@ -68,11 +67,7 @@ beforeEach(() => {
         catalog: [
             { name: 'avg_price', dataset: 'fct__order', entity_id: 'fct__order', bindable: true },
         ],
-    });
-    api.getDataModel.mockResolvedValue({
-        version: 0.1,
-        entities: [{ id: 'fct__order', label: 'Order', position: { x: 0, y: 0 } }],
-        relationships: [],
+        datasets: ['fct__order'],
     });
     api.saveMetricTree.mockResolvedValue({ status: 'success', warnings: [] });
 });

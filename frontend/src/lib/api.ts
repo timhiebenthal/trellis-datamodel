@@ -27,8 +27,8 @@ import type {
     ConfigSchema,
     ConfigGetResponse,
     ConfigUpdateResponse,
-    MetricCatalogEntry,
     MetricTreeFile,
+    MetricTreeResponse,
 } from './types';
 import { parseServerTiming, recordBootRequest } from './boot-diagnostics';
 import type { ReconciliationResult } from './boot-loader';
@@ -1256,9 +1256,7 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
  * Fetch the metric tree document.
  * @returns Promise containing the tree plus the semantic-model catalog
  */
-export async function getMetricTree(): Promise<
-    MetricTreeFile & { catalog: MetricCatalogEntry[] }
-> {
+export async function getMetricTree(): Promise<MetricTreeResponse> {
     try {
         const res = await fetch(`${API_BASE}/metric-tree`);
         if (!res.ok) {

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from trellis_datamodel import config as cfg
+from trellis_datamodel.adapters.base import semantic_dataset_name
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.entity_keys import get_model_ref
 from trellis_datamodel.models.metric import (
@@ -73,14 +74,6 @@ def _data_model_entities() -> list[dict[str, Any]]:
     return _entries(data.get("entities")) if isinstance(data, dict) else []
 
 
-def _entity_ids() -> set[str]:
-    return {
-        str(entity.get("id") or "").strip()
-        for entity in _data_model_entities()
-        if str(entity.get("id") or "").strip()
-    }
-
-
 def _model_dataset_names() -> dict[str, str]:
     """`unique_id -> dataset name`, using the exporter's naming rule.
 
@@ -97,7 +90,7 @@ def _model_dataset_names() -> dict[str, str]:
     for model in models:
         unique_id = str(model.get("unique_id") or "").strip()
         if unique_id:
-            names[unique_id] = str(model.get("name") or unique_id).strip()
+            names[unique_id] = semantic_dataset_name(model)
     return names
 
 
@@ -115,6 +108,17 @@ def _dataset_to_entity(
         if dataset_name and dataset_name not in mapping:
             mapping[dataset_name] = entity_id
     return mapping
+
+
+def resolve_datasets() -> list[str]:
+    """Names of the datasets a push writes to semantic_model.yml, sorted.
+
+    These are the datasets a draft can attach to: one per entity bound to a
+    model, named by the exporter's rule.
+    """
+    return sorted(
+        _dataset_to_entity(_data_model_entities(), _model_dataset_names())
+    )
 
 
 def _binding_key(binding: MetricBinding) -> tuple[str, str]:
@@ -170,13 +174,13 @@ def _bound_expressions(document: dict[str, Any]) -> dict[tuple[str, str], str]:
 def _is_unresolved(
     metric: MetricEntry,
     references: set[tuple[str, str]],
-    entity_ids: set[str],
+    datasets: set[str],
 ) -> bool:
-    """Why this entry's outside reference is broken; mirrors the save warnings."""
+    """Whether this entry's outside reference is broken; mirrors the save warnings."""
     if metric.binding is not None:
         return _binding_key(metric.binding) not in references
     dataset_ref = (metric.dataset_ref or "").strip()
-    return bool(dataset_ref) and dataset_ref not in entity_ids
+    return bool(dataset_ref) and dataset_ref not in datasets
 
 
 def _annotate_unresolved(tree: MetricTreeFile) -> MetricTreeFile:
@@ -188,9 +192,9 @@ def _annotate_unresolved(tree: MetricTreeFile) -> MetricTreeFile:
     document = _ossie_document()
     references = _bound_references(document)
     expressions = _bound_expressions(document)
-    entity_ids = _entity_ids()
+    datasets = set(resolve_datasets())
     for metric in tree.metrics:
-        metric.unresolved = _is_unresolved(metric, references, entity_ids)
+        metric.unresolved = _is_unresolved(metric, references, datasets)
         metric.resolved_expression = (
             expressions.get(_binding_key(metric.binding))
             if metric.binding is not None and not metric.unresolved
@@ -318,11 +322,11 @@ def _save_warnings(tree: MetricTreeUpdate) -> list[str]:
     """Warnings for references that no longer resolve; the entries are kept.
 
     Both cases are outside Trellis' control - a definition deleted from
-    semantic_model.yml, an entity deleted from data_model.yml - so they warn
-    and badge rather than rejecting the save or dropping the entry.
+    semantic_model.yml, a dataset whose entity or model went away - so they
+    warn and badge rather than rejecting the save or dropping the entry.
     """
     references = _bound_references(_ossie_document())
-    entity_ids = _entity_ids()
+    datasets = set(resolve_datasets())
 
     warnings: list[str] = []
     for metric in sorted(tree.metrics, key=lambda entry: entry.id):
@@ -336,10 +340,10 @@ def _save_warnings(tree: MetricTreeUpdate) -> list[str]:
             continue
 
         dataset_ref = (metric.dataset_ref or "").strip()
-        if dataset_ref and dataset_ref not in entity_ids:
+        if dataset_ref and dataset_ref not in datasets:
             warnings.append(
                 f'metric "{metric.id}" dataset_ref "{dataset_ref}" does not match '
-                "any entity in data_model.yml"
+                "any dataset exported to semantic_model.yml"
             )
     return warnings
 

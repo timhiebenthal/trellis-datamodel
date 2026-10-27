@@ -1949,8 +1949,8 @@ class TestMetricEmission:
             tmp_path,
             monkeypatch,
             metrics=[
-                draft("revenue", "sum(amount)", "sale", "Booked revenue."),
-                draft("orders", "count(*)", "sale"),
+                draft("revenue", "sum(amount)", "fct_sale", "Booked revenue."),
+                draft("orders", "count(*)", "fct_sale"),
             ],
         )
 
@@ -2001,7 +2001,7 @@ class TestMetricEmission:
         path, _ = export_product_and_sale(
             tmp_path,
             monkeypatch,
-            metrics=[draft("revenue", "sum(amount)", "sale"), draft("margin")],
+            metrics=[draft("revenue", "sum(amount)", "fct_sale"), draft("margin")],
             existing=FOREIGN_EXISTING,
         )
 
@@ -2044,7 +2044,7 @@ class TestMetricEmission:
         path, _ = export_product_and_sale(
             tmp_path,
             monkeypatch,
-            metrics=[draft("revenue", "sum(amount)", "sale"), draft("margin")],
+            metrics=[draft("revenue", "sum(amount)", "fct_sale"), draft("margin")],
             enabled=False,
             existing=FOREIGN_EXISTING,
         )
@@ -2077,6 +2077,23 @@ class TestMetricEmission:
         warning = next(w for w in result.warnings if "orphan" in w)
         assert "ghost" in warning
         assert "root" in warning
+
+    def test_dataset_ref_naming_an_entity_id_does_not_resolve(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """`dataset_ref` is the exported dataset name (`fct_sale`), not the entity id."""
+        path, result = export_product_and_sale(
+            tmp_path,
+            monkeypatch,
+            metrics=[draft("revenue", "sum(amount)", "sale")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        assert [m["name"] for m in document["metrics"]] == ["revenue"]
+        assert all("metrics" not in dataset for dataset in document["datasets"])
+        assert any('dataset_ref "sale"' in w for w in result.warnings)
 
     def test_preserved_metric_of_a_vanished_dataset_moves_to_the_root(
         self, validator, tmp_path, monkeypatch
@@ -2120,8 +2137,8 @@ class TestMetricEmission:
 
     def test_second_push_is_byte_identical(self, tmp_path, monkeypatch):
         metrics = [
-            draft("revenue", "sum(amount)", "sale", "Booked revenue."),
-            draft("orders", "count(*)", "sale"),
+            draft("revenue", "sum(amount)", "fct_sale", "Booked revenue."),
+            draft("orders", "count(*)", "fct_sale"),
             draft("margin"),
         ]
         path, _ = export_product_and_sale(

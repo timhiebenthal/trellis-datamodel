@@ -256,7 +256,7 @@ Ordered by dependency. Each task leaves the app runnable. Checkboxes are updated
 **Description:** Edit a draft metric's label, description, expression and `dataset_ref`; a bound metric shows its definition read-only with an unlink action. Every change is debounced and posted to `/api/metric-tree`, with warnings surfaced.
 
 **Acceptance criteria:**
-- [x] The panel edits `label`, `description`, `expression`, and `dataset_ref` (entity ids from the loaded data model, free text allowed) for drafts, and shows label, dataset, expression and "unlink" for bound entries
+- [x] The panel edits `label`, `description`, `expression`, and `dataset_ref` (the datasets a push writes, offered from GET `/api/metric-tree`; free text allowed) for drafts, and shows label, dataset, expression and "unlink" for bound entries
 - [x] `services/metric-tree-save.ts` debounces 400 ms, coalesces in-flight saves, exposes `isSaving`, `hasUnsavedChanges`, `saveNow()` and `flushSync()`, and calls `saveMetricTree`
 - [x] Server `warnings` render in the panel, one line per warning, and clear on the next successful save
 - [x] A failed save keeps the edited state on screen and shows the error, rather than silently discarding it

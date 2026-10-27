@@ -9,6 +9,7 @@ from trellis_datamodel.models.metric import MetricTreeUpdate
 from trellis_datamodel.services.metric_tree import (
     load_metric_tree,
     resolve_catalog,
+    resolve_datasets,
     save_metric_tree,
 )
 
@@ -38,7 +39,8 @@ async def get_metric_tree():
     Return the metric tree document.
 
     Returns:
-        Dictionary with version, metrics, influences, and catalog
+        Dictionary with version, metrics, influences, catalog, and the datasets
+        a draft can attach to
 
     Raises:
         HTTPException: 404 if the metric tree feature is disabled
@@ -54,6 +56,7 @@ async def get_metric_tree():
             influence.model_dump(exclude_none=True) for influence in tree.influences
         ],
         "catalog": _build_catalog(),
+        "datasets": resolve_datasets(),
     }
 
 

@@ -15,6 +15,7 @@ from trellis_datamodel.services import metric_tree as metric_tree_service
 from trellis_datamodel.services.metric_tree import (
     load_metric_tree,
     resolve_catalog,
+    resolve_datasets,
     save_metric_tree,
 )
 from trellis_datamodel.utils.structured_data import load_yaml_or_json
@@ -155,6 +156,30 @@ class TestResolveCatalog:
         ]
 
 
+class TestResolveDatasets:
+    """The datasets a draft can attach to: what a push writes, nothing else."""
+
+    def test_lists_one_dataset_per_entity_bound_to_a_model(self, catalog_docs):
+        # `fct__web_session` has no model_ref and `fct__orphan` points at a
+        # model the framework does not report: neither is exported.
+        assert resolve_datasets() == ["dim_customer", "fct__order"]
+
+    def test_names_a_versioned_model_the_way_the_exporter_does(
+        self, catalog_docs, monkeypatch
+    ):
+        versioned = [{**FIXTURE_MODELS[0], "version": 2}, FIXTURE_MODELS[1]]
+        monkeypatch.setattr(metric_tree_service, "get_models", lambda: versioned)
+
+        assert resolve_datasets() == ["dim_customer", "fct__order_v2"]
+
+    def test_a_framework_that_reports_no_models_yields_no_datasets(
+        self, catalog_docs, monkeypatch
+    ):
+        monkeypatch.setattr(metric_tree_service, "get_models", lambda: [])
+
+        assert resolve_datasets() == []
+
+
 class TestUnresolvedOnLoad:
     """A saved reference that no longer resolves is flagged, never dropped."""
 
@@ -200,7 +225,7 @@ class TestUnresolvedOnLoad:
                     id="orphan_draft",
                     label="Orphan draft",
                     expression="sum(amount) from removed",
-                    dataset_ref="removed_entity",
+                    dataset_ref="removed_dataset",
                 )
             )
         )
@@ -208,6 +233,49 @@ class TestUnresolvedOnLoad:
         reloaded = load_metric_tree(cfg.METRICS_CONFIG.file)
 
         assert reloaded.metrics[0].unresolved is True
+
+    def test_draft_naming_an_entity_id_instead_of_its_dataset_is_unresolved(
+        self, catalog_docs
+    ):
+        """`dataset_ref` is a semantic-model dataset name, not a data-model entity id."""
+        catalog_docs["data_model"].write_text(
+            yaml.safe_dump(
+                {
+                    "version": 0.1,
+                    "entities": [
+                        {
+                            "id": "order",
+                            "label": "Order",
+                            "model_ref": "model.shop.fct_order",
+                        }
+                    ],
+                    "relationships": [],
+                }
+            )
+        )
+        save_metric_tree(
+            self._tree(
+                MetricEntry(
+                    id="by_entity",
+                    label="By entity",
+                    expression="sum(amount)",
+                    dataset_ref="order",
+                ),
+                MetricEntry(
+                    id="by_dataset",
+                    label="By dataset",
+                    expression="sum(amount)",
+                    dataset_ref="fct__order",
+                ),
+            )
+        )
+
+        reloaded = load_metric_tree(cfg.METRICS_CONFIG.file)
+
+        assert {metric.id: metric.unresolved for metric in reloaded.metrics} == {
+            "by_dataset": False,
+            "by_entity": True,
+        }
 
     def test_a_bound_metric_survives_a_vanished_definition(self, catalog_docs):
         save_metric_tree(
@@ -375,19 +443,19 @@ class TestSaveWarnings:
                     id="orphan_draft",
                     label="Orphan draft",
                     expression="sum(amount) from removed",
-                    dataset_ref="removed_entity",
+                    dataset_ref="removed_dataset",
                 )
             )
         )
 
         assert len(warnings) == 1
         assert "orphan_draft" in warnings[0]
-        assert "removed_entity" in warnings[0]
-        assert "data_model.yml" in warnings[0]
+        assert "removed_dataset" in warnings[0]
+        assert "semantic_model.yml" in warnings[0]
 
         saved = load_yaml_or_json(str(catalog_docs["tree"]))["metrics"]
         assert [metric["id"] for metric in saved] == ["orphan_draft"]
-        assert saved[0]["dataset_ref"] == "removed_entity"
+        assert saved[0]["dataset_ref"] == "removed_dataset"
 
     def test_a_draft_without_a_dataset_ref_never_warns(self, catalog_docs):
         warnings = save_metric_tree(
@@ -484,7 +552,7 @@ class TestGetCatalogRoute:
                             "id": "orphan_draft",
                             "label": "Orphan draft",
                             "expression": "sum(amount) from removed",
-                            "dataset_ref": "removed_entity",
+                            "dataset_ref": "removed_dataset",
                         },
                     ],
                     "influences": [],
@@ -503,6 +571,7 @@ class TestGetCatalogRoute:
             "revenue": True,
             "sessions": False,
         }
+        assert body["datasets"] == ["dim_customer", "fct__order"]
         assert {
             metric["id"]: metric["unresolved"] for metric in body["metrics"]
         } == {

@@ -233,17 +233,17 @@ export function groupCatalog(
     return groups;
 }
 
-export type CatalogEntityItem =
+export type CatalogDatasetItem =
     | { kind: 'tree'; metric: MetricEntry; status: 'added' | 'draft' }
     | { kind: 'catalog'; entry: MetricCatalogEntry; status: 'available' | 'readonly' };
 
-export interface CatalogEntityGroup {
+export interface CatalogDatasetGroup {
     key: string;
     label: string;
-    /** `entity` is a real entity; the other two hold metrics that have none. */
-    kind: 'entity' | 'no-entity' | 'cross-entity';
+    /** `dataset` is a real semantic-model dataset; the other two hold metrics that have none. */
+    kind: 'dataset' | 'no-dataset' | 'cross-dataset';
     onTreeCount: number;
-    items: CatalogEntityItem[];
+    items: CatalogDatasetItem[];
 }
 
 export interface CatalogFilter {
@@ -251,34 +251,28 @@ export interface CatalogFilter {
     metric?: (metric: MetricEntry) => boolean;
 }
 
-const NO_ENTITY_KEY = '__no_entity__';
-const CROSS_ENTITY_KEY = '__cross_entity__';
-const GROUP_KIND_RANK: Record<CatalogEntityGroup['kind'], number> = {
-    entity: 0,
-    'no-entity': 1,
-    'cross-entity': 2,
+const NO_DATASET_KEY = '__no_dataset__';
+const CROSS_DATASET_KEY = '__cross_dataset__';
+const GROUP_KIND_RANK: Record<CatalogDatasetGroup['kind'], number> = {
+    dataset: 0,
+    'no-dataset': 1,
+    'cross-dataset': 2,
 };
 
 /**
- * Group the sidebar by entity: one list per entity, holding its drafts, its
- * metrics already on the tree, and its semantic-model metrics still to add.
+ * Group the sidebar by semantic-model dataset: one list per dataset, holding the
+ * drafts attached to it, its metrics already on the tree, and its metrics still to add.
  *
- * A binding names the Ossie dataset (the model's name), not the entity that owns
- * it, so the owner is looked up through the catalog. That lookup uses the whole
- * catalog even when `filter` hides entries, or a search would split an entity in two.
+ * Drafts, bindings and catalog entries all name the dataset the way
+ * `semantic_model.yml` does, so the group key needs no lookup.
  */
-export function groupCatalogByEntity(
+export function groupCatalogByDataset(
     catalog: MetricCatalogEntry[],
     metrics: MetricEntry[],
     filter: CatalogFilter = {},
-): CatalogEntityGroup[] {
-    const entityByDataset = new Map<string, string>();
-    for (const entry of catalog) {
-        if (entry.dataset && entry.entity_id) entityByDataset.set(entry.dataset, entry.entity_id);
-    }
-
-    const groups = new Map<string, CatalogEntityGroup>();
-    const groupFor = (key: string, label: string, kind: CatalogEntityGroup['kind']) => {
+): CatalogDatasetGroup[] {
+    const groups = new Map<string, CatalogDatasetGroup>();
+    const groupFor = (key: string, label: string, kind: CatalogDatasetGroup['kind']) => {
         let group = groups.get(key);
         if (!group) {
             group = { key, label, kind, onTreeCount: 0, items: [] };
@@ -286,17 +280,15 @@ export function groupCatalogByEntity(
         }
         return group;
     };
-    const entityGroup = (entityId: string) => groupFor(entityId, entityId, 'entity');
+    const datasetGroup = (dataset: string) => groupFor(dataset, dataset, 'dataset');
 
     const placed = new Set<MetricEntry>();
     const placeOnTree = (metric: MetricEntry) => {
         const { binding } = metric;
-        const entityId = binding
-            ? (entityByDataset.get(binding.dataset) ?? binding.dataset)
-            : (metric.dataset_ref ?? '').trim();
-        const group = entityId
-            ? entityGroup(entityId)
-            : groupFor(NO_ENTITY_KEY, 'No entity', 'no-entity');
+        const dataset = binding ? binding.dataset : (metric.dataset_ref ?? '').trim();
+        const group = dataset
+            ? datasetGroup(dataset)
+            : groupFor(NO_DATASET_KEY, 'No dataset', 'no-dataset');
 
         group.onTreeCount += 1;
         group.items.push({ kind: 'tree', metric, status: binding ? 'added' : 'draft' });
@@ -317,10 +309,10 @@ export function groupCatalogByEntity(
             continue;
         }
 
-        const entityId = (entry.entity_id ?? entry.dataset ?? '').trim();
-        const group = entityId
-            ? entityGroup(entityId)
-            : groupFor(CROSS_ENTITY_KEY, 'Cross-entity', 'cross-entity');
+        const dataset = (entry.dataset ?? '').trim();
+        const group = dataset
+            ? datasetGroup(dataset)
+            : groupFor(CROSS_DATASET_KEY, 'Cross-dataset', 'cross-dataset');
         group.items.push({
             kind: 'catalog',
             entry,

@@ -17,7 +17,12 @@ from pathlib import Path
 from typing import Any
 
 import trellis_datamodel.config as cfg
-from trellis_datamodel.adapters.base import ColumnSchema, ModelInfo, ModelSchema
+from trellis_datamodel.adapters.base import (
+    ColumnSchema,
+    ModelInfo,
+    ModelSchema,
+    semantic_dataset_name,
+)
 from trellis_datamodel.models.entity_keys import (
     get_model_ref,
     get_physical_datatype,
@@ -264,19 +269,6 @@ def _key_entries(
     if evidence and evidence in field_names:
         return {"primary_key": [evidence]}
     return {}
-
-
-def _dataset_name(model: ModelInfo) -> str:
-    """The model's short name, version-suffixed when the model is versioned.
-
-    Two versions of one dbt model are two physical tables. Sharing one dataset
-    name would make every relationship keyed by that name ambiguous.
-    """
-    name = (model.get("name") or model.get("unique_id") or "").strip()
-    version = model.get("version")
-    if version is not None:
-        name = f"{name}_v{version}"
-    return name
 
 
 def _build_dataset_skeleton(
@@ -556,17 +548,16 @@ def _existing_document(path: Path) -> dict[str, Any]:
 
 def _apply_metrics(
     datasets: list[dict[str, Any]],
-    emitted: dict[str, str],
     tree: MetricTreeFile,
     existing: dict[str, Any],
     warnings: list[str],
 ) -> list[Any]:
     """Place drafted metrics, keep every foreign one, and return the root list.
 
-    Drafts with a resolving `dataset_ref` join that dataset; the rest go to the
-    document root. An existing entry whose name this push did not author stays
-    where it was found, keys untouched, because a push never deletes metrics it
-    cannot prove it wrote.
+    A draft's `dataset_ref` names an exported dataset; drafts naming one join
+    it, the rest go to the document root. An existing entry whose name this
+    push did not author stays where it was found, keys untouched, because a
+    push never deletes metrics it cannot prove it wrote.
     """
     drafted: list[MetricEntry] = []
     authored: set[str] = set()
@@ -581,22 +572,21 @@ def _apply_metrics(
         drafted.append(metric)
         authored.add(metric.id)
 
+    dataset_names = {dataset["name"] for dataset in datasets}
     by_dataset: dict[str, list[dict[str, Any]]] = {}
     root: list[dict[str, Any]] = []
     for metric in sorted(drafted, key=lambda entry: entry.id):
         dataset_ref = (metric.dataset_ref or "").strip()
-        dataset_name = emitted.get(dataset_ref) if dataset_ref else None
-        if dataset_ref and dataset_name is None:
+        if dataset_ref in dataset_names:
+            by_dataset.setdefault(dataset_ref, []).append(_metric_entry(metric))
+            continue
+        if dataset_ref:
             warnings.append(
                 f'metric "{metric.id}" dataset_ref "{dataset_ref}" does not resolve '
                 "to an exported dataset; emitted at the document root"
             )
-        if dataset_name is None:
-            root.append(_metric_entry(metric))
-        else:
-            by_dataset.setdefault(dataset_name, []).append(_metric_entry(metric))
+        root.append(_metric_entry(metric))
 
-    dataset_names = {dataset["name"] for dataset in datasets}
     preserved_root = [
         entry
         for entry in _entries(existing.get("metrics"))
@@ -687,7 +677,7 @@ def export_ossie(
             )
             continue
 
-        dataset_name = _dataset_name(model)
+        dataset_name = semantic_dataset_name(model)
         owner = dataset_owners.get(dataset_name)
         if owner is not None:
             # A dataset name keys every relationship, so a second dataset with
@@ -745,9 +735,7 @@ def export_ossie(
             if metric_tree is not None
             else load_metric_tree(cfg.METRICS_CONFIG.file)
         )
-    root_metrics = _apply_metrics(
-        datasets, emitted, tree, _existing_document(path), warnings
-    )
+    root_metrics = _apply_metrics(datasets, tree, _existing_document(path), warnings)
 
     document: dict[str, Any] = {
         "version": OSSIE_VERSION,

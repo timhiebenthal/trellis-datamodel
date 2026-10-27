@@ -309,7 +309,7 @@ class TestOssiePushEndToEnd:
                     "label": "Revenue",
                     "description": "Booked revenue.",
                     "expression": "sum(amount)",
-                    "dataset_ref": "sale",
+                    "dataset_ref": "fct_sale",
                 },
                 {
                     "id": "avg_order_value",

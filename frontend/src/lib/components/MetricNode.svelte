@@ -22,7 +22,7 @@
         binding
             ? `The semantic model no longer defines ${binding.dataset}.${binding.name}. The reference is kept.`
             : dataset
-              ? `The entity "${dataset}" no longer exists in the data model.`
+              ? `The dataset "${dataset}" is not exported to the semantic model.`
               : "This metric no longer resolves to anything Trellis can read.",
     );
 
@@ -83,7 +83,6 @@
                       entry.name,
                       metricLabelFromName(entry.name),
                       entry.dataset,
-                      entry.entity_id,
                   ].some((field) => field?.toLowerCase().includes(normalizedQuery));
               })
             : [],
@@ -381,7 +380,7 @@
                                         >
                                             <span class="min-w-0 flex-1 truncate">{entry.name}</span>
                                             <span class="shrink-0 text-[10px] text-slate-400">
-                                                {entry.entity_id ?? entry.dataset}
+                                                {entry.dataset}
                                             </span>
                                         </button>
                                     </li>
@@ -460,7 +459,7 @@
             {:else if dataset}
                 <span
                     class="inline-flex max-w-full items-center gap-1 truncate rounded border border-gray-100 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px] text-gray-500"
-                    title="Draft metric of entity {dataset}"
+                    title="Draft metric in dataset {dataset}"
                     data-testid="metric-node-dataset"
                 >
                     <Icon icon="lucide:database" class="h-3 w-3 shrink-0 text-gray-400" />
@@ -469,7 +468,7 @@
             {:else}
                 <span
                     class="inline-flex items-center gap-1 rounded border border-dashed border-gray-300 px-1.5 py-0.5 text-[10px] font-medium text-gray-400"
-                    title="No entity set - this metric is drafted by hand"
+                    title="No dataset set - this metric is drafted by hand"
                     data-testid="metric-node-unbound"
                 >
                     unbound
