@@ -301,9 +301,11 @@
                 />
 
                 <!-- Inspector overlays the canvas instead of shrinking it, so opening a
-                     metric never moves the graph under the cursor. -->
-                <div class="pointer-events-none absolute inset-y-4 right-4 z-20 flex">
-                    <div class="pointer-events-auto flex max-h-full">
+                     metric never moves the graph under the cursor. It starts below the
+                     canvas's own "Add metric" button and only exists while something is
+                     selected, so an idle canvas stays unobstructed. -->
+                {#if selectedMetric}
+                    <div class="absolute bottom-4 right-4 top-16 z-20 flex">
                         <MetricDetailPanel
                             metric={selectedMetric}
                             {entityIds}
@@ -318,7 +320,7 @@
                             onclose={() => handleSelectMetric(null)}
                         />
                     </div>
-                </div>
+                {/if}
             </div>
         </div>
 
