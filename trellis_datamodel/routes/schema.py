@@ -44,13 +44,21 @@ async def sync_framework_tests_endpoint():
     """Sync relationship tests from data model to schema files."""
     outcome = sync_framework_tests()
 
-    message = f"Updated {len(outcome.files)} file(s)"
+    # `files` also carries the Ossie document, which the message already names
+    # separately; counting it here would report one more schema file than was
+    # actually written.
+    framework_file_count = len(outcome.files) - (1 if outcome.ossie_path else 0)
+    message = f"Updated {framework_file_count} file(s)"
     if outcome.ossie_path is not None:
         message += f", wrote {outcome.ossie_path.name}"
     elif cfg.OSSIE_CONFIG.enabled:
         # Only explain the absence when the user asked for the export; a
         # disabled feature should not shape the message at all.
         message += "; no semantic model was written"
+
+    if outcome.warnings:
+        count = len(outcome.warnings)
+        message += f", {count} warning" if count == 1 else f", {count} warnings"
 
     return SyncTestsResponse(
         message=message,

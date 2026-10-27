@@ -241,6 +241,21 @@ class TestOssiePushEndToEnd:
         assert str(ossie_path) in body["files"]
         assert any("procurement" in warning for warning in body["warnings"])
 
+    def test_message_counts_framework_files_and_reports_warnings(
+        self, test_client, monkeypatch, tmp_path
+    ):
+        """The Ossie document is named separately, not counted as a schema file."""
+        install(monkeypatch, tmp_path, enabled=True)
+
+        body = test_client.post("/api/sync-tests").json()
+
+        # FakeAdapter writes no framework files; the Ossie document is the only
+        # entry in `files`, and counting it would say "1 file(s)".
+        assert body["message"].startswith("Updated 0 file(s)")
+        assert "wrote semantic_model.yml" in body["message"]
+        assert body["warnings"]
+        assert body["message"].endswith(", 1 warning")
+
     def test_disabled_push_leaves_the_existing_document_untouched(
         self, test_client, monkeypatch, tmp_path
     ):
