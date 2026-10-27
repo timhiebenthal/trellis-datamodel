@@ -100,4 +100,35 @@ describe('MetricSidebar', () => {
         expect(container.textContent).toContain('No metrics found in the semantic model yet.');
         expect(container.textContent).toContain('Nothing yet.');
     });
+
+    it('filters both tree metrics and semantic model catalog entries via the search bar', async () => {
+        const { container } = render(MetricSidebar, { props: { metrics, catalog } });
+        const searchInput = container.querySelector(
+            '[data-testid="metric-sidebar-search"]',
+        ) as HTMLInputElement;
+        expect(searchInput).not.toBeNull();
+
+        await fireEvent.input(searchInput, { target: { value: 'order_count' } });
+
+        const treeRows = Array.from(
+            container.querySelectorAll('[data-testid="metric-sidebar-entry"]'),
+        );
+        expect(treeRows).toHaveLength(0);
+        expect(container.textContent).toContain('No matching metrics on this tree.');
+
+        const addable = Array.from(
+            container.querySelectorAll('[data-testid="metric-sidebar-catalog-add"]'),
+        );
+        expect(addable).toHaveLength(1);
+        expect(addable[0].textContent).toContain('order_count');
+
+        await fireEvent.input(searchInput, { target: { value: 'revenue' } });
+        expect(container.querySelectorAll('[data-testid="metric-sidebar-entry"]')).toHaveLength(1);
+        expect(
+            container.querySelectorAll('[data-testid="metric-sidebar-catalog-readonly"]'),
+        ).toHaveLength(1);
+        expect(
+            container.querySelectorAll('[data-testid="metric-sidebar-catalog-add"]'),
+        ).toHaveLength(0);
+    });
 });

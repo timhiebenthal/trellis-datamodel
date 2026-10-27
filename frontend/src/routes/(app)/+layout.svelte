@@ -1243,7 +1243,9 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     </header>
 
     <main class="flex-1 flex overflow-hidden relative">
-        <Sidebar width={280} {loading} trellisVersion={configInfo?.trellis_version ?? null} />
+        {#if !$page.url.pathname.startsWith('/metrics-tree')}
+            <Sidebar width={280} {loading} trellisVersion={configInfo?.trellis_version ?? null} />
+        {/if}
         {@render children()}
     </main>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import type { MetricCatalogEntry, MetricEntry } from "$lib/types";
-    import { groupCatalog } from "$lib/utils/metric-edits";
+    import { groupCatalog, metricLabelFromName } from "$lib/utils/metric-edits";
 
     /**
      * The catalog. Everything the sidebar shows comes from
@@ -26,7 +26,38 @@
         ondeletemetric?: (metricId: string) => void;
     } = $props();
 
-    const groups = $derived(groupCatalog(catalog, metrics));
+    let searchTerm = $state("");
+    const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
+
+    function matchesMetric(metric: MetricEntry, query: string): boolean {
+        if (!query) return true;
+        return [
+            metric.label,
+            metric.id,
+            metric.dataset_ref,
+            metric.binding?.dataset,
+            metric.binding?.name,
+            metric.description,
+        ].some((field) => field?.toLowerCase().includes(query));
+    }
+
+    function matchesCatalogEntry(entry: MetricCatalogEntry, query: string): boolean {
+        if (!query) return true;
+        return [
+            entry.name,
+            metricLabelFromName(entry.name),
+            entry.dataset,
+            entry.entity_id,
+        ].some((field) => field?.toLowerCase().includes(query));
+    }
+
+    const filteredMetrics = $derived(
+        metrics.filter((metric) => matchesMetric(metric, normalizedSearch)),
+    );
+    const filteredCatalog = $derived(
+        catalog.filter((entry) => matchesCatalogEntry(entry, normalizedSearch)),
+    );
+    const groups = $derived(groupCatalog(filteredCatalog, metrics));
 
     function subtitle(metric: MetricEntry): string {
         if (metric.binding) return `bound · ${metric.binding.dataset}`;
@@ -36,7 +67,7 @@
 </script>
 
 <aside
-    class="flex h-full w-80 shrink-0 flex-col border-l border-slate-200 bg-white"
+    class="flex h-full w-80 shrink-0 flex-col border-r border-slate-200 bg-white"
     aria-label="Metric catalog"
     data-testid="metric-sidebar"
 >
@@ -62,6 +93,23 @@
         {/if}
     </div>
 
+    <div class="border-b border-slate-200 px-3 py-2.5">
+        <div class="relative">
+            <Icon
+                icon="lucide:search"
+                class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+            />
+            <input
+                type="search"
+                placeholder="Search metrics..."
+                aria-label="Search metrics"
+                bind:value={searchTerm}
+                class="w-full rounded-md border border-slate-200 bg-slate-50/60 py-1.5 pl-8 pr-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                data-testid="metric-sidebar-search"
+            />
+        </div>
+    </div>
+
     <div class="flex-1 overflow-y-auto">
         <section class="px-3 py-3" data-testid="metric-sidebar-tree">
             <h4 class="px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -72,9 +120,13 @@
                 <p class="mt-2 px-1 text-xs leading-relaxed text-slate-500">
                     Nothing yet. Add a metric by hand, or bind one from the semantic model below.
                 </p>
+            {:else if filteredMetrics.length === 0}
+                <p class="mt-2 px-1 text-xs italic leading-relaxed text-slate-400">
+                    No matching metrics on this tree.
+                </p>
             {:else}
                 <ul class="mt-2 space-y-1">
-                    {#each metrics as metric (metric.id)}
+                    {#each filteredMetrics as metric (metric.id)}
                         <li>
                             <div
                                 class="group flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors"
@@ -126,6 +178,10 @@
             {#if catalog.length === 0}
                 <p class="mt-2 px-1 text-xs leading-relaxed text-slate-500">
                     No metrics found in the semantic model yet.
+                </p>
+            {:else if filteredCatalog.length === 0}
+                <p class="mt-2 px-1 text-xs italic leading-relaxed text-slate-400">
+                    No matching metrics in the semantic model.
                 </p>
             {:else}
                 {#if groups.available.length > 0}
