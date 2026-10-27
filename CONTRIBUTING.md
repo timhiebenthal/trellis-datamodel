@@ -101,6 +101,39 @@ uvx --from ~/git_repos/trellis-datamodel/dist/trellis_datamodel-*.whl \
 
 `trellis run` writes entity positions back to the project's data model and canvas layout files the first time it lays out unsaved entities. Preview on a clean checkout, or be ready to `git checkout --` those two files afterwards.
 
+### Debug a change against a live project (hot reload)
+
+`make preview` rebuilds the wheel on every change, which is too slow for debugging. To iterate with a live reload, skip the wheel and point the dev servers at the other project's config.
+
+```bash
+# Terminal 1 - this checkout's code, the other project's data
+cd ~/git_repos/trellis-datamodel
+uv run trellis run -p 8089 -c /path/to/project/trellis.yml --no-browser
+
+# Terminal 2 - Vite dev server, hot reload
+cd ~/git_repos/trellis-datamodel/frontend
+npm run dev            # open http://localhost:5173
+```
+
+Svelte and TypeScript edits reload instantly. Python edits need a restart of terminal 1, because `trellis run` starts uvicorn with `reload=False` (`trellis_datamodel/cli.py`).
+
+This works because:
+
+- Every path in `trellis.yml` resolves relative to the config file's directory, not the working directory (`trellis_datamodel/config.py`), so `-c` can point anywhere.
+- The Vite dev server proxies `/api` to `http://localhost:8089`. Override with `VITE_DEV_API_TARGET=http://localhost:9090 npm run dev` when the backend runs on another port.
+
+Two things to keep in mind:
+
+- Terminal 1 uses the checkout's environment, so reconcile and push run whatever dbt or Bruin version this repo has installed, not the project's pins. When that difference matters, install the checkout into the project's environment instead:
+
+  ```bash
+  cd /path/to/project
+  uv pip install -e ~/git_repos/trellis-datamodel
+  uv run --no-sync trellis run -p 8089
+  ```
+
+- Port 8089 serves the frontend bundle baked into `trellis_datamodel/static/` by the last `make build-package`, so it can lag behind your working tree. Use 5173 while debugging the frontend, and the write-back caveat above still applies to both ports.
+
 ### `trellis run` CLI
 ```bash
 trellis run [OPTIONS]
