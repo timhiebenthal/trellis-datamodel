@@ -19,6 +19,7 @@
     import {
         buildMetricTreePayload,
         layoutFromMetrics,
+        withMetricPosition,
         type MetricLayout,
     } from '$lib/utils/metric-graph';
     import type { MetricCatalogEntry, MetricEntry, MetricTreeFile } from '$lib/types';
@@ -208,6 +209,15 @@
         detailFocus = null;
     }
 
+    /**
+     * A dropped node updates the local layout first and the save follows, so the
+     * position is in the very next payload rather than a reload later.
+     */
+    function handleMoveMetric(metricId: string, position: { x: number; y: number }) {
+        layout = withMetricPosition(layout, metricId, position);
+        requestSave();
+    }
+
     function handleMetricChange(patch: Partial<MetricEntry>) {
         if (!tree || !selectedMetricId) return;
         applyGraph(updateMetric(tree, selectedMetricId, patch));
@@ -287,6 +297,7 @@
                     onconnect={handleConnect}
                     ondeleteedge={handleDeleteInfluence}
                     ondeletemetric={handleDeleteMetric}
+                    onmove={handleMoveMetric}
                 />
 
                 <!-- Inspector overlays the canvas instead of shrinking it, so opening a

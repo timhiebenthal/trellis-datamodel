@@ -143,6 +143,28 @@ describe('MetricCanvas', () => {
         expect(ondeletemetric).toHaveBeenCalledWith('order_count');
     });
 
+    it('reports where a node was dropped so the page can store the position', () => {
+        const onmove = vi.fn();
+        render(MetricCanvas, { props: { metrics, influences, layout: {}, onmove } });
+
+        lastFlow().onnodedragstop({
+            targetNode: { id: 'revenue', position: { x: 120, y: 240 } },
+            nodes: [],
+            event: new MouseEvent('mouseup'),
+        });
+
+        expect(onmove).toHaveBeenCalledWith('revenue', { x: 120, y: 240 });
+    });
+
+    it('stays quiet on a drag end that has no target node', () => {
+        const onmove = vi.fn();
+        render(MetricCanvas, { props: { metrics, influences, layout: {}, onmove } });
+
+        lastFlow().onnodedragstop({ targetNode: null, nodes: [], event: new MouseEvent('mouseup') });
+
+        expect(onmove).not.toHaveBeenCalled();
+    });
+
     it('reports node clicks and pane clicks so the page can drive the detail panel', () => {
         const onselectmetric = vi.fn();
         render(MetricCanvas, { props: { metrics, influences, layout: {}, onselectmetric } });

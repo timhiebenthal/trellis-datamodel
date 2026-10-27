@@ -38,6 +38,7 @@
         onconnect,
         ondeleteedge,
         ondeletemetric,
+        onmove,
     }: {
         metrics?: MetricEntry[];
         influences?: MetricInfluence[];
@@ -49,6 +50,8 @@
         onconnect?: (driver: string, effect: string) => void;
         ondeleteedge?: (driver: string, effect: string) => void;
         ondeletemetric?: (metricId: string) => void;
+        /** A node was dropped: the page records its new position. */
+        onmove?: (metricId: string, position: { x: number; y: number }) => void;
     } = $props();
 
     const nodeTypes = { metric: MetricNode };
@@ -99,6 +102,16 @@
 
     function handlePaneClick() {
         onselectmetric?.(null);
+    }
+
+    /**
+     * Report where a node was dropped. The canvas does not keep that position
+     * itself: the page owns the layout, so the save payload and the rendered
+     * position can never disagree.
+     */
+    function handleNodeDragStop({ targetNode }: { targetNode: Node | null }) {
+        if (!targetNode || !onmove) return;
+        onmove(targetNode.id, { x: targetNode.position.x, y: targetNode.position.y });
     }
 
     /** A metric cannot drive itself, and the same arrow only exists once. */
@@ -157,6 +170,7 @@
             ondelete={handleDelete}
             onnodeclick={handleNodeClick}
             onpaneclick={handlePaneClick}
+            onnodedragstop={handleNodeDragStop}
             isValidConnection={isValidConnection}
             class="bg-slate-50"
         >

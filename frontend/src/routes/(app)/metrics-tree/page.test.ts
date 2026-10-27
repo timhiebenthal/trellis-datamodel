@@ -158,3 +158,38 @@ describe('metrics-tree page', () => {
         });
     });
 });
+
+describe('metrics-tree layout round-trip', () => {
+    it('saves a dragged position on the metric and keeps it on screen', async () => {
+        render(MetricsTreePage);
+        await waitFor(() => expect(flow.props).not.toBeNull());
+
+        flow.props!.onnodedragstop({
+            targetNode: { id: 'orders', position: { x: 640, y: 480 } },
+            nodes: [],
+            event: new MouseEvent('mouseup'),
+        });
+
+        await waitFor(() => expect(api.saveMetricTree).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+        const payload = api.saveMetricTree.mock.calls[0][0];
+        const orders = payload.metrics.find((metric: { id: string }) => metric.id === 'orders');
+        expect(orders.position).toEqual({ x: 640, y: 480 });
+        // The stored position for the other metric is untouched.
+        expect(payload.metrics[0].position).toEqual({ x: 10, y: 20 });
+
+        expect(nodePositions()).toEqual([
+            { id: 'revenue', position: { x: 10, y: 20 } },
+            { id: 'orders', position: { x: 640, y: 480 } },
+        ]);
+        expect(flow.instances).toBe(1);
+    });
+
+    it('falls back to the grid for a metric that has no saved position', async () => {
+        render(MetricsTreePage);
+        await waitFor(() => expect(flow.props).not.toBeNull());
+
+        const orders = nodePositions().find((node) => node.id === 'orders');
+        expect(orders?.position).toEqual({ x: 380, y: 80 });
+    });
+});

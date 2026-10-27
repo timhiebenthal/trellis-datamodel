@@ -8,6 +8,7 @@ import {
     influenceEdgeId,
     layoutFromMetrics,
     metricGridPosition,
+    withMetricPosition,
 } from './metric-graph';
 
 function metric(id: string, extra: Partial<MetricEntry> = {}): MetricEntry {
@@ -207,5 +208,29 @@ describe('buildMetricTreePayload', () => {
         const payload = buildMetricTreePayload({ version: 0.1, metrics: [draft], influences: [] }, {});
 
         expect(payload.metrics[0]).toEqual(draft);
+    });
+});
+
+describe('withMetricPosition', () => {
+    it('records a dragged position against the metric id', () => {
+        expect(withMetricPosition({}, 'revenue', { x: 120, y: 240 })).toEqual({
+            revenue: { x: 120, y: 240 },
+        });
+    });
+
+    it('moves only the dragged metric', () => {
+        const layout = { revenue: { x: 0, y: 0 }, orders: { x: 10, y: 10 } };
+
+        expect(withMetricPosition(layout, 'orders', { x: 99, y: 98 })).toEqual({
+            revenue: { x: 0, y: 0 },
+            orders: { x: 99, y: 98 },
+        });
+    });
+
+    it('does not mutate the layout it was given', () => {
+        const layout = { revenue: { x: 0, y: 0 } };
+        withMetricPosition(layout, 'revenue', { x: 5, y: 5 });
+
+        expect(layout.revenue).toEqual({ x: 0, y: 0 });
     });
 });

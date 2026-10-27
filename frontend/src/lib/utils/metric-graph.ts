@@ -70,6 +70,18 @@ export function influenceEdgeId(driver: string, effect: string): string {
     return `influence:${driver}:${effect}`;
 }
 
+/**
+ * Record a dragged node's position in the local layout. The save payload reads
+ * from here, so a drag survives the next save without a reload.
+ */
+export function withMetricPosition(
+    layout: MetricLayout,
+    metricId: string,
+    position: MetricPosition,
+): MetricLayout {
+    return { ...layout, [metricId]: { x: position.x, y: position.y } };
+}
+
 /** Positions already stored on the payload, keyed by metric id. */
 export function layoutFromMetrics(metrics: MetricEntry[]): MetricLayout {
     const layout: MetricLayout = {};
