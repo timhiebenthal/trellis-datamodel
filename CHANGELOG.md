@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0b2] - 2026-10-27
+
 ### Fixed
 - **Column order stops churning between Push and the next app boot:** three
   writers each imposed their own order on the same column list. Boot reconcile
