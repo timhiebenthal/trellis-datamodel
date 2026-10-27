@@ -102,4 +102,55 @@ describe('MetricCanvas', () => {
         await fireEvent.click(container.querySelector('[data-testid="metric-canvas-add"]')!);
         expect(onaddmetric).toHaveBeenCalledOnce();
     });
+
+    it('reports a dragged connection with the drag source as driver', () => {
+        const onconnect = vi.fn();
+        render(MetricCanvas, { props: { metrics, influences: [], layout: {}, onconnect } });
+
+        lastFlow().onconnect({ source: 'order_count', target: 'revenue' });
+
+        expect(onconnect).toHaveBeenCalledWith('order_count', 'revenue');
+    });
+
+    it('refuses a self-link before it ever reaches the page', () => {
+        render(MetricCanvas, { props: { metrics, influences: [], layout: {} } });
+
+        expect(lastFlow().isValidConnection({ source: 'revenue', target: 'revenue' })).toBe(false);
+        expect(lastFlow().isValidConnection({ source: 'order_count', target: 'revenue' })).toBe(true);
+    });
+
+    it('refuses an influence that is already on the tree', () => {
+        render(MetricCanvas, { props: { metrics, influences, layout: {} } });
+
+        expect(lastFlow().isValidConnection({ source: 'avg_price', target: 'revenue' })).toBe(false);
+    });
+
+    it('reports a deleted edge as a driver and an effect', () => {
+        const ondeleteedge = vi.fn();
+        render(MetricCanvas, { props: { metrics, influences, layout: {}, ondeleteedge } });
+
+        lastFlow().ondelete({ nodes: [], edges: [{ source: 'avg_price', target: 'revenue' }] });
+
+        expect(ondeleteedge).toHaveBeenCalledWith('avg_price', 'revenue');
+    });
+
+    it('reports a deleted node as a metric id', () => {
+        const ondeletemetric = vi.fn();
+        render(MetricCanvas, { props: { metrics, influences, layout: {}, ondeletemetric } });
+
+        lastFlow().ondelete({ nodes: [{ id: 'order_count' }], edges: [] });
+
+        expect(ondeletemetric).toHaveBeenCalledWith('order_count');
+    });
+
+    it('reports node clicks and pane clicks so the page can drive the detail panel', () => {
+        const onselectmetric = vi.fn();
+        render(MetricCanvas, { props: { metrics, influences, layout: {}, onselectmetric } });
+
+        lastFlow().onnodeclick({ node: { id: 'revenue' }, event: new MouseEvent('click') });
+        expect(onselectmetric).toHaveBeenLastCalledWith('revenue');
+
+        lastFlow().onpaneclick({ event: new MouseEvent('click') });
+        expect(onselectmetric).toHaveBeenLastCalledWith(null);
+    });
 });

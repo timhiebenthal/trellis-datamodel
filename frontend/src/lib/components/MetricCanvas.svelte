@@ -5,9 +5,11 @@
         Background,
         BackgroundVariant,
         MarkerType,
+        type Connection,
         type Edge,
         type Node,
     } from "@xyflow/svelte";
+    import { setContext } from "svelte";
     import Icon from "$lib/components/Icon.svelte";
     import MetricNode from "./MetricNode.svelte";
     import MetricInfluenceEdge from "./MetricInfluenceEdge.svelte";
@@ -16,30 +18,51 @@
         METRIC_ACCENT,
         buildMetricEdges,
         buildMetricNodes,
+        type MetricCanvasActions,
         type MetricLayout,
     } from "$lib/utils/metric-graph";
 
     /**
      * The metric canvas. It is deliberately not `Canvas.svelte`: no groups, no
      * filters, no lineage, no star-schema positioner, and no reads of the global
-     * `nodes`/`edges` stores. Everything it draws comes from the props below.
+     * `nodes`/`edges` stores. Everything it draws comes from the props below, and
+     * every mutation is handed back to the page as a callback.
      */
     let {
         metrics = [],
         influences = [],
         layout = {},
+        selectedMetricId = null,
         onaddmetric,
+        onselectmetric,
+        onconnect,
+        ondeleteedge,
+        ondeletemetric,
     }: {
         metrics?: MetricEntry[];
         influences?: MetricInfluence[];
         layout?: MetricLayout;
+        selectedMetricId?: string | null;
         onaddmetric?: () => void;
+        onselectmetric?: (metricId: string | null) => void;
+        /** Drag source is the driver, drag target is the effect. */
+        onconnect?: (driver: string, effect: string) => void;
+        ondeleteedge?: (driver: string, effect: string) => void;
+        ondeletemetric?: (metricId: string) => void;
     } = $props();
 
     const nodeTypes = { metric: MetricNode };
     const edgeTypes = { influence: MetricInfluenceEdge };
 
-    const flowNodes = $derived(buildMetricNodes(metrics, layout) as unknown as Node[]);
+    // Node-level actions travel through context so `MetricNodeData` stays the
+    // wire shape it is on the server.
+    setContext<MetricCanvasActions>("metricCanvas", {
+        deleteMetric: (metricId: string) => ondeletemetric?.(metricId),
+    });
+
+    const flowNodes = $derived(
+        buildMetricNodes(metrics, layout, selectedMetricId) as unknown as Node[],
+    );
 
     const flowEdges = $derived(
         buildMetricEdges(metrics, influences).map((edge) => ({
@@ -55,6 +78,40 @@
     );
 
     const isEmpty = $derived(metrics.length === 0);
+
+    function handleConnect(connection: Connection) {
+        if (!connection.source || !connection.target) return;
+        onconnect?.(connection.source, connection.target);
+    }
+
+    function handleDelete({ nodes: goneNodes, edges: goneEdges }: { nodes: Node[]; edges: Edge[] }) {
+        for (const edge of goneEdges ?? []) {
+            ondeleteedge?.(edge.source, edge.target);
+        }
+        for (const node of goneNodes ?? []) {
+            ondeletemetric?.(node.id);
+        }
+    }
+
+    function handleNodeClick({ node }: { node: Node }) {
+        onselectmetric?.(node.id);
+    }
+
+    function handlePaneClick() {
+        onselectmetric?.(null);
+    }
+
+    /** A metric cannot drive itself, and the same arrow only exists once. */
+    function isValidConnection(connection: Connection | Edge): boolean {
+        if (!connection.source || !connection.target) return false;
+        if (connection.source === connection.target) return false;
+
+        return !influences.some(
+            (influence) =>
+                influence.effect === connection.target &&
+                influence.drivers.includes(connection.source as string),
+        );
+    }
 </script>
 
 <div class="relative h-full w-full flex-1 bg-slate-50">
@@ -96,6 +153,11 @@
             panOnDrag
             selectionOnDrag={false}
             onlyRenderVisibleElements
+            onconnect={handleConnect}
+            ondelete={handleDelete}
+            onnodeclick={handleNodeClick}
+            onpaneclick={handlePaneClick}
+            isValidConnection={isValidConnection}
             class="bg-slate-50"
         >
             <Controls />
@@ -115,5 +177,11 @@
                 </button>
             </div>
         {/if}
+
+        <div
+            class="pointer-events-none absolute bottom-4 left-4 z-10 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm backdrop-blur-sm"
+        >
+            Drag from a node's right dot onto another node to record an influence.
+        </div>
     {/if}
 </div>

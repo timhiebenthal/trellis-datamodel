@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import type { MetricEntry } from '$lib/types';
 
 vi.mock('@xyflow/svelte', () => ({
@@ -86,5 +86,28 @@ describe('MetricNode', () => {
         const { container } = renderNode({ id: 'revenue', label: 'Revenue', expression: 'sum(amount)' });
 
         expect(container.querySelector('[data-testid="metric-node-unresolved"]')).toBeNull();
+    });
+
+    it('removes the metric through the action the canvas publishes', async () => {
+        const deleteMetric = vi.fn();
+        const { container } = render(MetricNode, {
+            props: {
+                id: 'revenue',
+                type: 'metric',
+                data: { metric: { id: 'revenue', label: 'Revenue' }, unresolved: false },
+                selected: false,
+            } as any,
+            context: new Map<string, unknown>([['metricCanvas', { deleteMetric }]]),
+        });
+
+        await fireEvent.click(container.querySelector('[data-testid="metric-node-delete"]')!);
+
+        expect(deleteMetric).toHaveBeenCalledWith('revenue');
+    });
+
+    it('hides the remove action when nothing is listening', () => {
+        const { container } = renderNode({ id: 'revenue', label: 'Revenue' });
+
+        expect(container.querySelector('[data-testid="metric-node-delete"]')).toBeNull();
     });
 });

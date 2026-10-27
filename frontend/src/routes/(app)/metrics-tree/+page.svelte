@@ -1,7 +1,15 @@
 <script lang="ts">
     import { getConfigInfo, getMetricTree } from '$lib/api';
     import MetricCanvas from '$lib/components/MetricCanvas.svelte';
-    import { addDraftMetric, type MetricGraphState } from '$lib/utils/metric-edits';
+    import MetricSidebar from '$lib/components/MetricSidebar.svelte';
+    import {
+        addBoundMetric,
+        addDraftMetric,
+        connectInfluence,
+        removeInfluence,
+        removeMetric,
+        type MetricGraphState,
+    } from '$lib/utils/metric-edits';
     import { layoutFromMetrics, type MetricLayout } from '$lib/utils/metric-graph';
     import type { MetricCatalogEntry, MetricTreeFile } from '$lib/types';
 
@@ -12,12 +20,16 @@
     let error = $state<string | null>(null);
     let tree = $state<MetricTreeResponse | null>(null);
     let layout = $state<MetricLayout>({});
+    let notice = $state<string | null>(null);
 
-    // Detail panel seam (Task 9). Selecting a metric - by clicking its node or by
-    // creating one - records the id here, and `detailFocus` says which field the
-    // panel should focus first. `MetricDetailPanel` reads both when it lands.
+    // Detail panel seam (Task 9). Selecting a metric - by clicking its node, its
+    // sidebar row, or by creating one - records the id here, and `detailFocus`
+    // says which field the panel should focus first. `MetricDetailPanel` reads
+    // both when it lands.
     let selectedMetricId = $state<string | null>(null);
     let detailFocus = $state<'label' | null>(null);
+
+    let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Check the feature flag, then load the document. Redirect to the canvas
     // when the feature is off, matching the bus-matrix route.
@@ -50,6 +62,13 @@
         tree = { ...tree, metrics: next.metrics, influences: next.influences };
     }
 
+    /** Explain a refused edit instead of dropping it silently. */
+    function flash(message: string) {
+        notice = message;
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => (notice = null), 5000);
+    }
+
     function handleAddMetric() {
         if (!tree) return;
 
@@ -58,6 +77,63 @@
 
         selectedMetricId = metric.id;
         detailFocus = 'label';
+    }
+
+    function handleAddCatalogMetric(entry: MetricCatalogEntry) {
+        if (!tree) return;
+
+        const outcome = addBoundMetric(tree, entry);
+        applyGraph(outcome.state);
+
+        if (!outcome.metric) {
+            flash(
+                outcome.reason === 'duplicate'
+                    ? `${entry.name} is already on the tree.`
+                    : `${entry.name} cannot be added: ${entry.reason ?? 'it has no dataset to bind to'}.`,
+            );
+            return;
+        }
+
+        selectedMetricId = outcome.metric.id;
+    }
+
+    function handleConnect(driver: string, effect: string) {
+        if (!tree) return;
+
+        const outcome = connectInfluence(tree, driver, effect);
+        applyGraph(outcome.state);
+
+        if (outcome.ok) {
+            notice = null;
+            return;
+        }
+
+        if (outcome.reason === 'self') {
+            flash('A metric cannot influence itself.');
+        } else if (outcome.reason === 'duplicate') {
+            flash('That influence is already on the tree.');
+        }
+    }
+
+    function handleDeleteInfluence(driver: string, effect: string) {
+        if (!tree) return;
+        applyGraph(removeInfluence(tree, driver, effect));
+    }
+
+    function handleDeleteMetric(metricId: string) {
+        if (!tree) return;
+
+        applyGraph(removeMetric(tree, metricId));
+
+        if (selectedMetricId === metricId) {
+            selectedMetricId = null;
+            detailFocus = null;
+        }
+    }
+
+    function handleSelectMetric(metricId: string | null) {
+        selectedMetricId = metricId;
+        if (!metricId) detailFocus = null;
     }
 </script>
 
@@ -83,7 +159,7 @@
 {:else if metricsEnabled && tree}
     <div class="flex h-full w-full flex-1 overflow-hidden">
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-2.5">
+            <header class="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-2.5">
                 <div class="min-w-0">
                     <h2 class="text-sm font-semibold text-slate-800">Metric Tree</h2>
                     <!-- Direction is the whole point of this canvas: arrows leave drivers and land on effects. -->
@@ -96,13 +172,49 @@
                 </p>
             </header>
 
+            {#if notice}
+                <div
+                    class="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-1.5 text-xs text-amber-800"
+                    role="status"
+                    data-testid="metric-notice"
+                >
+                    <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"></span>
+                    <span class="min-w-0 flex-1 truncate">{notice}</span>
+                    <button
+                        type="button"
+                        class="shrink-0 rounded p-0.5 text-amber-600 hover:bg-amber-100"
+                        aria-label="Dismiss message"
+                        onclick={() => (notice = null)}
+                    >
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            {/if}
+
             <MetricCanvas
                 metrics={tree.metrics}
                 influences={tree.influences}
                 {layout}
+                {selectedMetricId}
                 onaddmetric={handleAddMetric}
+                onselectmetric={handleSelectMetric}
+                onconnect={handleConnect}
+                ondeleteedge={handleDeleteInfluence}
+                ondeletemetric={handleDeleteMetric}
             />
         </div>
+
+        <!-- Task 9 mounts MetricDetailPanel in a rail beside this sidebar, driven by
+             selectedMetricId + detailFocus. -->
+        <MetricSidebar
+            metrics={tree.metrics}
+            catalog={tree.catalog}
+            {selectedMetricId}
+            onaddmetric={handleAddMetric}
+            onaddcatalogmetric={handleAddCatalogMetric}
+            onselectmetric={handleSelectMetric}
+            ondeletemetric={handleDeleteMetric}
+        />
     </div>
 {:else}
     <div class="flex items-center justify-center h-full text-gray-500">
