@@ -174,28 +174,28 @@
 
 <div
     class="group relative w-[248px] rounded-lg border bg-white shadow-sm transition-all hover:shadow-md"
-    class:border-violet-200={!selected}
-    class:border-violet-500={selected}
+    class:border-slate-200={!selected}
+    class:border-primary-600={selected}
     class:ring-2={selected}
-    class:ring-violet-200={selected}
+    class:ring-primary-200={selected}
     class:opacity-90={isUnresolved && !selected}
     data-testid="metric-node"
     data-metric-id={metric?.id}
     title={metric?.description || label}
 >
     <!-- Accent rail -->
-    <span class="absolute inset-y-0 left-0 w-1 rounded-l-lg bg-violet-400" aria-hidden="true"></span>
+    <span class="absolute inset-y-0 left-0 w-1 rounded-l-lg bg-primary-500" aria-hidden="true"></span>
 
     <Handle
         type="target"
         position={Position.Top}
-        class="!h-3.5 !w-3.5 !rounded-full !border-2 !border-white !bg-violet-500"
+        class="!h-3.5 !w-3.5 !rounded-full !border-2 !border-white !bg-primary-600"
         title="Connect from the upper metric this one drives"
     />
     <Handle
         type="source"
         position={Position.Bottom}
-        class="!h-3.5 !w-3.5 !rounded-full !border-2 !border-white !bg-violet-500"
+        class="!h-3.5 !w-3.5 !rounded-full !border-2 !border-white !bg-primary-600"
         title="Drag to a driver metric below"
     />
 
@@ -211,14 +211,14 @@
             <button
                 type="button"
                 class="group/btn inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold shadow-sm transition-all"
-                class:border-violet-600={openPicker === "effect" || dragOverRelation === "effect"}
-                class:bg-violet-600={openPicker === "effect" || dragOverRelation === "effect"}
+                class:border-primary-600={openPicker === "effect" || dragOverRelation === "effect"}
+                class:bg-primary-600={openPicker === "effect" || dragOverRelation === "effect"}
                 class:text-white={openPicker === "effect" || dragOverRelation === "effect"}
-                class:border-violet-300={openPicker !== "effect" && dragOverRelation !== "effect"}
+                class:border-primary-300={openPicker !== "effect" && dragOverRelation !== "effect"}
                 class:bg-white={openPicker !== "effect" && dragOverRelation !== "effect"}
-                class:text-violet-700={openPicker !== "effect" && dragOverRelation !== "effect"}
-                class:hover:border-violet-500={openPicker !== "effect"}
-                class:hover:bg-violet-600={openPicker !== "effect"}
+                class:text-primary-700={openPicker !== "effect" && dragOverRelation !== "effect"}
+                class:hover:border-primary-600={openPicker !== "effect"}
+                class:hover:bg-primary-600={openPicker !== "effect"}
                 class:hover:text-white={openPicker !== "effect"}
                 onclick={(event) => togglePicker("effect", event)}
                 title="Add or drop an effect metric above {label}"
@@ -248,14 +248,14 @@
             <button
                 type="button"
                 class="group/btn inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold shadow-sm transition-all"
-                class:border-violet-600={openPicker === "driver" || dragOverRelation === "driver"}
-                class:bg-violet-600={openPicker === "driver" || dragOverRelation === "driver"}
+                class:border-primary-600={openPicker === "driver" || dragOverRelation === "driver"}
+                class:bg-primary-600={openPicker === "driver" || dragOverRelation === "driver"}
                 class:text-white={openPicker === "driver" || dragOverRelation === "driver"}
-                class:border-violet-300={openPicker !== "driver" && dragOverRelation !== "driver"}
+                class:border-primary-300={openPicker !== "driver" && dragOverRelation !== "driver"}
                 class:bg-white={openPicker !== "driver" && dragOverRelation !== "driver"}
-                class:text-violet-700={openPicker !== "driver" && dragOverRelation !== "driver"}
-                class:hover:border-violet-500={openPicker !== "driver"}
-                class:hover:bg-violet-600={openPicker !== "driver"}
+                class:text-primary-700={openPicker !== "driver" && dragOverRelation !== "driver"}
+                class:hover:border-primary-600={openPicker !== "driver"}
+                class:hover:bg-primary-600={openPicker !== "driver"}
                 class:hover:text-white={openPicker !== "driver"}
                 onclick={(event) => togglePicker("driver", event)}
                 title="Add or drop a driver metric below {label}"
@@ -292,7 +292,7 @@
                 data-relation={relation}
             >
                 <div class="mb-2 flex items-center justify-between gap-2">
-                    <span class="text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+                    <span class="text-[11px] font-semibold uppercase tracking-wide text-primary-700">
                         {relation === "driver"
                             ? `Add driver below ${label}`
                             : `Add effect above ${label}`}
@@ -323,7 +323,7 @@
                         onkeydown={(event) => {
                             if (event.key === "Escape") closePicker();
                         }}
-                        class="w-full rounded-md border border-slate-200 bg-slate-50 py-1 pl-6 pr-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:outline-none"
+                        class="w-full rounded-md border border-slate-200 bg-slate-50 py-1 pl-6 pr-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none"
                         data-testid="metric-node-picker-search"
                     />
                 </div>
@@ -332,7 +332,7 @@
                     {#if actions?.addRelatedDraft}
                         <button
                             type="button"
-                            class="flex w-full items-center gap-1.5 rounded-md border border-dashed border-violet-300 bg-violet-50/60 px-2 py-1.5 text-left text-xs font-medium text-violet-700 transition-colors hover:bg-violet-100"
+                            class="flex w-full items-center gap-1.5 rounded-md border border-dashed border-primary-300 bg-primary-50/60 px-2 py-1.5 text-left text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
                             onclick={(event) => handlePickDraft(relation, event)}
                             data-testid="metric-node-picker-draft"
                         >
@@ -351,7 +351,7 @@
                                     <li>
                                         <button
                                             type="button"
-                                            class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-800"
+                                            class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs text-slate-700 hover:bg-primary-50 hover:text-primary-800"
                                             onclick={(event) =>
                                                 handlePickTreeMetric(relation, entry.id, event)}
                                             data-testid="metric-node-picker-tree-item"
@@ -375,7 +375,7 @@
                                     <li>
                                         <button
                                             type="button"
-                                            class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-800"
+                                            class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs text-slate-700 hover:bg-primary-50 hover:text-primary-800"
                                             onclick={(event) =>
                                                 handlePickCatalogMetric(relation, entry, event)}
                                             data-testid="metric-node-picker-catalog-item"
@@ -403,7 +403,7 @@
 
     <div class="py-2.5 pl-4 pr-2">
         <div class="flex items-start gap-1.5">
-            <Icon icon="lucide:trending-up" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-600" />
+            <Icon icon="lucide:trending-up" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600" />
             <p class="min-w-0 flex-1 text-sm font-semibold leading-snug break-words text-slate-800">
                 {label}
             </p>
@@ -433,7 +433,7 @@
         <div class="mt-2 flex flex-wrap items-center gap-1">
             {#if binding}
                 <span
-                    class="inline-flex max-w-full items-center gap-1 truncate rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700"
+                    class="inline-flex max-w-full items-center gap-1 truncate rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-700"
                     title="Bound: read from {binding.dataset}.{binding.name} in the semantic model"
                     data-testid="metric-node-bound"
                 >

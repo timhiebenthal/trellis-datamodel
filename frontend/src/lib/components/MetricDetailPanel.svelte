@@ -74,7 +74,7 @@
         <header class="flex items-start gap-2 border-b border-slate-200 px-4 py-3">
             <Icon
                 icon={binding ? "lucide:link-2" : "lucide:trending-up"}
-                class="mt-0.5 h-4 w-4 shrink-0 text-violet-600"
+                class="mt-0.5 h-4 w-4 shrink-0 text-primary-600"
             />
             <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-semibold text-slate-800" title={metric.label}>
@@ -105,24 +105,24 @@
 
         <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4">
             {#if binding}
-                <div class="rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2.5">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+                <div class="rounded-lg border border-primary-200 bg-primary-50/60 px-3 py-2.5">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-primary-700">
                         Definition
                     </p>
-                    <p class="mt-1 font-mono text-xs break-all text-violet-900">
+                    <p class="mt-1 font-mono text-xs break-all text-primary-900">
                         {binding.dataset}.{binding.name}
                     </p>
                     {#if metric.resolved_expression}
                         <pre
-                            class="mt-2 overflow-x-auto rounded-md border border-violet-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-violet-900"
+                            class="mt-2 overflow-x-auto rounded-md border border-primary-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-primary-900"
                             data-testid="metric-resolved-expression">{metric.resolved_expression}</pre
                         >
-                        <p class="mt-1.5 text-[11px] leading-relaxed text-violet-800/80">
+                        <p class="mt-1.5 text-[11px] leading-relaxed text-primary-800/80">
                             Read from the semantic model. Edit it there; Trellis stores the reference,
                             never a copy.
                         </p>
                     {:else}
-                        <p class="mt-1.5 text-[11px] leading-relaxed text-violet-800/80">
+                        <p class="mt-1.5 text-[11px] leading-relaxed text-primary-800/80">
                             Read from the semantic model. Trellis stores the reference, never a copy,
                             so this file cannot drift from the definition.
                         </p>

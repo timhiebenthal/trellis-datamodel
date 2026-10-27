@@ -11,13 +11,7 @@ export default {
       },
       colors: {
         // The "Trellis" Brand Color
-        primary: {
-          50: colors.teal[50],
-          100: colors.teal[100],
-          500: colors.teal[500],
-          600: colors.teal[600], // Main Action Color
-          700: colors.teal[700],
-        },
+        primary: colors.teal,
         // The "Technical" Gray Scale
         gray: colors.slate,
         // Semantic aliases

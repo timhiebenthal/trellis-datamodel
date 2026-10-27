@@ -34,11 +34,10 @@ export interface MetricCanvasNode extends MetricTreeNode {
 }
 
 /**
- * The violet accent. Dimensions are green and facts are blue, so metrics take a
- * third colour that cannot be mistaken for either: violet-500 as the line and
- * marker colour, violet-* utilities for the badges in `MetricNode.svelte`.
+ * The Trellis primary accent (`teal-600`), used for selected edges and markers,
+ * paired with `primary-*` utilities for badges and controls in `MetricNode.svelte`.
  */
-export const METRIC_ACCENT = '#8b5cf6';
+export const METRIC_ACCENT = '#0d9488';
 
 export type MetricRelationKind = 'effect' | 'driver';
 

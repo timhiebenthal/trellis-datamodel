@@ -189,8 +189,8 @@
                 class="max-w-md rounded-xl border border-slate-200 bg-white/90 p-8 text-center shadow-sm"
                 data-testid="metric-canvas-empty"
             >
-                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-50">
-                    <Icon icon="lucide:network" class="h-8 w-8 text-violet-600" />
+                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
+                    <Icon icon="lucide:network" class="h-8 w-8 text-primary-600" />
                 </div>
                 <h3 class="text-xl font-semibold text-slate-800">Nothing to explain yet</h3>
                 <p class="mt-2 text-sm leading-relaxed text-slate-600">
@@ -200,7 +200,7 @@
                 {#if onaddmetric}
                     <button
                         type="button"
-                        class="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f172a] px-6 py-2.5 font-medium text-white shadow-md transition-colors hover:bg-slate-800"
+                        class="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 font-medium text-white shadow-md transition-colors hover:bg-primary-700"
                         onclick={onaddmetric}
                         data-testid="metric-canvas-empty-cta"
                     >
@@ -239,7 +239,7 @@
             <div class="absolute right-4 top-4 z-10 shadow-lg">
                 <button
                     type="button"
-                    class="flex items-center gap-2 rounded-lg bg-[#0f172a] px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-slate-800"
+                    class="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-primary-700"
                     onclick={onaddmetric}
                     data-testid="metric-canvas-add"
                 >

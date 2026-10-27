@@ -91,7 +91,7 @@
 >
     <div class="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
         <div class="flex min-w-0 items-center gap-2">
-            <Icon icon="lucide:trending-up" class="h-4 w-4 shrink-0 text-violet-600" />
+            <Icon icon="lucide:trending-up" class="h-4 w-4 shrink-0 text-primary-600" />
             <h3 class="truncate text-sm font-semibold text-slate-800">Metrics</h3>
             <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-slate-600">
                 {metrics.length}
@@ -101,7 +101,7 @@
         {#if onaddmetric}
             <button
                 type="button"
-                class="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                class="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
                 onclick={onaddmetric}
                 data-testid="metric-sidebar-add"
             >
@@ -122,7 +122,7 @@
                 placeholder="Search metrics..."
                 aria-label="Search metrics"
                 bind:value={searchTerm}
-                class="w-full rounded-md border border-slate-200 bg-slate-50/60 py-1.5 pl-8 pr-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                class="w-full rounded-md border border-slate-200 bg-slate-50/60 py-1.5 pl-8 pr-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
                 data-testid="metric-sidebar-search"
             />
         </div>
@@ -148,8 +148,8 @@
                         <li>
                             <div
                                 class="group flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors cursor-grab active:cursor-grabbing"
-                                class:border-violet-300={selectedMetricId === metric.id}
-                                class:bg-violet-50={selectedMetricId === metric.id}
+                                class:border-primary-300={selectedMetricId === metric.id}
+                                class:bg-primary-50={selectedMetricId === metric.id}
                                 class:border-slate-200={selectedMetricId !== metric.id}
                                 class:hover:border-slate-300={selectedMetricId !== metric.id}
                                 draggable="true"
@@ -213,12 +213,12 @@
                                     type="button"
                                     draggable="true"
                                     ondragstart={(event) => onDragStartCatalog(event, entry)}
-                                    class="flex w-full cursor-grab items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-violet-200 hover:bg-violet-50 active:cursor-grabbing"
+                                    class="flex w-full cursor-grab items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-primary-200 hover:bg-primary-50 active:cursor-grabbing"
                                     onclick={() => onaddcatalogmetric?.(entry)}
                                     data-testid="metric-sidebar-catalog-add"
                                     title="Click to add {entry.name}, or drag onto a metric's + Add driver / + Add effect button"
                                 >
-                                    <Icon icon="lucide:plus" class="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                                    <Icon icon="lucide:plus" class="h-3.5 w-3.5 shrink-0 text-primary-600" />
                                     <span class="min-w-0 flex-1">
                                         <span class="block truncate text-sm text-slate-700">{entry.name}</span>
                                         <span class="block truncate text-[11px] text-slate-400">{entry.dataset}</span>
@@ -237,7 +237,7 @@
                                 title="Already on this tree"
                                 data-testid="metric-sidebar-catalog-added"
                             >
-                                <Icon icon="lucide:check" class="h-3.5 w-3.5 shrink-0 text-violet-400" />
+                                <Icon icon="lucide:check" class="h-3.5 w-3.5 shrink-0 text-primary-500" />
                                 <span class="truncate line-through">{entry.name}</span>
                             </li>
                         {/each}

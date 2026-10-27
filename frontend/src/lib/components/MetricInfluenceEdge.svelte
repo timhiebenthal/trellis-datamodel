@@ -28,7 +28,7 @@
     const strokeStyle = $derived(
         selected
             ? `stroke: ${METRIC_ACCENT}; stroke-width: 2.5;`
-            : `stroke: #c4b5fd; stroke-width: 1.75;`,
+            : `stroke: #94a3b8; stroke-width: 1.75;`,
     );
 </script>
 
