@@ -291,6 +291,9 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             // Proceed with sync
             const result = await syncDbtTests();
             syncMessage = `✓ ${result.message}`;
+            for (const warning of result.warnings ?? []) {
+                console.warn("[trellis] sync warning:", warning);
+            }
             // Mark current state as synced
             if (autoSaveService) {
                 lastSyncedState = autoSaveService.getLastSavedState();
