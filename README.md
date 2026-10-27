@@ -94,6 +94,26 @@ ossie:
 
 The document is written to `semantic_model.yml` beside `data_model.yml`. Set `ossie.file` to put it somewhere else, and `ossie.source.database` / `ossie.source.schema` to override the address segments the adapter reports (those reflect whatever target last ran dbt). Only entities bound to a model are exported: draft entities, and relationships that touch them, are skipped and listed as warnings in the Push response.
 
+### Metric tree
+
+The canvas answers what is in the warehouse. The metric tree answers why a number moved. It is beta and off by default:
+
+```yaml
+metrics:
+  enabled: true
+```
+
+The `/metrics-tree` page holds two kinds of metric. A **draft metric** is authored in Trellis and carries a label, description and expression. A **bound metric** is a reference to a metric already defined in `semantic_model.yml`: it stores `{dataset, name}` and no copy of the definition, so the tree cannot drift from the semantic model. Draw an arrow from a node's right handle onto another node to record an influence from the driver to the metric it moves. An influence is a claim about direction, not a formula.
+
+Two files are written beside `data_model.yml`:
+
+- `metric_tree.yml` - the metrics and the influence edges, sorted so an unchanged graph saves byte for byte.
+- `metric_layout.yml` - node positions, keyed by metric id, kept apart from the definitions so drags never rewrite the graph.
+
+Set `metrics.file` and `metrics.layout_file` to move them, and `metrics.expression_dialect` (`ANSI_SQL` by default) to pick the dialect label written onto emitted expressions. It is a label, not a parser: Trellis does not validate the SQL.
+
+Pushing with `ossie.enabled: true` emits the drafts into the Ossie document: a draft with a `dataset_ref` lands under that dataset's `metrics`, one without lands at the document root. Metrics Trellis did not author are preserved at both levels, including their `custom_extensions` and `ai_context`. Turning the feature off stops the emission and leaves the existing `metric_tree.yml` untouched, but the push still preserves whatever metrics are already in the Ossie document.
+
 ## Vision
 
 trellis is built and tested around **dbt-core** today. The longer-term idea is to stay **tool-agnostic**—concepts outlive any one framework. Possible directions include dbt Fusion, Pydantic-flavored exports, or adapters for tools like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) where it makes sense. For now, the focus is a great experience with dbt-core.

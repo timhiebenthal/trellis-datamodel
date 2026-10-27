@@ -37,6 +37,11 @@ const TEST_DATA_MODEL_PATH = path.resolve(__dirname, 'test_data_model.yml');
 const CONFIG_DIR = path.resolve(__dirname, '.trellis-test');
 const TEST_CONFIG_PATH = path.join(CONFIG_DIR, 'trellis.yml');
 
+// Metric tree artifacts, kept inside the ignored test config dir rather than
+// beside test_data_model.yml so a run leaves no files in the tests folder.
+const METRIC_TREE_PATH = path.join(CONFIG_DIR, 'metric_tree.yml');
+const METRIC_LAYOUT_PATH = path.join(CONFIG_DIR, 'metric_layout.yml');
+
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const dbtCompanyDummyPath = path.join(REPO_ROOT, 'dbt_company_dummy');
 const manifestPath = path.join(dbtCompanyDummyPath, 'target', 'manifest.json');
@@ -332,6 +337,11 @@ bus_matrix:
   enabled: true
 business_events:
   enabled: true
+metrics:
+  enabled: true
+  file: ${METRIC_TREE_PATH}
+  layout_file: ${METRIC_LAYOUT_PATH}
+  expression_dialect: ANSI_SQL
 
 # Optional: enable other features if needed
 # exposures:
@@ -345,4 +355,4 @@ business_events:
     }
 }
 
-export { TEST_CONFIG_PATH, CONFIG_DIR, TEST_DATA_MODEL_PATH };
+export { TEST_CONFIG_PATH, CONFIG_DIR, TEST_DATA_MODEL_PATH, METRIC_TREE_PATH, METRIC_LAYOUT_PATH };

@@ -109,6 +109,15 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #                  # so set this when you want to override them.
 #    schema: ""  # Schema segment override. Leave empty to use the adapter-derived schema.
 
+# Metric tree canvas (beta, opt-in). When enabled, a /metrics-tree route records
+# how metrics influence each other - "revenue is influenced by average price and
+# order count" - and a push emits drafted metrics into the Ossie document above.
+#metrics:
+#  enabled: false  # Set to true to show the metric tree canvas and emit metrics on push
+#  file: ""  # Metric definitions; defaults to metric_tree.yml beside the data model
+#  layout_file: ""  # Node positions; defaults to metric_layout.yml beside the data model
+#  expression_dialect: ANSI_SQL  # Dialect label on emitted expressions (ANSI_SQL, OSSIE_SQL_2026)
+
 # Dimensional modeling configuration (opt-in).
 # Use this feature if you want to enable Kimball dimensional modeling features such as:
 # - Entity classification (fact vs dimension)

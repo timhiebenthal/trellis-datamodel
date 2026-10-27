@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Metric tree canvas (beta, opt-in):** a new `metrics` block in `trellis.yml` -
+  `enabled`, `file`, `layout_file` and `expression_dialect` - adds a
+  `/metrics-tree` route that lays metrics out as a directed influence graph:
+  "revenue is influenced by average price and order count". Definitions are
+  written to `metric_tree.yml` and node positions to `metric_layout.yml`, both
+  beside `data_model.yml` by default, so a tree survives a reload and is readable
+  without Trellis. A metric is either a draft authored in Trellis or a bound
+  reference to a metric in `semantic_model.yml`; a bound entry stores
+  `{dataset, name}` and never a copy of the definition. Influences carry no
+  arithmetic - an edge states direction, not a formula. A push with
+  `ossie.enabled: true` emits the drafts into the Ossie document, dataset-scoped
+  drafts under `datasets[].metrics` and the rest at the document root, and
+  preserves every metric Trellis did not author at both levels, including
+  `custom_extensions` and `ai_context`. The block is normalised only when
+  `trellis.yml` declares it, and it is off by default.
+
 ## [0.25.0b1] - 2026-10-26
 
 ### Added
