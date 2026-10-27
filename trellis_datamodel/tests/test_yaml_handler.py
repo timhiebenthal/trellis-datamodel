@@ -1,6 +1,8 @@
 """Tests for YamlHandler utility class."""
 
 import os
+import textwrap
+
 import pytest
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
@@ -281,6 +283,59 @@ class TestYamlHandlerColumnOperations:
         cols = handler.get_columns(model)
         assert cols[0]["description"] is None
         assert "origin" not in cols[0]
+
+    @pytest.mark.parametrize(
+        "column_yaml",
+        [
+            # dbt's dict form, which Trellis itself writes.
+            """
+            - name: customer_id
+              data_type: varchar
+              data_tests:
+                - unique: {}
+                - not_null: {}
+            """,
+            # dbt's canonical spelling, flow style.
+            """
+            - name: customer_id
+              data_type: varchar
+              data_tests: [unique, not_null]
+            """,
+            # Same spelling, block style.
+            """
+            - name: customer_id
+              data_type: varchar
+              data_tests:
+                - unique
+                - not_null
+            """,
+            # The older `tests:` key.
+            """
+            - name: customer_id
+              data_type: varchar
+              tests:
+                - unique
+                - not_null
+            """,
+        ],
+    )
+    def test_get_columns_keeps_every_test_spelling(self, column_yaml, tmp_path):
+        """Bare test names must survive, or key inference never sees them."""
+        handler = YamlHandler()
+        path = tmp_path / "schema.yml"
+        path.write_text(
+            "version: 2\n"
+            "models:\n"
+            "  - name: customers\n"
+            "    columns:\n"
+            + textwrap.indent(textwrap.dedent(column_yaml), " " * 6)
+        )
+
+        model = handler.find_model(handler.load_file(str(path)), "customers")
+        cols = handler.get_columns(model)
+
+        assert cols[0]["name"] == "customer_id"
+        assert cols[0]["data_tests"] == [{"unique": {}}, {"not_null": {}}]
 
 
 class TestYamlHandlerRelationshipTests:

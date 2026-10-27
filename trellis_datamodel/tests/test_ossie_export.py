@@ -67,11 +67,12 @@ def model(
     table=None,
     columns=None,
     description=None,
+    version=None,
 ):
     return ModelInfo(
         unique_id=unique_id,
         name=name,
-        version=None,
+        version=version,
         schema=schema,
         table=table if table is not None else name,
         columns=columns or [],
@@ -525,6 +526,177 @@ class TestKeyInference:
 
         assert datasets["dim_customer"]["primary_key"] == ["customer_key"]
 
+    def test_two_inbound_relationships_yield_one_primary_key(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """Two inbound relationships are two claims, not two unique keys."""
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "customer", "model_ref": "model.company.dim_customer"},
+            {"id": "sale", "model_ref": "model.company.fct_sale"},
+            {"id": "shipment", "model_ref": "model.company.fct_shipment"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[
+                    column("customer_id", "varchar"),
+                    column("legacy_customer_id", "varchar"),
+                ],
+            ),
+            model(
+                unique_id="model.company.fct_sale",
+                name="fct_sale",
+                columns=[column("legacy_customer_id", "varchar")],
+            ),
+            model(
+                unique_id="model.company.fct_shipment",
+                name="fct_shipment",
+                columns=[column("customer_id", "varchar")],
+            ),
+        ]
+        # Input order puts the shipment first; the sorted `from` puts fct_sale
+        # first, so that relationship is the deterministic single candidate.
+        relationships = [
+            relationship(
+                "shipment", "customer", "many_to_one", "customer_id", "customer_id"
+            ),
+            relationship(
+                "sale",
+                "customer",
+                "many_to_one",
+                "legacy_customer_id",
+                "legacy_customer_id",
+            ),
+        ]
+
+        export_ossie(entities, relationships, "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = next(d for d in document["datasets"] if d["name"] == "dim_customer")
+
+        assert len(document["relationships"]) == 2
+        assert dataset["primary_key"] == ["legacy_customer_id"]
+        assert "unique_keys" not in dataset
+
+    def test_skipped_relationship_contributes_no_key(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """A relationship the exporter drops is not evidence of uniqueness."""
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "customer", "model_ref": "model.company.dim_customer"},
+            {"id": "sale", "model_ref": "model.company.fct_sale"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[column("customer_id", "varchar")],
+            ),
+            model(
+                unique_id="model.company.fct_sale",
+                name="fct_sale",
+                columns=[column("customer_id", "varchar")],
+            ),
+        ]
+        relationships = [
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "missing_id"
+            )
+        ]
+
+        export_ossie(entities, relationships, "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = next(d for d in document["datasets"] if d["name"] == "dim_customer")
+
+        assert document["relationships"] == []
+        assert "primary_key" not in dataset
+        assert "unique_keys" not in dataset
+
+    @pytest.mark.parametrize("rel_type", ["many_to_many", "zero_or_many_to_many"])
+    def test_many_to_many_contributes_no_key(
+        self, validator, tmp_path, monkeypatch, rel_type
+    ):
+        """Both sides many: neither endpoint's field identifies a row."""
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "customer", "model_ref": "model.company.dim_customer"},
+            {"id": "sale", "model_ref": "model.company.fct_sale"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[column("customer_id", "varchar")],
+            ),
+            model(
+                unique_id="model.company.fct_sale",
+                name="fct_sale",
+                columns=[column("customer_id", "varchar")],
+            ),
+        ]
+        relationships = [
+            relationship("sale", "customer", rel_type, "customer_id", "customer_id")
+        ]
+
+        export_ossie(entities, relationships, "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+
+        # The relationship itself still survives; only the key claim is withheld.
+        assert len(document["relationships"]) == 1
+        for dataset in document["datasets"]:
+            assert "primary_key" not in dataset
+            assert "unique_keys" not in dataset
+
+    def test_absent_metadata_candidate_falls_through_to_relationship_evidence(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "customer", "model_ref": "model.company.dim_customer"},
+            {"id": "sale", "model_ref": "model.company.fct_sale"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[column("customer_id", "varchar")],
+            ),
+            model(
+                unique_id="model.company.fct_sale",
+                name="fct_sale",
+                columns=[column("customer_id", "varchar")],
+            ),
+        ]
+        # The metadata flags a column the dataset does not declare, so it cannot
+        # be a key; the surviving relationship still can.
+        schemas = {
+            "model.company.dim_customer": model_schema(
+                bruin_column("legacy_id", primary_key=True),
+            )
+        }
+        relationships = [
+            relationship(
+                "sale", "customer", "many_to_one", "customer_id", "customer_id"
+            )
+        ]
+
+        export_ossie(entities, relationships, "company", models, schemas)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        dataset = next(d for d in document["datasets"] if d["name"] == "dim_customer")
+
+        assert dataset["primary_key"] == ["customer_id"]
+        assert "unique_keys" not in dataset
+
     def test_candidate_absent_from_fields_is_dropped(
         self, validator, tmp_path, monkeypatch
     ):
@@ -544,8 +716,9 @@ class TestKeyInference:
         validate(validator, document)
         dataset = document["datasets"][0]
 
-        # The phantom candidate is dropped before counting, so one remains.
-        assert dataset["primary_key"] == ["product_id"]
+        # One member of the flagged composite is not a declared field, so the
+        # composite is incomplete and neither column identifies a row alone.
+        assert "primary_key" not in dataset
         assert "unique_keys" not in dataset
 
     def test_only_absent_candidates_leave_both_keys_off(
@@ -584,6 +757,7 @@ class TestKeyInference:
         assert "unique_keys" not in dataset
 
     def test_both_key_shapes_validate(self, validator, tmp_path, monkeypatch):
+        """Single metadata candidate vs Bruin's composite flag, both validated."""
         entities = [{"id": "product", "model_ref": "model.company.dim_product"}]
         models = [
             model(
@@ -607,8 +781,13 @@ class TestKeyInference:
                 )
             },
         )
-        validate(validator, read_yaml(single))
+        document = read_yaml(single)
+        validate(validator, document)
+        assert document["datasets"][0]["primary_key"] == ["product_id"]
+        assert "unique_keys" not in document["datasets"][0]
 
+        # Bruin flags every column of a composite key, so two flags are one
+        # multi-element primary key, never two independent unique keys.
         multiple = configure(monkeypatch, tmp_path / "multiple.yml")
         export_ossie(
             entities,
@@ -622,7 +801,75 @@ class TestKeyInference:
                 )
             },
         )
-        validate(validator, read_yaml(multiple))
+        document = read_yaml(multiple)
+        validate(validator, document)
+        dataset = document["datasets"][0]
+        assert dataset["primary_key"] == ["product_id", "sku"]
+        assert "unique_keys" not in dataset
+
+
+class TestDatasetNaming:
+    def test_duplicate_dataset_name_exports_first_and_warns(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """Two entities on one model would make the dataset reference ambiguous."""
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "a", "model_ref": "model.company.dim_customer"},
+            {"id": "b", "model_ref": "model.company.dim_customer"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[column("customer_id", "varchar")],
+            )
+        ]
+
+        result = export_ossie(entities, [], "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert [d["name"] for d in document["datasets"]] == ["dim_customer"]
+        assert result.warnings == [
+            'entities "a" and "b" both map to dataset "dim_customer"; only "a" '
+            "was exported (a dataset name must be unique)"
+        ]
+
+    def test_versioned_model_names_the_dataset_with_the_version(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path = configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "player_v1", "model_ref": "model.company.player.v1"},
+            {"id": "player_v2", "model_ref": "model.company.player.v2"},
+        ]
+        models = [
+            model(
+                unique_id="model.company.player.v1",
+                name="player",
+                version=1,
+                table="player_v1",
+                columns=[column("player_id", "varchar")],
+            ),
+            model(
+                unique_id="model.company.player.v2",
+                name="player",
+                version=2,
+                table="player_v2",
+                columns=[column("player_id", "varchar")],
+            ),
+        ]
+
+        export_ossie(entities, [], "company", models)
+
+        document = read_yaml(path)
+        validate(validator, document)
+        datasets = {d["name"]: d for d in document["datasets"]}
+
+        assert list(datasets) == ["player_v1", "player_v2"]
+        assert datasets["player_v1"]["source"] == "main.player_v1"
+        assert datasets["player_v2"]["source"] == "main.player_v2"
 
 
 class TestRelationships:
@@ -796,6 +1043,37 @@ class TestRelationships:
 
         warning = next(w for w in result.warnings if '"sale"' in w and '"product"' in w)
         assert "target_field" in warning
+
+    def test_empty_field_warning_uses_the_plural_verb_for_two_fields(
+        self, validator, tmp_path, monkeypatch
+    ):
+        path, result = self._export(
+            tmp_path,
+            monkeypatch,
+            [relationship("sale", "product", "many_to_one", "", "")],
+        )
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+        assert result.warnings == [
+            'relationship "sale" -> "product" (many_to_one) skipped: '
+            "source_field and target_field are empty"
+        ]
+
+    def test_duplicate_skipped_relationship_warns_once(
+        self, validator, tmp_path, monkeypatch
+    ):
+        duplicate = relationship("sale", "product", "many_to_one", "", "product_id")
+        path, result = self._export(tmp_path, monkeypatch, [duplicate, dict(duplicate)])
+
+        document = read_yaml(path)
+        validate(validator, document)
+        assert document["relationships"] == []
+        assert result.warnings == [
+            'relationship "sale" -> "product" (many_to_one) skipped: '
+            "source_field is empty"
+        ]
 
     def test_referenced_field_absent_from_the_dataset_is_skipped(
         self, validator, tmp_path, monkeypatch
@@ -1078,6 +1356,32 @@ class TestSourceQualification:
             [model(table="")],
         )
         assert read_yaml(path)["datasets"][0]["source"] == "main.dim_product"
+
+
+class TestOutputPathFallback:
+    def test_unconfigured_path_is_absolute_in_the_working_directory(
+        self, validator, tmp_path, monkeypatch
+    ):
+        """A bare filename would hand `save_file` an empty parent directory."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(cfg, "OSSIE_CONFIG", cfg.OssieConfig(file=""))
+        monkeypatch.setattr(cfg, "DATA_MODEL_PATH", "")
+        expected = tmp_path / DEFAULT_FILENAME
+
+        result = export_ossie(
+            [{"id": "product", "model_ref": "model.company.dim_product"}],
+            [],
+            "company",
+            [model()],
+        )
+
+        assert expected.is_absolute()
+        assert result.path is not None
+        assert result.path.is_absolute()
+        assert result.path.parent == Path.cwd()
+        assert result.path.name == DEFAULT_FILENAME
+        assert expected.exists()
+        validate(validator, read_yaml(expected))
 
 
 class TestUnresolvableModelRef:

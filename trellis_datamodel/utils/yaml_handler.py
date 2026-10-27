@@ -608,14 +608,19 @@ class YamlHandler:
             if origin is not None:
                 col_dict["origin"] = origin
 
-            # Extract tests (supports both dbt's tests and data_tests keys)
+            # Extract tests (supports both dbt's tests and data_tests keys).
+            # A bare test name is dbt's canonical spelling; normalise it to the
+            # dict shape consumers already understand.
             collected_tests: list[dict[str, Any]] = []
             for key in ("data_tests", "tests"):
-                if key not in col:
+                raw_tests = col.get(key)
+                if not isinstance(raw_tests, list):
                     continue
-                for test in col.get(key, []):
+                for test in raw_tests:
                     if isinstance(test, dict):
                         collected_tests.append(dict(test))
+                    elif isinstance(test, str) and test.strip():
+                        collected_tests.append({test.strip(): {}})
 
             if collected_tests:
                 col_dict["data_tests"] = collected_tests

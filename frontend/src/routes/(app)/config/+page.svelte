@@ -1280,7 +1280,7 @@
                                             id="business-events-file-input"
                                             type="text"
                                             value={getFieldValue('business_events.file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('business_events.file', e.currentTarget.value || null)}
+                                            oninput={(e) => handleNestedFieldChange('business_events.file', e.currentTarget.value)}
                                             placeholder="business_events.yml (defaults to same directory as data_model.yml)"
                                             disabled={!isDangerZoneEnabled}
                                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
@@ -1296,7 +1296,6 @@
                             {/if}
 
                             <!-- Apache Ossie Container -->
-                            {#if true}
                             <div class="bg-white border border-amber-200 rounded-lg p-4">
                                 <div class="flex items-center gap-2 mb-4">
                                     <h3 class="text-base font-semibold text-amber-900">Apache Ossie</h3>
@@ -1342,7 +1341,7 @@
                                             id="ossie-file-input"
                                             type="text"
                                             value={getFieldValue('ossie.file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('ossie.file', e.currentTarget.value || null)}
+                                            oninput={(e) => handleNestedFieldChange('ossie.file', e.currentTarget.value)}
                                             placeholder="semantic_model.yml (defaults to same directory as data_model.yml)"
                                             disabled={!isDangerZoneEnabled}
                                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
@@ -1362,7 +1361,7 @@
                                             id="ossie-source-database"
                                             type="text"
                                             value={getFieldValue('ossie.source.database') || ''}
-                                            oninput={(e) => handleNestedFieldChange('ossie.source.database', e.currentTarget.value || null)}
+                                            oninput={(e) => handleNestedFieldChange('ossie.source.database', e.currentTarget.value)}
                                             disabled={!isDangerZoneEnabled}
                                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
                                         />
@@ -1381,7 +1380,7 @@
                                             id="ossie-source-schema"
                                             type="text"
                                             value={getFieldValue('ossie.source.schema') || ''}
-                                            oninput={(e) => handleNestedFieldChange('ossie.source.schema', e.currentTarget.value || null)}
+                                            oninput={(e) => handleNestedFieldChange('ossie.source.schema', e.currentTarget.value)}
                                             disabled={!isDangerZoneEnabled}
                                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
                                         />
@@ -1393,7 +1392,6 @@
                                     </div>
                                 </div>
                             </div>
-                            {/if}
 
                             <!-- Metric Tree Container -->
                             {#if true}

@@ -306,7 +306,7 @@ export async function inferRelationships(): Promise<Relationship[]> {
     }
 }
 
-export async function syncDbtTests(): Promise<{ message: string }> {
+export async function syncDbtTests(): Promise<{ message: string; warnings?: string[] }> {
     try {
         const res = await fetch(`${API_BASE}/sync-tests`, {
             method: 'POST',

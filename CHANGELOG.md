@@ -24,6 +24,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `custom_extensions` and `ai_context`. The block is normalised only when
   `trellis.yml` declares it, and it is off by default.
 
+### Fixed
+- **Ossie export no longer claims keys it cannot prove:** the key fallback read
+  every relationship in `data_model.yml`, including the ones the export skipped
+  and many-to-many pairs, and could turn two inbound relationships into two
+  independent `unique_keys`. Evidence now comes only from relationships that
+  were actually written, at most one per dataset, and never from a many-to-many
+  pair. A Bruin composite `primary_key` stays one composite key instead of
+  becoming one unique column per member, and an incomplete composite is no
+  longer narrowed to its surviving column.
+- **dbt projects get key inference:** `YamlHandler.get_columns` kept only
+  dict-shaped tests, so dbt's canonical `data_tests: [unique, not_null]`
+  spelling was dropped before the exporter saw it and no dbt project ever
+  produced a `primary_key`. String test names are now normalised, which also
+  restores them in the schema the frontend reads.
+- **Nothing silently disappears from a push:** datasets are named by model and
+  version, and a second entity claiming an existing dataset name is skipped with
+  a warning instead of producing a duplicate `name` the relationships cannot
+  address. The push response counts framework files only and appends the warning
+  count; the frontend logs the individual warnings.
+- **Config page can be saved after clearing a field:** the Ossie and business
+  events path inputs stored `null` for an empty value, which the config
+  validator rejected.
+- **Malformed `ossie` blocks no longer break startup:** a non-string `file`,
+  non-string `source.database`/`source.schema`, or a quoted `enabled: "false"`
+  now warns and falls back instead of raising or silently enabling the export.
+
 ## [0.25.0b1] - 2026-10-26
 
 ### Added

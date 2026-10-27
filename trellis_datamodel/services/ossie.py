@@ -3,6 +3,13 @@
 Writes one flat `0.2.0.dev0` document from the entities bound in
 `data_model.yml`. The spec is a draft, so the version is pinned in one constant
 and the whole mapping lives here rather than leaking into routes or adapters.
+
+Keys are claimed from provenance, never guessed. Bruin's `primary_key: true`
+flags every column of one composite key, dbt's `unique` + `not_null` pair marks
+one independently unique column, and the relationship fallback is evidence about
+a single field. `_key_entries` keeps those three claims distinct so two flagged
+Bruin columns cannot be reported as two independent unique keys, and two inbound
+relationships cannot be reported as two independently unique fields.
 """
 
 from dataclasses import dataclass, field
@@ -179,90 +186,132 @@ def _test_names(column: ColumnSchema) -> set[str]:
     return names
 
 
-def _is_key_candidate(column: ColumnSchema) -> bool:
-    """Bruin's `primary_key: true`, or dbt's unique *and* not_null pair.
+def _is_dbt_key_candidate(column: ColumnSchema) -> bool:
+    """dbt's unique *and* not_null pair: one independently unique column.
 
-    `unique` alone does not identify rows, so it is not a candidate.
+    `unique` alone does not identify rows, so it is not a candidate. Bruin's
+    `primary_key: true` is deliberately not handled here: it flags membership of
+    a composite key, which is a different claim (see `_key_entries`).
     """
-    if column.get("primary_key") is True:
-        return True
     names = _test_names(column)
     return "unique" in names and "not_null" in names
 
 
-def _key_candidates(
-    entity_id: str,
-    schema: ModelSchema | None,
-    relationships: list[dict],
-) -> list[str]:
-    """Distinct candidate field names, metadata first, then the FK fallback."""
-    candidates: list[str] = []
-    for column in (schema or {}).get("columns") or []:
-        name = (column.get("name") or "").strip()
-        if name and name not in candidates and _is_key_candidate(column):
-            candidates.append(name)
+def _declared(names: list[str], field_names: set[str]) -> list[str]:
+    """Deduplicate while keeping order, then drop names the dataset lacks.
 
-    if candidates:
-        return candidates
-
-    # No framework metadata: the referenced side of an inbound relationship is
-    # the only evidence of uniqueness available.
-    for relationship in relationships:
-        placement = place_foreign_key(
-            relationship.get("type") or "",
-            relationship.get("source") or "",
-            relationship.get("source_field") or "",
-            relationship.get("target") or "",
-            relationship.get("target_field") or "",
-        )
-        if placement.ref_entity != entity_id:
-            continue
-        name = (placement.ref_field or "").strip()
-        if name and name not in candidates:
-            candidates.append(name)
-    return candidates
-
-
-def _key_entries(candidates: list[str]) -> dict[str, Any]:
-    """One candidate is the primary key; independent candidates are unique keys.
-
-    A multi-element `primary_key` would mean one composite key, which is not
-    what independent unique columns describe.
+    Ossie resolves a key's column list against declared fields, so a candidate
+    that is not a field cannot be emitted.
     """
-    if len(candidates) == 1:
-        return {"primary_key": [candidates[0]]}
-    if candidates:
-        return {"unique_keys": [[candidate] for candidate in candidates]}
+    return [name for name in dict.fromkeys(names) if name in field_names]
+
+
+def _key_entries(
+    dataset_name: str,
+    model_unique_id: str,
+    model_schemas: dict[str, ModelSchema] | None,
+    field_names: set[str],
+    key_evidence: dict[str, str],
+) -> dict[str, Any]:
+    """Key claims for one dataset, keeping the two provenances apart.
+
+    Bruin flags every column of a composite key with `primary_key: true`, so
+    those columns describe one key and must stay together. Ossie's multi-element
+    `primary_key` is exactly that composite claim; emitting the same columns as
+    separate `unique_keys` would say each one identifies a row alone, which is
+    false. dbt's `unique` + `not_null` pair is per-column evidence, so two such
+    columns are independent rather than composite and become separate
+    one-field `unique_keys`; a lone one is the primary key, per rule 8. A
+    dataset never mixes the two shapes: a flagged set wins and any dbt pairs are
+    dropped.
+
+    Metadata that names an undeclared field does not count, because it cannot be
+    referenced. When no metadata candidate survives, `key_evidence` supplies at
+    most one field: the referenced side of the first emitted relationship
+    pointing at this dataset. When neither is available, both keys are omitted.
+    """
+    columns = ((model_schemas or {}).get(model_unique_id) or {}).get("columns") or []
+
+    composite: list[str] = []
+    independent: list[str] = []
+    for column in columns:
+        name = (column.get("name") or "").strip()
+        if not name:
+            continue
+        if column.get("primary_key") is True:
+            composite.append(name)
+        elif _is_dbt_key_candidate(column):
+            independent.append(name)
+
+    # A composite claim is all-or-nothing: if one flagged column is not a
+    # declared field, the remaining ones are not unique on their own, so the
+    # key is dropped rather than narrowed.
+    composite_named = list(dict.fromkeys(composite))
+    composite = _declared(composite_named, field_names)
+    independent = _declared(independent, field_names)
+
+    if composite_named and len(composite) == len(composite_named):
+        return {"primary_key": composite}
+    if len(independent) == 1:
+        return {"primary_key": independent}
+    if independent:
+        return {"unique_keys": [[name] for name in independent]}
+
+    # No usable framework metadata: at most one relationship field is evidence,
+    # because two inbound relationships are two separate claims and Ossie would
+    # read two unique keys as independently identifying a row.
+    evidence = key_evidence.get(dataset_name)
+    if evidence and evidence in field_names:
+        return {"primary_key": [evidence]}
     return {}
 
 
-def _build_dataset(
-    entity: dict[str, Any],
-    entity_id: str,
-    model: ModelInfo,
-    model_schemas: dict[str, ModelSchema] | None,
-    relationships: list[dict],
-) -> dict[str, Any]:
+def _dataset_name(model: ModelInfo) -> str:
+    """The model's short name, version-suffixed when the model is versioned.
+
+    Two versions of one dbt model are two physical tables. Sharing one dataset
+    name would make every relationship keyed by that name ambiguous.
+    """
+    name = (model.get("name") or model.get("unique_id") or "").strip()
+    version = model.get("version")
+    if version is not None:
+        name = f"{name}_v{version}"
+    return name
+
+
+def _build_dataset_skeleton(
+    entity: dict[str, Any], model: ModelInfo, dataset_name: str
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Name, source, description and fields; keys are attached later.
+
+    Keys wait for the emitted relationships, because the relationship fallback
+    is evidence from relationships that survived filtering.
+    """
     dataset: dict[str, Any] = {
-        "name": (model.get("name") or model.get("unique_id") or "").strip(),
+        "name": dataset_name,
         "source": _build_source(model),
     }
     description = entity.get("description")
     if description:
         dataset["description"] = description
+    return dataset, _build_fields(entity, model)
 
-    fields = _build_fields(entity, model)
-    field_names = {field["name"] for field in fields}
-    schema = (model_schemas or {}).get(model.get("unique_id") or "")
-    candidates = [
-        candidate
-        for candidate in _key_candidates(entity_id, schema, relationships)
-        if candidate in field_names
-    ]
-    dataset.update(_key_entries(candidates))
 
-    dataset["fields"] = fields
-    return dataset
+# Both sides are many, so neither referenced field identifies a row. The
+# fallback key rule skips these types; a key candidate from them would be a
+# fabricated claim.
+_MANY_TO_MANY_TYPES = frozenset({"many_to_many", "zero_or_many_to_many"})
+
+
+@dataclass(frozen=True)
+class _EmittedRelationship:
+    """One surviving relationship, before naming."""
+
+    from_dataset: str
+    to_dataset: str
+    from_field: str
+    to_field: str
+    rel_type: str
 
 
 def _relationship_label(relationship: dict[str, Any]) -> str:
@@ -305,7 +354,7 @@ def _build_relationships(
     relationships: list[dict],
     emitted: dict[str, str],
     field_names: dict[str, set[str]],
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], dict[str, str]]:
     """Orient, filter, deduplicate and name every relationship worth emitting.
 
     `emitted` maps an entity id to the dataset name actually written, and
@@ -313,13 +362,19 @@ def _build_relationships(
     relationship survives only when both endpoints became datasets, both field
     names are present, and both fields are declared: Ossie resolves column
     lists against declared fields, so a dangling name is a hard error upstream.
+
+    Returns the entries, the warnings (deduplicated, first occurrence wins), and
+    `key_evidence`: a map from a referenced dataset name to at most one field
+    that a surviving relationship says identifies its rows. Skipped or
+    many-to-many relationships contribute nothing, and a dataset never gets two
+    candidates, because Ossie would read those as independent unique keys.
     """
     warnings: list[str] = []
     entities_by_id = {
         (entity.get("id") or "").strip(): entity for entity in entities
     }
 
-    entries: list[dict[str, Any]] = []
+    entries: list[_EmittedRelationship] = []
     seen: set[tuple[str, str, str, str]] = set()
 
     for relationship in relationships:
@@ -347,7 +402,11 @@ def _build_relationships(
             if not value
         ]
         if missing:
-            warnings.append(f"{label} skipped: {' and '.join(missing)} is empty")
+            if len(missing) == 1:
+                detail = f"{missing[0]} is empty"
+            else:
+                detail = f"{' and '.join(missing)} are empty"
+            warnings.append(f"{label} skipped: {detail}")
             continue
 
         placement = place_foreign_key(
@@ -386,40 +445,61 @@ def _build_relationships(
             continue
         seen.add(key)
         entries.append(
-            {
-                "from": key[0],
-                "to": key[1],
-                "from_columns": [key[2]],
-                "to_columns": [key[3]],
-            }
+            _EmittedRelationship(
+                from_dataset=key[0],
+                to_dataset=key[1],
+                from_field=key[2],
+                to_field=key[3],
+                rel_type=(relationship.get("type") or "").strip(),
+            )
         )
 
-    # `to_columns` only breaks ties, so input order cannot leak into the file.
+    # Sorted like the emitted list, so "the first surviving relationship" below
+    # is stable across runs regardless of the input order.
     entries.sort(
         key=lambda entry: (
-            entry["from"],
-            entry["to"],
-            tuple(entry["from_columns"]),
-            tuple(entry["to_columns"]),
+            entry.from_dataset,
+            entry.to_dataset,
+            entry.from_field,
+            entry.to_field,
         )
     )
+
+    # At most one fallback candidate per dataset: the first surviving
+    # relationship that points at it. Many-to-many is evidence that neither side
+    # is the one side, so it cannot identify a row.
+    key_evidence: dict[str, str] = {}
+    for entry in entries:
+        if entry.rel_type in _MANY_TO_MANY_TYPES:
+            continue
+        key_evidence.setdefault(entry.to_dataset, entry.to_field)
 
     used: set[str] = set()
     named: list[dict[str, Any]] = []
     for entry in entries:
-        base = f'{entry["from"]}_to_{entry["to"]}'
+        base = f"{entry.from_dataset}_to_{entry.to_dataset}"
         name = base
         if name in used:
-            name = f'{base}_{entry["from_columns"][0]}'
+            name = f"{base}_{entry.from_field}"
         if name in used:
             suffix = 2
             while f"{name}_{suffix}" in used:
                 suffix += 1
             name = f"{name}_{suffix}"
         used.add(name)
-        named.append({"name": name, **entry})
+        named.append(
+            {
+                "name": name,
+                "from": entry.from_dataset,
+                "to": entry.to_dataset,
+                "from_columns": [entry.from_field],
+                "to_columns": [entry.to_field],
+            }
+        )
 
-    return named, warnings
+    # Duplicate input relationships skip identically; report each reason once,
+    # in the order the first occurrence produced it.
+    return named, list(dict.fromkeys(warnings)), key_evidence
 
 
 def _resolve_name(project_name: str) -> str:
@@ -443,7 +523,9 @@ def _output_path() -> Path:
     data_model_path = (getattr(cfg, "DATA_MODEL_PATH", "") or "").strip()
     if data_model_path:
         return Path(data_model_path).parent / DEFAULT_FILENAME
-    return Path(DEFAULT_FILENAME)
+    # An absolute path: `YamlHandler.save_file` creates the parent directory and
+    # a bare filename gives it an empty one to create.
+    return Path.cwd() / DEFAULT_FILENAME
 
 
 def _metric_expression(expression: str) -> dict[str, Any]:
@@ -561,7 +643,12 @@ def export_ossie(
 
     `model_schemas` is keyed by `unique_id` and carries the column metadata the
     key rules need; the exporter never calls an adapter itself. When a model has
-    no entry, key inference falls back to inbound relationships.
+    no usable entry, key inference falls back to the first emitted relationship
+    that points at the dataset.
+
+    Datasets are built in two passes: skeletons first, because a relationship
+    only counts as key evidence once it survives filtering, and keys are attached
+    after `_build_relationships` has decided what was emitted.
 
     `metric_tree` defaults to `metric_tree.yml` beside `data_model.yml`. Its
     drafted metrics are emitted only while `metrics.enabled` is true; metrics
@@ -578,11 +665,12 @@ def export_ossie(
         if model.get("unique_id")
     }
 
-    datasets: list[dict[str, Any]] = []
+    skeletons: list[tuple[dict[str, Any], list[dict[str, Any]], str]] = []
     emitted: dict[str, str] = {}
     field_names: dict[str, set[str]] = {}
+    dataset_owners: dict[str, str] = {}
     for entity in entities:
-        entity_id = entity.get("id") or ""
+        entity_id = (entity.get("id") or "").strip()
         model_ref = get_model_ref(entity)
         if not model_ref:
             warnings.append(
@@ -599,27 +687,53 @@ def export_ossie(
             )
             continue
 
-        dataset = _build_dataset(
-            entity, entity_id, model, model_schemas, relationships
+        dataset_name = _dataset_name(model)
+        owner = dataset_owners.get(dataset_name)
+        if owner is not None:
+            # A dataset name keys every relationship, so a second dataset with
+            # the same name would make every reference to it ambiguous.
+            warnings.append(
+                f'entities "{owner}" and "{entity_id}" both map to dataset '
+                f'"{dataset_name}"; only "{owner}" was exported '
+                "(a dataset name must be unique)"
+            )
+            continue
+        dataset_owners[dataset_name] = entity_id
+
+        dataset, fields = _build_dataset_skeleton(entity, model, dataset_name)
+        skeletons.append(
+            (dataset, fields, model.get("unique_id") or "")
         )
-        datasets.append(dataset)
-        emitted[entity_id.strip()] = dataset["name"]
-        field_names[entity_id.strip()] = {
-            field["name"] for field in dataset["fields"]
-        }
+        emitted[entity_id] = dataset_name
+        field_names[entity_id] = {field["name"] for field in fields}
 
-    datasets.sort(key=lambda dataset: dataset["name"])
-
-    if not datasets:
+    if not skeletons:
         warnings.append(
             "no entities resolved to adapter models; nothing was written"
         )
         return OssieExport(path=None, warnings=warnings)
 
-    relationship_entries, relationship_warnings = _build_relationships(
-        entities, relationships, emitted, field_names
+    relationship_entries, relationship_warnings, key_evidence = (
+        _build_relationships(entities, relationships, emitted, field_names)
     )
     warnings.extend(relationship_warnings)
+
+    datasets: list[dict[str, Any]] = []
+    for dataset, fields, model_unique_id in skeletons:
+        dataset.update(
+            _key_entries(
+                dataset["name"],
+                model_unique_id,
+                model_schemas,
+                {field["name"] for field in fields},
+                key_evidence,
+            )
+        )
+        # Keys sit between the descriptive keys and the fields, as emitted.
+        dataset["fields"] = fields
+        datasets.append(dataset)
+
+    datasets.sort(key=lambda dataset: dataset["name"])
 
     path = _output_path()
     # Off means off: no tree is read while the feature is disabled, but metrics
