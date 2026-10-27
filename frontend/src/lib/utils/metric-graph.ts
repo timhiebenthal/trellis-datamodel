@@ -1,4 +1,4 @@
-import type { MetricEntry, MetricInfluence, MetricTreeEdge, MetricTreeNode } from '$lib/types';
+import type { MetricEntry, MetricInfluence, MetricTreeEdge, MetricTreeNode, MetricTreeFile } from '$lib/types';
 
 /**
  * Pure helpers behind the metric canvas.
@@ -143,4 +143,34 @@ export function buildMetricEdges(
     }
 
     return edges;
+}
+
+/**
+ * The POST body. Positions travel on each metric and the backend splits them into
+ * `metric_layout.yml`; `unresolved` is read-only server state and never sent back,
+ * and a bound entry is reduced to its reference so a saved file can never hold a
+ * copied definition.
+ */
+export function buildMetricTreePayload(
+    tree: { version: number; metrics: MetricEntry[]; influences: MetricInfluence[] },
+    layout: MetricLayout = {},
+): MetricTreeFile {
+    return {
+        version: tree.version,
+        metrics: tree.metrics.map((entry) => {
+            const { unresolved: _unresolved, ...metric } = entry;
+            const stored = layout[metric.id] ?? metric.position;
+
+            if (metric.binding) {
+                const { description: _description, expression: _expression, ...reference } = metric;
+                return stored ? { ...reference, position: stored } : reference;
+            }
+
+            return stored ? { ...metric, position: stored } : metric;
+        }),
+        influences: tree.influences.map((influence) => ({
+            effect: influence.effect,
+            drivers: [...influence.drivers],
+        })),
+    };
 }

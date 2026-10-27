@@ -206,7 +206,6 @@ export interface CatalogGroups {
     /** Read-only: cross-dataset, or a dataset with no bound entity. */
     unavailable: MetricCatalogEntry[];
 }
-
 /** Split the sidebar catalog into what can be added, what is added, and what cannot. */
 export function groupCatalog(
     catalog: MetricCatalogEntry[],
@@ -224,4 +223,46 @@ export function groupCatalog(
     }
 
     return groups;
+}
+
+/**
+ * Edit one metric's fields. The id is never patched - influences reference it -
+ * and a bound entry can never acquire an expression or description, because that
+ * would turn a reference into a copy (and the backend rejects the file).
+ */
+export function updateMetric(
+    state: MetricGraphState,
+    metricId: string,
+    patch: Partial<MetricEntry>,
+): MetricGraphState {
+    const metrics = state.metrics.map((metric) => {
+        if (metric.id !== metricId) return metric;
+
+        const next: MetricEntry = { ...metric, ...patch, id: metric.id };
+
+        if (next.binding) {
+            delete next.expression;
+            delete next.description;
+            delete next.dataset_ref;
+        }
+
+        return next;
+    });
+
+    return withMetrics(state, metrics);
+}
+
+/** Turn a bound entry back into a draft by dropping the reference, keeping the label. */
+export function unlinkMetric(state: MetricGraphState, metricId: string): MetricGraphState {
+    return updateMetric(state, metricId, { binding: undefined });
+}
+
+/**
+ * Drafts a save would reject: the backend answers 422 when a metric has no
+ * expression. Autosave is gated on this list being empty.
+ */
+export function incompleteDraftIds(metrics: MetricEntry[]): string[] {
+    return metrics
+        .filter((metric) => !metric.binding && !(metric.expression ?? '').trim())
+        .map((metric) => metric.id);
 }

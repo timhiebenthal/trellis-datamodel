@@ -5,9 +5,12 @@ import {
     addDraftMetric,
     connectInfluence,
     groupCatalog,
+    incompleteDraftIds,
     metricLabelFromName,
     removeInfluence,
     removeMetric,
+    unlinkMetric,
+    updateMetric,
     type MetricGraphState,
 } from './metric-edits';
 
@@ -254,8 +257,7 @@ describe('removeMetric', () => {
     });
 });
 
-describe('groupCatalog', () => {
-    const catalog: MetricCatalogEntry[] = [
+describe('groupCatalog', () => {    const catalog: MetricCatalogEntry[] = [
         { name: 'avg_price', dataset: 'fct__order', entity_id: 'order', bindable: true },
         { name: 'revenue', bindable: false, reason: 'Cross-dataset metric' },
         { name: 'order_count', dataset: 'fct__order', entity_id: 'order', bindable: true },
@@ -286,5 +288,90 @@ describe('groupCatalog', () => {
 
         expect(groups.added).toEqual([]);
         expect(groups.available.map((entry) => entry.name)).toEqual(['avg_price', 'order_count']);
+    });
+});
+
+describe('updateMetric', () => {
+    const graph = state([
+        { id: 'revenue', label: 'Revenue', description: '', expression: 'sum(amount)' },
+        { id: 'avg_price', label: 'Avg price', binding: { dataset: 'fct__order', name: 'avg_price' } },
+    ]);
+
+    it('edits the draft fields without touching the id', () => {
+        const next = updateMetric(graph, 'revenue', {
+            label: 'Booked revenue',
+            description: 'Booked revenue for the period.',
+            expression: 'sum(amount) from fct__order',
+            dataset_ref: 'fct__order',
+        });
+
+        expect(next.metrics[0]).toEqual({
+            id: 'revenue',
+            label: 'Booked revenue',
+            description: 'Booked revenue for the period.',
+            expression: 'sum(amount) from fct__order',
+            dataset_ref: 'fct__order',
+        });
+    });
+
+    it('ignores an attempted id change so influences keep pointing at the metric', () => {
+        const next = updateMetric(graph, 'revenue', { id: 'revenue_v2', label: 'Renamed' } as Partial<MetricEntry>);
+
+        expect(next.metrics[0].id).toBe('revenue');
+        expect(next.metrics[0].label).toBe('Renamed');
+    });
+
+    it('never lets a bound entry pick up an expression or description', () => {
+        const next = updateMetric(graph, 'avg_price', {
+            expression: 'avg(amount)',
+            description: 'copied definition',
+        });
+
+        expect(next.metrics[1].expression).toBeUndefined();
+        expect(next.metrics[1].description).toBeUndefined();
+        expect(next.metrics[1].binding).toEqual({ dataset: 'fct__order', name: 'avg_price' });
+    });
+
+    it('leaves the other metrics untouched', () => {
+        const next = updateMetric(graph, 'revenue', { label: 'Booked revenue' });
+
+        expect(next.metrics[1]).toEqual(graph.metrics[1]);
+    });
+});
+
+describe('unlinkMetric', () => {
+    it('drops the binding and leaves an incomplete draft behind', () => {
+        const graph = state([
+            { id: 'avg_price', label: 'Avg price', binding: { dataset: 'fct__order', name: 'avg_price' } },
+        ]);
+
+        const next = unlinkMetric(graph, 'avg_price');
+
+        expect(next.metrics[0].binding).toBeUndefined();
+        expect(next.metrics[0].label).toBe('Avg price');
+        expect(incompleteDraftIds(next.metrics)).toEqual(['avg_price']);
+    });
+});
+
+describe('incompleteDraftIds', () => {
+    it('names every draft without an expression', () => {
+        expect(
+            incompleteDraftIds([
+                { id: 'a', label: 'A', expression: 'sum(x)' },
+                { id: 'b', label: 'B', expression: '' },
+                { id: 'c', label: 'C' },
+                { id: 'd', label: 'D', expression: '   ' },
+                { id: 'e', label: 'E', binding: { dataset: 'fct__order', name: 'e' } },
+            ]),
+        ).toEqual(['b', 'c', 'd']);
+    });
+
+    it('is empty for a canvas of complete drafts and bound entries', () => {
+        expect(
+            incompleteDraftIds([
+                { id: 'a', label: 'A', expression: 'sum(x)' },
+                { id: 'e', label: 'E', binding: { dataset: 'fct__order', name: 'e' } },
+            ]),
+        ).toEqual([]);
     });
 });

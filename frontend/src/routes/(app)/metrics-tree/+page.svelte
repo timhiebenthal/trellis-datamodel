@@ -1,17 +1,27 @@
 <script lang="ts">
-    import { getConfigInfo, getMetricTree } from '$lib/api';
+    import { onMount } from 'svelte';
+    import { getConfigInfo, getDataModel, getMetricTree } from '$lib/api';
     import MetricCanvas from '$lib/components/MetricCanvas.svelte';
+    import MetricDetailPanel from '$lib/components/MetricDetailPanel.svelte';
     import MetricSidebar from '$lib/components/MetricSidebar.svelte';
+    import { MetricTreeSaveService, type MetricTreeSaveState } from '$lib/services/metric-tree-save';
     import {
         addBoundMetric,
         addDraftMetric,
         connectInfluence,
+        incompleteDraftIds,
         removeInfluence,
         removeMetric,
+        unlinkMetric,
+        updateMetric,
         type MetricGraphState,
     } from '$lib/utils/metric-edits';
-    import { layoutFromMetrics, type MetricLayout } from '$lib/utils/metric-graph';
-    import type { MetricCatalogEntry, MetricTreeFile } from '$lib/types';
+    import {
+        buildMetricTreePayload,
+        layoutFromMetrics,
+        type MetricLayout,
+    } from '$lib/utils/metric-graph';
+    import type { MetricCatalogEntry, MetricEntry, MetricTreeFile } from '$lib/types';
 
     type MetricTreeResponse = MetricTreeFile & { catalog: MetricCatalogEntry[] };
 
@@ -20,16 +30,35 @@
     let error = $state<string | null>(null);
     let tree = $state<MetricTreeResponse | null>(null);
     let layout = $state<MetricLayout>({});
+    let entityIds = $state<string[]>([]);
     let notice = $state<string | null>(null);
 
-    // Detail panel seam (Task 9). Selecting a metric - by clicking its node, its
-    // sidebar row, or by creating one - records the id here, and `detailFocus`
-    // says which field the panel should focus first. `MetricDetailPanel` reads
-    // both when it lands.
+    // Selection drives the detail panel: which metric is open, and which field it
+    // should focus when the panel was opened by creating something.
     let selectedMetricId = $state<string | null>(null);
     let detailFocus = $state<'label' | null>(null);
 
+    let saveState = $state<MetricTreeSaveState>({ isSaving: false, warnings: [], error: null });
+    let hasUnsavedChanges = $state(false);
+    let baselineReady = false;
+
     let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const saver = new MetricTreeSaveService({
+        debounceMs: 400,
+        // The backend rejects a draft without an expression with 422, so autosave
+        // waits for a complete document instead of posting a doomed payload.
+        canSave: (payload) => incompleteDraftIds(payload.metrics).length === 0,
+        onStateChange: (state) => {
+            saveState = state;
+            hasUnsavedChanges = currentPayload() ? saver.hasUnsavedChanges(currentPayload()!) : false;
+        },
+    });
+
+    const selectedMetric = $derived(
+        tree?.metrics.find((metric) => metric.id === selectedMetricId) ?? null,
+    );
+    const incompleteIds = $derived(incompleteDraftIds(tree?.metrics ?? []));
 
     // Check the feature flag, then load the document. Redirect to the canvas
     // when the feature is off, matching the bus-matrix route.
@@ -43,8 +72,20 @@
                 return;
             }
 
-            tree = await getMetricTree();
-            layout = layoutFromMetrics(tree.metrics);
+            const [document, dataModel] = await Promise.all([
+                getMetricTree(),
+                // Only used to suggest entity ids for `dataset_ref`; a failure here
+                // must not block the canvas.
+                getDataModel().catch(() => null),
+            ]);
+
+            tree = document;
+            layout = layoutFromMetrics(document.metrics);
+            entityIds = (dataModel?.entities ?? []).map((entity) => entity.id);
+
+            // The freshly loaded document counts as saved: loading must never post.
+            saver.initializeBaseline(buildMetricTreePayload(tree, layout));
+            baselineReady = true;
         } catch (e) {
             console.error('Failed to load metric tree:', e);
             error = e instanceof Error ? e.message : 'Failed to load metric tree';
@@ -53,13 +94,42 @@
         }
     })();
 
+    onMount(() => {
+        // The debounce would otherwise drop the last edit when the tab closes.
+        const handleBeforeUnload = () => {
+            if (!tree) return;
+            void saver.flushSync(buildMetricTreePayload(tree, layout));
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    });
+
     /**
-     * Every graph edit is a pure function over `{ metrics, influences }`; this is
-     * the single place the page swaps in the result.
+     * The POST body for the current document, positions included. `null` until the
+     * document has loaded.
      */
+    function currentPayload(): MetricTreeFile | null {
+        if (!tree) return null;
+        return buildMetricTreePayload(tree, layout);
+    }
+
+    /**
+     * Ask for a debounced save. Called from `applyGraph` and from layout changes -
+     * deliberately not from an effect: the service reports progress synchronously,
+     * and writing page state from inside an effect that also reads the document
+     * makes Svelte's scheduler loop.
+     */
+    function requestSave() {
+        const payload = currentPayload();
+        if (!baselineReady || !payload) return;
+        saver.save(payload);
+    }
+
     function applyGraph(next: MetricGraphState) {
         if (!tree) return;
         tree = { ...tree, metrics: next.metrics, influences: next.influences };
+        requestSave();
     }
 
     /** Explain a refused edit instead of dropping it silently. */
@@ -95,6 +165,7 @@
         }
 
         selectedMetricId = outcome.metric.id;
+        detailFocus = null;
     }
 
     function handleConnect(driver: string, effect: string) {
@@ -133,7 +204,21 @@
 
     function handleSelectMetric(metricId: string | null) {
         selectedMetricId = metricId;
-        if (!metricId) detailFocus = null;
+        // A deliberate selection is not a "start typing" moment.
+        detailFocus = null;
+    }
+
+    function handleMetricChange(patch: Partial<MetricEntry>) {
+        if (!tree || !selectedMetricId) return;
+        applyGraph(updateMetric(tree, selectedMetricId, patch));
+    }
+
+    function handleUnlinkMetric(metricId: string) {
+        if (!tree) return;
+
+        applyGraph(unlinkMetric(tree, metricId));
+        flash('Unlinked. Write an expression so this metric can be saved as a draft.');
+        detailFocus = 'label';
     }
 </script>
 
@@ -158,7 +243,7 @@
     </div>
 {:else if metricsEnabled && tree}
     <div class="flex h-full w-full flex-1 overflow-hidden">
-        <div class="flex min-w-0 flex-1 flex-col">
+        <div class="relative flex min-w-0 flex-1 flex-col">
             <header class="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-2.5">
                 <div class="min-w-0">
                     <h2 class="text-sm font-semibold text-slate-800">Metric Tree</h2>
@@ -191,21 +276,41 @@
                 </div>
             {/if}
 
-            <MetricCanvas
-                metrics={tree.metrics}
-                influences={tree.influences}
-                {layout}
-                {selectedMetricId}
-                onaddmetric={handleAddMetric}
-                onselectmetric={handleSelectMetric}
-                onconnect={handleConnect}
-                ondeleteedge={handleDeleteInfluence}
-                ondeletemetric={handleDeleteMetric}
-            />
+            <div class="relative min-h-0 flex-1">
+                <MetricCanvas
+                    metrics={tree.metrics}
+                    influences={tree.influences}
+                    {layout}
+                    {selectedMetricId}
+                    onaddmetric={handleAddMetric}
+                    onselectmetric={handleSelectMetric}
+                    onconnect={handleConnect}
+                    ondeleteedge={handleDeleteInfluence}
+                    ondeletemetric={handleDeleteMetric}
+                />
+
+                <!-- Inspector overlays the canvas instead of shrinking it, so opening a
+                     metric never moves the graph under the cursor. -->
+                <div class="pointer-events-none absolute inset-y-4 right-4 z-20 flex">
+                    <div class="pointer-events-auto flex max-h-full">
+                        <MetricDetailPanel
+                            metric={selectedMetric}
+                            {entityIds}
+                            focus={detailFocus}
+                            warnings={saveState.warnings}
+                            error={saveState.error}
+                            isSaving={saveState.isSaving}
+                            {hasUnsavedChanges}
+                            {incompleteIds}
+                            onchange={handleMetricChange}
+                            onunlink={handleUnlinkMetric}
+                            onclose={() => handleSelectMetric(null)}
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Task 9 mounts MetricDetailPanel in a rail beside this sidebar, driven by
-             selectedMetricId + detailFocus. -->
         <MetricSidebar
             metrics={tree.metrics}
             catalog={tree.catalog}

@@ -4,6 +4,7 @@ import {
     METRIC_GRID,
     buildMetricEdges,
     buildMetricNodes,
+    buildMetricTreePayload,
     influenceEdgeId,
     layoutFromMetrics,
     metricGridPosition,
@@ -132,5 +133,79 @@ describe('layoutFromMetrics', () => {
         ]);
 
         expect(layout).toEqual({ revenue: { x: 1, y: 2 } });
+    });
+});
+
+describe('buildMetricTreePayload', () => {
+    it('attaches the local layout position to every metric', () => {
+        const payload = buildMetricTreePayload(
+            {
+                version: 0.1,
+                metrics: [metric('revenue', { expression: 'sum(amount)' }), metric('orders', { expression: 'count(*)' })],
+                influences: [{ effect: 'revenue', drivers: ['orders'] }],
+            },
+            { revenue: { x: 10, y: 20 } },
+        );
+
+        expect(payload.version).toBe(0.1);
+        expect(payload.metrics[0].position).toEqual({ x: 10, y: 20 });
+        expect(payload.metrics[1].position).toBeUndefined();
+        expect(payload.influences).toEqual([{ effect: 'revenue', drivers: ['orders'] }]);
+    });
+
+    it('falls back to the position carried on the metric', () => {
+        const payload = buildMetricTreePayload(
+            { version: 0.1, metrics: [metric('revenue', { position: { x: 5, y: 6 } })], influences: [] },
+            {},
+        );
+
+        expect(payload.metrics[0].position).toEqual({ x: 5, y: 6 });
+    });
+
+    it('strips the read-only unresolved flag before saving', () => {
+        const payload = buildMetricTreePayload(
+            { version: 0.1, metrics: [metric('revenue', { unresolved: true, expression: 'sum(x)' })], influences: [] },
+            {},
+        );
+
+        expect(payload.metrics[0]).not.toHaveProperty('unresolved');
+    });
+
+    it('never sends an expression or description for a bound metric', () => {
+        const payload = buildMetricTreePayload(
+            {
+                version: 0.1,
+                metrics: [
+                    {
+                        id: 'avg_price',
+                        label: 'Avg price',
+                        binding: { dataset: 'fct__order', name: 'avg_price' },
+                        description: 'stale copy',
+                        expression: 'avg(amount)',
+                    },
+                ],
+                influences: [],
+            },
+            {},
+        );
+
+        expect(payload.metrics[0]).toEqual({
+            id: 'avg_price',
+            label: 'Avg price',
+            binding: { dataset: 'fct__order', name: 'avg_price' },
+        });
+    });
+
+    it('keeps draft fields as they are', () => {
+        const draft = {
+            id: 'revenue',
+            label: 'Revenue',
+            description: 'Booked revenue.',
+            expression: 'sum(amount)',
+            dataset_ref: 'fct__order',
+        };
+        const payload = buildMetricTreePayload({ version: 0.1, metrics: [draft], influences: [] }, {});
+
+        expect(payload.metrics[0]).toEqual(draft);
     });
 });
