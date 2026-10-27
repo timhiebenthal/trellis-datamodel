@@ -12,12 +12,15 @@
     import Icon from "$lib/components/Icon.svelte";
     import MetricNode from "./MetricNode.svelte";
     import MetricInfluenceEdge from "./MetricInfluenceEdge.svelte";
-    import type { MetricEntry, MetricInfluence } from "$lib/types";
+    import type { MetricCatalogEntry, MetricEntry, MetricInfluence } from "$lib/types";
     import {
+        METRIC_GRID,
         buildMetricEdges,
         buildMetricNodes,
+        withMetricPosition,
         type MetricCanvasActions,
         type MetricLayout,
+        type MetricRelationKind,
     } from "$lib/utils/metric-graph";
 
     /**
@@ -29,6 +32,7 @@
     let {
         metrics = [],
         influences = [],
+        catalog = [],
         layout = {},
         selectedMetricId = null,
         onaddmetric,
@@ -37,9 +41,12 @@
         ondeleteedge,
         ondeletemetric,
         onmove,
+        onaddrelateddraft,
+        onaddrelatedcatalog,
     }: {
         metrics?: MetricEntry[];
         influences?: MetricInfluence[];
+        catalog?: MetricCatalogEntry[];
         layout?: MetricLayout;
         selectedMetricId?: string | null;
         onaddmetric?: () => void;
@@ -50,6 +57,14 @@
         ondeletemetric?: (metricId: string) => void;
         /** A node was dropped: the page records its new position. */
         onmove?: (metricId: string, position: { x: number; y: number }) => void;
+        /** Create a draft metric above (`effect`) or below (`driver`) `anchorMetricId` and connect it. */
+        onaddrelateddraft?: (anchorMetricId: string, relation: MetricRelationKind) => void;
+        /** Bind a catalog metric above (`effect`) or below (`driver`) `anchorMetricId` and connect it. */
+        onaddrelatedcatalog?: (
+            anchorMetricId: string,
+            relation: MetricRelationKind,
+            entry: MetricCatalogEntry,
+        ) => void;
     } = $props();
 
     const nodeTypes = { metric: MetricNode };
@@ -59,10 +74,43 @@
     // wire shape it is on the server.
     setContext<MetricCanvasActions>("metricCanvas", {
         deleteMetric: (metricId: string) => ondeletemetric?.(metricId),
+        getMetrics: () => metrics,
+        getCatalog: () => catalog,
+        getInfluences: () => influences,
+        addRelatedDraft: (anchorMetricId, relation) =>
+            onaddrelateddraft?.(anchorMetricId, relation),
+        addRelatedCatalogMetric: (anchorMetricId, relation, entry) =>
+            onaddrelatedcatalog?.(anchorMetricId, relation, entry),
+        connectRelatedMetric: (anchorMetricId, relation, targetMetricId) => {
+            if (relation === "driver") {
+                onconnect?.(targetMetricId, anchorMetricId);
+            } else {
+                onconnect?.(anchorMetricId, targetMetricId);
+            }
+        },
     });
 
+    let dragOverride = $state<{ id: string; position: { x: number; y: number } } | null>(null);
+
+    const effectiveLayout = $derived(
+        dragOverride
+            ? withMetricPosition(
+                  layout,
+                  dragOverride.id,
+                  dragOverride.position,
+                  metrics,
+                  influences,
+              )
+            : layout,
+    );
+
     const flowNodes = $derived(
-        buildMetricNodes(metrics, layout, selectedMetricId) as unknown as Node[],
+        buildMetricNodes(
+            metrics,
+            effectiveLayout,
+            selectedMetricId,
+            influences,
+        ) as unknown as Node[],
     );
 
     const flowEdges = $derived(
@@ -95,14 +143,30 @@
         onselectmetric?.(null);
     }
 
+    function handleNodeDrag({ targetNode }: { targetNode: Node | null }) {
+        if (!targetNode) return;
+        dragOverride = {
+            id: targetNode.id,
+            position: { x: targetNode.position.x, y: targetNode.position.y },
+        };
+    }
+
     /**
      * Report where a node was dropped. The canvas does not keep that position
      * itself: the page owns the layout, so the save payload and the rendered
      * position can never disagree.
      */
     function handleNodeDragStop({ targetNode }: { targetNode: Node | null }) {
+        dragOverride = null;
         if (!targetNode || !onmove) return;
-        onmove(targetNode.id, { x: targetNode.position.x, y: targetNode.position.y });
+        const aligned = withMetricPosition(
+            layout,
+            targetNode.id,
+            targetNode.position,
+            metrics,
+            influences,
+        )[targetNode.id];
+        onmove(targetNode.id, aligned ?? { x: targetNode.position.x, y: targetNode.position.y });
     }
 
     /** A metric cannot drive itself, and the same connection only exists once. */
@@ -152,6 +216,7 @@
             edges={flowEdges}
             {nodeTypes}
             {edgeTypes}
+            snapGrid={[METRIC_GRID.snapX, METRIC_GRID.snapX]}
             fitView
             fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
             panOnDrag
@@ -161,6 +226,7 @@
             ondelete={handleDelete}
             onnodeclick={handleNodeClick}
             onpaneclick={handlePaneClick}
+            onnodedrag={handleNodeDrag}
             onnodedragstop={handleNodeDragStop}
             isValidConnection={isValidConnection}
             class="bg-slate-50"
@@ -186,8 +252,8 @@
         <div
             class="pointer-events-none absolute bottom-4 left-4 z-10 max-w-xs rounded-lg border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] leading-relaxed text-slate-500 shadow-sm backdrop-blur-sm"
         >
-            Drag from a metric's bottom dot to a driver metric below it to record an influence.
-            Select a line and press Backspace to remove it.
+            Hover a metric to click <strong>+ Add effect</strong> (top) or
+            <strong>+ Add driver</strong> (bottom), or drag a metric from the sidebar onto those buttons.
         </div>
     {/if}
 </div>

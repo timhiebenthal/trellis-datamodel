@@ -1,4 +1,11 @@
-import type { MetricEntry, MetricInfluence, MetricTreeEdge, MetricTreeNode, MetricTreeFile } from '$lib/types';
+import type {
+    MetricCatalogEntry,
+    MetricEntry,
+    MetricInfluence,
+    MetricTreeEdge,
+    MetricTreeNode,
+    MetricTreeFile,
+} from '$lib/types';
 
 /**
  * Pure helpers behind the metric canvas.
@@ -33,12 +40,29 @@ export interface MetricCanvasNode extends MetricTreeNode {
  */
 export const METRIC_ACCENT = '#8b5cf6';
 
+export type MetricRelationKind = 'effect' | 'driver';
+
 /**
  * Node-level actions the canvas publishes through Svelte context, so a node can
- * offer "remove" without widening `MetricNodeData` on the wire.
+ * offer "remove" and "+ Add effect / + Add driver" without widening `MetricNodeData`
+ * on the wire.
  */
 export interface MetricCanvasActions {
     deleteMetric?: (metricId: string) => void;
+    getMetrics?: () => MetricEntry[];
+    getCatalog?: () => MetricCatalogEntry[];
+    getInfluences?: () => MetricInfluence[];
+    addRelatedDraft?: (anchorMetricId: string, relation: MetricRelationKind) => void;
+    addRelatedCatalogMetric?: (
+        anchorMetricId: string,
+        relation: MetricRelationKind,
+        entry: MetricCatalogEntry,
+    ) => void;
+    connectRelatedMetric?: (
+        anchorMetricId: string,
+        relation: MetricRelationKind,
+        targetMetricId: string,
+    ) => void;
 }
 
 /**
@@ -51,7 +75,107 @@ export const METRIC_GRID = {
     columns: 3,
     columnWidth: 300,
     rowHeight: 190,
+    snapX: 20,
 } as const;
+
+const METRIC_NODE_MIN_GAP_X = 240;
+
+/** Snap a horizontal coordinate to the metric canvas grid. */
+export function snapMetricX(x: number): number {
+    if (!Number.isFinite(x)) return METRIC_GRID.originX;
+    const snapped = Math.round(x / METRIC_GRID.snapX) * METRIC_GRID.snapX;
+    return Object.is(snapped, -0) ? 0 : snapped;
+}
+
+/** Fixed vertical coordinate for a 0-based tree depth level. */
+export function metricLevelY(level: number): number {
+    const safeLevel = Number.isFinite(level) && level > 0 ? Math.floor(level) : 0;
+    return METRIC_GRID.originY + safeLevel * METRIC_GRID.rowHeight;
+}
+
+/**
+ * Compute 0-based tree depth for each metric from `influences` (`effect` at top,
+ * `drivers` below). Every driver sits at least one level below all of its effects,
+ * and root effects whose only drivers sit deeper than level 1 are pulled down so
+ * sibling effects of the same metric share a level row.
+ */
+export function computeMetricLevels(
+    metrics: MetricEntry[],
+    influences: MetricInfluence[] = [],
+): Map<string, number> {
+    const known = new Set(metrics.map((entry) => entry.id));
+    const driversOf = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+    const levels = new Map<string, number>();
+
+    for (const entry of metrics) {
+        driversOf.set(entry.id, []);
+        inDegree.set(entry.id, 0);
+        levels.set(entry.id, 0);
+    }
+
+    const seenEdges = new Set<string>();
+    for (const influence of influences) {
+        if (!known.has(influence.effect)) continue;
+        for (const driver of influence.drivers) {
+            if (driver === influence.effect || !known.has(driver)) continue;
+            const edgeKey = `${influence.effect}->${driver}`;
+            if (seenEdges.has(edgeKey)) continue;
+            seenEdges.add(edgeKey);
+            driversOf.get(influence.effect)!.push(driver);
+            inDegree.set(driver, (inDegree.get(driver) ?? 0) + 1);
+        }
+    }
+
+    const remainingInDegree = new Map(inDegree);
+    const processed = new Set<string>();
+    const queue: string[] = [];
+
+    for (const entry of metrics) {
+        if ((remainingInDegree.get(entry.id) ?? 0) === 0) {
+            queue.push(entry.id);
+        }
+    }
+
+    while (processed.size < metrics.length) {
+        if (queue.length === 0) {
+            const cycleStart = metrics.find((entry) => !processed.has(entry.id));
+            if (!cycleStart) break;
+            queue.push(cycleStart.id);
+        }
+
+        const current = queue.shift()!;
+        if (processed.has(current)) continue;
+        processed.add(current);
+
+        const currentLevel = levels.get(current) ?? 0;
+        for (const driver of driversOf.get(current) ?? []) {
+            if (processed.has(driver)) continue;
+            if ((levels.get(driver) ?? 0) < currentLevel + 1) {
+                levels.set(driver, currentLevel + 1);
+            }
+            const nextIn = (remainingInDegree.get(driver) ?? 1) - 1;
+            remainingInDegree.set(driver, nextIn);
+            if (nextIn <= 0) {
+                queue.push(driver);
+            }
+        }
+    }
+
+    // Tighten roots (no incoming effects) whose drivers all sit below level 1,
+    // so multiple top-level effects of the same deep metric share the level above it.
+    for (const entry of metrics) {
+        if ((inDegree.get(entry.id) ?? 0) > 0) continue;
+        const drivers = driversOf.get(entry.id) ?? [];
+        if (drivers.length === 0) continue;
+        const minDriverLevel = Math.min(...drivers.map((driver) => levels.get(driver) ?? 0));
+        if (minDriverLevel > 1) {
+            levels.set(entry.id, minDriverLevel - 1);
+        }
+    }
+
+    return levels;
+}
 
 /** The fallback cell for a metric at `index` in the document. */
 export function metricGridPosition(index: number): MetricPosition {
@@ -65,21 +189,332 @@ export function metricGridPosition(index: number): MetricPosition {
     };
 }
 
+function isLevelXOccupied(occupiedX: number[], candidateX: number): boolean {
+    return occupiedX.some((existingX) => Math.abs(existingX - candidateX) < METRIC_NODE_MIN_GAP_X);
+}
+
+function nextFreeLevelX(occupiedX: number[], preferredX?: number): number {
+    if (preferredX !== undefined) {
+        const snapped = snapMetricX(preferredX);
+        if (!isLevelXOccupied(occupiedX, snapped)) {
+            return snapped;
+        }
+        for (let step = 1; step <= occupiedX.length + 2; step++) {
+            for (const dir of [1, -1]) {
+                const candidate = snapMetricX(snapped + dir * step * METRIC_GRID.columnWidth);
+                if (candidate >= 0 && !isLevelXOccupied(occupiedX, candidate)) {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    let col = 0;
+    while (
+        isLevelXOccupied(occupiedX, METRIC_GRID.originX + col * METRIC_GRID.columnWidth)
+    ) {
+        col += 1;
+    }
+    return METRIC_GRID.originX + col * METRIC_GRID.columnWidth;
+}
+
+function buildInfluenceMaps(
+    metrics: MetricEntry[],
+    influences: MetricInfluence[],
+): {
+    driversOf: Map<string, string[]>;
+    effectsOf: Map<string, string[]>;
+} {
+    const known = new Set(metrics.map((entry) => entry.id));
+    const driversOf = new Map<string, string[]>();
+    const effectsOf = new Map<string, string[]>();
+
+    for (const entry of metrics) {
+        driversOf.set(entry.id, []);
+        effectsOf.set(entry.id, []);
+    }
+
+    const seenEdges = new Set<string>();
+    for (const influence of influences) {
+        if (!known.has(influence.effect)) continue;
+        for (const driver of influence.drivers) {
+            if (driver === influence.effect || !known.has(driver)) continue;
+            const edgeKey = `${influence.effect}->${driver}`;
+            if (seenEdges.has(edgeKey)) continue;
+            seenEdges.add(edgeKey);
+            driversOf.get(influence.effect)!.push(driver);
+            effectsOf.get(driver)!.push(influence.effect);
+        }
+    }
+
+    return { driversOf, effectsOf };
+}
+
+function resolveMetricPositions(
+    metrics: MetricEntry[],
+    influences: MetricInfluence[],
+    layout: MetricLayout,
+): Map<string, MetricPosition> {
+    const levels = computeMetricLevels(metrics, influences);
+    const { driversOf, effectsOf } = buildInfluenceMaps(metrics, influences);
+
+    const indexById = new Map<string, number>();
+    metrics.forEach((entry, index) => indexById.set(entry.id, index));
+
+    const storedX = new Map<string, number>();
+    for (const entry of metrics) {
+        const stored = layout[entry.id] ?? entry.position;
+        if (stored && Number.isFinite(stored.x)) {
+            storedX.set(entry.id, stored.x);
+        }
+    }
+
+    const byLevel = new Map<number, string[]>();
+    let maxLevel = 0;
+    for (const entry of metrics) {
+        const level = levels.get(entry.id) ?? 0;
+        if (level > maxLevel) maxLevel = level;
+        const list = byLevel.get(level) ?? [];
+        list.push(entry.id);
+        byLevel.set(level, list);
+    }
+
+    const resolvedX = new Map<string, number>();
+    const occupiedByLevel = new Map<number, number[]>();
+
+    for (let level = 0; level <= maxLevel; level++) {
+        const idsOnLevel = byLevel.get(level) ?? [];
+        const occupied: number[] = [];
+
+        if (level > 0) {
+            const parentIds = [...(byLevel.get(level - 1) ?? [])].sort(
+                (a, b) =>
+                    (resolvedX.get(a) ?? 0) - (resolvedX.get(b) ?? 0) ||
+                    (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0),
+            );
+
+            for (const parentId of parentIds) {
+                const parentX = resolvedX.get(parentId) ?? METRIC_GRID.originX;
+                const children = (driversOf.get(parentId) ?? []).filter(
+                    (driverId) =>
+                        (levels.get(driverId) ?? 0) === level && !resolvedX.has(driverId),
+                );
+                if (children.length === 0) continue;
+
+                // Preserve left-to-right visual order when stored x exists, falling back to document order.
+                children.sort((a, b) => {
+                    const ax = storedX.get(a);
+                    const bx = storedX.get(b);
+                    if (ax !== undefined && bx !== undefined && ax !== bx) {
+                        return ax - bx;
+                    }
+                    return (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0);
+                });
+
+                const count = children.length;
+                children.forEach((childId, idx) => {
+                    const offset = (idx - (count - 1) / 2) * METRIC_GRID.columnWidth;
+                    const desiredX = snapMetricX(parentX + offset);
+                    const x = nextFreeLevelX(occupied, desiredX);
+                    occupied.push(x);
+                    resolvedX.set(childId, x);
+                });
+            }
+        }
+
+        // Remaining nodes on this level (roots on level 0, tightened roots on deeper levels,
+        // or drivers whose effects sit more than one level above).
+        for (const id of idsOnLevel) {
+            if (resolvedX.has(id)) continue;
+            const parentXs = (effectsOf.get(id) ?? [])
+                .map((effectId) => resolvedX.get(effectId))
+                .filter((val): val is number => val !== undefined);
+
+            if (parentXs.length > 0) {
+                const avgParentX =
+                    parentXs.reduce((sum, val) => sum + val, 0) / parentXs.length;
+                const x = nextFreeLevelX(occupied, snapMetricX(avgParentX));
+                occupied.push(x);
+                resolvedX.set(id, x);
+            } else if (storedX.has(id)) {
+                const x = storedX.get(id)!;
+                occupied.push(x);
+                resolvedX.set(id, x);
+            } else {
+                const x = nextFreeLevelX(occupied);
+                occupied.push(x);
+                resolvedX.set(id, x);
+            }
+        }
+
+        occupiedByLevel.set(level, occupied);
+    }
+
+    // Bottom-up pass for roots without stored x that have drivers below them:
+    // center the root above its direct drivers so top-level effects also sit balanced.
+    for (let level = maxLevel - 1; level >= 0; level--) {
+        const idsOnLevel = byLevel.get(level) ?? [];
+        const occupied = occupiedByLevel.get(level) ?? [];
+
+        for (const id of idsOnLevel) {
+            if (storedX.has(id) || (effectsOf.get(id) ?? []).length > 0) continue;
+            const childXs = (driversOf.get(id) ?? [])
+                .map((driverId) => resolvedX.get(driverId))
+                .filter((val): val is number => val !== undefined);
+            if (childXs.length === 0) continue;
+
+            const currentX = resolvedX.get(id);
+            const otherOccupied = occupied.filter((val) => val !== currentX);
+            const avgChildX = childXs.reduce((sum, val) => sum + val, 0) / childXs.length;
+            const x = nextFreeLevelX(otherOccupied, snapMetricX(avgChildX));
+            otherOccupied.push(x);
+            occupiedByLevel.set(level, otherOccupied);
+            resolvedX.set(id, x);
+        }
+    }
+
+    const resolved = new Map<string, MetricPosition>();
+    for (const entry of metrics) {
+        const level = levels.get(entry.id) ?? 0;
+        const x = resolvedX.get(entry.id) ?? METRIC_GRID.originX;
+        const y = metricLevelY(level);
+        resolved.set(entry.id, { x, y });
+    }
+
+    return resolved;
+}
+
 /** Stable id for the edge a driver draws onto an effect. */
 export function influenceEdgeId(driver: string, effect: string): string {
     return `influence:${driver}:${effect}`;
 }
 
 /**
+ * Compute a clean position for a new related metric above (`effect`) or below (`driver`)
+ * `anchorMetricId`, spreading multiple drivers/effects horizontally around the anchor.
+ */
+export function relatedMetricPosition(
+    anchorMetricId: string,
+    relation: MetricRelationKind,
+    metrics: MetricEntry[],
+    influences: MetricInfluence[],
+    layout: MetricLayout,
+): MetricPosition {
+    const anchorIndex = metrics.findIndex((entry) => entry.id === anchorMetricId);
+    const anchorMetric = anchorIndex >= 0 ? metrics[anchorIndex] : undefined;
+    const resolved = resolveMetricPositions(metrics, influences, layout);
+    const anchorPos =
+        layout[anchorMetricId] ??
+        anchorMetric?.position ??
+        resolved.get(anchorMetricId) ??
+        metricGridPosition(anchorIndex >= 0 ? anchorIndex : 0);
+
+    const siblingCount =
+        relation === 'driver'
+            ? (influences.find((inf) => inf.effect === anchorMetricId)?.drivers.length ?? 0)
+            : influences.filter((inf) => inf.drivers.includes(anchorMetricId)).length;
+
+    const horizontalStep = METRIC_GRID.columnWidth;
+    const verticalStep = METRIC_GRID.rowHeight;
+    const offsetIndex =
+        siblingCount === 0
+            ? 0
+            : (siblingCount % 2 === 1 ? 1 : -1) * Math.ceil(siblingCount / 2);
+
+    const levels = computeMetricLevels(metrics, influences);
+    const anchorLevel = levels.get(anchorMetricId) ?? 0;
+    const targetLevel = relation === 'driver' ? anchorLevel + 1 : Math.max(0, anchorLevel - 1);
+    const occupiedOnTargetLevel: number[] = [];
+    for (const entry of metrics) {
+        if (entry.id === anchorMetricId && relation === 'effect' && anchorLevel === 0) continue;
+        if ((levels.get(entry.id) ?? 0) === targetLevel) {
+            const pos = resolved.get(entry.id);
+            if (pos) occupiedOnTargetLevel.push(pos.x);
+        }
+    }
+
+    const desiredX = snapMetricX(anchorPos.x + offsetIndex * horizontalStep);
+    const x = nextFreeLevelX(occupiedOnTargetLevel, desiredX);
+
+    return {
+        x,
+        y: anchorPos.y + (relation === 'driver' ? verticalStep : -verticalStep),
+    };
+}
+
+/**
+ * Align stored positions in `layout` so every metric's `y` matches its tree level
+ * and every driver is spaced evenly and symmetrically in `x` around its effect node.
+ */
+export function alignMetricLayout(
+    metrics: MetricEntry[],
+    influences: MetricInfluence[],
+    layout: MetricLayout,
+): MetricLayout {
+    const resolved = resolveMetricPositions(metrics, influences, layout);
+    const next: MetricLayout = {};
+
+    for (const entry of metrics) {
+        const pos = resolved.get(entry.id);
+        if (pos) {
+            next[entry.id] = { x: pos.x, y: pos.y };
+        }
+    }
+
+    return next;
+}
+
+/**
  * Record a dragged node's position in the local layout. The save payload reads
- * from here, so a drag survives the next save without a reload.
+ * from here, so a drag survives the next save without a reload. When `metrics`
+ * is provided, `y` is locked to the metric's tree level, `x` snaps to the grid,
+ * and dragging a driver horizontally shifts its upstream root effect so all
+ * sibling drivers stay evenly spaced around their effect.
  */
 export function withMetricPosition(
     layout: MetricLayout,
     metricId: string,
     position: MetricPosition,
+    metrics: MetricEntry[] = [],
+    influences: MetricInfluence[] = [],
 ): MetricLayout {
-    return { ...layout, [metricId]: { x: position.x, y: position.y } };
+    const levels = computeMetricLevels(metrics, influences);
+    const level = levels.get(metricId);
+    const snappedX = snapMetricX(position.x);
+    const y = level !== undefined ? metricLevelY(level) : position.y;
+    const updated: MetricLayout = { ...layout, [metricId]: { x: snappedX, y } };
+
+    if (metrics.length > 0 && influences.length > 0) {
+        const before = resolveMetricPositions(metrics, influences, layout);
+        const prevPos = before.get(metricId);
+        if (prevPos && prevPos.x !== snappedX) {
+            const deltaX = snappedX - prevPos.x;
+            const { effectsOf } = buildInfluenceMaps(metrics, influences);
+            const visited = new Set<string>([metricId]);
+            const queue = [...(effectsOf.get(metricId) ?? [])];
+
+            while (queue.length > 0) {
+                const current = queue.shift()!;
+                if (visited.has(current)) continue;
+                visited.add(current);
+                const parents = effectsOf.get(current) ?? [];
+                if (parents.length === 0) {
+                    const rootPos = before.get(current);
+                    if (rootPos) {
+                        updated[current] = {
+                            x: Math.max(0, snapMetricX(rootPos.x + deltaX)),
+                            y: rootPos.y,
+                        };
+                    }
+                } else {
+                    queue.push(...parents);
+                }
+            }
+        }
+        return alignMetricLayout(metrics, influences, updated);
+    }
+
+    return updated;
 }
 
 /** Positions already stored on the payload, keyed by metric id. */
@@ -96,22 +531,26 @@ export function layoutFromMetrics(metrics: MetricEntry[]): MetricLayout {
 }
 
 /**
- * One node per metric. A stored position wins, then a position carried on the
- * payload, then the grid cell for the metric's index - so nothing ever stacks
- * at `{0, 0}`.
+ * One node per metric. Each node's `y` coordinate is locked to its tree depth
+ * level (`computeMetricLevels`) so metrics on the same level always share the
+ * exact same row, while `x` comes from the stored layout or the next free column
+ * on that level.
  */
 export function buildMetricNodes(
     metrics: MetricEntry[],
     layout: MetricLayout = {},
     selectedId: string | null = null,
+    influences: MetricInfluence[] = [],
 ): MetricCanvasNode[] {
+    const resolved = resolveMetricPositions(metrics, influences, layout);
+
     return metrics.map((entry, index) => {
-        const stored = layout[entry.id] ?? entry.position;
+        const position = resolved.get(entry.id) ?? metricGridPosition(index);
 
         return {
             id: entry.id,
             type: 'metric',
-            position: stored ? { x: stored.x, y: stored.y } : metricGridPosition(index),
+            position: { x: position.x, y: position.y },
             data: {
                 metric: entry,
                 unresolved: entry.unresolved ?? false,

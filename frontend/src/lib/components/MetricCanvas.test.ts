@@ -70,14 +70,15 @@ describe('MetricCanvas', () => {
         expect(edges.every((edge) => edge.label === undefined)).toBe(true);
     });
 
-    it('places nodes at the stored layout position when the document supplies one', () => {
+    it('places nodes at the stored layout x position while locking y to the tree level and spacing drivers evenly around the effect', () => {
         render(MetricCanvas, {
             props: { metrics, influences, layout: { revenue: { x: 400, y: 250 } } },
         });
 
         const nodes = lastFlow().nodes as Array<{ id: string; position: { x: number; y: number } }>;
-        expect(nodes.find((node) => node.id === 'revenue')?.position).toEqual({ x: 400, y: 250 });
-        expect(nodes.find((node) => node.id === 'avg_price')?.position).not.toEqual({ x: 0, y: 0 });
+        expect(nodes.find((node) => node.id === 'revenue')?.position).toEqual({ x: 400, y: 80 });
+        expect(nodes.find((node) => node.id === 'avg_price')?.position).toEqual({ x: 260, y: 270 });
+        expect(nodes.find((node) => node.id === 'order_count')?.position).toEqual({ x: 560, y: 270 });
     });
 
     it('shows the empty state with a call to action instead of an empty canvas', async () => {
@@ -143,17 +144,17 @@ describe('MetricCanvas', () => {
         expect(ondeletemetric).toHaveBeenCalledWith('order_count');
     });
 
-    it('reports where a node was dropped so the page can store the position', () => {
+    it('reports where a node was dropped with x snapped to the grid and y locked to its tree level', () => {
         const onmove = vi.fn();
         render(MetricCanvas, { props: { metrics, influences, layout: {}, onmove } });
 
         lastFlow().onnodedragstop({
-            targetNode: { id: 'revenue', position: { x: 120, y: 240 } },
+            targetNode: { id: 'revenue', position: { x: 123, y: 240 } },
             nodes: [],
             event: new MouseEvent('mouseup'),
         });
 
-        expect(onmove).toHaveBeenCalledWith('revenue', { x: 120, y: 240 });
+        expect(onmove).toHaveBeenCalledWith('revenue', { x: 120, y: 80 });
     });
 
     it('stays quiet on a drag end that has no target node', () => {

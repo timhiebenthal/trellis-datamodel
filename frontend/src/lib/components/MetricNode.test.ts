@@ -110,4 +110,65 @@ describe('MetricNode', () => {
 
         expect(container.querySelector('[data-testid="metric-node-delete"]')).toBeNull();
     });
+
+    it('opens the + Add driver / + Add effect popover and triggers related metric actions', async () => {
+        const addRelatedDraft = vi.fn();
+        const addRelatedCatalogMetric = vi.fn();
+        const connectRelatedMetric = vi.fn();
+        const catalogEntry = {
+            name: 'project_end_date',
+            dataset: 'entity_booking',
+            entity_id: 'entity_booking',
+            bindable: true,
+        };
+
+        const { container } = render(MetricNode, {
+            props: {
+                id: 'revenue',
+                type: 'metric',
+                data: { metric: { id: 'revenue', label: 'Revenue' }, unresolved: false },
+                selected: false,
+            } as any,
+            context: new Map<string, unknown>([
+                [
+                    'metricCanvas',
+                    {
+                        getMetrics: () => [
+                            { id: 'revenue', label: 'Revenue' },
+                            { id: 'orders', label: 'Orders' },
+                        ],
+                        getCatalog: () => [catalogEntry],
+                        getInfluences: () => [],
+                        addRelatedDraft,
+                        addRelatedCatalogMetric,
+                        connectRelatedMetric,
+                    },
+                ],
+            ]),
+        });
+
+        const addDriverBtn = container.querySelector('[data-testid="metric-node-add-driver"]')!;
+        expect(addDriverBtn.textContent).toContain('Add driver');
+
+        await fireEvent.click(addDriverBtn);
+
+        const picker = container.querySelector('[data-testid="metric-node-picker"]');
+        expect(picker).not.toBeNull();
+        expect(picker?.getAttribute('data-relation')).toBe('driver');
+
+        // Pick a semantic model metric from the popover
+        const catalogBtn = container.querySelector(
+            '[data-testid="metric-node-picker-catalog-item"]',
+        )!;
+        expect(catalogBtn.textContent).toContain('project_end_date');
+        await fireEvent.click(catalogBtn);
+
+        expect(addRelatedCatalogMetric).toHaveBeenCalledWith('revenue', 'driver', catalogEntry);
+        expect(container.querySelector('[data-testid="metric-node-picker"]')).toBeNull();
+
+        // Open + Add effect popover and create a new draft effect
+        await fireEvent.click(container.querySelector('[data-testid="metric-node-add-effect"]')!);
+        await fireEvent.click(container.querySelector('[data-testid="metric-node-picker-draft"]')!);
+        expect(addRelatedDraft).toHaveBeenCalledWith('revenue', 'effect');
+    });
 });

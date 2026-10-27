@@ -83,16 +83,15 @@ afterEach(() => {
 });
 
 describe('metrics-tree page', () => {
-    it('passes the loaded document to the canvas with its stored positions', async () => {
+    it('passes the loaded document to the canvas with stored x and level-locked y positions, centering single driver under effect', async () => {
         render(MetricsTreePage);
 
         await waitFor(() => expect(flow.props).not.toBeNull());
 
         expect(nodePositions()).toEqual([
-            { id: 'revenue', position: { x: 10, y: 20 } },
-            { id: 'orders', position: expect.any(Object) },
+            { id: 'revenue', position: { x: 10, y: 80 } },
+            { id: 'orders', position: { x: 20, y: 270 } },
         ]);
-        expect(nodePositions()[1].position).not.toEqual({ x: 0, y: 0 });
     });
 
     it('redirects to the canvas without loading the tree when the feature is disabled', async () => {
@@ -178,7 +177,7 @@ describe('metrics-tree page', () => {
 });
 
 describe('metrics-tree layout round-trip', () => {
-    it('saves a dragged position on the metric and keeps it on screen', async () => {
+    it('saves a dragged position with y locked to the metric tree level and keeps effect and drivers aligned', async () => {
         render(MetricsTreePage);
         await waitFor(() => expect(flow.props).not.toBeNull());
 
@@ -192,22 +191,21 @@ describe('metrics-tree layout round-trip', () => {
 
         const payload = api.saveMetricTree.mock.calls[0][0];
         const orders = payload.metrics.find((metric: { id: string }) => metric.id === 'orders');
-        expect(orders.position).toEqual({ x: 640, y: 480 });
-        // The stored position for the other metric is untouched.
-        expect(payload.metrics[0].position).toEqual({ x: 10, y: 20 });
+        expect(orders.position).toEqual({ x: 640, y: 270 });
+        expect(payload.metrics[0].position).toEqual({ x: 640, y: 80 });
 
         expect(nodePositions()).toEqual([
-            { id: 'revenue', position: { x: 10, y: 20 } },
-            { id: 'orders', position: { x: 640, y: 480 } },
+            { id: 'revenue', position: { x: 640, y: 80 } },
+            { id: 'orders', position: { x: 640, y: 270 } },
         ]);
         expect(flow.instances).toBe(1);
     });
 
-    it('falls back to the grid for a metric that has no saved position', async () => {
+    it('centers a driver without a saved position directly below its effect', async () => {
         render(MetricsTreePage);
         await waitFor(() => expect(flow.props).not.toBeNull());
 
         const orders = nodePositions().find((node) => node.id === 'orders');
-        expect(orders?.position).toEqual({ x: 380, y: 80 });
+        expect(orders?.position).toEqual({ x: 20, y: 270 });
     });
 });

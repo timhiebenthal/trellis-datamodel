@@ -17,10 +17,13 @@
         type MetricGraphState,
     } from '$lib/utils/metric-edits';
     import {
+        alignMetricLayout,
         buildMetricTreePayload,
         layoutFromMetrics,
+        relatedMetricPosition,
         withMetricPosition,
         type MetricLayout,
+        type MetricRelationKind,
     } from '$lib/utils/metric-graph';
     import type { MetricCatalogEntry, MetricEntry, MetricTreeFile } from '$lib/types';
 
@@ -169,10 +172,102 @@
         detailFocus = null;
     }
 
+    function handleAddRelatedDraft(anchorMetricId: string, relation: MetricRelationKind) {
+        if (!tree) return;
+
+        const pos = relatedMetricPosition(
+            anchorMetricId,
+            relation,
+            tree.metrics,
+            tree.influences,
+            layout,
+        );
+        const { state: withDraft, metric } = addDraftMetric(tree);
+        const driver = relation === 'driver' ? metric.id : anchorMetricId;
+        const effect = relation === 'driver' ? anchorMetricId : metric.id;
+        const connected = connectInfluence(withDraft, driver, effect);
+
+        layout = alignMetricLayout(
+            connected.state.metrics,
+            connected.state.influences,
+            withMetricPosition(
+                layout,
+                metric.id,
+                pos,
+                connected.state.metrics,
+                connected.state.influences,
+            ),
+        );
+        applyGraph(connected.state);
+
+        selectedMetricId = metric.id;
+        detailFocus = 'label';
+    }
+
+    function handleAddRelatedCatalogMetric(
+        anchorMetricId: string,
+        relation: MetricRelationKind,
+        entry: MetricCatalogEntry,
+    ) {
+        if (!tree) return;
+
+        const pos = relatedMetricPosition(
+            anchorMetricId,
+            relation,
+            tree.metrics,
+            tree.influences,
+            layout,
+        );
+
+        // If the catalog entry is already on the tree, connect the existing metric.
+        const existing = tree.metrics.find(
+            (metric) =>
+                metric.binding?.name === entry.name &&
+                (!entry.dataset || metric.binding?.dataset === entry.dataset),
+        );
+        if (existing) {
+            const driver = relation === 'driver' ? existing.id : anchorMetricId;
+            const effect = relation === 'driver' ? anchorMetricId : existing.id;
+            handleConnect(driver, effect);
+            return;
+        }
+
+        const added = addBoundMetric(tree, entry);
+        if (!added.metric) {
+            flash(
+                `${entry.name} cannot be added: ${entry.reason ?? 'it has no dataset to bind to'}.`,
+            );
+            return;
+        }
+
+        const driver = relation === 'driver' ? added.metric.id : anchorMetricId;
+        const effect = relation === 'driver' ? anchorMetricId : added.metric.id;
+        const connected = connectInfluence(added.state, driver, effect);
+
+        layout = alignMetricLayout(
+            connected.state.metrics,
+            connected.state.influences,
+            withMetricPosition(
+                layout,
+                added.metric.id,
+                pos,
+                connected.state.metrics,
+                connected.state.influences,
+            ),
+        );
+        applyGraph(connected.state);
+
+        selectedMetricId = added.metric.id;
+        detailFocus = null;
+    }
+
     function handleConnect(driver: string, effect: string) {
         if (!tree) return;
 
         const outcome = connectInfluence(tree, driver, effect);
+        if (outcome.ok) {
+            layout = alignMetricLayout(outcome.state.metrics, outcome.state.influences, layout);
+        }
         applyGraph(outcome.state);
 
         if (outcome.ok) {
@@ -189,13 +284,17 @@
 
     function handleDeleteInfluence(driver: string, effect: string) {
         if (!tree) return;
-        applyGraph(removeInfluence(tree, driver, effect));
+        const next = removeInfluence(tree, driver, effect);
+        layout = alignMetricLayout(next.metrics, next.influences, layout);
+        applyGraph(next);
     }
 
     function handleDeleteMetric(metricId: string) {
         if (!tree) return;
 
-        applyGraph(removeMetric(tree, metricId));
+        const next = removeMetric(tree, metricId);
+        layout = alignMetricLayout(next.metrics, next.influences, layout);
+        applyGraph(next);
 
         if (selectedMetricId === metricId) {
             selectedMetricId = null;
@@ -214,7 +313,13 @@
      * position is in the very next payload rather than a reload later.
      */
     function handleMoveMetric(metricId: string, position: { x: number; y: number }) {
-        layout = withMetricPosition(layout, metricId, position);
+        layout = withMetricPosition(
+            layout,
+            metricId,
+            position,
+            tree?.metrics ?? [],
+            tree?.influences ?? [],
+        );
         requestSave();
     }
 
@@ -299,6 +404,7 @@
                 <MetricCanvas
                     metrics={tree.metrics}
                     influences={tree.influences}
+                    catalog={tree.catalog}
                     {layout}
                     {selectedMetricId}
                     onaddmetric={handleAddMetric}
@@ -307,6 +413,8 @@
                     ondeleteedge={handleDeleteInfluence}
                     ondeletemetric={handleDeleteMetric}
                     onmove={handleMoveMetric}
+                    onaddrelateddraft={handleAddRelatedDraft}
+                    onaddrelatedcatalog={handleAddRelatedCatalogMetric}
                 />
 
                 <!-- Inspector overlays the canvas instead of shrinking it, so opening a

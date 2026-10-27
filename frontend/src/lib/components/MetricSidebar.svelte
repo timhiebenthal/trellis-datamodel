@@ -64,6 +64,24 @@
         if (metric.dataset_ref) return metric.dataset_ref;
         return "unbound";
     }
+
+    function onDragStartMetric(event: DragEvent, metric: MetricEntry) {
+        if (!event.dataTransfer) return;
+        event.dataTransfer.setData(
+            "application/metric-tree-item",
+            JSON.stringify({ kind: "tree", metricId: metric.id }),
+        );
+        event.dataTransfer.effectAllowed = "linkMove";
+    }
+
+    function onDragStartCatalog(event: DragEvent, entry: MetricCatalogEntry) {
+        if (!event.dataTransfer) return;
+        event.dataTransfer.setData(
+            "application/metric-tree-item",
+            JSON.stringify({ kind: "catalog", entry }),
+        );
+        event.dataTransfer.effectAllowed = "copyLink";
+    }
 </script>
 
 <aside
@@ -129,11 +147,14 @@
                     {#each filteredMetrics as metric (metric.id)}
                         <li>
                             <div
-                                class="group flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors"
+                                class="group flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors cursor-grab active:cursor-grabbing"
                                 class:border-violet-300={selectedMetricId === metric.id}
                                 class:bg-violet-50={selectedMetricId === metric.id}
                                 class:border-slate-200={selectedMetricId !== metric.id}
                                 class:hover:border-slate-300={selectedMetricId !== metric.id}
+                                draggable="true"
+                                role="listitem"
+                                ondragstart={(event) => onDragStartMetric(event, metric)}
                                 data-testid="metric-sidebar-entry"
                             >
                                 <button
@@ -190,10 +211,12 @@
                             <li>
                                 <button
                                     type="button"
-                                    class="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-violet-200 hover:bg-violet-50"
+                                    draggable="true"
+                                    ondragstart={(event) => onDragStartCatalog(event, entry)}
+                                    class="flex w-full cursor-grab items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-violet-200 hover:bg-violet-50 active:cursor-grabbing"
                                     onclick={() => onaddcatalogmetric?.(entry)}
                                     data-testid="metric-sidebar-catalog-add"
-                                    title="Add {entry.name} as a reference to {entry.dataset}"
+                                    title="Click to add {entry.name}, or drag onto a metric's + Add driver / + Add effect button"
                                 >
                                     <Icon icon="lucide:plus" class="h-3.5 w-3.5 shrink-0 text-violet-500" />
                                     <span class="min-w-0 flex-1">
