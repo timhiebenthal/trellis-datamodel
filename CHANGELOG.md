@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drafts under `datasets[].metrics` and the rest at the document root, and
   preserves every metric Trellis did not author at both levels, including
   `custom_extensions` and `ai_context`. The block is normalised only when
-  `trellis.yml` declares it, and it is off by default.
+  `trellis.yml` declares it, and it is off by default. With `metrics.enabled`,
+  the header gains a Metric Tree entry after Entity List.
 
 ## [0.25.0] - 2026-10-27
 

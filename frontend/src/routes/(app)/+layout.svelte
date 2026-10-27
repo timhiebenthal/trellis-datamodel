@@ -1075,20 +1075,6 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                     Business Events
                 </a>
             {/if}
-            {#if metricsEnabled}
-                <a
-                    href="/metrics-tree"
-                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
-                    class:bg-white={$page.url.pathname === '/metrics-tree'}
-                    class:text-primary-600={$page.url.pathname === '/metrics-tree'}
-                    class:shadow-sm={$page.url.pathname === '/metrics-tree'}
-                    class:text-gray-500={$page.url.pathname !== '/metrics-tree'}
-                    class:hover:text-gray-900={$page.url.pathname !== '/metrics-tree'}
-                >
-                    <Icon icon="lucide:trending-up" class="w-3.5 h-3.5" />
-                    Metric Tree
-                </a>
-            {/if}
             <a
                 href="/canvas"
                 class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
@@ -1113,6 +1099,20 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                 <Icon icon="lucide:list-tree" class="w-3.5 h-3.5" />
                 Entity List
             </a>
+            {#if metricsEnabled}
+                <a
+                    href="/metrics-tree"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class:bg-white={$page.url.pathname === '/metrics-tree'}
+                    class:text-primary-600={$page.url.pathname === '/metrics-tree'}
+                    class:shadow-sm={$page.url.pathname === '/metrics-tree'}
+                    class:text-gray-500={$page.url.pathname !== '/metrics-tree'}
+                    class:hover:text-gray-900={$page.url.pathname !== '/metrics-tree'}
+                >
+                    <Icon icon="lucide:git-branch" class="w-3.5 h-3.5" />
+                    Metric Tree
+                </a>
+            {/if}
             {#if exposuresEnabled && hasExposuresData}
                 <a
                     href="/exposures"
