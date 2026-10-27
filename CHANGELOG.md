@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-27
+
+Promotes 0.25.0b2 to a final release. No code changes since the beta: the Ossie export, the push fixes and the column-order fix are already in it.
+
 ## [0.25.0b2] - 2026-10-27
 
 ### Fixed
