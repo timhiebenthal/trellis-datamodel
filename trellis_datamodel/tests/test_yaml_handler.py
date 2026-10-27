@@ -1,6 +1,8 @@
 """Tests for YamlHandler utility class."""
 
 import os
+import textwrap
+
 import pytest
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
@@ -196,7 +198,8 @@ class TestYamlHandlerColumnOperations:
         )
 
         names = [c["name"] for c in model["columns"]]
-        assert names == ["order_id", "new_name", "amount"]
+        # Existing columns keep their file position; the new one is appended.
+        assert names == ["order_id", "amount", "new_name"]
         assert "old_name" not in names
 
     def test_update_columns_batch_preserves_existing_metadata(self):
@@ -214,6 +217,40 @@ class TestYamlHandlerColumnOperations:
 
         assert list(model["columns"][0]["data_tests"]) == ["not_null"]
         assert model["columns"][0]["description"] == "PK"
+
+    def test_update_columns_batch_keeps_file_order_and_appends_new(self):
+        """Incoming order must not move existing columns - only add and drop.
+
+        The push and the entity modal both send their own idea of column
+        order (data model, manifest). If either could reorder the file, a
+        one-line edit turned into a column shuffle in the diff (#152).
+        """
+        handler = YamlHandler()
+        model = CommentedMap({"name": "orders"})
+        model["columns"] = CommentedSeq(
+            [
+                CommentedMap({"name": "order_id", "data_type": "int"}),
+                CommentedMap({"name": "order_date", "data_type": "date"}),
+                CommentedMap({"name": "amount", "data_type": "numeric"}),
+            ]
+        )
+
+        handler.update_columns_batch(
+            model,
+            [
+                {"name": "amount", "data_type": "numeric"},
+                {"name": "late_addition", "data_type": "text"},
+                {"name": "order_id", "data_type": "int"},
+                {"name": "order_date", "data_type": "date"},
+            ],
+        )
+
+        assert [c["name"] for c in model["columns"]] == [
+            "order_id",
+            "order_date",
+            "amount",
+            "late_addition",
+        ]
 
     def test_get_columns(self):
         handler = YamlHandler()
@@ -281,6 +318,59 @@ class TestYamlHandlerColumnOperations:
         cols = handler.get_columns(model)
         assert cols[0]["description"] is None
         assert "origin" not in cols[0]
+
+    @pytest.mark.parametrize(
+        "column_yaml",
+        [
+            # dbt's dict form, which Trellis itself writes.
+            """
+            - name: customer_id
+              data_type: varchar
+              data_tests:
+                - unique: {}
+                - not_null: {}
+            """,
+            # dbt's canonical spelling, flow style.
+            """
+            - name: customer_id
+              data_type: varchar
+              data_tests: [unique, not_null]
+            """,
+            # Same spelling, block style.
+            """
+            - name: customer_id
+              data_type: varchar
+              data_tests:
+                - unique
+                - not_null
+            """,
+            # The older `tests:` key.
+            """
+            - name: customer_id
+              data_type: varchar
+              tests:
+                - unique
+                - not_null
+            """,
+        ],
+    )
+    def test_get_columns_keeps_every_test_spelling(self, column_yaml, tmp_path):
+        """Bare test names must survive, or key inference never sees them."""
+        handler = YamlHandler()
+        path = tmp_path / "schema.yml"
+        path.write_text(
+            "version: 2\n"
+            "models:\n"
+            "  - name: customers\n"
+            "    columns:\n"
+            + textwrap.indent(textwrap.dedent(column_yaml), " " * 6)
+        )
+
+        model = handler.find_model(handler.load_file(str(path)), "customers")
+        cols = handler.get_columns(model)
+
+        assert cols[0]["name"] == "customer_id"
+        assert cols[0]["data_tests"] == [{"unique": {}}, {"not_null": {}}]
 
 
 class TestYamlHandlerRelationshipTests:

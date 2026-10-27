@@ -139,9 +139,13 @@ class ProjectStatus(TypedDict):
     `artifacts` is framework-shaped on purpose — dbt reports manifest.json and
     catalog.json, Bruin reports its pipeline definition — but callers only ever
     read it generically, as {label: {path, exists, hint}}.
+
+    `project_name` is the name the framework itself gives the project, so
+    callers never need to read manifest.json or pipeline.yml to find it.
     """
 
     framework: str
+    project_name: str
     artifacts_present: bool
     artifacts: dict[str, dict[str, Any]]
     project_path: str

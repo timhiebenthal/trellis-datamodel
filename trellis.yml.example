@@ -97,6 +97,18 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 #  enabled: false  # Set to true to enable Exposures view mode (opt-in)
 #  default_layout: dashboards-as-rows  # Default table orientation: dashboards-as-rows (exposures as rows, entities as columns) or entities-as-rows (exposures as columns, entities as rows). Use toggle button in UI to switch layouts.
 
+# Apache Ossie semantic model export (opt-in). When enabled, a push writes an
+# Ossie document describing the bound entities, their fields, and their
+# relationships.
+#ossie:
+#  enabled: false  # Set to true to write the semantic model on every push
+#  file: ""  # Output path; defaults to semantic_model.yml beside the data model
+#  source:
+#    database: ""  # Database segment of dataset names. Leave empty to omit it.
+#                  # Adapter-derived values reflect the target that last ran dbt,
+#                  # so set this when you want to override them.
+#    schema: ""  # Schema segment override. Leave empty to use the adapter-derived schema.
+
 # Dimensional modeling configuration (opt-in).
 # Use this feature if you want to enable Kimball dimensional modeling features such as:
 # - Entity classification (fact vs dimension)

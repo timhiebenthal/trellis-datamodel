@@ -601,3 +601,123 @@ def test_validate_paths_ignores_bruin_for_a_dbt_config(temp_config_dir):
     config = {"framework": "dbt-core", "dbt_project_path": "./dbt_project"}
 
     assert _validate_paths(config, str(Path(temp_config_dir) / "trellis.yml")) == []
+
+
+OSSIE_FIELD_PATHS = [
+    "ossie.enabled",
+    "ossie.file",
+    "ossie.source.database",
+    "ossie.source.schema",
+]
+
+
+@pytest.mark.asyncio
+async def test_get_config_omits_ossie_block_when_unconfigured(client: AsyncClient):
+    """An opt-in section is not injected into a config that never declared it."""
+    config = (await client.get("/api/config")).json()["config"]
+
+    assert "ossie" not in config
+
+
+@pytest.mark.asyncio
+async def test_get_config_returns_a_declared_ossie_block(client: AsyncClient, temp_config_dir):
+    """A declared Ossie block comes back normalized with its defaults."""
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    config_path.write_text(
+        config_path.read_text()
+        + "\nossie:\n  enabled: true\n  source:\n    database: ANALYTICS\n"
+    )
+
+    config = (await client.get("/api/config")).json()["config"]
+
+    assert config["ossie"]["enabled"] is True
+    assert config["ossie"]["file"] == ""
+    assert config["ossie"]["source"] == {"database": "ANALYTICS", "schema": ""}
+
+
+@pytest.mark.asyncio
+async def test_ossie_fields_are_listed_as_beta(client: AsyncClient):
+    """All four Ossie paths carry field metadata and beta flags."""
+    schema = (await client.get("/api/config/schema")).json()
+
+    fields = schema["fields"]
+    for path in OSSIE_FIELD_PATHS:
+        assert path in schema["beta_flags"], path
+        assert fields[path]["beta"] is True, path
+        assert fields[path]["description"], path
+
+
+@pytest.mark.asyncio
+async def test_ossie_database_description_explains_the_dev_target_caveat(
+    client: AsyncClient,
+):
+    """The override field says why adapter-derived values may be stale."""
+    fields = (await client.get("/api/config/schema")).json()["fields"]
+
+    assert "last dbt run" in fields["ossie.source.database"]["description"]
+
+
+@pytest.mark.asyncio
+async def test_put_config_round_trips_the_ossie_block(
+    client: AsyncClient, temp_config_dir
+):
+    """A saved Ossie block comes back through GET with source still a dict."""
+    loaded = (await client.get("/api/config")).json()
+    initial_config = loaded["config"]
+    file_info = loaded["file_info"]
+
+    updated_config = {
+        **initial_config,
+        "ossie": {
+            "enabled": True,
+            "file": "",
+            "source": {"database": "ANALYTICS", "schema": ""},
+        },
+    }
+
+    put_response = await client.put(
+        "/api/config",
+        json={
+            "config": updated_config,
+            "expected_mtime": file_info["mtime"],
+            "expected_hash": file_info["hash"],
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+
+    reloaded = (await client.get("/api/config")).json()["config"]
+
+    assert reloaded["ossie"]["enabled"] is True
+    assert isinstance(reloaded["ossie"]["source"], dict)
+    assert reloaded["ossie"]["source"]["database"] == "ANALYTICS"
+    assert reloaded["ossie"]["file"] == ""
+
+
+@pytest.mark.asyncio
+async def test_put_config_persists_the_nested_ossie_source(
+    client: AsyncClient, temp_config_dir
+):
+    """The nested source block is written to trellis.yml, not just echoed."""
+    loaded = (await client.get("/api/config")).json()
+    initial_config = loaded["config"]
+
+    updated_config = {
+        **initial_config,
+        "ossie": {
+            "enabled": True,
+            "file": "",
+            "source": {"database": "ANALYTICS", "schema": "marts"},
+        },
+    }
+
+    put_response = await client.put(
+        "/api/config",
+        json={"config": updated_config},
+    )
+    assert put_response.status_code == 200, put_response.text
+
+    saved = yaml.safe_load((Path(temp_config_dir) / "trellis.yml").read_text())
+
+    assert saved["ossie"]["enabled"] is True
+    assert saved["ossie"]["source"]["database"] == "ANALYTICS"
+    assert saved["ossie"]["source"]["schema"] == "marts"

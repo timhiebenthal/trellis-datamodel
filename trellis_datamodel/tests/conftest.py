@@ -378,6 +378,7 @@ class FakeAdapter:
     def get_project_status(self):
         return {
             "framework": "fake",
+            "project_name": "fake",
             "artifacts_present": True,
             "artifacts": {},
             "project_path": "/fake/project",

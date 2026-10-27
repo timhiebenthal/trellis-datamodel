@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0b2] - 2026-10-27
+
+### Fixed
+- **Column order stops churning between Push and the next app boot:** three
+  writers each imposed their own order on the same column list. Boot reconcile
+  re-derived `data_model.yml` field order from the dbt manifest, and Push
+  rewrote each `schema.yml` column list in data-model order, so arranging
+  columns in Trellis survived only until the next page load and every review
+  diff showed columns moving that nobody moved. Only the incoming list's
+  *content* is applied now: columns already in a file keep their position and
+  new ones are appended, in both `reconcile_entity_fields` and
+  `YamlHandler.update_columns_batch`. That also fixes the entity modal
+  reshuffling a whole `schema.yml` when a single description was edited. dbt
+  push now matches Bruin's existing behaviour.
+- **Ossie export no longer claims keys it cannot prove:** the key fallback read
+  every relationship in `data_model.yml`, including the ones the export skipped
+  and many-to-many pairs, and could turn two inbound relationships into two
+  independent `unique_keys`. Evidence now comes only from relationships that
+  were actually written, at most one per dataset, and never from a many-to-many
+  pair. A Bruin composite `primary_key` stays one composite key instead of
+  becoming one unique column per member, and an incomplete composite is no
+  longer narrowed to its surviving column.
+- **dbt projects get key inference:** `YamlHandler.get_columns` kept only
+  dict-shaped tests, so dbt's canonical `data_tests: [unique, not_null]`
+  spelling was dropped before the exporter saw it and no dbt project ever
+  produced a `primary_key`. String test names are now normalised, which also
+  restores them in the schema the frontend reads.
+- **Nothing silently disappears from a push:** datasets are named by model and
+  version, and a second entity claiming an existing dataset name is skipped with
+  a warning instead of producing a duplicate `name` the relationships cannot
+  address. The push response counts framework files only and appends the warning
+  count; the frontend logs the individual warnings.
+- **Config page can be saved after clearing a field:** the Ossie and business
+  events path inputs stored `null` for an empty value, which the config
+  validator rejected.
+- **Malformed `ossie` blocks no longer break startup:** a non-string `file`,
+  non-string `source.database`/`source.schema`, or a quoted `enabled: "false"`
+  now warns and falls back instead of raising or silently enabling the export.
+
+## [0.25.0b1] - 2026-10-26
+
+### Added
+- **Ossie semantic model export (beta, opt-in):** a new `ossie` block in
+  `trellis.yml` - `enabled`, `file`, `source.database` and `source.schema` - lets
+  the existing Push write an Apache Ossie document alongside the framework
+  schema files, to `semantic_model.yml` beside `data_model.yml` by default. Only
+  entities bound to a model are exported; a draft entity, and any relationship
+  touching one, is skipped and named in the push response's warnings. The output
+  targets Ossie `0.2.0.dev0`, which is still a draft, so the version is pinned in
+  one constant and validation against the vendored schema guards the shape. The
+  `source.database` and `source.schema` overrides exist because the address
+  segments an adapter reports describe the target of the last dbt run - usually a
+  developer's dev database and per-user schema, not the deployed one.
+
 ## [0.24.4] - 2026-10-16
 
 ### Fixed

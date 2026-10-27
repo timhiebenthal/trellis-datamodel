@@ -1280,7 +1280,7 @@
                                             id="business-events-file-input"
                                             type="text"
                                             value={getFieldValue('business_events.file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('business_events.file', e.currentTarget.value || null)}
+                                            oninput={(e) => handleNestedFieldChange('business_events.file', e.currentTarget.value)}
                                             placeholder="business_events.yml (defaults to same directory as data_model.yml)"
                                             disabled={!isDangerZoneEnabled}
                                             class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
@@ -1294,6 +1294,104 @@
                                 </div>
                             </div>
                             {/if}
+
+                            <!-- Apache Ossie Container -->
+                            <div class="bg-white border border-amber-200 rounded-lg p-4">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <h3 class="text-base font-semibold text-amber-900">Apache Ossie</h3>
+                                    <Tooltip text="Export an Apache Ossie semantic model alongside each push. The model describes the entities bound to your data, using overrides below for the database and schema segments of its dataset names.">
+                                        <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
+                                    </Tooltip>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <label for="ossie-enabled-toggle" class="block text-sm font-medium text-gray-700">
+                                                    Ossie Export Enabled
+                                                </label>
+                                                {#if isBetaField('ossie.enabled')}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
+                                                {/if}
+                                            </div>
+                                            {#if getFieldMetadata('ossie.enabled')?.description}
+                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('ossie.enabled')?.description}</p>
+                                            {:else}
+                                                <p class="text-xs text-gray-500 mt-1">Enable Apache Ossie semantic model export alongside framework pushes</p>
+                                            {/if}
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                id="ossie-enabled-toggle"
+                                                type="checkbox"
+                                                checked={getFieldValue('ossie.enabled')}
+                                                onchange={(e) => handleNestedFieldChange('ossie.enabled', e.currentTarget.checked)}
+                                                disabled={!isDangerZoneEnabled}
+                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
+                                            />
+                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label for="ossie-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Semantic Model File
+                                        </label>
+                                        <input
+                                            id="ossie-file-input"
+                                            type="text"
+                                            value={getFieldValue('ossie.file') || ''}
+                                            oninput={(e) => handleNestedFieldChange('ossie.file', e.currentTarget.value)}
+                                            placeholder="semantic_model.yml (defaults to same directory as data_model.yml)"
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        />
+                                        {#if getFieldMetadata('ossie.file')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('ossie.file')?.description}</p>
+                                        {:else}
+                                            <p class="mt-1.5 text-xs text-gray-500">Path to the Ossie semantic model file (optional, defaults to semantic_model.yml in data model directory)</p>
+                                        {/if}
+                                    </div>
+
+                                    <div>
+                                        <label for="ossie-source-database" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Database Override
+                                        </label>
+                                        <input
+                                            id="ossie-source-database"
+                                            type="text"
+                                            value={getFieldValue('ossie.source.database') || ''}
+                                            oninput={(e) => handleNestedFieldChange('ossie.source.database', e.currentTarget.value)}
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        />
+                                        {#if getFieldMetadata('ossie.source.database')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('ossie.source.database')?.description}</p>
+                                        {:else}
+                                            <p class="mt-1.5 text-xs text-gray-500">Leave empty to omit the database segment. Values from the manifest reflect the target that last ran dbt.</p>
+                                        {/if}
+                                    </div>
+
+                                    <div>
+                                        <label for="ossie-source-schema" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Schema Override
+                                        </label>
+                                        <input
+                                            id="ossie-source-schema"
+                                            type="text"
+                                            value={getFieldValue('ossie.source.schema') || ''}
+                                            oninput={(e) => handleNestedFieldChange('ossie.source.schema', e.currentTarget.value)}
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        />
+                                        {#if getFieldMetadata('ossie.source.schema')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('ossie.source.schema')?.description}</p>
+                                        {:else}
+                                            <p class="mt-1.5 text-xs text-gray-500">Leave empty to use the schema the adapter reports.</p>
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

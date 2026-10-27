@@ -1,6 +1,7 @@
 """Tests for configuration loading."""
 
 import importlib
+import logging
 import os
 import textwrap
 from pathlib import Path
@@ -22,6 +23,7 @@ def _prepare_config(monkeypatch):
     monkeypatch.setattr(cfg, "BRUIN_PIPELINE_PATH", "")
     monkeypatch.setattr(cfg, "BRUIN_ASSET_PATHS", [])
     monkeypatch.setattr(cfg, "BRUIN_DEFAULT_ASSET_TYPE", "duckdb.sql")
+    monkeypatch.setattr(cfg, "OSSIE_CONFIG", cfg.OssieConfig())
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -536,3 +538,242 @@ def test_repo_trellis_yml_loads(monkeypatch):
     assert cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix == ["fact__"]
     assert cfg.EXPOSURES_ENABLED is True
     assert cfg.BUSINESS_EVENTS_ENABLED is True
+
+
+def test_ossie_defaults_to_disabled(monkeypatch, tmp_path):
+    """No ossie block leaves the feature off with no address overrides."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        framework: dbt-core
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.enabled is False
+    assert cfg.OSSIE_CONFIG.database == ""
+    assert cfg.OSSIE_CONFIG.schema == ""
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(tmp_path / "semantic_model.yml")
+
+
+def test_ossie_nested_config_populates_source(monkeypatch, tmp_path):
+    """The nested source block populates the address overrides."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        ossie:
+          enabled: true
+          source:
+            database: ANALYTICS
+            schema: MARTS
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.enabled is True
+    assert cfg.OSSIE_CONFIG.database == "ANALYTICS"
+    assert cfg.OSSIE_CONFIG.schema == "MARTS"
+
+
+def test_ossie_file_defaults_beside_data_model(monkeypatch, tmp_path):
+    """The default document sits next to the resolved data_model.yml."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(tmp_path / "semantic_model.yml")
+
+
+def test_ossie_relative_file_resolves_under_project_path(monkeypatch, tmp_path):
+    """An explicit relative file resolves against dbt_project_path."""
+    _prepare_config(monkeypatch)
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          file: docs/semantic.yml
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(
+        tmp_path / "docs" / "semantic.yml"
+    )
+
+
+def test_ossie_absolute_file_is_preserved(monkeypatch, tmp_path):
+    """An absolute file path is used verbatim."""
+    _prepare_config(monkeypatch)
+    absolute_file = str(tmp_path / "elsewhere" / "ossie.yml")
+    config_path = _write_config(
+        tmp_path,
+        f"""
+        dbt_project_path: .
+        ossie:
+          file: {absolute_file}
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == absolute_file
+
+
+def test_ossie_non_dict_falls_back_to_defaults(monkeypatch, tmp_path, caplog):
+    """A malformed ossie block warns instead of raising."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        ossie: "yes"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.enabled is False
+    assert cfg.OSSIE_CONFIG.database == ""
+    assert cfg.OSSIE_CONFIG.schema == ""
+    assert any("'ossie'" in record.message for record in caplog.records)
+
+
+def test_ossie_int_file_falls_back_to_default(monkeypatch, tmp_path, caplog):
+    """A non-path `file` must warn and default, not crash the app at startup."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          file: 123
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(tmp_path / "semantic_model.yml")
+    file_warnings = [
+        record for record in caplog.records if "'ossie.file'" in record.message
+    ]
+    assert len(file_warnings) == 1
+
+
+def test_ossie_mapping_file_falls_back_to_default(monkeypatch, tmp_path, caplog):
+    """Same for a mapping value, which also is not a path."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          file:
+            a: b
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(tmp_path / "semantic_model.yml")
+    file_warnings = [
+        record for record in caplog.records if "'ossie.file'" in record.message
+    ]
+    assert len(file_warnings) == 1
+
+
+def test_ossie_non_string_source_value_is_ignored(monkeypatch, tmp_path, caplog):
+    """A list must not become the literal address segment "['marts']"."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        ossie:
+          source:
+            schema:
+              - marts
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.schema == ""
+    assert any(
+        "'ossie.source.schema'" in record.message for record in caplog.records
+    )
+
+
+def test_ossie_quoted_false_is_disabled(monkeypatch, tmp_path, caplog):
+    """`bool("false")` is True, so a quoted string must not enable the export."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        ossie:
+          enabled: "false"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.enabled is False
+    assert any("'ossie.enabled'" in record.message for record in caplog.records)
+
+
+def test_reload_config_picks_up_ossie_changes(monkeypatch, tmp_path):
+
+    """A rewritten config file is reflected without a restart."""
+    _prepare_config(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          source:
+            database: RAW
+        """,
+    )
+    cfg.reload_config()
+
+    assert cfg.OSSIE_CONFIG.database == "RAW"
+
+    _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          source:
+            database: ANALYTICS
+        """,
+    )
+    cfg.reload_config()
+
+    assert cfg.OSSIE_CONFIG.database == "ANALYTICS"

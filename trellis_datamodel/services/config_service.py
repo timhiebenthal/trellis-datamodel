@@ -225,6 +225,37 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         description="Path to business events YAML file (defaults to business_events.yml in data model directory)",
         beta=True,
     ),
+    "ossie.enabled": ConfigFieldMetadata(
+        type="boolean",
+        default=False,
+        required=False,
+        description="Enable Apache Ossie semantic model export alongside framework pushes",
+        beta=True,
+    ),
+    "ossie.file": ConfigFieldMetadata(
+        type="string",
+        default="",
+        required=False,
+        description="Path to the Ossie semantic model file (defaults to semantic_model.yml beside the data model)",
+        beta=True,
+    ),
+    "ossie.source.database": ConfigFieldMetadata(
+        type="string",
+        default="",
+        required=False,
+        description=(
+            "Database segment for Ossie dataset names; empty omits the database segment. "
+            "Adapter-derived values come from the last dbt run's target, so set this field to override them."
+        ),
+        beta=True,
+    ),
+    "ossie.source.schema": ConfigFieldMetadata(
+        type="string",
+        default="",
+        required=False,
+        description="Schema segment override for Ossie dataset names; empty uses the adapter-derived schema",
+        beta=True,
+    ),
 }
 
 # List of fields that are beta features
@@ -235,6 +266,10 @@ _BETA_FIELDS = [
     "exposures.default_layout",
     "business_events.enabled",
     "business_events.file",
+    "ossie.enabled",
+    "ossie.file",
+    "ossie.source.database",
+    "ossie.source.schema",
 ]
 
 
@@ -360,6 +395,30 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
                 "enabled": bool(business_events.get("enabled", False)),
                 "file": business_events.get("file", ""),
             }
+
+    # Ossie export. Only emitted when the file already declares the block, the
+    # way the other optional sections behave: an unrelated config save must not
+    # inject an opt-in feature into a version-controlled trellis.yml. A
+    # malformed value falls back to the defaults instead of raising.
+    if "ossie" in config:
+        ossie = config.get("ossie")
+        if not isinstance(ossie, dict):
+            ossie = {}
+        ossie_source = ossie.get("source")
+        if not isinstance(ossie_source, dict):
+            ossie_source = {}
+
+        def as_str(value: Any) -> str:
+            return value if isinstance(value, str) else ""
+
+        normalized["ossie"] = {
+            "enabled": bool(ossie.get("enabled", False)),
+            "file": as_str(ossie.get("file")),
+            "source": {
+                "database": as_str(ossie_source.get("database")),
+                "schema": as_str(ossie_source.get("schema")),
+            },
+        }
 
     # Dimensional modeling
     if "dimensional_modeling" in config:

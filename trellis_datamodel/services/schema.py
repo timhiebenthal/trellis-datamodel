@@ -12,6 +12,7 @@ All operations validate configuration and paths before execution, raising
 appropriate domain exceptions for error conditions.
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.adapters import get_adapter
+from trellis_datamodel.adapters.base import ModelInfo, ModelSchema, TransformationAdapter
 from trellis_datamodel.exceptions import (
     ConfigurationError,
     FileOperationError,
@@ -26,6 +28,7 @@ from trellis_datamodel.exceptions import (
     ValidationError,
 )
 from trellis_datamodel.models.entity_keys import get_model_ref
+from trellis_datamodel.services.ossie import export_ossie
 from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
 from trellis_datamodel.utils.path_validation import (
     ensure_data_model_path_exists,
@@ -33,6 +36,15 @@ from trellis_datamodel.utils.path_validation import (
 )
 from trellis_datamodel.utils.structured_data import load_yaml_or_json
 from trellis_datamodel.utils.yaml_handler import YamlHandler
+
+
+@dataclass
+class SyncOutcome:
+    """What one push produced: framework files, warnings, and the Ossie file."""
+
+    files: list[Path]
+    warnings: list[str]
+    ossie_path: Path | None
 
 
 def save_model_schema_from_request(
@@ -77,12 +89,16 @@ def save_model_schema_from_request(
         raise FileOperationError(f"Error saving schema: {str(e)}") from e
 
 
-def sync_framework_tests() -> list[Path]:
+def sync_framework_tests() -> SyncOutcome:
     """
     Sync relationship tests from data model to schema files.
 
+    When `ossie.enabled` is set, the semantic model is exported after the
+    framework files are written and the pushed tags persisted, so a failed
+    export can never leave the framework half-pushed.
+
     Returns:
-        List of paths to updated schema files
+        The updated framework files, exporter warnings, and the Ossie path
 
     Raises:
         ConfigurationError: If the project path or data_model_path is not configured
@@ -136,10 +152,68 @@ def sync_framework_tests() -> list[Path]:
         pushed_before = {e.get("id"): e.get(PUSHED_TAGS_KEY) for e in entities}
         updated_files = adapter.sync_relationships(entities, relationships)
         _persist_pushed_tags(data_model_path, entities, pushed_before)
-
-        return updated_files
     except Exception as e:
         raise FileOperationError(f"Error syncing tests: {str(e)}") from e
+
+    if not cfg.OSSIE_CONFIG.enabled:
+        return SyncOutcome(files=updated_files, warnings=[], ossie_path=None)
+
+    # Outside the block above on purpose: the framework push already succeeded,
+    # so the error must say so rather than reporting a failed sync.
+    try:
+        models = adapter.get_models()
+        project_name = adapter.get_project_status()["project_name"]
+        model_schemas, schema_warnings = _ossie_model_schemas(
+            adapter, entities, models
+        )
+        export = export_ossie(
+            entities, relationships, project_name, models, model_schemas
+        )
+    except Exception as e:
+        raise FileOperationError(
+            "Framework schema files were updated, but the Ossie file was not "
+            f"written: {e}"
+        ) from e
+
+    if export.path is not None:
+        updated_files.append(export.path)
+    return SyncOutcome(
+        files=updated_files,
+        warnings=schema_warnings + export.warnings,
+        ossie_path=export.path,
+    )
+
+
+def _ossie_model_schemas(
+    adapter: TransformationAdapter,
+    entities: list[dict[str, Any]],
+    models: list[ModelInfo],
+) -> tuple[dict[str, ModelSchema], list[str]]:
+    """Read key metadata for the models bound entities actually name.
+
+    Unreadable schemas are only a warning: the dataset is still exported, it
+    just loses key inference, and one broken schema file must not fail a push.
+    """
+    wanted = {
+        model_ref for model_ref in (get_model_ref(e) for e in entities) if model_ref
+    }
+    schemas: dict[str, ModelSchema] = {}
+    warnings: list[str] = []
+
+    for model in models:
+        unique_id = model.get("unique_id") or ""
+        if not unique_id or unique_id not in wanted:
+            continue
+        try:
+            schemas[unique_id] = adapter.get_model_schema(
+                model["name"], version=model.get("version")
+            )
+        except Exception as e:
+            warnings.append(
+                f'model "{model.get("name")}" schema could not be read, so its '
+                f"key metadata was skipped: {e}"
+            )
+    return schemas, warnings
 
 
 def _persist_pushed_tags(

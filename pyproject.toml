@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trellis-datamodel"
-version = "0.24.4"
+version = "0.25.0b2"
 description = "Visual data model editor for dbt and Bruin projects"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -72,6 +72,7 @@ asyncio_default_fixture_loop_scope = "function"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
     "pytest>=9.0.1",
     "pytest-asyncio>=0.23.0",
 ]
