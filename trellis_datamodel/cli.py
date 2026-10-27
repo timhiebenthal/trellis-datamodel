@@ -74,6 +74,13 @@ def run(
     )
 
     config_path = config
+    if config_path:
+        # Pin an explicit --config for the process lifetime. Request handlers
+        # that re-discover the config (GET/PUT /api/config, /api/config/reload)
+        # call find_config_file() with no argument, which searches the *server's*
+        # cwd; without this they silently fall back to the trellis checkout's own
+        # trellis.yml instead of the project passed on the command line.
+        os.environ["TRELLIS_CONFIG_PATH"] = os.path.abspath(config_path)
     if not config_path:
         found_config = find_config_file()
         if not found_config:

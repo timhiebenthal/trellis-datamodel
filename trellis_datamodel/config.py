@@ -179,7 +179,9 @@ def _load_yaml_config(path: str) -> dict[str, Any]:
 def _resolve_config_path(config_path: Optional[str]) -> Optional[str]:
     """Pick explicit path or search for a config file."""
     if config_path:
-        return config_path
+        # Normalise once: a relative --config would otherwise break every later
+        # lookup that happens after the process cwd changes.
+        return os.path.abspath(config_path)
     return find_config_file()
 
 

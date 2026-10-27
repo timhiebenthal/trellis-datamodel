@@ -313,6 +313,42 @@ class TestCLIRun:
             importlib.reload(config_module)
 
 
+    def test_run_with_explicit_config_pins_path_for_later_lookups(self, monkeypatch):
+        """--config must survive for request handlers that re-discover the file.
+
+        Handlers such as GET/PUT /api/config call find_config_file() with no
+        argument, which searches the process cwd. Without pinning, a server
+        started from the trellis checkout with --config pointing at another
+        project would report and write the checkout's own trellis.yml.
+        """
+        from trellis_datamodel.cli import app
+        import trellis_datamodel.config as config_module
+
+        monkeypatch.delenv("TRELLIS_CONFIG_PATH", raising=False)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_config = Path(tmpdir) / "trellis.yml"
+            project_config.write_text(
+                "framework: dbt-core\ndbt_project_path: .\ndata_model_file: dm.yml\n"
+            )
+
+            # Avoid starting uvicorn: fail once the config has been pinned.
+            def _stop(*_args, **_kwargs):
+                raise RuntimeError("server-start")
+
+            monkeypatch.setattr("trellis_datamodel.cli.uvicorn.run", _stop)
+
+            result = runner.invoke(
+                app, ["run", "--config", str(project_config), "--no-browser"]
+            )
+            assert isinstance(result.exception, RuntimeError)
+
+            pinned = os.environ.get("TRELLIS_CONFIG_PATH")
+            assert pinned == str(project_config.resolve())
+            # The same lookup handlers use must now resolve to the project file.
+            assert config_module.find_config_file() == pinned
+
+
 class TestCLIHelp:
     """Test help output."""
 
