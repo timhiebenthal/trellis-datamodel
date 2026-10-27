@@ -52,14 +52,11 @@
         ].some((field) => field?.toLowerCase().includes(query));
     }
 
-    const filteredMetrics = $derived(
-        metrics.filter((metric) => matchesMetric(metric, normalizedSearch)),
-    );
-    const filteredCatalog = $derived(
-        catalog.filter((entry) => matchesCatalogEntry(entry, normalizedSearch)),
-    );
     const entityGroups = $derived(
-        groupCatalogByEntity(filteredCatalog, filteredMetrics, metrics),
+        groupCatalogByEntity(catalog, metrics, {
+            catalog: (entry) => matchesCatalogEntry(entry, normalizedSearch),
+            metric: (metric) => matchesMetric(metric, normalizedSearch),
+        }),
     );
 
     function isGroupCollapsed(key: string): boolean {
@@ -72,12 +69,6 @@
             ...collapsedGroups,
             [key]: !collapsedGroups[key],
         };
-    }
-
-    function subtitle(metric: MetricEntry): string {
-        if (metric.binding) return `bound · ${metric.binding.dataset}`;
-        if (metric.dataset_ref) return metric.dataset_ref;
-        return "unbound";
     }
 
     function onDragStartMetric(event: DragEvent, metric: MetricEntry) {
@@ -147,19 +138,14 @@
         <section class="px-3 py-3" data-testid="metric-sidebar-catalog">
             {#if metrics.length === 0 && catalog.length === 0}
                 <p class="px-1 text-xs leading-relaxed text-slate-500">
-                    Nothing yet. Add a metric by hand, or bind one from the semantic model.
-                </p>
-                <p class="mt-2 px-1 text-xs leading-relaxed text-slate-500">
-                    No metrics found in the semantic model yet.
+                    No metrics yet. Add one by hand, or define metrics in the semantic model to
+                    bind them here.
                 </p>
             {:else if entityGroups.length === 0}
                 <p class="px-1 text-xs italic leading-relaxed text-slate-400">
-                    No matching metrics on this tree or in the semantic model.
+                    No matching metrics.
                 </p>
             {:else}
-                {#if normalizedSearch && filteredMetrics.length === 0}
-                    <p class="sr-only">No matching metrics on this tree.</p>
-                {/if}
                 <div class="space-y-1.5">
                     {#each entityGroups as group (group.key)}
                         {@const collapsed = isGroupCollapsed(group.key)}
@@ -177,15 +163,15 @@
                                     <Icon icon="lucide:chevron-down" class="h-3 w-3 text-slate-400" />
                                 </span>
                                 <Icon
-                                    icon={group.isDraftUnbound
-                                        ? "lucide:file-edit"
-                                        : group.isCrossDataset
+                                    icon={group.kind === "no-entity"
+                                        ? "lucide:pencil"
+                                        : group.kind === "cross-entity"
                                           ? "lucide:layers"
                                           : "lucide:database"}
-                                    class="h-3.5 w-3.5 shrink-0 {group.isDraftUnbound ? 'text-amber-500' : 'text-slate-400'}"
+                                    class="h-3.5 w-3.5 shrink-0 {group.kind === 'no-entity' ? 'text-amber-500' : 'text-slate-400'}"
                                 />
                                 <span class="min-w-0 flex-1 truncate">{group.label}</span>
-                                {#if group.onTreeCount > 0 && !group.isDraftUnbound}
+                                {#if group.onTreeCount > 0 && group.kind !== "no-entity"}
                                     <span
                                         class="rounded-full bg-primary-50 px-1.5 py-0.2 text-[10px] font-semibold tabular-nums text-primary-700"
                                         title="{group.onTreeCount} on this tree"
@@ -243,9 +229,6 @@
                                                         >
                                                             {metric.binding ? metric.binding.name : metric.label}
                                                         </span>
-                                                        <span class="sr-only">
-                                                            {metric.label} {subtitle(metric)}
-                                                        </span>
                                                     </button>
 
                                                     {#if !isBound}
@@ -297,7 +280,7 @@
                                         {:else}
                                             <li
                                                 class="flex items-center justify-between gap-1.5 rounded-md border border-transparent px-2 py-1 text-xs text-slate-400"
-                                                title={item.entry.reason ?? "This metric cannot be bound to a dataset"}
+                                                title={item.entry.reason ?? "This metric cannot be bound to an entity"}
                                                 data-readonly="true"
                                                 data-testid="metric-sidebar-catalog-readonly"
                                             >

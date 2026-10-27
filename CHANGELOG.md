@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   author at both levels, including `custom_extensions` and `ai_context`. The
   block is normalised only when `trellis.yml` declares it, and it is off by
   default. With `metrics.enabled`, the header gains a Metric Tree entry after
-  Entity List.
+  Entity List. The metric sidebar groups everything by entity in collapsible
+  sections - drafts, metrics already on the tree, and semantic-model metrics
+  still to add - with teal marking a bound metric and amber a draft.
 
 ### Fixed
 - **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`

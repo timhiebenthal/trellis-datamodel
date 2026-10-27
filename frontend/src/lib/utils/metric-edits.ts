@@ -82,16 +82,24 @@ export function metricLabelFromName(name: string): string {
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** The metric on the canvas that carries this exact `{dataset, name}` reference. */
+export function findBoundMetric(
+    metrics: MetricEntry[],
+    entry: MetricCatalogEntry,
+): MetricEntry | undefined {
+    return metrics.find(
+        (metric) =>
+            metric.binding?.name === entry.name &&
+            (!entry.dataset || metric.binding?.dataset === entry.dataset),
+    );
+}
+
 /** True when the canvas already carries this exact `{dataset, name}` reference. */
 export function isCatalogEntryAdded(
     metrics: MetricEntry[],
     entry: MetricCatalogEntry,
 ): boolean {
-    return metrics.some(
-        (metric) =>
-            metric.binding?.name === entry.name &&
-            (!entry.dataset || metric.binding?.dataset === entry.dataset),
-    );
+    return findBoundMetric(metrics, entry) !== undefined;
 }
 
 /**
@@ -226,127 +234,93 @@ export function groupCatalog(
 }
 
 export type CatalogEntityItem =
-    | {
-          kind: 'tree';
-          metric: MetricEntry;
-          entry?: MetricCatalogEntry;
-          status: 'added' | 'draft';
-      }
-    | {
-          kind: 'catalog';
-          entry: MetricCatalogEntry;
-          status: 'available' | 'readonly';
-      };
+    | { kind: 'tree'; metric: MetricEntry; status: 'added' | 'draft' }
+    | { kind: 'catalog'; entry: MetricCatalogEntry; status: 'available' | 'readonly' };
 
 export interface CatalogEntityGroup {
     key: string;
     label: string;
-    isCrossDataset: boolean;
-    isDraftUnbound: boolean;
+    /** `entity` is a real entity; the other two hold metrics that have none. */
+    kind: 'entity' | 'no-entity' | 'cross-entity';
     onTreeCount: number;
     items: CatalogEntityItem[];
 }
 
+export interface CatalogFilter {
+    catalog?: (entry: MetricCatalogEntry) => boolean;
+    metric?: (metric: MetricEntry) => boolean;
+}
+
+const NO_ENTITY_KEY = '__no_entity__';
+const CROSS_ENTITY_KEY = '__cross_entity__';
+const GROUP_KIND_RANK: Record<CatalogEntityGroup['kind'], number> = {
+    entity: 0,
+    'no-entity': 1,
+    'cross-entity': 2,
+};
+
 /**
- * Group tree metrics and semantic-model catalog entries by their entity/dataset
- * into a single collapsible list per entity.
+ * Group the sidebar by entity: one list per entity, holding its drafts, its
+ * metrics already on the tree, and its semantic-model metrics still to add.
+ *
+ * A binding names the Ossie dataset (the model's name), not the entity that owns
+ * it, so the owner is looked up through the catalog. That lookup uses the whole
+ * catalog even when `filter` hides entries, or a search would split an entity in two.
  */
 export function groupCatalogByEntity(
     catalog: MetricCatalogEntry[],
     metrics: MetricEntry[],
-    allMetrics: MetricEntry[] = metrics,
+    filter: CatalogFilter = {},
 ): CatalogEntityGroup[] {
-    const byKey = new Map<string, CatalogEntityGroup>();
+    const entityByDataset = new Map<string, string>();
+    for (const entry of catalog) {
+        if (entry.dataset && entry.entity_id) entityByDataset.set(entry.dataset, entry.entity_id);
+    }
 
-    function ensureGroup(
-        key: string,
-        label: string,
-        opts: { isCrossDataset?: boolean; isDraftUnbound?: boolean } = {},
-    ): CatalogEntityGroup {
-        let group = byKey.get(key);
+    const groups = new Map<string, CatalogEntityGroup>();
+    const groupFor = (key: string, label: string, kind: CatalogEntityGroup['kind']) => {
+        let group = groups.get(key);
         if (!group) {
-            group = {
-                key,
-                label,
-                isCrossDataset: Boolean(opts.isCrossDataset),
-                isDraftUnbound: Boolean(opts.isDraftUnbound),
-                onTreeCount: 0,
-                items: [],
-            };
-            byKey.set(key, group);
+            group = { key, label, kind, onTreeCount: 0, items: [] };
+            groups.set(key, group);
         }
         return group;
-    }
+    };
+    const entityGroup = (entityId: string) => groupFor(entityId, entityId, 'entity');
 
-    const catalogByBinding = new Map<string, MetricCatalogEntry>();
-    for (const entry of catalog) {
-        if (entry.bindable && entry.dataset) {
-            catalogByBinding.set(`${entry.dataset}::${entry.name}`, entry);
-        }
-    }
+    const placed = new Set<MetricEntry>();
+    const placeOnTree = (metric: MetricEntry) => {
+        const { binding } = metric;
+        const entityId = binding
+            ? (entityByDataset.get(binding.dataset) ?? binding.dataset)
+            : (metric.dataset_ref ?? '').trim();
+        const group = entityId
+            ? entityGroup(entityId)
+            : groupFor(NO_ENTITY_KEY, 'No entity', 'no-entity');
 
-    const renderedBindings = new Set<string>();
+        group.onTreeCount += 1;
+        group.items.push({ kind: 'tree', metric, status: binding ? 'added' : 'draft' });
+        placed.add(metric);
+    };
 
-    // 1. Place metrics currently on the tree into their entity group (or Drafts if unbound).
     for (const metric of metrics) {
-        if (metric.binding) {
-            const datasetKey = metric.binding.dataset.trim();
-            const bindingKey = `${datasetKey}::${metric.binding.name}`;
-            renderedBindings.add(bindingKey);
-            const group = ensureGroup(datasetKey, datasetKey);
-            group.onTreeCount += 1;
-            group.items.push({
-                kind: 'tree',
-                metric,
-                entry: catalogByBinding.get(bindingKey),
-                status: 'added',
-            });
-        } else {
-            const datasetKey = (metric.dataset_ref ?? '').trim();
-            const group = datasetKey
-                ? ensureGroup(datasetKey, datasetKey)
-                : ensureGroup('__drafts__', 'Drafts (unbound)', { isDraftUnbound: true });
-            group.onTreeCount += 1;
-            group.items.push({
-                kind: 'tree',
-                metric,
-                status: 'draft',
-            });
-        }
+        if (filter.metric?.(metric) ?? true) placeOnTree(metric);
     }
 
-    // 2. Place remaining catalog entries into their entity group.
     for (const entry of catalog) {
-        const datasetKey = (entry.dataset ?? entry.entity_id ?? '').trim();
-        const isCrossDataset = !datasetKey;
-        const key = isCrossDataset ? '__cross_dataset__' : datasetKey;
-        const label = isCrossDataset ? 'Cross-dataset' : datasetKey;
+        if (!(filter.catalog?.(entry) ?? true)) continue;
 
-        if (entry.bindable && entry.dataset) {
-            const bindingKey = `${entry.dataset.trim()}::${entry.name}`;
-            if (renderedBindings.has(bindingKey)) {
-                continue;
-            }
-            const boundMetric = allMetrics.find(
-                (metric) =>
-                    metric.binding?.name === entry.name &&
-                    (!entry.dataset || metric.binding?.dataset === entry.dataset),
-            );
-            if (boundMetric) {
-                renderedBindings.add(bindingKey);
-                const group = ensureGroup(key, label, { isCrossDataset });
-                group.onTreeCount += 1;
-                group.items.push({
-                    kind: 'tree',
-                    metric: boundMetric,
-                    entry,
-                    status: 'added',
-                });
-                continue;
-            }
+        // A match on the entry alone still shows the metric it is bound to.
+        const bound = entry.bindable ? findBoundMetric(metrics, entry) : undefined;
+        if (bound) {
+            if (!placed.has(bound)) placeOnTree(bound);
+            continue;
         }
 
-        const group = ensureGroup(key, label, { isCrossDataset });
+        const entityId = (entry.entity_id ?? entry.dataset ?? '').trim();
+        const group = entityId
+            ? entityGroup(entityId)
+            : groupFor(CROSS_ENTITY_KEY, 'Cross-entity', 'cross-entity');
         group.items.push({
             kind: 'catalog',
             entry,
@@ -354,15 +328,14 @@ export function groupCatalogByEntity(
         });
     }
 
-    return Array.from(byKey.values()).sort((a, b) => {
-        if (a.isCrossDataset !== b.isCrossDataset) {
-            return a.isCrossDataset ? 1 : -1;
-        }
-        if (a.isDraftUnbound !== b.isDraftUnbound) {
-            return a.isDraftUnbound ? 1 : -1;
-        }
-        return a.label.localeCompare(b.label);
-    });
+    // On-tree entries lead each group; the sort is stable, so order is otherwise kept.
+    for (const group of groups.values()) {
+        group.items.sort((a, b) => Number(b.kind === 'tree') - Number(a.kind === 'tree'));
+    }
+
+    return [...groups.values()].sort(
+        (a, b) => GROUP_KIND_RANK[a.kind] - GROUP_KIND_RANK[b.kind] || a.label.localeCompare(b.label),
+    );
 }
 
 /**

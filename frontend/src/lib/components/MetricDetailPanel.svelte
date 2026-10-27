@@ -276,7 +276,7 @@
 
                 <div>
                     <label class={labelClass} for="metric-field-dataset-{metric.id}">
-                        <span>Dataset</span>
+                        <span>Entity</span>
                         <span class="normal-case tracking-normal text-slate-400">optional</span>
                     </label>
                     <div class="relative" bind:this={datasetDropdownRef}>
@@ -309,7 +309,7 @@
                                 type="button"
                                 tabindex="-1"
                                 class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600"
-                                aria-label="Toggle dataset options"
+                                aria-label="Toggle entity options"
                                 onmousedown={(event) => event.preventDefault()}
                                 onclick={toggleDatasetDropdown}
                                 data-testid="metric-dataset-toggle"
@@ -363,8 +363,8 @@
                         {/if}
                     </div>
                     <p class="mt-1 text-[11px] leading-relaxed text-slate-400">
-                        An entity id from your data model. Free text is allowed; a reference that
-                        no longer resolves is badged rather than deleted.
+                        The entity this metric belongs to. Free text is allowed; an entity that no
+                        longer exists is badged rather than deleted.
                     </p>
                 </div>
             {/if}

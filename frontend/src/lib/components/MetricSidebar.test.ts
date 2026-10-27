@@ -4,7 +4,7 @@ import type { MetricCatalogEntry, MetricEntry } from '$lib/types';
 import MetricSidebar from './MetricSidebar.svelte';
 
 const metrics: MetricEntry[] = [
-    { id: 'revenue', label: 'Revenue', expression: 'sum(amount)', dataset_ref: 'fct__order' },
+    { id: 'revenue', label: 'Revenue', expression: 'sum(amount)', dataset_ref: 'order' },
     { id: 'avg_price', label: 'Avg price', binding: { dataset: 'fct__order', name: 'avg_price' } },
 ];
 
@@ -19,15 +19,21 @@ describe('MetricSidebar', () => {
         cleanup();
     });
 
-    it('lists the metrics already on the tree with their dataset or binding', () => {
-        const { container } = render(MetricSidebar, { props: { metrics, catalog: [] } });
+    it('lists a draft and a bound metric under one entity, ahead of what is still to add', () => {
+        const { container } = render(MetricSidebar, { props: { metrics, catalog } });
 
-        const rows = Array.from(container.querySelectorAll('[data-testid="metric-sidebar-entry"]'));
+        // The bound metric names the dataset `fct__order`; its entity is `order`,
+        // the same one the draft points at, so there is a single group for both.
+        expect(container.querySelector('[data-group-key="fct__order"]')).toBeNull();
+        const group = container.querySelector('[data-group-key="order"]')!;
+
+        const rows = Array.from(group.querySelectorAll('[data-testid="metric-sidebar-entry"]'));
         expect(rows).toHaveLength(2);
         expect(rows[0].textContent).toContain('Revenue');
-        expect(rows[0].textContent).toContain('fct__order');
-        expect(rows[1].textContent).toContain('Avg price');
-        expect(rows[1].textContent).toContain('bound · fct__order');
+        expect(rows[0].textContent).toContain('draft');
+        expect(rows[1].textContent).toContain('avg_price');
+        expect(rows[1].textContent).not.toContain('draft');
+        expect(group.querySelectorAll('[data-testid="metric-sidebar-catalog-add"]')).toHaveLength(1);
     });
 
     it('creates a draft from the add action', async () => {
@@ -94,11 +100,22 @@ describe('MetricSidebar', () => {
         expect(ondeletemetric).toHaveBeenCalledWith('revenue');
     });
 
-    it('explains an empty catalog instead of showing an empty section', () => {
+    it('explains an empty sidebar instead of showing nothing', () => {
         const { container } = render(MetricSidebar, { props: { metrics: [], catalog: [] } });
 
-        expect(container.textContent).toContain('No metrics found in the semantic model yet.');
-        expect(container.textContent).toContain('Nothing yet.');
+        expect(container.textContent).toContain('No metrics yet.');
+        expect(container.querySelector('[data-testid="metric-sidebar-entity-group"]')).toBeNull();
+    });
+
+    it('says so when the search matches nothing', async () => {
+        const { container } = render(MetricSidebar, { props: { metrics, catalog } });
+
+        await fireEvent.input(
+            container.querySelector('[data-testid="metric-sidebar-search"]') as HTMLInputElement,
+            { target: { value: 'no-such-metric' } },
+        );
+
+        expect(container.textContent).toContain('No matching metrics.');
     });
 
     it('filters both tree metrics and semantic model catalog entries via the search bar', async () => {
@@ -114,7 +131,6 @@ describe('MetricSidebar', () => {
             container.querySelectorAll('[data-testid="metric-sidebar-entry"]'),
         );
         expect(treeRows).toHaveLength(0);
-        expect(container.textContent).toContain('No matching metrics on this tree.');
 
         const addable = Array.from(
             container.querySelectorAll('[data-testid="metric-sidebar-catalog-add"]'),
@@ -132,7 +148,7 @@ describe('MetricSidebar', () => {
         ).toHaveLength(0);
     });
 
-    it('groups catalog metrics by entity/dataset and toggles collapse on click', async () => {
+    it('groups metrics by entity and toggles collapse on click', async () => {
         const multiEntityCatalog: MetricCatalogEntry[] = [
             { name: 'order_count', dataset: 'fct__order', entity_id: 'order', bindable: true },
             { name: 'avg_price', dataset: 'fct__order', entity_id: 'order', bindable: true },
@@ -148,8 +164,8 @@ describe('MetricSidebar', () => {
         );
         expect(groups.map((g) => g.getAttribute('data-group-key'))).toEqual([
             'entity_booking',
-            'fct__order',
-            '__cross_dataset__',
+            'order',
+            '__cross_entity__',
         ]);
 
         // Collapse entity_booking

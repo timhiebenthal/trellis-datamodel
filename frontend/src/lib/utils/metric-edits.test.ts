@@ -293,40 +293,91 @@ describe('groupCatalog', () => {    const catalog: MetricCatalogEntry[] = [
 });
 
 describe('groupCatalogByEntity', () => {
+    // The Ossie dataset is named after the model (`entity_booking`); the entity
+    // that owns it is `booking`, which is also what a draft's `dataset_ref` holds.
     const catalog: MetricCatalogEntry[] = [
-        { name: 'avg_price', dataset: 'fct__order', entity_id: 'order', bindable: true },
-        { name: 'revenue', bindable: false, reason: 'Cross-dataset metric' },
+        { name: 'avg_rate', dataset: 'entity_booking', entity_id: 'booking', bindable: true },
+        { name: 'hours', dataset: 'entity_booking', entity_id: 'booking', bindable: true },
         { name: 'order_count', dataset: 'fct__order', entity_id: 'order', bindable: true },
-        { name: 'booking_hours', dataset: 'entity_booking', entity_id: 'entity_booking', bindable: true },
+        { name: 'orphan_metric', dataset: 'unmapped_dataset', entity_id: null, bindable: false, reason: 'no entity' },
+        { name: 'revenue', bindable: false, reason: 'Cross-dataset metric' },
     ];
+    const bound: MetricEntry = {
+        id: 'avg_rate',
+        label: 'Avg rate',
+        binding: { dataset: 'entity_booking', name: 'avg_rate' },
+    };
+    const draft: MetricEntry = {
+        id: 'margin',
+        label: 'Margin',
+        expression: 'a - b',
+        dataset_ref: 'booking',
+    };
 
-    it('groups entries by dataset in alphabetical order with unbound drafts and cross-dataset after named entities', () => {
-        const metrics: MetricEntry[] = [
-            { id: 'avg_price', label: 'Avg price', binding: { dataset: 'fct__order', name: 'avg_price' } },
-            { id: 'custom_margin', label: 'Custom margin', expression: 'a - b' },
-        ];
+    const shape = (group: { items: Array<{ kind: string; status: string }> }) =>
+        group.items.map((item) => `${item.kind}:${item.status}`);
 
-        const groups = groupCatalogByEntity(catalog, metrics);
+    it('keeps a draft, a bound metric and an addable one together under their entity', () => {
+        const groups = groupCatalogByEntity(catalog, [draft, bound]);
+        const booking = groups.find((group) => group.key === 'booking');
 
-        expect(groups.map((g) => g.label)).toEqual([
-            'entity_booking',
-            'fct__order',
-            'Drafts (unbound)',
-            'Cross-dataset',
+        expect(groups.filter((group) => group.key === 'entity_booking')).toEqual([]);
+        expect(booking?.label).toBe('booking');
+        expect(booking?.onTreeCount).toBe(2);
+        expect(shape(booking!)).toEqual(['tree:draft', 'tree:added', 'catalog:available']);
+    });
+
+    it('orders entities by name, then metrics without an entity, then cross-entity ones', () => {
+        const groups = groupCatalogByEntity(catalog, [
+            { id: 'loose', label: 'Loose', expression: 'x' },
         ]);
-        expect(groups[0].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
-            { kind: 'catalog', status: 'available' },
+
+        expect(groups.map((group) => group.label)).toEqual([
+            'booking',
+            'order',
+            'unmapped_dataset',
+            'No entity',
+            'Cross-entity',
         ]);
-        expect(groups[1].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
-            { kind: 'tree', status: 'added' },
-            { kind: 'catalog', status: 'available' },
+        expect(groups.map((group) => group.kind)).toEqual([
+            'entity',
+            'entity',
+            'entity',
+            'no-entity',
+            'cross-entity',
         ]);
-        expect(groups[2].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
-            { kind: 'tree', status: 'draft' },
-        ]);
-        expect(groups[3].items.map((i) => ({ kind: i.kind, status: i.status }))).toEqual([
-            { kind: 'catalog', status: 'readonly' },
-        ]);
+    });
+
+    it('falls back to the dataset name for a binding the catalog no longer lists', () => {
+        const stale: MetricEntry = {
+            id: 'gone',
+            label: 'Gone',
+            binding: { dataset: 'old_dataset', name: 'gone' },
+        };
+
+        const groups = groupCatalogByEntity(catalog, [stale]);
+
+        expect(groups.find((group) => group.key === 'old_dataset')?.items).toHaveLength(1);
+    });
+
+    it('still resolves the entity of a bound metric when a filter hides its catalog entries', () => {
+        const groups = groupCatalogByEntity(catalog, [bound], {
+            catalog: () => false,
+            metric: () => true,
+        });
+
+        expect(groups.map((group) => group.key)).toEqual(['booking']);
+        expect(shape(groups[0])).toEqual(['tree:added']);
+    });
+
+    it('shows the bound metric when only its catalog entry matches the filter', () => {
+        const groups = groupCatalogByEntity(catalog, [bound], {
+            catalog: (entry) => entry.name === 'avg_rate',
+            metric: () => false,
+        });
+
+        expect(groups.map((group) => group.key)).toEqual(['booking']);
+        expect(shape(groups[0])).toEqual(['tree:added']);
     });
 });
 
