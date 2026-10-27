@@ -381,6 +381,22 @@ def _load_business_events_config(config: dict[str, Any]) -> bool:
     return enabled
 
 
+def _ossie_source_value(source: dict[str, Any], key: str) -> str:
+    """Read an address segment, ignoring non-string values.
+
+    Coercing with `str()` would turn a malformed list into a literal address
+    segment (`"['a']"`) that cannot be traced back to the config mistake.
+    """
+    value = source.get(key)
+    if isinstance(value, str):
+        return value.strip()
+    if value is not None:
+        logger.warning(
+            "'ossie.source.%s' must be a string. Ignoring provided value.", key
+        )
+    return ""
+
+
 def _load_ossie_config(config: dict[str, Any]) -> tuple[bool, str, str]:
     """Load Ossie export settings, ignoring a malformed block."""
     ossie_config = config.get("ossie")
@@ -393,10 +409,23 @@ def _load_ossie_config(config: dict[str, Any]) -> tuple[bool, str, str]:
     database = ""
     schema = ""
     if isinstance(source, dict):
-        database = str(source.get("database") or "")
-        schema = str(source.get("schema") or "")
+        database = _ossie_source_value(source, "database")
+        schema = _ossie_source_value(source, "schema")
+    elif source is not None:
+        logger.warning("'ossie.source' must be a mapping. Ignoring provided value.")
 
-    return bool(ossie_config.get("enabled", False)), database, schema
+    # YAML has real booleans; a quoted "false" is a string and bool("false") is
+    # True, which would silently turn the feature on.
+    enabled_value = ossie_config.get("enabled", False)
+    if isinstance(enabled_value, bool):
+        enabled = enabled_value
+    else:
+        enabled = False
+        logger.warning(
+            "'ossie.enabled' must be true or false. Treating it as disabled."
+        )
+
+    return enabled, database, schema
 
 
 def _load_canvas_navigation_config(
@@ -459,9 +488,14 @@ def _resolve_ossie_file_path(
     ossie_config = config.get("ossie")
     if isinstance(ossie_config, dict):
         ossie_file = ossie_config.get("file")
-        if ossie_file:
+        if isinstance(ossie_file, str) and ossie_file.strip():
             base_dir = project_path or _resolve_base_path(config_path)
             return _resolve_path(base_dir, ossie_file)
+        if ossie_file is not None:
+            logger.warning(
+                "'ossie.file' must be a non-empty string. Using the default "
+                "'semantic_model.yml' beside data_model.yml."
+            )
 
     # Default: same directory as data_model.yml
     if data_model_path:

@@ -656,7 +656,97 @@ def test_ossie_non_dict_falls_back_to_defaults(monkeypatch, tmp_path, caplog):
     assert any("'ossie'" in record.message for record in caplog.records)
 
 
+def test_ossie_int_file_falls_back_to_default(monkeypatch, tmp_path, caplog):
+    """A non-path `file` must warn and default, not crash the app at startup."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          file: 123
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(tmp_path / "semantic_model.yml")
+    file_warnings = [
+        record for record in caplog.records if "'ossie.file'" in record.message
+    ]
+    assert len(file_warnings) == 1
+
+
+def test_ossie_mapping_file_falls_back_to_default(monkeypatch, tmp_path, caplog):
+    """Same for a mapping value, which also is not a path."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        data_model_file: data_model.yml
+        ossie:
+          file:
+            a: b
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.file == os.path.abspath(tmp_path / "semantic_model.yml")
+    file_warnings = [
+        record for record in caplog.records if "'ossie.file'" in record.message
+    ]
+    assert len(file_warnings) == 1
+
+
+def test_ossie_non_string_source_value_is_ignored(monkeypatch, tmp_path, caplog):
+    """A list must not become the literal address segment "['marts']"."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        ossie:
+          source:
+            schema:
+              - marts
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.schema == ""
+    assert any(
+        "'ossie.source.schema'" in record.message for record in caplog.records
+    )
+
+
+def test_ossie_quoted_false_is_disabled(monkeypatch, tmp_path, caplog):
+    """`bool("false")` is True, so a quoted string must not enable the export."""
+    _prepare_config(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
+    config_path = _write_config(
+        tmp_path,
+        """
+        dbt_project_path: .
+        ossie:
+          enabled: "false"
+        """,
+    )
+
+    cfg.load_config(str(config_path))
+
+    assert cfg.OSSIE_CONFIG.enabled is False
+    assert any("'ossie.enabled'" in record.message for record in caplog.records)
+
+
 def test_reload_config_picks_up_ossie_changes(monkeypatch, tmp_path):
+
     """A rewritten config file is reflected without a restart."""
     _prepare_config(monkeypatch)
     monkeypatch.chdir(tmp_path)
