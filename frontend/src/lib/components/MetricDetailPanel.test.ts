@@ -85,6 +85,24 @@ describe('MetricDetailPanel', () => {
         expect(onunlink).toHaveBeenCalledWith('avg_price');
     });
 
+    it('shows the resolved expression of a bound metric without letting it be edited', () => {
+        const { container } = render(MetricDetailPanel, {
+            props: { metric: { ...bound, resolved_expression: 'avg(amount)' } },
+        });
+
+        const expression = container.querySelector('[data-testid="metric-resolved-expression"]');
+        expect(expression?.textContent).toBe('avg(amount)');
+        expect(field(container, 'expression')).toBeNull();
+        expect(container.querySelector('[data-testid="metric-resolved-expression"] textarea')).toBeNull();
+    });
+
+    it('explains where a bound definition lives when the expression is absent', () => {
+        const { container } = render(MetricDetailPanel, { props: { metric: bound } });
+
+        expect(container.querySelector('[data-testid="metric-resolved-expression"]')).toBeNull();
+        expect(container.textContent).toContain('never a copy');
+    });
+
     it('lists every server warning on its own line', () => {
         const { container } = render(MetricDetailPanel, {
             props: {

@@ -163,6 +163,38 @@ def _bound_references(document: dict[str, Any]) -> set[tuple[str, str]]:
     return references
 
 
+def _expression_text(metric: dict[str, Any]) -> str | None:
+    """The dialect expression the exporter writes, or None for another shape."""
+    expression = metric.get("expression")
+    dialects = expression.get("dialects") if isinstance(expression, dict) else None
+    if not isinstance(dialects, list):
+        return None
+    for dialect in dialects:
+        if not isinstance(dialect, dict):
+            continue
+        text = dialect.get("expression")
+        if isinstance(text, str) and text.strip():
+            return text
+    return None
+
+
+def _bound_expressions(document: dict[str, Any]) -> dict[tuple[str, str], str]:
+    """`(dataset, metric name) -> expression`, keyed like `_bound_references`."""
+    expressions: dict[tuple[str, str], str] = {}
+    for dataset in _entries(document.get("datasets")):
+        dataset_name = str(dataset.get("name") or "").strip()
+        if not dataset_name:
+            continue
+        for metric in _entries(dataset.get("metrics")):
+            metric_name = str(metric.get("name") or "").strip()
+            if not metric_name:
+                continue
+            text = _expression_text(metric)
+            if text is not None:
+                expressions.setdefault((dataset_name, metric_name), text)
+    return expressions
+
+
 def _is_unresolved(
     metric: MetricEntry,
     references: set[tuple[str, str]],
@@ -176,11 +208,22 @@ def _is_unresolved(
 
 
 def _annotate_unresolved(tree: MetricTreeFile) -> MetricTreeFile:
-    """Flag entries whose reference no longer resolves; never drops one."""
-    references = _bound_references(_ossie_document())
+    """Flag entries whose reference no longer resolves; never drops one.
+
+    Also carries the bound definition's expression for display, so the detail
+    panel can show it without the client reading semantic_model.yml.
+    """
+    document = _ossie_document()
+    references = _bound_references(document)
+    expressions = _bound_expressions(document)
     entity_ids = _entity_ids()
     for metric in tree.metrics:
         metric.unresolved = _is_unresolved(metric, references, entity_ids)
+        metric.resolved_expression = (
+            expressions.get(_binding_key(metric.binding))
+            if metric.binding is not None and not metric.unresolved
+            else None
+        )
     return tree
 
 
@@ -373,9 +416,12 @@ def save_metric_tree(tree: MetricTreeUpdate) -> list[str]:
 
     document = {
         "version": tree.version,
-        # `unresolved` is wire state: the file carries definitions, not verdicts.
+        # `unresolved` and `resolved_expression` are wire state: the file carries
+        # definitions and references, not verdicts or copies.
         "metrics": [
-            entry.model_dump(exclude_none=True, exclude={"unresolved"})
+            entry.model_dump(
+                exclude_none=True, exclude={"unresolved", "resolved_expression"}
+            )
             for entry in entries
         ],
         "influences": [

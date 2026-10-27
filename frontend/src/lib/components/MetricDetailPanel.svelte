@@ -4,9 +4,9 @@
 
     /**
      * The inspector for one metric. Drafts are editable; a bound metric shows the
-     * reference it holds and nothing else, because the definition stays in
-     * `semantic_model.yml` - copying it into this file is exactly what the metric
-     * tree is designed not to do.
+     * reference it holds plus the definition's expression, read-only, because the
+     * definition stays in `semantic_model.yml` - copying it into this file is
+     * exactly what the metric tree is designed not to do.
      */
     let {
         metric = null,
@@ -112,10 +112,21 @@
                     <p class="mt-1 font-mono text-xs break-all text-violet-900">
                         {binding.dataset}.{binding.name}
                     </p>
-                    <p class="mt-1.5 text-[11px] leading-relaxed text-violet-800/80">
-                        Read from the semantic model. Trellis stores the reference, never a copy,
-                        so this file cannot drift from the definition.
-                    </p>
+                    {#if metric.resolved_expression}
+                        <pre
+                            class="mt-2 overflow-x-auto rounded-md border border-violet-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-violet-900"
+                            data-testid="metric-resolved-expression">{metric.resolved_expression}</pre
+                        >
+                        <p class="mt-1.5 text-[11px] leading-relaxed text-violet-800/80">
+                            Read from the semantic model. Edit it there; Trellis stores the reference,
+                            never a copy.
+                        </p>
+                    {:else}
+                        <p class="mt-1.5 text-[11px] leading-relaxed text-violet-800/80">
+                            Read from the semantic model. Trellis stores the reference, never a copy,
+                            so this file cannot drift from the definition.
+                        </p>
+                    {/if}
                 </div>
 
                 {#if onunlink}

@@ -550,6 +550,9 @@ export interface MetricEntry {
     binding?: { dataset: string; name: string }; // semantic_model.yml reference; bound only
     position?: { x: number; y: number }; // wire/layout only, split into metric_layout.yml
     unresolved?: boolean; // set by GET when dataset_ref or binding no longer resolves
+    // Set by GET for a bound metric whose definition resolves: the expression read
+    // from semantic_model.yml. Display only; never sent back on save.
+    resolved_expression?: string;
 }
 
 /**

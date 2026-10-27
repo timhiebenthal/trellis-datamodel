@@ -159,9 +159,9 @@ export function buildMetricEdges(
 
 /**
  * The POST body. Positions travel on each metric and the backend splits them into
- * `metric_layout.yml`; `unresolved` is read-only server state and never sent back,
- * and a bound entry is reduced to its reference so a saved file can never hold a
- * copied definition.
+ * `metric_layout.yml`; `unresolved` and `resolved_expression` are read-only server
+ * state and never sent back, and a bound entry is reduced to its reference so a
+ * saved file can never hold a copied definition.
  */
 export function buildMetricTreePayload(
     tree: { version: number; metrics: MetricEntry[]; influences: MetricInfluence[] },
@@ -170,7 +170,11 @@ export function buildMetricTreePayload(
     return {
         version: tree.version,
         metrics: tree.metrics.map((entry) => {
-            const { unresolved: _unresolved, ...metric } = entry;
+            const {
+                unresolved: _unresolved,
+                resolved_expression: _resolvedExpression,
+                ...metric
+            } = entry;
             const stored = layout[metric.id] ?? metric.position;
 
             if (metric.binding) {

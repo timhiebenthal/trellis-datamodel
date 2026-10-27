@@ -38,11 +38,18 @@ class MetricEntry(BaseModel):
         None, description="Canvas position supplied by the client, split into metric_layout.yml"
     )
     # Read-only resolution state for the API, attached at load time. Never
-    # authored by a client and never written: `save_metric_tree` excludes it
+    # authored by a client and never written: `save_metric_tree` excludes both
     # from the document it dumps.
     unresolved: bool | None = Field(
         None,
         description="True when the binding or dataset_ref no longer resolves; read only",
+    )
+    resolved_expression: str | None = Field(
+        None,
+        description=(
+            "Expression read from the bound metric's definition in semantic_model.yml; "
+            "read only, never persisted"
+        ),
     )
 
 

@@ -172,6 +172,35 @@ describe('buildMetricTreePayload', () => {
         expect(payload.metrics[0]).not.toHaveProperty('unresolved');
     });
 
+    it('strips the read-only resolved expression before saving', () => {
+        const payload = buildMetricTreePayload(
+            {
+                version: 0.1,
+                metrics: [
+                    metric('revenue', {
+                        expression: 'sum(x)',
+                        resolved_expression: 'sum(amount)',
+                    }),
+                    {
+                        id: 'avg_price',
+                        label: 'Avg price',
+                        binding: { dataset: 'fct__order', name: 'avg_price' },
+                        resolved_expression: 'avg(amount)',
+                    },
+                ],
+                influences: [],
+            },
+            {},
+        );
+
+        expect(payload.metrics[0]).not.toHaveProperty('resolved_expression');
+        expect(payload.metrics[1]).toEqual({
+            id: 'avg_price',
+            label: 'Avg price',
+            binding: { dataset: 'fct__order', name: 'avg_price' },
+        });
+    });
+
     it('never sends an expression or description for a bound metric', () => {
         const payload = buildMetricTreePayload(
             {

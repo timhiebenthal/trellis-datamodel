@@ -232,6 +232,95 @@ class TestUnresolvedOnLoad:
         assert "unresolved" not in saved
 
 
+class TestResolvedExpressionOnLoad:
+    """A bound entry carries the definition's expression, read-only."""
+
+    def _tree(self, *metrics: MetricEntry) -> MetricTreeUpdate:
+        return MetricTreeUpdate(version=0.1, metrics=list(metrics), influences=[])
+
+    def test_bound_metric_carries_the_semantic_model_expression(self, catalog_docs):
+        save_metric_tree(
+            self._tree(
+                MetricEntry(
+                    id="revenue",
+                    label="Revenue",
+                    binding=MetricBinding(dataset="fct__order", name="revenue"),
+                )
+            )
+        )
+
+        reloaded = load_metric_tree(cfg.METRICS_CONFIG.file)
+
+        assert reloaded.metrics[0].resolved_expression == "sum(amount)"
+
+    def test_a_draft_carries_no_resolved_expression(self, catalog_docs):
+        save_metric_tree(
+            self._tree(
+                MetricEntry(
+                    id="revenue",
+                    label="Revenue",
+                    expression="sum(amount) from fct__order",
+                    dataset_ref="fct__order",
+                )
+            )
+        )
+
+        reloaded = load_metric_tree(cfg.METRICS_CONFIG.file)
+
+        assert reloaded.metrics[0].resolved_expression is None
+
+    def test_an_unresolved_binding_carries_no_resolved_expression(self, catalog_docs):
+        save_metric_tree(
+            self._tree(
+                MetricEntry(
+                    id="archived_revenue",
+                    label="Archived revenue",
+                    binding=MetricBinding(
+                        dataset="fct__order", name="archived_revenue"
+                    ),
+                )
+            )
+        )
+
+        reloaded = load_metric_tree(cfg.METRICS_CONFIG.file)
+
+        assert reloaded.metrics[0].unresolved is True
+        assert reloaded.metrics[0].resolved_expression is None
+
+    def test_a_definition_with_another_expression_shape_is_left_without_one(
+        self, catalog_docs
+    ):
+        catalog_docs["semantic_model"].write_text(
+            yaml.safe_dump(
+                {
+                    "version": "0.2.0.dev0",
+                    "datasets": [
+                        {
+                            "name": "fct__order",
+                            "metrics": [
+                                {"name": "revenue", "expression": "sum(amount)"}
+                            ],
+                        }
+                    ],
+                }
+            )
+        )
+        save_metric_tree(
+            self._tree(
+                MetricEntry(
+                    id="revenue",
+                    label="Revenue",
+                    binding=MetricBinding(dataset="fct__order", name="revenue"),
+                )
+            )
+        )
+
+        reloaded = load_metric_tree(cfg.METRICS_CONFIG.file)
+
+        assert reloaded.metrics[0].unresolved is False
+        assert reloaded.metrics[0].resolved_expression is None
+
+
 class TestSaveWarnings:
     """Unresolvable references warn; the entry is always kept."""
 
@@ -340,6 +429,32 @@ class TestSaveWarnings:
         saved = load_yaml_or_json(str(catalog_docs["tree"]))["metrics"][0]
         assert "unresolved" not in saved
 
+    def test_client_supplied_resolved_expression_is_never_written(self, catalog_docs):
+        """`resolved_expression` is wire state; a round-tripped payload must not persist it."""
+        warnings = save_metric_tree(
+            MetricTreeUpdate.model_validate(
+                {
+                    "version": 0.1,
+                    "metrics": [
+                        {
+                            "id": "revenue",
+                            "label": "Revenue",
+                            "binding": {
+                                "dataset": "fct__order",
+                                "name": "revenue",
+                            },
+                            "resolved_expression": "sum(amount)",
+                        }
+                    ],
+                    "influences": [],
+                }
+            )
+        )
+
+        assert warnings == []
+        saved = load_yaml_or_json(str(catalog_docs["tree"]))["metrics"][0]
+        assert "resolved_expression" not in saved
+
 
 class TestGetCatalogRoute:
     """GET /api/metric-tree publishes catalog flags and the unresolved state."""
@@ -396,3 +511,26 @@ class TestGetCatalogRoute:
             "orphan_draft": True,
             "revenue": False,
         }
+
+    def test_get_publishes_the_bound_expression(self, test_client, catalog_docs):
+        assert (
+            test_client.post(
+                "/api/metric-tree",
+                json={
+                    "version": 0.1,
+                    "metrics": [
+                        {
+                            "id": "revenue",
+                            "label": "Revenue",
+                            "binding": {"dataset": "fct__order", "name": "revenue"},
+                        }
+                    ],
+                    "influences": [],
+                },
+            ).status_code
+            == 200
+        )
+
+        body = test_client.get("/api/metric-tree").json()
+
+        assert body["metrics"][0]["resolved_expression"] == "sum(amount)"
