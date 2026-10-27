@@ -5,6 +5,7 @@ import {
     addDraftMetric,
     connectInfluence,
     groupCatalog,
+    groupCatalogByEntity,
     incompleteDraftIds,
     metricLabelFromName,
     removeInfluence,
@@ -288,6 +289,35 @@ describe('groupCatalog', () => {    const catalog: MetricCatalogEntry[] = [
 
         expect(groups.added).toEqual([]);
         expect(groups.available.map((entry) => entry.name)).toEqual(['avg_price', 'order_count']);
+    });
+});
+
+describe('groupCatalogByEntity', () => {
+    const catalog: MetricCatalogEntry[] = [
+        { name: 'avg_price', dataset: 'fct__order', entity_id: 'order', bindable: true },
+        { name: 'revenue', bindable: false, reason: 'Cross-dataset metric' },
+        { name: 'order_count', dataset: 'fct__order', entity_id: 'order', bindable: true },
+        { name: 'booking_hours', dataset: 'entity_booking', entity_id: 'entity_booking', bindable: true },
+    ];
+
+    it('groups entries by dataset in alphabetical order with cross-dataset last', () => {
+        const metrics: MetricEntry[] = [
+            { id: 'avg_price', label: 'Avg price', binding: { dataset: 'fct__order', name: 'avg_price' } },
+        ];
+
+        const groups = groupCatalogByEntity(catalog, metrics);
+
+        expect(groups.map((g) => g.label)).toEqual(['entity_booking', 'fct__order', 'Cross-dataset']);
+        expect(groups[0].items.map((i) => ({ name: i.entry.name, status: i.status }))).toEqual([
+            { name: 'booking_hours', status: 'available' },
+        ]);
+        expect(groups[1].items.map((i) => ({ name: i.entry.name, status: i.status, boundMetricId: i.boundMetricId }))).toEqual([
+            { name: 'avg_price', status: 'added', boundMetricId: 'avg_price' },
+            { name: 'order_count', status: 'available', boundMetricId: undefined },
+        ]);
+        expect(groups[2].items.map((i) => ({ name: i.entry.name, status: i.status }))).toEqual([
+            { name: 'revenue', status: 'readonly' },
+        ]);
     });
 });
 

@@ -131,4 +131,50 @@ describe('MetricSidebar', () => {
             container.querySelectorAll('[data-testid="metric-sidebar-catalog-add"]'),
         ).toHaveLength(0);
     });
+
+    it('groups catalog metrics by entity/dataset and toggles collapse on click', async () => {
+        const multiEntityCatalog: MetricCatalogEntry[] = [
+            { name: 'order_count', dataset: 'fct__order', entity_id: 'order', bindable: true },
+            { name: 'avg_price', dataset: 'fct__order', entity_id: 'order', bindable: true },
+            { name: 'booking_hours', dataset: 'entity_booking', entity_id: 'entity_booking', bindable: true },
+            { name: 'revenue', bindable: false, reason: 'Cross-dataset metric' },
+        ];
+        const { container } = render(MetricSidebar, {
+            props: { metrics, catalog: multiEntityCatalog },
+        });
+
+        const groups = Array.from(
+            container.querySelectorAll('[data-testid="metric-sidebar-entity-group"]'),
+        );
+        expect(groups.map((g) => g.getAttribute('data-group-key'))).toEqual([
+            'entity_booking',
+            'fct__order',
+            '__cross_dataset__',
+        ]);
+
+        // Collapse entity_booking
+        const firstToggle = groups[0].querySelector(
+            '[data-testid="metric-sidebar-entity-group-toggle"]',
+        )!;
+        await fireEvent.click(firstToggle);
+        expect(groups[0].querySelectorAll('[data-testid="metric-sidebar-catalog-add"]')).toHaveLength(0);
+
+        // Expand entity_booking again
+        await fireEvent.click(firstToggle);
+        expect(groups[0].querySelectorAll('[data-testid="metric-sidebar-catalog-add"]')).toHaveLength(1);
+    });
+
+    it('highlights an added catalog entry in teal and selects the bound metric on click', async () => {
+        const onselectmetric = vi.fn();
+        const { container } = render(MetricSidebar, {
+            props: { metrics, catalog, selectedMetricId: 'avg_price', onselectmetric },
+        });
+
+        const added = container.querySelector('[data-testid="metric-sidebar-catalog-added"]') as HTMLElement;
+        expect(added).not.toBeNull();
+        expect(added.className).toContain('bg-primary-100');
+
+        await fireEvent.click(added);
+        expect(onselectmetric).toHaveBeenCalledWith('avg_price');
+    });
 });

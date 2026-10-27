@@ -225,6 +225,70 @@ export function groupCatalog(
     return groups;
 }
 
+export interface CatalogEntityItem {
+    entry: MetricCatalogEntry;
+    status: 'available' | 'added' | 'readonly';
+    boundMetricId?: string;
+}
+
+export interface CatalogEntityGroup {
+    key: string;
+    label: string;
+    isCrossDataset: boolean;
+    items: CatalogEntityItem[];
+}
+
+/**
+ * Group catalog entries by their entity/dataset so the sidebar can render
+ * collapsible entity sections instead of repeating the dataset on every row.
+ */
+export function groupCatalogByEntity(
+    catalog: MetricCatalogEntry[],
+    metrics: MetricEntry[],
+): CatalogEntityGroup[] {
+    const byKey = new Map<string, CatalogEntityGroup>();
+
+    for (const entry of catalog) {
+        const datasetKey = (entry.dataset ?? entry.entity_id ?? '').trim();
+        const isCrossDataset = !datasetKey;
+        const key = isCrossDataset ? '__cross_dataset__' : datasetKey;
+        const label = isCrossDataset ? 'Cross-dataset' : datasetKey;
+
+        const boundMetric = entry.bindable
+            ? metrics.find(
+                  (metric) =>
+                      metric.binding?.name === entry.name &&
+                      (!entry.dataset || metric.binding?.dataset === entry.dataset),
+              )
+            : undefined;
+
+        const status: CatalogEntityItem['status'] = !entry.bindable
+            ? 'readonly'
+            : boundMetric
+              ? 'added'
+              : 'available';
+
+        let group = byKey.get(key);
+        if (!group) {
+            group = { key, label, isCrossDataset, items: [] };
+            byKey.set(key, group);
+        }
+
+        group.items.push({
+            entry,
+            status,
+            boundMetricId: boundMetric?.id,
+        });
+    }
+
+    return Array.from(byKey.values()).sort((a, b) => {
+        if (a.isCrossDataset !== b.isCrossDataset) {
+            return a.isCrossDataset ? 1 : -1;
+        }
+        return a.label.localeCompare(b.label);
+    });
+}
+
 /**
  * Edit one metric's fields. The id is never patched - influences reference it -
  * and a bound entry can never acquire an expression or description, because that

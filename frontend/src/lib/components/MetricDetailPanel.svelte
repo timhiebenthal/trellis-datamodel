@@ -35,11 +35,20 @@
     } = $props();
 
     let labelInput = $state<HTMLInputElement | null>(null);
+    let datasetDropdownRef = $state<HTMLDivElement | null>(null);
+    let datasetDropdownOpen = $state(false);
+    let datasetFilterActive = $state(false);
+    let activeEntityIndex = $state(-1);
 
     const binding = $derived(metric?.binding ?? null);
     const needsExpression = $derived(
         !!metric && !binding && !(metric.expression ?? "").trim(),
     );
+    const filteredEntityIds = $derived.by(() => {
+        const query = (metric?.dataset_ref ?? "").trim().toLowerCase();
+        if (!datasetFilterActive || !query) return entityIds;
+        return entityIds.filter((id) => id.toLowerCase().includes(query));
+    });
 
     // `focus === 'label'` is how "Add metric" lands the caret in the name field.
     $effect(() => {
@@ -48,6 +57,78 @@
             labelInput.select();
         }
     });
+
+    $effect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (datasetDropdownRef && !datasetDropdownRef.contains(event.target as Node)) {
+                datasetDropdownOpen = false;
+                datasetFilterActive = false;
+            }
+        }
+
+        if (datasetDropdownOpen) {
+            document.addEventListener("click", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("click", handleClickOutside);
+        };
+    });
+
+    function openDatasetDropdown() {
+        if (entityIds.length === 0) return;
+        datasetDropdownOpen = true;
+        datasetFilterActive = false;
+        activeEntityIndex = -1;
+    }
+
+    function toggleDatasetDropdown() {
+        if (datasetDropdownOpen) {
+            datasetDropdownOpen = false;
+            datasetFilterActive = false;
+        } else {
+            openDatasetDropdown();
+        }
+    }
+
+    function selectDatasetEntity(entityId: string) {
+        onchange?.({ dataset_ref: entityId });
+        datasetDropdownOpen = false;
+        datasetFilterActive = false;
+        activeEntityIndex = -1;
+    }
+
+    function handleDatasetKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+            if (datasetDropdownOpen) {
+                datasetDropdownOpen = false;
+                datasetFilterActive = false;
+                event.preventDefault();
+            }
+        } else if (event.key === "ArrowDown") {
+            if (!datasetDropdownOpen && entityIds.length > 0) {
+                openDatasetDropdown();
+            }
+            if (filteredEntityIds.length > 0) {
+                event.preventDefault();
+                activeEntityIndex = Math.min(activeEntityIndex + 1, filteredEntityIds.length - 1);
+            }
+        } else if (event.key === "ArrowUp") {
+            if (datasetDropdownOpen && filteredEntityIds.length > 0) {
+                event.preventDefault();
+                activeEntityIndex = Math.max(activeEntityIndex - 1, 0);
+            }
+        } else if (event.key === "Enter") {
+            if (
+                datasetDropdownOpen &&
+                activeEntityIndex >= 0 &&
+                activeEntityIndex < filteredEntityIds.length
+            ) {
+                event.preventDefault();
+                selectDatasetEntity(filteredEntityIds[activeEntityIndex]);
+            }
+        }
+    }
 
     const fieldClass =
         "w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-500";
@@ -184,7 +265,7 @@
                         class="{fieldClass} resize-none font-mono text-xs leading-relaxed"
                         rows="3"
                         value={metric.expression ?? ""}
-                        placeholder="sum(amount) from fct__order"
+                        placeholder="sum(amount)"
                         oninput={(event) => onchange?.({ expression: event.currentTarget.value })}
                         data-testid="metric-field-expression"
                     ></textarea>
@@ -198,20 +279,89 @@
                         <span>Dataset</span>
                         <span class="normal-case tracking-normal text-slate-400">optional</span>
                     </label>
-                    <input
-                        id="metric-field-dataset-{metric.id}"
-                        class={fieldClass}
-                        value={metric.dataset_ref ?? ""}
-                        placeholder="fct__order"
-                        list="metric-dataset-options"
-                        oninput={(event) => onchange?.({ dataset_ref: event.currentTarget.value })}
-                        data-testid="metric-field-dataset"
-                    />
-                    <datalist id="metric-dataset-options">
-                        {#each entityIds as entityId (entityId)}
-                            <option value={entityId}></option>
-                        {/each}
-                    </datalist>
+                    <div class="relative" bind:this={datasetDropdownRef}>
+                        <input
+                            id="metric-field-dataset-{metric.id}"
+                            class="{fieldClass} pr-8"
+                            value={metric.dataset_ref ?? ""}
+                            placeholder="fct__order"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded={datasetDropdownOpen && filteredEntityIds.length > 0}
+                            aria-autocomplete="list"
+                            aria-controls="metric-dataset-options-{metric.id}"
+                            onfocus={openDatasetDropdown}
+                            onblur={() => {
+                                datasetDropdownOpen = false;
+                                datasetFilterActive = false;
+                            }}
+                            oninput={(event) => {
+                                datasetDropdownOpen = true;
+                                datasetFilterActive = true;
+                                activeEntityIndex = 0;
+                                onchange?.({ dataset_ref: event.currentTarget.value });
+                            }}
+                            onkeydown={handleDatasetKeydown}
+                            data-testid="metric-field-dataset"
+                        />
+                        {#if entityIds.length > 0}
+                            <button
+                                type="button"
+                                tabindex="-1"
+                                class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600"
+                                aria-label="Toggle dataset options"
+                                onmousedown={(event) => event.preventDefault()}
+                                onclick={toggleDatasetDropdown}
+                                data-testid="metric-dataset-toggle"
+                            >
+                                <Icon
+                                    icon="lucide:chevron-down"
+                                    class="h-4 w-4 shrink-0 transition-transform {datasetDropdownOpen
+                                        ? 'rotate-180'
+                                        : ''}"
+                                />
+                            </button>
+                        {/if}
+
+                        {#if datasetDropdownOpen && filteredEntityIds.length > 0}
+                            <div
+                                class="absolute left-0 z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
+                                onmousedown={(event) => event.preventDefault()}
+                            >
+                                <ul
+                                    id="metric-dataset-options-{metric.id}"
+                                    role="listbox"
+                                    class="focus:outline-none"
+                                    data-testid="metric-dataset-options"
+                                >
+                                    {#each filteredEntityIds as entityId, index (entityId)}
+                                        {@const isSelected = entityId === (metric.dataset_ref ?? "")}
+                                        {@const isHighlighted = index === activeEntityIndex}
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <li
+                                            role="option"
+                                            aria-selected={isSelected}
+                                            class="relative cursor-pointer select-none py-1.5 pl-3 pr-8 text-sm text-gray-900 transition-colors hover:bg-primary-50 hover:text-primary-700 {isSelected ||
+                                            isHighlighted
+                                                ? 'bg-primary-50 font-medium text-primary-700'
+                                                : ''}"
+                                            onclick={() => selectDatasetEntity(entityId)}
+                                            data-testid="metric-dataset-option"
+                                        >
+                                            <span class="block truncate font-mono text-xs">{entityId}</span>
+                                            {#if isSelected}
+                                                <span
+                                                    class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-primary-600"
+                                                >
+                                                    <Icon icon="lucide:check" class="h-4 w-4" />
+                                                </span>
+                                            {/if}
+                                        </li>
+                                    {/each}
+                                </ul>
+                            </div>
+                        {/if}
+                    </div>
                     <p class="mt-1 text-[11px] leading-relaxed text-slate-400">
                         An entity id from your data model. Free text is allowed; a reference that
                         no longer resolves is badged rather than deleted.

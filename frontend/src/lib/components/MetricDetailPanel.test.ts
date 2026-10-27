@@ -53,16 +53,26 @@ describe('MetricDetailPanel', () => {
         expect(onchange).toHaveBeenCalledWith({ dataset_ref: 'fct__booking' });
     });
 
-    it('suggests entity ids for the dataset reference but still accepts free text', () => {
+    it('suggests entity ids for the dataset reference and still accepts free text', async () => {
+        const onchange = vi.fn();
         const { container } = render(MetricDetailPanel, {
-            props: { metric: draft, entityIds: ['fct__order', 'dim_customer'] },
+            props: { metric: draft, entityIds: ['fct__order', 'dim_customer'], onchange },
         });
 
-        const options = Array.from(container.querySelectorAll('datalist option')).map((option) =>
-            option.getAttribute('value'),
+        const datasetInput = field(container, 'dataset');
+        await fireEvent.focus(datasetInput);
+
+        const options = Array.from(
+            container.querySelectorAll('[data-testid="metric-dataset-option"]'),
         );
-        expect(options).toEqual(['fct__order', 'dim_customer']);
-        expect(field(container, 'dataset').getAttribute('list')).not.toBeNull();
+        expect(options.map((option) => option.textContent?.trim())).toEqual([
+            'fct__order',
+            'dim_customer',
+        ]);
+
+        await fireEvent.click(options[1]);
+        expect(onchange).toHaveBeenCalledWith({ dataset_ref: 'dim_customer' });
+        expect(container.querySelector('[data-testid="metric-dataset-options"]')).toBeNull();
     });
 
     it('marks a draft with no expression as required', () => {

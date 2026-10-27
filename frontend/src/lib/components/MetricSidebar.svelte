@@ -1,7 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import type { MetricCatalogEntry, MetricEntry } from "$lib/types";
-    import { groupCatalog, metricLabelFromName } from "$lib/utils/metric-edits";
+    import { groupCatalogByEntity, metricLabelFromName } from "$lib/utils/metric-edits";
 
     /**
      * The catalog. Everything the sidebar shows comes from
@@ -27,6 +27,7 @@
     } = $props();
 
     let searchTerm = $state("");
+    let collapsedGroups = $state<Record<string, boolean>>({});
     const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
 
     function matchesMetric(metric: MetricEntry, query: string): boolean {
@@ -57,7 +58,19 @@
     const filteredCatalog = $derived(
         catalog.filter((entry) => matchesCatalogEntry(entry, normalizedSearch)),
     );
-    const groups = $derived(groupCatalog(filteredCatalog, metrics));
+    const entityGroups = $derived(groupCatalogByEntity(filteredCatalog, metrics));
+
+    function isGroupCollapsed(key: string): boolean {
+        if (normalizedSearch) return false;
+        return Boolean(collapsedGroups[key]);
+    }
+
+    function toggleGroup(key: string) {
+        collapsedGroups = {
+            ...collapsedGroups,
+            [key]: !collapsedGroups[key],
+        };
+    }
 
     function subtitle(metric: MetricEntry): string {
         if (metric.dataset_ref) return metric.dataset_ref;
@@ -218,60 +231,98 @@
                     No matching metrics in the semantic model.
                 </p>
             {:else}
-                {#if groups.available.length > 0}
-                    <ul class="mt-2 space-y-1">
-                        {#each groups.available as entry (entry.name)}
-                            <li>
-                                <button
-                                    type="button"
-                                    draggable="true"
-                                    ondragstart={(event) => onDragStartCatalog(event, entry)}
-                                    class="flex w-full cursor-grab items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-primary-200 hover:bg-primary-50 active:cursor-grabbing"
-                                    onclick={() => onaddcatalogmetric?.(entry)}
-                                    data-testid="metric-sidebar-catalog-add"
-                                    title="Click to add {entry.name}, or drag onto a metric's + Add driver / + Add effect button"
+                <div class="mt-2 space-y-1">
+                    {#each entityGroups as group (group.key)}
+                        {@const collapsed = isGroupCollapsed(group.key)}
+                        <div data-testid="metric-sidebar-entity-group" data-group-key={group.key}>
+                            <button
+                                type="button"
+                                class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                                onclick={() => toggleGroup(group.key)}
+                                aria-expanded={!collapsed}
+                                data-testid="metric-sidebar-entity-group-toggle"
+                            >
+                                <span
+                                    class="flex h-3 w-3 shrink-0 items-center justify-center transition-transform {collapsed ? '-rotate-90' : 'rotate-0'}"
                                 >
-                                    <Icon icon="lucide:plus" class="h-3.5 w-3.5 shrink-0 text-primary-600" />
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block truncate text-sm text-slate-700">{entry.name}</span>
-                                        <span class="block truncate text-[11px] text-slate-400">{entry.dataset}</span>
-                                    </span>
-                                </button>
-                            </li>
-                        {/each}
-                    </ul>
-                {/if}
+                                    <Icon icon="lucide:chevron-down" class="h-3 w-3 text-slate-400" />
+                                </span>
+                                <Icon
+                                    icon={group.isCrossDataset ? "lucide:layers" : "lucide:database"}
+                                    class="h-3.5 w-3.5 shrink-0 text-slate-400"
+                                />
+                                <span class="min-w-0 flex-1 truncate">{group.label}</span>
+                                <span class="rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium tabular-nums text-slate-500">
+                                    {group.items.length}
+                                </span>
+                            </button>
 
-                {#if groups.added.length > 0}
-                    <ul class="mt-2 space-y-0.5">
-                        {#each groups.added as entry (entry.name)}
-                            <li
-                                class="flex items-center gap-2 px-2 py-1 text-xs text-slate-400"
-                                title="Already on this tree"
-                                data-testid="metric-sidebar-catalog-added"
-                            >
-                                <Icon icon="lucide:check" class="h-3.5 w-3.5 shrink-0 text-primary-500" />
-                                <span class="truncate line-through">{entry.name}</span>
-                            </li>
-                        {/each}
-                    </ul>
-                {/if}
-
-                {#if groups.unavailable.length > 0}
-                    <ul class="mt-2 space-y-0.5">
-                        {#each groups.unavailable as entry (entry.name)}
-                            <li
-                                class="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-400"
-                                title={entry.reason ?? "This metric cannot be bound to a dataset"}
-                                data-readonly="true"
-                                data-testid="metric-sidebar-catalog-readonly"
-                            >
-                                <Icon icon="lucide:lock" class="h-3.5 w-3.5 shrink-0 text-slate-300" />
-                                <span class="truncate">{entry.name}</span>
-                            </li>
-                        {/each}
-                    </ul>
-                {/if}
+                            {#if !collapsed}
+                                <ul class="ml-[13px] mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
+                                    {#each group.items as item (`${item.entry.dataset ?? ''}::${item.entry.name}`)}
+                                        {#if item.status === "available"}
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    draggable="true"
+                                                    ondragstart={(event) => onDragStartCatalog(event, item.entry)}
+                                                    class="group flex w-full cursor-grab items-center justify-between gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-left text-xs font-medium text-slate-700 transition-all hover:border-primary-500 hover:bg-primary-50/40 active:cursor-grabbing"
+                                                    onclick={() => onaddcatalogmetric?.(item.entry)}
+                                                    data-testid="metric-sidebar-catalog-add"
+                                                    title="Click to add {item.entry.name}, or drag onto a metric's + Add driver / + Add effect button"
+                                                >
+                                                    <span class="min-w-0 flex-1 truncate">{item.entry.name}</span>
+                                                    <Icon
+                                                        icon="lucide:plus"
+                                                        class="h-3.5 w-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-primary-600"
+                                                    />
+                                                </button>
+                                            </li>
+                                        {:else if item.status === "added"}
+                                            {@const isSelected = Boolean(item.boundMetricId && selectedMetricId === item.boundMetricId)}
+                                            <li>
+                                                <div
+                                                    class="flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-md border px-2 py-1 text-left text-xs font-medium transition-colors"
+                                                    class:border-primary-400={isSelected}
+                                                    class:bg-primary-100={isSelected}
+                                                    class:text-primary-900={isSelected}
+                                                    class:border-primary-200={!isSelected}
+                                                    class:bg-primary-50={!isSelected}
+                                                    class:text-primary-700={!isSelected}
+                                                    class:hover:border-primary-300={!isSelected}
+                                                    role="button"
+                                                    tabindex="0"
+                                                    onclick={() => item.boundMetricId && onselectmetric?.(item.boundMetricId)}
+                                                    onkeydown={(e) => {
+                                                        if ((e.key === "Enter" || e.key === " ") && item.boundMetricId) {
+                                                            e.preventDefault();
+                                                            onselectmetric?.(item.boundMetricId);
+                                                        }
+                                                    }}
+                                                    title="Already on this tree — click to select"
+                                                    data-testid="metric-sidebar-catalog-added"
+                                                >
+                                                    <span class="min-w-0 flex-1 truncate">{item.entry.name}</span>
+                                                    <Icon icon="lucide:check" class="h-3.5 w-3.5 shrink-0 text-primary-600" />
+                                                </div>
+                                            </li>
+                                        {:else}
+                                            <li
+                                                class="flex items-center justify-between gap-1.5 rounded-md border border-transparent px-2 py-1 text-xs text-slate-400"
+                                                title={item.entry.reason ?? "This metric cannot be bound to a dataset"}
+                                                data-readonly="true"
+                                                data-testid="metric-sidebar-catalog-readonly"
+                                            >
+                                                <span class="min-w-0 flex-1 truncate">{item.entry.name}</span>
+                                                <Icon icon="lucide:lock" class="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                                            </li>
+                                        {/if}
+                                    {/each}
+                                </ul>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
             {/if}
 
             <p class="mt-3 px-1 text-[11px] leading-relaxed text-slate-400">
