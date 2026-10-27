@@ -10,11 +10,10 @@
         targetY,
         sourcePosition,
         targetPosition,
-        markerEnd,
     }: EdgeProps = $props();
 
-    // A claim about direction, not a formula: no label, no cardinality, just an
-    // arrow from the driver onto the metric it moves.
+    // Hierarchical tree line connecting the bottom of the upper (effect) metric
+    // to the top of the lower (driver) metric.
     const [path] = $derived(
         getBezierPath({
             sourceX,
@@ -33,4 +32,4 @@
     );
 </script>
 
-<BaseEdge path={path} {markerEnd} style={strokeStyle} class="metric-influence-edge" />
+<BaseEdge path={path} style={strokeStyle} class="metric-influence-edge" />

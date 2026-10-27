@@ -30,13 +30,13 @@ async function fillSelectedDraft(page: Page, label: string, expression: string):
     await page.getByTestId('metric-field-expression').fill(expression);
 }
 
-/** Drag from one node's source handle onto another node's target handle. */
+/** Drag from the upper effect node's bottom source handle onto the lower driver node's top target handle. */
 async function connectMetrics(page: Page, driverId: string, effectId: string): Promise<void> {
     const source = page.locator(
-        `[data-testid="metric-node"][data-metric-id="${driverId}"] .svelte-flow__handle.source`,
+        `[data-testid="metric-node"][data-metric-id="${effectId}"] .svelte-flow__handle.source`,
     );
     const target = page.locator(
-        `[data-testid="metric-node"][data-metric-id="${effectId}"] .svelte-flow__handle.target`,
+        `[data-testid="metric-node"][data-metric-id="${driverId}"] .svelte-flow__handle.target`,
     );
 
     const from = await source.boundingBox();

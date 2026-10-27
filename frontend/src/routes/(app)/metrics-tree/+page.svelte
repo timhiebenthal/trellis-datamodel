@@ -267,9 +267,8 @@
             <header class="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-2.5">
                 <div class="min-w-0">
                     <h2 class="text-sm font-semibold text-slate-800">Metric Tree</h2>
-                    <!-- Direction is the whole point of this canvas: arrows leave drivers and land on effects. -->
                     <p class="truncate text-xs text-slate-500">
-                        Arrows run from a driver to the metric it moves.
+                        Top-down hierarchy from high-level metrics to the input metrics that drive them.
                     </p>
                 </div>
                 <p class="shrink-0 text-xs tabular-nums text-slate-500" data-testid="metric-count">

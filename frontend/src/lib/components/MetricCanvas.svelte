@@ -4,7 +4,6 @@
         Controls,
         Background,
         BackgroundVariant,
-        MarkerType,
         type Connection,
         type Edge,
         type Node,
@@ -15,7 +14,6 @@
     import MetricInfluenceEdge from "./MetricInfluenceEdge.svelte";
     import type { MetricEntry, MetricInfluence } from "$lib/types";
     import {
-        METRIC_ACCENT,
         buildMetricEdges,
         buildMetricNodes,
         type MetricCanvasActions,
@@ -46,7 +44,7 @@
         selectedMetricId?: string | null;
         onaddmetric?: () => void;
         onselectmetric?: (metricId: string | null) => void;
-        /** Drag source is the driver, drag target is the effect. */
+        /** Callback receives (driver, effect). In top-to-bottom layout, source is effect (top) and target is driver (bottom). */
         onconnect?: (driver: string, effect: string) => void;
         ondeleteedge?: (driver: string, effect: string) => void;
         ondeletemetric?: (metricId: string) => void;
@@ -68,28 +66,21 @@
     );
 
     const flowEdges = $derived(
-        buildMetricEdges(metrics, influences).map((edge) => ({
-            ...edge,
-            // Directed claim: the arrow points at the metric that moves.
-            markerEnd: {
-                type: MarkerType.ArrowClosed,
-                width: 16,
-                height: 16,
-                color: METRIC_ACCENT,
-            },
-        })) as unknown as Edge[],
+        buildMetricEdges(metrics, influences) as unknown as Edge[],
     );
 
     const isEmpty = $derived(metrics.length === 0);
 
     function handleConnect(connection: Connection) {
         if (!connection.source || !connection.target) return;
-        onconnect?.(connection.source, connection.target);
+        // Top-to-bottom tree: source (bottom handle of upper node) is the effect,
+        // target (top handle of lower node) is the driver.
+        onconnect?.(connection.target, connection.source);
     }
 
     function handleDelete({ nodes: goneNodes, edges: goneEdges }: { nodes: Node[]; edges: Edge[] }) {
         for (const edge of goneEdges ?? []) {
-            ondeleteedge?.(edge.source, edge.target);
+            ondeleteedge?.(edge.target, edge.source);
         }
         for (const node of goneNodes ?? []) {
             ondeletemetric?.(node.id);
@@ -114,15 +105,15 @@
         onmove(targetNode.id, { x: targetNode.position.x, y: targetNode.position.y });
     }
 
-    /** A metric cannot drive itself, and the same arrow only exists once. */
+    /** A metric cannot drive itself, and the same connection only exists once. */
     function isValidConnection(connection: Connection | Edge): boolean {
         if (!connection.source || !connection.target) return false;
         if (connection.source === connection.target) return false;
 
         return !influences.some(
             (influence) =>
-                influence.effect === connection.target &&
-                influence.drivers.includes(connection.source as string),
+                influence.effect === connection.source &&
+                influence.drivers.includes(connection.target as string),
         );
     }
 </script>
@@ -195,8 +186,8 @@
         <div
             class="pointer-events-none absolute bottom-4 left-4 z-10 max-w-xs rounded-lg border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] leading-relaxed text-slate-500 shadow-sm backdrop-blur-sm"
         >
-            Drag from a node's right dot onto another node to record an influence. Select an
-            arrow and press Backspace to remove it.
+            Drag from a metric's bottom dot to a driver metric below it to record an influence.
+            Select a line and press Backspace to remove it.
         </div>
     {/if}
 </div>

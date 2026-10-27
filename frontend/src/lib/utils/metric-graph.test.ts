@@ -84,7 +84,7 @@ describe('buildMetricNodes', () => {
 describe('buildMetricEdges', () => {
     const metrics = [metric('revenue'), metric('avg_price'), metric('order_count')];
 
-    it('builds one edge per driver, pointing from the driver at the effect', () => {
+    it('builds one edge per driver, connecting the effect at the top (source) to the driver below (target)', () => {
         const influences: MetricInfluence[] = [
             { effect: 'revenue', drivers: ['avg_price', 'order_count'] },
         ];
@@ -93,8 +93,8 @@ describe('buildMetricEdges', () => {
 
         expect(edges).toHaveLength(2);
         expect(edges).toEqual([
-            { id: influenceEdgeId('avg_price', 'revenue'), type: 'influence', source: 'avg_price', target: 'revenue' },
-            { id: influenceEdgeId('order_count', 'revenue'), type: 'influence', source: 'order_count', target: 'revenue' },
+            { id: influenceEdgeId('avg_price', 'revenue'), type: 'influence', source: 'revenue', target: 'avg_price' },
+            { id: influenceEdgeId('order_count', 'revenue'), type: 'influence', source: 'revenue', target: 'order_count' },
         ]);
     });
 
@@ -109,7 +109,8 @@ describe('buildMetricEdges', () => {
         ]);
 
         expect(edges).toHaveLength(1);
-        expect(edges[0].source).toBe('avg_price');
+        expect(edges[0].source).toBe('revenue');
+        expect(edges[0].target).toBe('avg_price');
     });
 
     it('drops influences that reference a metric that is not on the canvas', () => {

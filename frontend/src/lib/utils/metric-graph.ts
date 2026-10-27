@@ -122,10 +122,10 @@ export function buildMetricNodes(
 }
 
 /**
- * One directed edge per driver, from the driver to the effect. Repeated drivers
- * collapse, self-influences are dropped, and so is anything pointing at a metric
- * that is not on the canvas - the backend rejects those, so they can only arrive
- * from a hand-edited file.
+ * One edge per driver, connecting the bottom handle of the upper `effect` node
+ * (`source`) to the top handle of the lower `driver` node (`target`). Repeated
+ * drivers collapse, self-influences are dropped, and so is anything pointing at
+ * a metric that is not on the canvas.
  */
 export function buildMetricEdges(
     metrics: MetricEntry[],
@@ -148,8 +148,8 @@ export function buildMetricEdges(
             edges.push({
                 id,
                 type: 'influence',
-                source: driver,
-                target: influence.effect,
+                source: influence.effect,
+                target: driver,
             });
         }
     }

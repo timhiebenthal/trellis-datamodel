@@ -39,20 +39,20 @@
     data-metric-id={metric?.id}
     title={metric?.description || label}
 >
-    <!-- Direction rail: drivers arrive on the left handle, effects leave on the right -->
+    <!-- Accent rail -->
     <span class="absolute inset-y-0 left-0 w-1 rounded-l-lg bg-violet-400" aria-hidden="true"></span>
 
     <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         class="!h-2.5 !w-2.5 !rounded-full !border-2 !border-white !bg-violet-500"
-        title="Influenced by another metric"
+        title="Connect from the upper metric this one drives"
     />
     <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         class="!h-2.5 !w-2.5 !rounded-full !border-2 !border-white !bg-violet-500"
-        title="Drag to the metric this one influences"
+        title="Drag to a driver metric below"
     />
 
     <div class="py-2.5 pl-4 pr-2">

@@ -56,17 +56,17 @@ describe('MetricCanvas', () => {
         expect(nodes.every((node) => node.type === 'metric')).toBe(true);
     });
 
-    it('renders one directed edge per driver, with an arrow and no label', () => {
+    it('renders one edge per driver from effect (top) to driver (bottom), with no arrowhead or label', () => {
         render(MetricCanvas, { props: { metrics, influences, layout: {} } });
 
         const edges = lastFlow().edges as Array<Record<string, any>>;
         expect(edges).toHaveLength(2);
         expect(edges.map((edge) => [edge.source, edge.target])).toEqual([
-            ['avg_price', 'revenue'],
-            ['order_count', 'revenue'],
+            ['revenue', 'avg_price'],
+            ['revenue', 'order_count'],
         ]);
         expect(edges.every((edge) => edge.type === 'influence')).toBe(true);
-        expect(edges.every((edge) => edge.markerEnd?.type === 'arrowclosed')).toBe(true);
+        expect(edges.every((edge) => edge.markerEnd === undefined)).toBe(true);
         expect(edges.every((edge) => edge.label === undefined)).toBe(true);
     });
 
@@ -103,11 +103,11 @@ describe('MetricCanvas', () => {
         expect(onaddmetric).toHaveBeenCalledOnce();
     });
 
-    it('reports a dragged connection with the drag source as driver', () => {
+    it('reports a dragged connection with the upper source node as effect and lower target node as driver', () => {
         const onconnect = vi.fn();
         render(MetricCanvas, { props: { metrics, influences: [], layout: {}, onconnect } });
 
-        lastFlow().onconnect({ source: 'order_count', target: 'revenue' });
+        lastFlow().onconnect({ source: 'revenue', target: 'order_count' });
 
         expect(onconnect).toHaveBeenCalledWith('order_count', 'revenue');
     });
@@ -116,20 +116,20 @@ describe('MetricCanvas', () => {
         render(MetricCanvas, { props: { metrics, influences: [], layout: {} } });
 
         expect(lastFlow().isValidConnection({ source: 'revenue', target: 'revenue' })).toBe(false);
-        expect(lastFlow().isValidConnection({ source: 'order_count', target: 'revenue' })).toBe(true);
+        expect(lastFlow().isValidConnection({ source: 'revenue', target: 'order_count' })).toBe(true);
     });
 
     it('refuses an influence that is already on the tree', () => {
         render(MetricCanvas, { props: { metrics, influences, layout: {} } });
 
-        expect(lastFlow().isValidConnection({ source: 'avg_price', target: 'revenue' })).toBe(false);
+        expect(lastFlow().isValidConnection({ source: 'revenue', target: 'avg_price' })).toBe(false);
     });
 
     it('reports a deleted edge as a driver and an effect', () => {
         const ondeleteedge = vi.fn();
         render(MetricCanvas, { props: { metrics, influences, layout: {}, ondeleteedge } });
 
-        lastFlow().ondelete({ nodes: [], edges: [{ source: 'avg_price', target: 'revenue' }] });
+        lastFlow().ondelete({ nodes: [], edges: [{ source: 'revenue', target: 'avg_price' }] });
 
         expect(ondeleteedge).toHaveBeenCalledWith('avg_price', 'revenue');
     });
