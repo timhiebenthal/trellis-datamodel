@@ -145,12 +145,28 @@ def reconcile_entity_fields(
             or None when the model is absent from the manifest (non-destructive).
 
     Returns:
-        Reconciled field list. Order: dbt fields (manifest order) then
-        surviving draft fields (original order).
+        Reconciled field list. Order: the fields already in the data model
+        keep their position; materialized columns the data model doesn't have
+        yet are appended in manifest order. The manifest is authoritative for
+        a field's content, never for where it sits - re-deriving the order
+        from the manifest on every boot silently undid whatever the user
+        arranged, and rewrote data_model.yml on each page load (see #152).
     """
     if manifest_columns is None:
         # Model absent from manifest — non-destructive, return unchanged.
         return existing_fields
+
+    manifest_by_name: dict[str, dict[str, Any]] = {}
+    manifest_order: list[str] = []
+    for col in manifest_columns:
+        col_name = col.get("name")
+        if not col_name or col_name in manifest_by_name:
+            continue
+        manifest_by_name[col_name] = col
+        manifest_order.append(col_name)
+
+    result: list[dict[str, Any]] = []
+    placed: set[str] = set()
 
     # Index existing fields by name for O(1) lookup
     existing_by_name: dict[str, dict[str, Any]] = {}
@@ -159,21 +175,12 @@ def reconcile_entity_fields(
         if name:
             existing_by_name[name] = field
 
-    manifest_names: set[str] = set()
-    result: list[dict[str, Any]] = []
-
-    for col in manifest_columns:
-        col_name = col.get("name")
-        if not col_name:
-            continue
-        manifest_names.add(col_name)
-
+    def reconcile_field(name: str, col: Mapping[str, Any]) -> dict[str, Any]:
         # Start from existing entry to preserve extra keys (e.g. origin, roles)
-        existing = existing_by_name.get(col_name, {})
-        field: dict[str, Any] = dict(existing)
+        field: dict[str, Any] = dict(existing_by_name.get(name, {}))
 
         # dbt is authoritative for these attributes
-        field["name"] = col_name
+        field["name"] = name
         field["datatype"] = _map_column_type(col.get("type"))
         field["source"] = "dbt"
         # Preserve the exact warehouse/adapter type (e.g. "varchar") alongside
@@ -190,14 +197,33 @@ def reconcile_entity_fields(
             # No source (meta, resolved origin, description) carries origin
             # anymore: drop the stale one.
             del field["origin"]
+        placed.add(name)
+        return field
 
-        result.append(field)
-
-    # Append surviving draft fields (those not matched by any manifest column)
+    # Index existing fields by name for O(1) lookup
+    existing_by_name: dict[str, dict[str, Any]] = {}
     for field in existing_fields:
         name = field.get("name")
-        if name and name not in manifest_names:
+        if name:
+            existing_by_name[name] = field
+
+    # Existing fields keep their position; drafts survive untouched.
+    for field in existing_fields:
+        name = field.get("name")
+        if not name:
+            continue
+        col = manifest_by_name.get(name)
+        if col is None:
             result.append(field)
+            placed.add(name)
+        else:
+            result.append(reconcile_field(name, col))
+
+    # Materialized columns the data model doesn't know yet, in manifest order.
+    for name in manifest_order:
+        if name in placed:
+            continue
+        result.append(reconcile_field(name, manifest_by_name[name]))
 
     return result
 

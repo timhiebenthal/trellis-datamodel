@@ -24,7 +24,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `custom_extensions` and `ai_context`. The block is normalised only when
   `trellis.yml` declares it, and it is off by default.
 
+## [0.25.0] - 2026-10-27
+
+Promotes 0.25.0b2 to a final release. No code changes since the beta: the Ossie
+export, the push fixes and the column-order fix are already in it.
+
+## [0.25.0b2] - 2026-10-27
+
 ### Fixed
+- **Column order stops churning between Push and the next app boot:** three
+  writers each imposed their own order on the same column list. Boot reconcile
+  re-derived `data_model.yml` field order from the dbt manifest, and Push
+  rewrote each `schema.yml` column list in data-model order, so arranging
+  columns in Trellis survived only until the next page load and every review
+  diff showed columns moving that nobody moved. Only the incoming list's
+  *content* is applied now: columns already in a file keep their position and
+  new ones are appended, in both `reconcile_entity_fields` and
+  `YamlHandler.update_columns_batch`. That also fixes the entity modal
+  reshuffling a whole `schema.yml` when a single description was edited. dbt
+  push now matches Bruin's existing behaviour.
 - **Ossie export no longer claims keys it cannot prove:** the key fallback read
   every relationship in `data_model.yml`, including the ones the export skipped
   and many-to-many pairs, and could turn two inbound relationships into two
