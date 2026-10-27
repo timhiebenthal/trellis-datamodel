@@ -83,7 +83,6 @@ def catalog_docs(monkeypatch, tmp_path):
         cfg.MetricsConfig(
             enabled=True,
             file=str(tmp_path / "metric_tree.yml"),
-            layout_file=str(tmp_path / "metric_layout.yml"),
         ),
     )
     monkeypatch.setattr(metric_tree_service, "get_models", lambda: FIXTURE_MODELS)

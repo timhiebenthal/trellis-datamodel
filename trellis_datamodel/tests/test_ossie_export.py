@@ -1864,7 +1864,6 @@ def configure_metrics(
         cfg.MetricsConfig(
             enabled=enabled,
             file=str(tree_path),
-            layout_file=str(Path(tmp_path) / "metric_layout.yml"),
             expression_dialect=dialect,
         ),
     )

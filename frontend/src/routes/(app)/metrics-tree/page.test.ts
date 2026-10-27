@@ -90,7 +90,7 @@ describe('metrics-tree page', () => {
 
         expect(nodePositions()).toEqual([
             { id: 'revenue', position: { x: 10, y: 80 } },
-            { id: 'orders', position: { x: 20, y: 270 } },
+            { id: 'orders', position: { x: 10, y: 270 } },
         ]);
     });
 
@@ -133,7 +133,7 @@ describe('metrics-tree page', () => {
 
         const payload = api.saveMetricTree.mock.calls[0][0];
         expect(payload.metrics[0].label).toBe('Booked revenue');
-        expect(payload.metrics[0].position).toEqual({ x: 10, y: 20 });
+        expect(payload.metrics[0].position).toBeUndefined();
 
         // The canvas instance is the same one, still at the same coordinates.
         expect(flow.instances).toBe(1);
@@ -177,7 +177,7 @@ describe('metrics-tree page', () => {
 });
 
 describe('metrics-tree layout round-trip', () => {
-    it('saves a dragged position with y locked to the metric tree level and keeps effect and drivers aligned', async () => {
+    it('keeps a dragged position with y locked to the metric tree level on screen without triggering a save', async () => {
         render(MetricsTreePage);
         await waitFor(() => expect(flow.props).not.toBeNull());
 
@@ -187,17 +187,13 @@ describe('metrics-tree layout round-trip', () => {
             event: new MouseEvent('mouseup'),
         });
 
-        await waitFor(() => expect(api.saveMetricTree).toHaveBeenCalledTimes(1), { timeout: 2000 });
-
-        const payload = api.saveMetricTree.mock.calls[0][0];
-        const orders = payload.metrics.find((metric: { id: string }) => metric.id === 'orders');
-        expect(orders.position).toEqual({ x: 640, y: 270 });
-        expect(payload.metrics[0].position).toEqual({ x: 640, y: 80 });
-
-        expect(nodePositions()).toEqual([
-            { id: 'revenue', position: { x: 640, y: 80 } },
-            { id: 'orders', position: { x: 640, y: 270 } },
-        ]);
+        await waitFor(() =>
+            expect(nodePositions()).toEqual([
+                { id: 'revenue', position: { x: 640, y: 80 } },
+                { id: 'orders', position: { x: 640, y: 270 } },
+            ]),
+        );
+        expect(api.saveMetricTree).not.toHaveBeenCalled();
         expect(flow.instances).toBe(1);
     });
 
@@ -206,6 +202,6 @@ describe('metrics-tree layout round-trip', () => {
         await waitFor(() => expect(flow.props).not.toBeNull());
 
         const orders = nodePositions().find((node) => node.id === 'orders');
-        expect(orders?.position).toEqual({ x: 20, y: 270 });
+        expect(orders?.position).toEqual({ x: 10, y: 270 });
     });
 });

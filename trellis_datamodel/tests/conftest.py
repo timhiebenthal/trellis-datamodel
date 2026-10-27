@@ -63,11 +63,10 @@ def clean_test_files():
     if os.path.exists(business_events_path):
         os.remove(business_events_path)
 
-    # Clean metric tree files
-    for filename in ("metric_tree.yml", "metric_layout.yml"):
-        metric_path = os.path.join(_TEST_TEMP_DIR, filename)
-        if os.path.exists(metric_path):
-            os.remove(metric_path)
+    # Clean metric tree file
+    metric_path = os.path.join(_TEST_TEMP_DIR, "metric_tree.yml")
+    if os.path.exists(metric_path):
+        os.remove(metric_path)
 
     # Clean model yml files (recursively) to avoid cross-test leakage
     models_dir = os.path.join(_TEST_TEMP_DIR, "models", "3_core")
@@ -113,7 +112,6 @@ def _reset_shared_test_state():
     cfg.SOURCE_CHIPS_CONFIG = cfg.SourceChipsConfig()
     cfg.METRICS_CONFIG = cfg.MetricsConfig(
         file=os.path.join(_TEST_TEMP_DIR, "metric_tree.yml"),
-        layout_file=os.path.join(_TEST_TEMP_DIR, "metric_layout.yml"),
     )
 
     from trellis_datamodel.adapters.artifact_snapshot import clear_snapshots

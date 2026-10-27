@@ -190,13 +190,7 @@
         layout = alignMetricLayout(
             connected.state.metrics,
             connected.state.influences,
-            withMetricPosition(
-                layout,
-                metric.id,
-                pos,
-                connected.state.metrics,
-                connected.state.influences,
-            ),
+            withMetricPosition(layout, metric.id, pos),
         );
         applyGraph(connected.state);
 
@@ -247,13 +241,7 @@
         layout = alignMetricLayout(
             connected.state.metrics,
             connected.state.influences,
-            withMetricPosition(
-                layout,
-                added.metric.id,
-                pos,
-                connected.state.metrics,
-                connected.state.influences,
-            ),
+            withMetricPosition(layout, added.metric.id, pos),
         );
         applyGraph(connected.state);
 
@@ -309,8 +297,8 @@
     }
 
     /**
-     * A dropped node updates the local layout first and the save follows, so the
-     * position is in the very next payload rather than a reload later.
+     * A dropped node updates the local runtime layout on the canvas without
+     * rewriting `metric_tree.yml`.
      */
     function handleMoveMetric(metricId: string, position: { x: number; y: number }) {
         layout = withMetricPosition(
@@ -320,7 +308,6 @@
             tree?.metrics ?? [],
             tree?.influences ?? [],
         );
-        requestSave();
     }
 
     function handleMetricChange(patch: Partial<MetricEntry>) {

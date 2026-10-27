@@ -200,7 +200,6 @@ def install_metrics(monkeypatch, tmp_path, *, enabled, metrics):
         cfg.MetricsConfig(
             enabled=enabled,
             file=str(tree_path),
-            layout_file=str(tmp_path / "metric_layout.yml"),
         ),
     )
     return tree_path

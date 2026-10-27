@@ -70,7 +70,6 @@ class MetricsConfig:
 
     enabled: bool = False
     file: str = ""  # resolved absolute path to metric_tree.yml
-    layout_file: str = ""  # resolved absolute path to metric_layout.yml
     expression_dialect: str = "ANSI_SQL"
 
 
@@ -129,7 +128,6 @@ if _TEST_DIR:
     )
     METRICS_CONFIG: MetricsConfig = MetricsConfig(
         file=os.path.join(_TEST_DIR, "metric_tree.yml"),
-        layout_file=os.path.join(_TEST_DIR, "metric_layout.yml"),
     )
     GUIDANCE_CONFIG: GuidanceConfig = GuidanceConfig()
     DIMENSIONAL_MODELING_CONFIG: DimensionalModelingConfig = DimensionalModelingConfig()
@@ -796,14 +794,6 @@ def load_config(config_path: Optional[str] = None) -> None:
             config,
             "file",
             "metric_tree.yml",
-        ),
-        layout_file=_resolve_metrics_file_path(
-            CONFIG_PATH,
-            DBT_PROJECT_PATH,
-            DATA_MODEL_PATH,
-            config,
-            "layout_file",
-            "metric_layout.yml",
         ),
         expression_dialect=metrics_dialect,
     )

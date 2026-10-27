@@ -1253,7 +1253,7 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
  */
 
 /**
- * Fetch the metric tree document with layout merged into each metric.
+ * Fetch the metric tree document.
  * @returns Promise containing the tree plus the semantic-model catalog
  */
 export async function getMetricTree(): Promise<
@@ -1273,8 +1273,7 @@ export async function getMetricTree(): Promise<
 }
 
 /**
- * Save the metric tree document. Positions are sent on each metric and split
- * into metric_layout.yml by the backend.
+ * Save the metric tree document.
  * @param payload - version, metrics and influences to persist
  * @returns Promise containing the status and any validation warnings
  */

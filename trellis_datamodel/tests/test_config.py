@@ -658,7 +658,7 @@ def test_ossie_non_dict_falls_back_to_defaults(monkeypatch, tmp_path, caplog):
 
 
 def test_metrics_defaults_to_disabled(monkeypatch, tmp_path):
-    """No metrics block leaves the feature off with default files and dialect."""
+    """No metrics block leaves the feature off with default file and dialect."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -674,13 +674,10 @@ def test_metrics_defaults_to_disabled(monkeypatch, tmp_path):
     assert cfg.METRICS_CONFIG.enabled is False
     assert cfg.METRICS_CONFIG.expression_dialect == "ANSI_SQL"
     assert cfg.METRICS_CONFIG.file == os.path.abspath(tmp_path / "metric_tree.yml")
-    assert cfg.METRICS_CONFIG.layout_file == os.path.abspath(
-        tmp_path / "metric_layout.yml"
-    )
 
 
 def test_metrics_nested_config_populates_values(monkeypatch, tmp_path):
-    """A declared block populates enablement, paths and dialect."""
+    """A declared block populates enablement, path and dialect."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -699,7 +696,7 @@ def test_metrics_nested_config_populates_values(monkeypatch, tmp_path):
 
 
 def test_metrics_relative_paths_resolve_under_project_path(monkeypatch, tmp_path):
-    """Explicit relative files resolve against dbt_project_path."""
+    """Explicit relative file resolves against dbt_project_path."""
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -707,37 +704,30 @@ def test_metrics_relative_paths_resolve_under_project_path(monkeypatch, tmp_path
         dbt_project_path: .
         metrics:
           file: docs/metrics.yml
-          layout_file: docs/layout.yml
         """,
     )
 
     cfg.load_config(str(config_path))
 
     assert cfg.METRICS_CONFIG.file == os.path.abspath(tmp_path / "docs" / "metrics.yml")
-    assert cfg.METRICS_CONFIG.layout_file == os.path.abspath(
-        tmp_path / "docs" / "layout.yml"
-    )
 
 
 def test_metrics_absolute_paths_are_preserved(monkeypatch, tmp_path):
-    """Absolute paths are used verbatim."""
+    """Absolute path is used verbatim."""
     _prepare_config(monkeypatch)
     absolute_file = str(tmp_path / "elsewhere" / "metrics.yml")
-    absolute_layout = str(tmp_path / "elsewhere" / "layout.yml")
     config_path = _write_config(
         tmp_path,
         f"""
         dbt_project_path: .
         metrics:
           file: {absolute_file}
-          layout_file: {absolute_layout}
         """,
     )
 
     cfg.load_config(str(config_path))
 
     assert cfg.METRICS_CONFIG.file == absolute_file
-    assert cfg.METRICS_CONFIG.layout_file == absolute_layout
 
 
 def test_metrics_non_dict_falls_back_to_defaults(monkeypatch, tmp_path, caplog):
@@ -783,7 +773,6 @@ def test_normalize_nested_config_emits_metrics_when_declared():
     assert normalized["metrics"] == {
         "enabled": True,
         "file": "",
-        "layout_file": "",
         "expression_dialect": "ANSI_SQL",
     }
 
@@ -797,7 +786,6 @@ def test_normalize_nested_config_falls_back_for_malformed_metrics():
     assert normalized["metrics"] == {
         "enabled": False,
         "file": "",
-        "layout_file": "",
         "expression_dialect": "ANSI_SQL",
     }
 

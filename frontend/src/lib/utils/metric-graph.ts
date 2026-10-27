@@ -16,13 +16,13 @@ import type {
  * the graph can be reasoned about, and tested, without Svelte Flow or a browser.
  */
 
-/** Where a metric sits on the canvas. Mirrors `position` in `metric_layout.yml`. */
+/** Where a metric sits on the canvas. */
 export interface MetricPosition {
     x: number;
     y: number;
 }
 
-/** Positions keyed by metric id, as held by the page before a save. */
+/** Runtime positions keyed by metric id. */
 export type MetricLayout = Record<string, MetricPosition>;
 
 /**
@@ -75,7 +75,7 @@ export const METRIC_GRID = {
     columns: 3,
     columnWidth: 300,
     rowHeight: 190,
-    snapX: 20,
+    snapX: 10,
 } as const;
 
 const METRIC_NODE_MIN_GAP_X = 240;
@@ -83,7 +83,8 @@ const METRIC_NODE_MIN_GAP_X = 240;
 /** Snap a horizontal coordinate to the metric canvas grid. */
 export function snapMetricX(x: number): number {
     if (!Number.isFinite(x)) return METRIC_GRID.originX;
-    const snapped = Math.round(x / METRIC_GRID.snapX) * METRIC_GRID.snapX;
+    const sign = x < 0 ? -1 : 1;
+    const snapped = sign * Math.round(Math.abs(x) / METRIC_GRID.snapX) * METRIC_GRID.snapX;
     return Object.is(snapped, -0) ? 0 : snapped;
 }
 
@@ -265,7 +266,7 @@ function resolveMetricPositions(
     for (const entry of metrics) {
         const stored = layout[entry.id] ?? entry.position;
         if (stored && Number.isFinite(stored.x)) {
-            storedX.set(entry.id, stored.x);
+            storedX.set(entry.id, snapMetricX(stored.x));
         }
     }
 
@@ -279,13 +280,108 @@ function resolveMetricPositions(
         byLevel.set(level, list);
     }
 
+    const sortSiblings = (ids: string[]): string[] =>
+        [...ids].sort((a, b) => {
+            const ax = storedX.get(a);
+            const bx = storedX.get(b);
+            if (ax !== undefined && bx !== undefined && ax !== bx) {
+                return ax - bx;
+            }
+            return (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0);
+        });
+
+    // Assign each node to at most one primary parent on `level - 1` so subtree spans are well-defined.
+    const treeChildren = new Map<string, string[]>();
+    const primaryParent = new Map<string, string>();
+    for (const entry of metrics) {
+        treeChildren.set(entry.id, []);
+    }
+
+    for (let level = 0; level < maxLevel; level++) {
+        const parents = sortSiblings(byLevel.get(level) ?? []);
+        for (const parentId of parents) {
+            const directDrivers = sortSiblings(
+                (driversOf.get(parentId) ?? []).filter(
+                    (driverId) =>
+                        (levels.get(driverId) ?? 0) === level + 1 &&
+                        !primaryParent.has(driverId),
+                ),
+            );
+            treeChildren.set(parentId, directDrivers);
+            for (const driverId of directDrivers) {
+                primaryParent.set(driverId, parentId);
+            }
+        }
+    }
+
+    // Bottom-up pass: compute each node's per-level relative horizontal bounds `[min, max]`
+    // and the symmetric offsets of its direct children so sibling subtrees never collide.
+    const relBounds = new Map<string, Map<number, { min: number; max: number }>>();
+    const childOffsets = new Map<string, Map<string, number>>();
+    const stepQuantum = METRIC_GRID.snapX * 2;
+
+    for (let level = maxLevel; level >= 0; level--) {
+        for (const id of byLevel.get(level) ?? []) {
+            const bounds = new Map<number, { min: number; max: number }>([
+                [level, { min: 0, max: 0 }],
+            ]);
+            const offsets = new Map<string, number>();
+            const children = treeChildren.get(id) ?? [];
+
+            if (children.length > 0) {
+                let step: number = METRIC_GRID.columnWidth;
+                for (let i = 0; i < children.length; i++) {
+                    const boundsI = relBounds.get(children[i]);
+                    if (!boundsI) continue;
+                    for (let j = i + 1; j < children.length; j++) {
+                        const boundsJ = relBounds.get(children[j]);
+                        if (!boundsJ) continue;
+                        for (const [depth, rangeI] of boundsI) {
+                            const rangeJ = boundsJ.get(depth);
+                            if (!rangeJ) continue;
+                            const needed =
+                                (rangeI.max - rangeJ.min + METRIC_GRID.columnWidth) / (j - i);
+                            if (needed > step) {
+                                step = needed;
+                            }
+                        }
+                    }
+                }
+                step = Math.ceil(step / stepQuantum) * stepQuantum;
+
+                const count = children.length;
+                children.forEach((childId, idx) => {
+                    const offset = snapMetricX((idx - (count - 1) / 2) * step);
+                    offsets.set(childId, offset);
+                    const childMap = relBounds.get(childId);
+                    if (!childMap) return;
+                    for (const [depth, range] of childMap) {
+                        const existing = bounds.get(depth);
+                        const min = offset + range.min;
+                        const max = offset + range.max;
+                        if (existing) {
+                            existing.min = Math.min(existing.min, min);
+                            existing.max = Math.max(existing.max, max);
+                        } else {
+                            bounds.set(depth, { min, max });
+                        }
+                    }
+                });
+            }
+
+            relBounds.set(id, bounds);
+            childOffsets.set(id, offsets);
+        }
+    }
+
     const resolvedX = new Map<string, number>();
     const occupiedByLevel = new Map<number, number[]>();
 
     for (let level = 0; level <= maxLevel; level++) {
         const idsOnLevel = byLevel.get(level) ?? [];
-        const occupied: number[] = [];
+        const occupied = occupiedByLevel.get(level) ?? [];
 
+        // 1. Place children of parents from `level - 1` using their exact symmetric offsets.
         if (level > 0) {
             const parentIds = [...(byLevel.get(level - 1) ?? [])].sort(
                 (a, b) =>
@@ -295,35 +391,18 @@ function resolveMetricPositions(
 
             for (const parentId of parentIds) {
                 const parentX = resolvedX.get(parentId) ?? METRIC_GRID.originX;
-                const children = (driversOf.get(parentId) ?? []).filter(
-                    (driverId) =>
-                        (levels.get(driverId) ?? 0) === level && !resolvedX.has(driverId),
-                );
-                if (children.length === 0) continue;
-
-                // Preserve left-to-right visual order when stored x exists, falling back to document order.
-                children.sort((a, b) => {
-                    const ax = storedX.get(a);
-                    const bx = storedX.get(b);
-                    if (ax !== undefined && bx !== undefined && ax !== bx) {
-                        return ax - bx;
-                    }
-                    return (indexById.get(a) ?? 0) - (indexById.get(b) ?? 0);
-                });
-
-                const count = children.length;
-                children.forEach((childId, idx) => {
-                    const offset = (idx - (count - 1) / 2) * METRIC_GRID.columnWidth;
-                    const desiredX = snapMetricX(parentX + offset);
+                const offsets = childOffsets.get(parentId);
+                for (const childId of treeChildren.get(parentId) ?? []) {
+                    if (resolvedX.has(childId)) continue;
+                    const desiredX = snapMetricX(parentX + (offsets?.get(childId) ?? 0));
                     const x = nextFreeLevelX(occupied, desiredX);
                     occupied.push(x);
                     resolvedX.set(childId, x);
-                });
+                }
             }
         }
 
-        // Remaining nodes on this level (roots on level 0, tightened roots on deeper levels,
-        // or drivers whose effects sit more than one level above).
+        // 2. Place remaining nodes on this level (roots, or multi-level edges).
         for (const id of idsOnLevel) {
             if (resolvedX.has(id)) continue;
             const parentXs = (effectsOf.get(id) ?? [])
@@ -341,36 +420,18 @@ function resolveMetricPositions(
                 occupied.push(x);
                 resolvedX.set(id, x);
             } else {
-                const x = nextFreeLevelX(occupied);
+                const bounds = relBounds.get(id);
+                const minRel = bounds
+                    ? Math.min(...Array.from(bounds.values()).map((b) => b.min))
+                    : 0;
+                const preferredRootX = snapMetricX(METRIC_GRID.originX - minRel);
+                const x = nextFreeLevelX(occupied, preferredRootX);
                 occupied.push(x);
                 resolvedX.set(id, x);
             }
         }
 
         occupiedByLevel.set(level, occupied);
-    }
-
-    // Bottom-up pass for roots without stored x that have drivers below them:
-    // center the root above its direct drivers so top-level effects also sit balanced.
-    for (let level = maxLevel - 1; level >= 0; level--) {
-        const idsOnLevel = byLevel.get(level) ?? [];
-        const occupied = occupiedByLevel.get(level) ?? [];
-
-        for (const id of idsOnLevel) {
-            if (storedX.has(id) || (effectsOf.get(id) ?? []).length > 0) continue;
-            const childXs = (driversOf.get(id) ?? [])
-                .map((driverId) => resolvedX.get(driverId))
-                .filter((val): val is number => val !== undefined);
-            if (childXs.length === 0) continue;
-
-            const currentX = resolvedX.get(id);
-            const otherOccupied = occupied.filter((val) => val !== currentX);
-            const avgChildX = childXs.reduce((sum, val) => sum + val, 0) / childXs.length;
-            const x = nextFreeLevelX(otherOccupied, snapMetricX(avgChildX));
-            otherOccupied.push(x);
-            occupiedByLevel.set(level, otherOccupied);
-            resolvedX.set(id, x);
-        }
     }
 
     const resolved = new Map<string, MetricPosition>();
@@ -486,28 +547,45 @@ export function withMetricPosition(
 
     if (metrics.length > 0 && influences.length > 0) {
         const before = resolveMetricPositions(metrics, influences, layout);
+        for (const [id, pos] of before) {
+            if (!updated[id]) {
+                updated[id] = { x: pos.x, y: pos.y };
+            }
+        }
+        updated[metricId] = { x: snappedX, y };
+
         const prevPos = before.get(metricId);
         if (prevPos && prevPos.x !== snappedX) {
             const deltaX = snappedX - prevPos.x;
-            const { effectsOf } = buildInfluenceMaps(metrics, influences);
-            const visited = new Set<string>([metricId]);
-            const queue = [...(effectsOf.get(metricId) ?? [])];
+            const { driversOf, effectsOf } = buildInfluenceMaps(metrics, influences);
+            const directParents = effectsOf.get(metricId) ?? [];
+            const hasSiblings = directParents.some(
+                (parentId) => (driversOf.get(parentId)?.length ?? 0) > 1,
+            );
 
-            while (queue.length > 0) {
-                const current = queue.shift()!;
-                if (visited.has(current)) continue;
-                visited.add(current);
-                const parents = effectsOf.get(current) ?? [];
-                if (parents.length === 0) {
-                    const rootPos = before.get(current);
-                    if (rootPos) {
-                        updated[current] = {
-                            x: Math.max(0, snapMetricX(rootPos.x + deltaX)),
-                            y: rootPos.y,
-                        };
+            // Only shift the upstream root when dragging an single-child chain; when a
+            // driver has siblings, dragging it horizontally reorders it among its siblings
+            // while keeping the effect node anchored.
+            if (!hasSiblings) {
+                const visited = new Set<string>([metricId]);
+                const queue = [...directParents];
+
+                while (queue.length > 0) {
+                    const current = queue.shift()!;
+                    if (visited.has(current)) continue;
+                    visited.add(current);
+                    const parents = effectsOf.get(current) ?? [];
+                    if (parents.length === 0) {
+                        const rootPos = before.get(current);
+                        if (rootPos) {
+                            updated[current] = {
+                                x: snapMetricX(rootPos.x + deltaX),
+                                y: rootPos.y,
+                            };
+                        }
+                    } else {
+                        queue.push(...parents);
                     }
-                } else {
-                    queue.push(...parents);
                 }
             }
         }
@@ -597,31 +675,30 @@ export function buildMetricEdges(
 }
 
 /**
- * The POST body. Positions travel on each metric and the backend splits them into
- * `metric_layout.yml`; `unresolved` and `resolved_expression` are read-only server
- * state and never sent back, and a bound entry is reduced to its reference so a
- * saved file can never hold a copied definition.
+ * The POST body. `position`, `unresolved` and `resolved_expression` are runtime or
+ * read-only state and never sent back, and a bound entry is reduced to its
+ * reference so a saved file can never hold a copied definition.
  */
 export function buildMetricTreePayload(
     tree: { version: number; metrics: MetricEntry[]; influences: MetricInfluence[] },
-    layout: MetricLayout = {},
+    _layout: MetricLayout = {},
 ): MetricTreeFile {
     return {
         version: tree.version,
         metrics: tree.metrics.map((entry) => {
             const {
+                position: _position,
                 unresolved: _unresolved,
                 resolved_expression: _resolvedExpression,
                 ...metric
             } = entry;
-            const stored = layout[metric.id] ?? metric.position;
 
             if (metric.binding) {
                 const { description: _description, expression: _expression, ...reference } = metric;
-                return stored ? { ...reference, position: stored } : reference;
+                return reference;
             }
 
-            return stored ? { ...metric, position: stored } : metric;
+            return metric;
         }),
         influences: tree.influences.map((influence) => ({
             effect: influence.effect,

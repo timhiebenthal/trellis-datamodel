@@ -696,7 +696,6 @@ async def test_put_config_round_trips_the_ossie_block(
 METRICS_FIELD_PATHS = [
     "metrics.enabled",
     "metrics.file",
-    "metrics.layout_file",
     "metrics.expression_dialect",
 ]
 

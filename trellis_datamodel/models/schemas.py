@@ -107,7 +107,6 @@ class MetricsConfig(BaseModel):
     """Metric tree canvas configuration (beta)."""
     enabled: bool = False
     file: str = ""
-    layout_file: str = ""
     expression_dialect: str = "ANSI_SQL"
 
 

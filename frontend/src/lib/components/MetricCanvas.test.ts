@@ -77,8 +77,8 @@ describe('MetricCanvas', () => {
 
         const nodes = lastFlow().nodes as Array<{ id: string; position: { x: number; y: number } }>;
         expect(nodes.find((node) => node.id === 'revenue')?.position).toEqual({ x: 400, y: 80 });
-        expect(nodes.find((node) => node.id === 'avg_price')?.position).toEqual({ x: 260, y: 270 });
-        expect(nodes.find((node) => node.id === 'order_count')?.position).toEqual({ x: 560, y: 270 });
+        expect(nodes.find((node) => node.id === 'avg_price')?.position).toEqual({ x: 250, y: 270 });
+        expect(nodes.find((node) => node.id === 'order_count')?.position).toEqual({ x: 550, y: 270 });
     });
 
     it('shows the empty state with a call to action instead of an empty canvas', async () => {

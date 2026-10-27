@@ -8,7 +8,6 @@ from trellis_datamodel import config as cfg
 from trellis_datamodel.models.metric import MetricTreeUpdate
 from trellis_datamodel.services.metric_tree import (
     load_metric_tree,
-    merge_layout,
     resolve_catalog,
     save_metric_tree,
 )
@@ -36,7 +35,7 @@ def _build_catalog() -> list[dict[str, Any]]:
 @router.get("/metric-tree")
 async def get_metric_tree():
     """
-    Return the metric tree document with layout merged into each metric.
+    Return the metric tree document.
 
     Returns:
         Dictionary with version, metrics, influences, and catalog
@@ -46,7 +45,7 @@ async def get_metric_tree():
     """
     _ensure_metrics_enabled()
 
-    tree = merge_layout(load_metric_tree(cfg.METRICS_CONFIG.file))
+    tree = load_metric_tree(cfg.METRICS_CONFIG.file)
 
     return {
         "version": tree.version,
@@ -61,7 +60,7 @@ async def get_metric_tree():
 @router.post("/metric-tree")
 async def post_metric_tree(payload: MetricTreeUpdate = Body(...)):
     """
-    Save the metric tree document, splitting metric positions into the layout file.
+    Save the metric tree document.
 
     Args:
         payload: MetricTreeUpdate with version, metrics and influences

@@ -270,13 +270,6 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         description="Path to the metric tree file (defaults to metric_tree.yml beside the data model)",
         beta=True,
     ),
-    "metrics.layout_file": ConfigFieldMetadata(
-        type="string",
-        default="",
-        required=False,
-        description="Path to the metric layout file (defaults to metric_layout.yml beside the data model)",
-        beta=True,
-    ),
     "metrics.expression_dialect": ConfigFieldMetadata(
         type="enum",
         enum_values=["ANSI_SQL", "OSSIE_SQL_2026"],
@@ -301,7 +294,6 @@ _BETA_FIELDS = [
     "ossie.source.schema",
     "metrics.enabled",
     "metrics.file",
-    "metrics.layout_file",
     "metrics.expression_dialect",
 ]
 
@@ -476,7 +468,6 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         normalized["metrics"] = {
             "enabled": bool(metrics.get("enabled", False)),
             "file": metrics_str(metrics.get("file")),
-            "layout_file": metrics_str(metrics.get("layout_file")),
             "expression_dialect": dialect,
         }
 

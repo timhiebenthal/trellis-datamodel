@@ -1398,7 +1398,7 @@
                             <div class="bg-white border border-amber-200 rounded-lg p-4">
                                 <div class="flex items-center gap-2 mb-4">
                                     <h3 class="text-base font-semibold text-amber-900">Metric Tree</h3>
-                                    <Tooltip text="Design a metric tree on its own canvas and emit the drafted metrics into the Apache Ossie document on push. The two files below hold the metric graph and the node layout.">
+                                    <Tooltip text="Design a metric tree on its own canvas and emit the drafted metrics into the Apache Ossie document on push.">
                                         <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
                                     </Tooltip>
                                 </div>
@@ -1449,26 +1449,6 @@
                                             <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('metrics.file')?.description}</p>
                                         {:else}
                                             <p class="mt-1.5 text-xs text-gray-500">Path to the metric tree file (optional, defaults to metric_tree.yml in data model directory)</p>
-                                        {/if}
-                                    </div>
-
-                                    <div>
-                                        <label for="metrics-layout-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Metric Layout File
-                                        </label>
-                                        <input
-                                            id="metrics-layout-file-input"
-                                            type="text"
-                                            value={getFieldValue('metrics.layout_file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('metrics.layout_file', e.currentTarget.value)}
-                                            placeholder="metric_layout.yml (defaults to same directory as data_model.yml)"
-                                            disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
-                                        {#if getFieldMetadata('metrics.layout_file')?.description}
-                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('metrics.layout_file')?.description}</p>
-                                        {:else}
-                                            <p class="mt-1.5 text-xs text-gray-500">Path to the metric layout file (optional, defaults to metric_layout.yml in data model directory)</p>
                                         {/if}
                                     </div>
 

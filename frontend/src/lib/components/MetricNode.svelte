@@ -472,3 +472,9 @@
         </div>
     </div>
 </div>
+
+<style>
+    :global(.svelte-flow__node:has([data-testid="metric-node-picker"])) {
+        z-index: 1001 !important;
+    }
+</style>

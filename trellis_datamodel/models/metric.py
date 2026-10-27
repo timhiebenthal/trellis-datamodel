@@ -10,13 +10,6 @@ class MetricBinding(BaseModel):
     name: str = Field(..., description="Metric name within that dataset")
 
 
-class Position(BaseModel):
-    """Canvas position for a metric node. Wire/layout only, never persisted to metric_tree.yml."""
-
-    x: float = Field(..., description="Horizontal canvas position")
-    y: float = Field(..., description="Vertical canvas position")
-
-
 class MetricEntry(BaseModel):
     """A metric on the canvas: authored in Trellis (draft) or bound to the semantic model."""
 
@@ -33,9 +26,6 @@ class MetricEntry(BaseModel):
     )
     binding: MetricBinding | None = Field(
         None, description="Bound metric reference; never set on a draft"
-    )
-    position: Position | None = Field(
-        None, description="Canvas position supplied by the client, split into metric_layout.yml"
     )
     # Read-only resolution state for the API, attached at load time. Never
     # authored by a client and never written: `save_metric_tree` excludes both
@@ -71,4 +61,4 @@ class MetricTreeFile(BaseModel):
 
 
 class MetricTreeUpdate(MetricTreeFile):
-    """POST /api/metric-tree payload; identical shape, positions allowed per metric."""
+    """POST /api/metric-tree payload."""

@@ -12,11 +12,10 @@ from trellis_datamodel.utils.structured_data import load_yaml_or_json
 
 @pytest.fixture
 def metrics_paths(monkeypatch, tmp_path):
-    """Point the metric tree file paths at a throwaway directory, feature on."""
+    """Point the metric tree file path at a throwaway directory, feature on."""
     config = cfg.MetricsConfig(
         enabled=True,
         file=str(tmp_path / "metric_tree.yml"),
-        layout_file=str(tmp_path / "metric_layout.yml"),
     )
     monkeypatch.setattr(cfg, "METRICS_CONFIG", config)
     return config
@@ -24,11 +23,10 @@ def metrics_paths(monkeypatch, tmp_path):
 
 @pytest.fixture
 def disabled_metrics(monkeypatch, tmp_path):
-    """Point the metric tree file paths at a throwaway directory, feature off."""
+    """Point the metric tree file path at a throwaway directory, feature off."""
     config = cfg.MetricsConfig(
         enabled=False,
         file=str(tmp_path / "metric_tree.yml"),
-        layout_file=str(tmp_path / "metric_layout.yml"),
     )
     monkeypatch.setattr(cfg, "METRICS_CONFIG", config)
     return config
@@ -78,11 +76,10 @@ class TestDisabledGate:
         assert response.status_code == 404
         assert "metrics.enabled" in response.json()["detail"]
         assert not os.path.exists(disabled_metrics.file)
-        assert not os.path.exists(disabled_metrics.layout_file)
 
 
 class TestGetMetricTree:
-    """GET returns the document with layout merged in."""
+    """GET returns the document."""
 
     def test_returns_empty_document_when_no_file(self, test_client, metrics_paths):
         response = test_client.get("/api/metric-tree")
@@ -96,27 +93,23 @@ class TestGetMetricTree:
         }
         assert not os.path.exists(metrics_paths.file)
 
-    def test_returns_saved_document_with_positions_merged(
+    def test_returns_saved_document(
         self, test_client, metrics_paths
     ):
         payload = _payload()
-        payload["metrics"][0]["position"] = {"x": 10, "y": 20}
         assert test_client.post("/api/metric-tree", json=payload).status_code == 200
 
         body = test_client.get("/api/metric-tree").json()
 
         assert [metric["id"] for metric in body["metrics"]] == ["avg_price", "revenue"]
-        revenue = next(m for m in body["metrics"] if m["id"] == "revenue")
-        assert revenue["position"] == {"x": 10.0, "y": 20.0}
-        assert "position" not in body["metrics"][0]
         assert body["influences"] == [{"effect": "revenue", "drivers": ["avg_price"]}]
         assert body["catalog"] == []
 
 
 class TestPostMetricTree:
-    """POST validates, splits layout out and writes both files."""
+    """POST validates and writes metric_tree.yml."""
 
-    def test_round_trip_writes_both_files(
+    def test_round_trip_writes_tree_file(
         self, test_client, metrics_paths, temp_data_model_path
     ):
         Path(temp_data_model_path).write_text(
@@ -150,20 +143,6 @@ class TestPostMetricTree:
         assert response.status_code == 422
         assert "revenue" in response.json()["detail"]
         assert not os.path.exists(metrics_paths.file)
-
-    def test_position_lands_in_layout_and_not_in_the_tree(
-        self, test_client, metrics_paths
-    ):
-        payload = _payload()
-        payload["metrics"][1]["position"] = {"x": 120.5, "y": -40}
-
-        assert test_client.post("/api/metric-tree", json=payload).status_code == 200
-
-        tree = load_yaml_or_json(metrics_paths.file)
-        layout = load_yaml_or_json(metrics_paths.layout_file)
-
-        assert all("position" not in metric for metric in tree["metrics"])
-        assert layout == {"avg_price": {"position": {"x": 120.5, "y": -40}}}
 
 
 class TestConfigInfoFlag:

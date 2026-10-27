@@ -59,9 +59,9 @@ describe('buildMetricNodes', () => {
     });
 
     it('falls back to a metric x position from the payload when the layout has none, with level-locked y', () => {
-        const nodes = buildMetricNodes([metric('revenue', { position: { x: 12, y: 34 } })], {});
+        const nodes = buildMetricNodes([metric('revenue', { position: { x: 10, y: 34 } })], {});
 
-        expect(nodes[0].position).toEqual({ x: 12, y: metricLevelY(0) });
+        expect(nodes[0].position).toEqual({ x: 10, y: metricLevelY(0) });
     });
 
     it('gives metrics on the same level of the tree the exact same y value and spaces them evenly around their effect node', () => {
@@ -85,11 +85,12 @@ describe('buildMetricNodes', () => {
         expect(byId.sum_actual_billable_hours.y).toBe(metricLevelY(1));
         expect(byId.avg_billing_rate.y).toBe(byId.sum_actual_billable_hours.y);
 
-        // Evenly spaced around effect x=500: 500 - 150 = 350 (snapped 360) and 500 + 150 = 650 (snapped 660)
-        // Average of the two drivers' x positions equals the effect's x position (within 1 snap unit)
-        const midpointX = (byId.avg_billing_rate.x + byId.sum_actual_billable_hours.x) / 2;
-        expect(Math.abs(midpointX - byId.sum_actual_billing.x)).toBeLessThanOrEqual(METRIC_GRID.snapX);
-        expect(byId.sum_actual_billable_hours.x - byId.avg_billing_rate.x).toBe(METRIC_GRID.columnWidth);
+        // Exact symmetric spacing around effect x=500: 500 - 150 = 350 and 500 + 150 = 650
+        expect(byId.avg_billing_rate.x).toBe(350);
+        expect(byId.sum_actual_billable_hours.x).toBe(650);
+        expect((byId.avg_billing_rate.x + byId.sum_actual_billable_hours.x) / 2).toBe(
+            byId.sum_actual_billing.x,
+        );
     });
 
     it('gives every unstored metric a distinct position', () => {
@@ -171,29 +172,23 @@ describe('layoutFromMetrics', () => {
 });
 
 describe('buildMetricTreePayload', () => {
-    it('attaches the local layout position to every metric', () => {
+    it('strips runtime positions so metric_tree.yml only holds definitions and influences', () => {
         const payload = buildMetricTreePayload(
             {
                 version: 0.1,
-                metrics: [metric('revenue', { expression: 'sum(amount)' }), metric('orders', { expression: 'count(*)' })],
+                metrics: [
+                    metric('revenue', { expression: 'sum(amount)', position: { x: 5, y: 6 } }),
+                    metric('orders', { expression: 'count(*)' }),
+                ],
                 influences: [{ effect: 'revenue', drivers: ['orders'] }],
             },
             { revenue: { x: 10, y: 20 } },
         );
 
         expect(payload.version).toBe(0.1);
-        expect(payload.metrics[0].position).toEqual({ x: 10, y: 20 });
+        expect(payload.metrics[0].position).toBeUndefined();
         expect(payload.metrics[1].position).toBeUndefined();
         expect(payload.influences).toEqual([{ effect: 'revenue', drivers: ['orders'] }]);
-    });
-
-    it('falls back to the position carried on the metric', () => {
-        const payload = buildMetricTreePayload(
-            { version: 0.1, metrics: [metric('revenue', { position: { x: 5, y: 6 } })], influences: [] },
-            {},
-        );
-
-        expect(payload.metrics[0].position).toEqual({ x: 5, y: 6 });
     });
 
     it('strips the read-only unresolved flag before saving', () => {
@@ -344,8 +339,47 @@ describe('computeMetricLevels and alignMetricLayout', () => {
         expect(aligned.revenue).toEqual({ x: 400, y: metricLevelY(0) });
         expect(aligned.orders.y).toBe(metricLevelY(1));
         expect(aligned.avg_price.y).toBe(metricLevelY(1));
-        expect(aligned.orders.x).toBe(260);
-        expect(aligned.avg_price.x).toBe(560);
+        expect(aligned.orders.x).toBe(250);
+        expect(aligned.avg_price.x).toBe(550);
+    });
+
+    it('widens parent driver spacing when both drivers have their own subtrees so grandchildren never collide', () => {
+        const metrics = [
+            metric('sum_actual_billing', { position: { x: 480, y: 80 } }),
+            metric('avg_billing_rate'),
+            metric('sum_actual_billable_hours'),
+            metric('delivery_pct'),
+            metric('demand_pct'),
+            metric('sum_allocated_hours'),
+            metric('sum_available_hours'),
+        ];
+        const influences: MetricInfluence[] = [
+            {
+                effect: 'sum_actual_billing',
+                drivers: ['avg_billing_rate', 'sum_actual_billable_hours'],
+            },
+            {
+                effect: 'avg_billing_rate',
+                drivers: ['delivery_pct', 'demand_pct'],
+            },
+            {
+                effect: 'sum_actual_billable_hours',
+                drivers: ['sum_allocated_hours', 'sum_available_hours'],
+            },
+        ];
+
+        const aligned = alignMetricLayout(metrics, influences, {});
+
+        // Root is centered between its two level-1 drivers (180 and 780 -> midpoint 480)
+        expect(aligned.sum_actual_billing).toEqual({ x: 480, y: metricLevelY(0) });
+        expect(aligned.avg_billing_rate).toEqual({ x: 180, y: metricLevelY(1) });
+        expect(aligned.sum_actual_billable_hours).toEqual({ x: 780, y: metricLevelY(1) });
+
+        // Each level-1 driver is centered between its own two level-2 drivers
+        expect(aligned.delivery_pct).toEqual({ x: 30, y: metricLevelY(2) });
+        expect(aligned.demand_pct).toEqual({ x: 330, y: metricLevelY(2) });
+        expect(aligned.sum_allocated_hours).toEqual({ x: 630, y: metricLevelY(2) });
+        expect(aligned.sum_available_hours).toEqual({ x: 930, y: metricLevelY(2) });
     });
 });
 
