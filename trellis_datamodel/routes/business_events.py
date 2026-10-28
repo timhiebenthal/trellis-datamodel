@@ -223,6 +223,8 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
         raise HTTPException(status_code=400, detail=str(e))
     except FileOperationError:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error creating business event: {str(e)}"
@@ -491,6 +493,8 @@ async def generate_entities_from_business_event(event_id: str):
         raise HTTPException(status_code=400, detail=str(e))
     except FileOperationError:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error generating entities: {str(e)}"
@@ -589,6 +593,8 @@ async def create_business_event_process(request: CreateProcessRequest = Body(...
         raise HTTPException(status_code=400, detail=str(e))
     except FileOperationError:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating process: {str(e)}")
 
@@ -662,6 +668,8 @@ async def update_business_event_process(
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except FileOperationError:
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating process: {str(e)}")
@@ -749,6 +757,8 @@ async def attach_events_to_business_event_process(
         raise HTTPException(status_code=400, detail=str(e))
     except FileOperationError:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error attaching events to process: {str(e)}"
@@ -787,6 +797,8 @@ async def detach_events_from_business_event_process(
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except FileOperationError:
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
@@ -843,6 +855,8 @@ async def generate_entities_from_business_event_process(process_id: str):
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except FileOperationError:
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
