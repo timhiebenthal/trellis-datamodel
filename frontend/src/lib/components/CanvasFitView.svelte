@@ -11,6 +11,9 @@
     const { fitView } = useSvelteFlow();
 
     let fitted = false;
+    // Flips once the boot fit's animation has finished, so callers (and e2e
+    // tests) can tell the viewport is no longer moving under the pointer (#170).
+    let fitSettled = $state(false);
 
     $effect(() => {
         if (!active || fitted) return;
@@ -21,8 +24,14 @@
         // Defer until the nodes are measured, then fit once.
         const timer = setTimeout(() => {
             fitted = true;
-            void fitView({ padding: 0.15, maxZoom: 1.2, duration: 250 });
+            void fitView({ padding: 0.15, maxZoom: 1.2, duration: 250 }).finally(() => {
+                fitSettled = true;
+            });
         }, 250);
         return () => clearTimeout(timer);
     });
 </script>
+
+{#if fitSettled}
+    <div data-testid="canvas-fitted" hidden></div>
+{/if}
