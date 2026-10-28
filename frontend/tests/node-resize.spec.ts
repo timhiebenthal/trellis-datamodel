@@ -132,4 +132,18 @@ test.describe('Group Node Resize', () => {
             `group height must persist after release (before=${before.height}, after=${after.height})`,
         ).toBeGreaterThan(before.height + 50);
     });
+
+    test('the dragged edge follows the cursor at the current zoom', async ({ page }) => {
+        await openFreshCanvas(page);
+        await prepareCanvas(page, GROUP);
+
+        // Pointer deltas are screen pixels, sizes are flow units: without the zoom
+        // correction the edge drifts away from the cursor (#170).
+        const grab = await assertGrabbable(page, HEIGHT_HANDLE, 'height-resize-handle');
+        const { before, after } = await dragHandle(page, grab, () => box(page, GROUP_BODY), 0, 120);
+
+        const bottomMovedBy = after.y + after.height - (before.y + before.height);
+        expect(bottomMovedBy).toBeGreaterThan(120 - 3);
+        expect(bottomMovedBy).toBeLessThan(120 + 3);
+    });
 });

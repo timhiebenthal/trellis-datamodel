@@ -35,12 +35,35 @@ export async function prepareCanvas(
     nodeSelector: string,
     zoomOutClicks = 3,
 ): Promise<void> {
+    // The canvas runs a one-off animated fit shortly after boot. Zooming before it
+    // lands gets overridden mid-flight, sliding the handle out from under the
+    // pointer so the press hits nothing (#170).
+    await expect(page.getByTestId('canvas-fitted')).toBeAttached({ timeout: 10000 });
     await page.locator('.svelte-flow__controls-fitview').click();
     for (let i = 0; i < zoomOutClicks; i++) {
         await page.locator('.svelte-flow__controls-zoomout').click();
     }
     await expect(page.locator(nodeSelector)).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(200);
+    // Wait out the zoom/fit animations: the node must hold still before a handle
+    // is measured.
+    await expectStable(() => box(page, nodeSelector));
+}
+
+/** Poll until `sample` returns the same value on consecutive reads. */
+export async function expectStable<T>(sample: () => Promise<T>, intervalMs = 150): Promise<T> {
+    let previous = JSON.stringify(await sample());
+    await expect
+        .poll(
+            async () => {
+                const current = JSON.stringify(await sample());
+                const stable = current === previous;
+                previous = current;
+                return stable;
+            },
+            { intervals: [intervalMs], timeout: 10000 },
+        )
+        .toBe(true);
+    return JSON.parse(previous) as T;
 }
 
 /**
@@ -93,8 +116,8 @@ export async function assertGrabbable(
 
 /**
  * Press on the returned grab point, drag by (dx, dy), sample mid-drag with the
- * button still held, release, then sample again ~600ms later (long enough for the
- * auto-fit pass and its 50ms/300ms timers to run).
+ * button still held, release, then sample again once the size stops changing (after the
+ * auto-fit pass and its 50ms/300ms timers have run).
  *
  * `sample` is caller-supplied so each spec can measure what actually matters for
  * its node type, and `settleMs` lets a caller wait out a CSS transition.
@@ -116,7 +139,9 @@ export async function dragHandle<T>(
     }
     const during = await sample();
     await page.mouse.up();
-    await page.waitForTimeout(600);
-    const after = await sample();
+    // Auto-fit runs on 50ms/300ms timers after release; wait for the size to hold
+    // still rather than guessing a delay.
+    await page.waitForTimeout(350);
+    const after = await expectStable(sample);
     return { before, during, after };
 }
