@@ -11,7 +11,6 @@ import os
 import re
 import time
 import yaml
-from collections import deque
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional
@@ -30,6 +29,7 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.utils.path_validation import validate_path_is_safe
+from trellis_datamodel.adapters.lineage import walk_upstream
 from trellis_datamodel.utils.structured_data import load_data_model_file
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
@@ -1576,37 +1576,23 @@ class DbtCoreAdapter:
         if model_unique_id not in nodes:
             raise NotFoundError(self._model_not_found_message(model_unique_id, nodes))
 
-        node_ids: set[str] = {model_unique_id}
-        edges: list[dict[str, str]] = []
-
-        queue = deque([model_unique_id])
-        visited = {model_unique_id}
-
-        while queue:
-            current_id = queue.popleft()
-            current_node = nodes.get(current_id)
+        def upstreams_of(node_id: str):
+            current_node = nodes.get(node_id)
             if not current_node:
-                continue
-
+                return ()
             depends_on = current_node.get("depends_on")
             if not depends_on:
-                continue
-
-            upstream_ids = snapshot.dependency_index.get(current_id, ())
+                return ()
             if isinstance(depends_on, Mapping):
-                upstream_ids = depends_on.get("nodes", [])
-            elif isinstance(depends_on, (list, tuple)):
-                upstream_ids = depends_on
+                return depends_on.get("nodes", [])
+            if isinstance(depends_on, (list, tuple)):
+                return depends_on
+            return snapshot.dependency_index.get(node_id, ())
 
-            for upstream_id in upstream_ids:
-                edges.append({"source": upstream_id, "target": current_id})
-                node_ids.add(upstream_id)
-
-                if upstream_id not in visited:
-                    visited.add(upstream_id)
-                    # Sources terminate the walk; only models have upstreams.
-                    if upstream_id.startswith("model."):
-                        queue.append(upstream_id)
+        # Sources terminate the walk; only models have upstreams.
+        node_ids, edges = walk_upstream(
+            model_unique_id, upstreams_of, lambda uid: uid.startswith("model.")
+        )
 
         return LineageGraph(
             nodes=[self._lineage_node(nid, nodes, sources) for nid in node_ids],

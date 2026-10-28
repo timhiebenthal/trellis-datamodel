@@ -47,6 +47,7 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
+from trellis_datamodel.adapters.lineage import walk_upstream
 from trellis_datamodel.utils.structured_data import (
     load_data_model_file,
     load_yaml_or_json,
@@ -928,8 +929,6 @@ class BruinAdapter:
 
     def get_lineage(self, model_unique_id: str) -> LineageGraph:
         """Build the upstream lineage graph for an asset from `depends:`."""
-        from collections import deque
-
         assets = self._scan_all_assets()
         by_name: dict[str, BruinAsset] = {}
         for asset in assets:
@@ -942,27 +941,21 @@ class BruinAdapter:
                 self._asset_not_found_message(model_unique_id, assets)
             )
 
-        node_names: set[str] = {root.name}
-        edges: list[dict[str, str]] = []
+        def resolve(name: str) -> str:
+            # Report the canonical asset name when we can resolve it, so a
+            # short-name `depends` entry does not appear as a second node.
+            upstream = by_name.get(name)
+            return upstream.name if upstream else name
 
-        queue = deque([root])
-        visited = {root.name}
+        def upstreams_of(name: str):
+            asset = by_name.get(name)
+            return [resolve(dep) for dep in asset.depends] if asset else ()
 
-        while queue:
-            current = queue.popleft()
-            for upstream_name in current.depends:
-                upstream = by_name.get(upstream_name)
-                # Report the canonical asset name when we can resolve it, so a
-                # short-name `depends` entry does not appear as a second node.
-                resolved_name = upstream.name if upstream else upstream_name
+        def should_expand(name: str) -> bool:
+            upstream = by_name.get(name)
+            return upstream is not None and not _is_ingestion_asset(upstream)
 
-                edges.append({"source": resolved_name, "target": current.name})
-                node_names.add(resolved_name)
-
-                if resolved_name not in visited:
-                    visited.add(resolved_name)
-                    if upstream is not None and not _is_ingestion_asset(upstream):
-                        queue.append(upstream)
+        node_names, edges = walk_upstream(root.name, upstreams_of, should_expand)
 
         return LineageGraph(
             nodes=[self._lineage_node(name, by_name) for name in sorted(node_names)],
