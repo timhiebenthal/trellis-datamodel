@@ -47,7 +47,16 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
-from trellis_datamodel.utils.structured_data import load_yaml_or_json, try_load_yaml_file
+from trellis_datamodel.models.schemas import FrameworkEnum
+from trellis_datamodel.observability import timed_phase
+from trellis_datamodel.adapters.lineage import (
+    source_systems_from_lineage,
+    walk_upstream,
+)
+from trellis_datamodel.utils.structured_data import (
+    load_data_model_file,
+    load_yaml_or_json,
+)
 from . import entity_type_inference
 from .artifact_snapshot import clear_snapshots
 from .base import (
@@ -65,7 +74,7 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
-FRAMEWORK_NAME = "bruin"
+FRAMEWORK_NAME = FrameworkEnum.BRUIN.value
 
 # Asset types that ingest from outside the warehouse rather than transform
 # within it. These terminate a lineage walk the way a dbt source does.
@@ -92,6 +101,15 @@ def _split_asset_name(name: str) -> tuple[str, str]:
 def _short_name(name: str) -> str:
     """The asset name without its schema prefix."""
     return _split_asset_name(name)[1]
+
+
+def _assets_by_name(assets: list[BruinAsset]) -> dict[str, BruinAsset]:
+    """Index assets by full name, and by short name where no full name claims it."""
+    by_name: dict[str, BruinAsset] = {}
+    for asset in assets:
+        by_name[asset.name] = asset
+        by_name.setdefault(_short_name(asset.name), asset)
+    return by_name
 
 
 def _ambiguous_short_names(assets: list[BruinAsset]) -> set[str]:
@@ -313,7 +331,7 @@ class BruinAdapter:
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
-        return try_load_yaml_file(self.data_model_path, {})
+        return load_data_model_file(self.data_model_path)
 
     def _get_model_to_entity_map(self) -> dict[str, str]:
         """Map asset names to the entity bound to them.
@@ -357,6 +375,13 @@ class BruinAdapter:
         ]
 
     def get_model_schema(
+        self, model_name: str, version: Optional[int] = None
+    ) -> ModelSchema:
+        """Get a model schema while timing the adapter-owned lookup."""
+        with timed_phase("schema_read"):
+            return self._get_model_schema(model_name, version=version)
+
+    def _get_model_schema(
         self,
         model_name: str,
         version: Optional[int] = None,
@@ -539,7 +564,12 @@ class BruinAdapter:
     # Relationships
     # ------------------------------------------------------------------
 
-    def infer_relationships(
+    def infer_relationships(self, include_unbound: bool = False) -> list[Relationship]:
+        """Read relationships while timing the adapter-owned scan."""
+        with timed_phase("relationship_scan"):
+            return self._infer_relationships(include_unbound=include_unbound)
+
+    def _infer_relationships(
         self,
         include_unbound: bool = False,
     ) -> list[Relationship]:
@@ -883,12 +913,13 @@ class BruinAdapter:
         if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             return {}
 
-        return entity_type_inference.infer_entity_types(
-            framework=FRAMEWORK_NAME,
-            cache_key=self._inference_cache_key(),
-            get_models=self.get_models,
-            get_model_to_entity_map=self._get_model_to_entity_map,
-        )
+        with timed_phase("entity_inference"):
+            return entity_type_inference.infer_entity_types(
+                framework=FRAMEWORK_NAME,
+                cache_key=self._inference_cache_key(),
+                get_models=self.get_models,
+                get_model_to_entity_map=self._get_model_to_entity_map,
+            )
 
     def _inference_cache_key(self) -> str:
         """Staleness token for inference: the newest asset file's mtime.
@@ -924,14 +955,14 @@ class BruinAdapter:
     # ------------------------------------------------------------------
 
     def get_lineage(self, model_unique_id: str) -> LineageGraph:
-        """Build the upstream lineage graph for an asset from `depends:`."""
-        from collections import deque
+        """Build lineage while timing the adapter-owned source walk."""
+        with timed_phase("source_lineage"):
+            return self._get_lineage(model_unique_id)
 
+    def _get_lineage(self, model_unique_id: str) -> LineageGraph:
+        """Build the upstream lineage graph for an asset from `depends:`."""
         assets = self._scan_all_assets()
-        by_name: dict[str, BruinAsset] = {}
-        for asset in assets:
-            by_name[asset.name] = asset
-            by_name.setdefault(_short_name(asset.name), asset)
+        by_name = _assets_by_name(assets)
 
         root = by_name.get(model_unique_id)
         if root is None:
@@ -939,27 +970,21 @@ class BruinAdapter:
                 self._asset_not_found_message(model_unique_id, assets)
             )
 
-        node_names: set[str] = {root.name}
-        edges: list[dict[str, str]] = []
+        def resolve(name: str) -> str:
+            # Report the canonical asset name when we can resolve it, so a
+            # short-name `depends` entry does not appear as a second node.
+            upstream = by_name.get(name)
+            return upstream.name if upstream else name
 
-        queue = deque([root])
-        visited = {root.name}
+        def upstreams_of(name: str):
+            asset = by_name.get(name)
+            return [resolve(dep) for dep in asset.depends] if asset else ()
 
-        while queue:
-            current = queue.popleft()
-            for upstream_name in current.depends:
-                upstream = by_name.get(upstream_name)
-                # Report the canonical asset name when we can resolve it, so a
-                # short-name `depends` entry does not appear as a second node.
-                resolved_name = upstream.name if upstream else upstream_name
+        def should_expand(name: str) -> bool:
+            upstream = by_name.get(name)
+            return upstream is not None and not _is_ingestion_asset(upstream)
 
-                edges.append({"source": resolved_name, "target": current.name})
-                node_names.add(resolved_name)
-
-                if resolved_name not in visited:
-                    visited.add(resolved_name)
-                    if upstream is not None and not _is_ingestion_asset(upstream):
-                        queue.append(upstream)
+        node_names, edges = walk_upstream(root.name, upstreams_of, should_expand)
 
         return LineageGraph(
             nodes=[self._lineage_node(name, by_name) for name in sorted(node_names)],
@@ -1017,22 +1042,8 @@ class BruinAdapter:
 
     def get_source_systems_for_model(self, model_unique_id: str) -> list[str]:
         """Return the source connections feeding an asset."""
-        try:
-            graph = self.get_lineage(model_unique_id)
-        except Exception as e:
-            logger.warning(
-                "Failed to extract source systems for asset %s: %s",
-                model_unique_id,
-                e,
-            )
-            return []
-
-        return sorted(
-            {
-                node["source_name"]
-                for node in graph["nodes"]
-                if node["is_source"] and node["source_name"]
-            }
+        return source_systems_from_lineage(
+            self.get_lineage, model_unique_id, "asset"
         )
 
     def get_source_systems_for_models(
@@ -1045,10 +1056,7 @@ class BruinAdapter:
 
         try:
             assets = self._scan_all_assets()
-            by_name: dict[str, BruinAsset] = {}
-            for asset in assets:
-                by_name[asset.name] = asset
-                by_name.setdefault(_short_name(asset.name), asset)
+            by_name = _assets_by_name(assets)
 
             memo: dict[str, tuple[str, ...]] = {}
 

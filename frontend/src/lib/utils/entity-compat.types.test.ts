@@ -1,6 +1,6 @@
 import { describe, it, expect, expectTypeOf } from 'vitest';
-import type { OriginEntry, DbtColumn, DraftedField, Entity } from './types';
-import { readModelRef, readFrameworkTags } from './utils/entity-compat';
+import type { OriginEntry, DbtColumn, DraftedField, Entity } from '../types';
+import { readModelRef, readFrameworkTags } from './entity-compat';
 
 describe('origin types', () => {
 	it('OriginEntry is a single-key record', () => {

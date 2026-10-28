@@ -7,7 +7,6 @@ is rewritten as a whole YAML document with the same round-trip guarantees.
 """
 
 import os
-import re
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
@@ -16,26 +15,12 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from trellis_datamodel.utils.atomic_write import atomic_write
-from trellis_datamodel.utils.bruin_parser import is_yaml_asset
-from trellis_datamodel.utils.bruin_yaml import bruin_yaml
-
-
-# Regex patterns matching the parser's conventions
-SQL_BRUIN_PATTERN = re.compile(r"/\*\s*@bruin\s*\n(.*?)\n\s*@bruin\s*\*/", re.DOTALL)
-PYTHON_BRUIN_PATTERN = re.compile(
-    r'"""\s*@bruin\s*\n(.*?)\n\s*@bruin\s*"""', re.DOTALL
+from trellis_datamodel.utils.bruin_parser import (
+    block_pattern,
+    is_python_asset,
+    is_yaml_asset,
 )
-
-
-def _is_python(file_path: str) -> bool:
-    return os.path.splitext(str(file_path))[1].lower() == ".py"
-
-
-def _get_pattern(file_path: str) -> re.Pattern:
-    """Return the appropriate regex pattern based on file extension."""
-    if _is_python(file_path):
-        return PYTHON_BRUIN_PATTERN
-    return SQL_BRUIN_PATTERN
+from trellis_datamodel.utils.bruin_yaml import bruin_yaml
 
 
 # Bruin's own `Asset` struct orders the block's fields (bruin-data/bruin
@@ -142,15 +127,6 @@ def _set_key(parsed: CommentedMap, key: str, value: Any) -> None:
             return
         del parsed[key]
     parsed.insert(_insert_index(parsed, _rank(key)), key, value)
-
-
-def _yaml() -> YAML:
-    """A round-trip YAML instance configured to match Bruin's block style.
-
-    Shares its configuration (and its quoting rules) with the parser so the two
-    cannot drift; see :mod:`trellis_datamodel.utils.bruin_yaml`.
-    """
-    return bruin_yaml()
 
 
 def _dump_to_str(yaml_rt: YAML, data: Any) -> str:
@@ -280,14 +256,14 @@ def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
     """
     path = Path(file_path)
     original_content = path.read_text(encoding="utf-8")
-    yaml_rt = _yaml()
+    yaml_rt = bruin_yaml()
 
     if is_yaml_asset(str(path)):
         new_yaml_str = _apply_updates(yaml_rt, original_content, updates)
         _atomic_write(path, f"{new_yaml_str}\n")
         return path
 
-    pattern = _get_pattern(str(path))
+    pattern = block_pattern(str(path))
     match = pattern.search(original_content)
     if not match:
         raise ValueError("No @bruin block found in file")
@@ -296,7 +272,7 @@ def rewrite_bruin_block(file_path: str, updates: dict) -> Path:
 
     replacement = _wrap_block(
         new_yaml_str,
-        is_python=_is_python(str(path)),
+        is_python=is_python_asset(str(path)),
         indent=_get_bruin_indent(original_content),
     )
 
@@ -340,10 +316,10 @@ def write_bruin_asset(file_path: str, asset: dict, sql_body: str) -> Path:
     for key, value in asset.items():
         block[key] = _normalize_columns(value) if key == "columns" else value
 
-    yaml_rt = _yaml()
+    yaml_rt = bruin_yaml()
     body = sql_body if sql_body.endswith("\n") else f"{sql_body}\n"
     content = (
-        _wrap_block(_dump_to_str(yaml_rt, block), is_python=_is_python(str(path)))
+        _wrap_block(_dump_to_str(yaml_rt, block), is_python=is_python_asset(str(path)))
         + "\n"
         + body
     )

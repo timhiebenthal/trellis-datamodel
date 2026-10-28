@@ -64,3 +64,12 @@ def save_yaml_file(path: str | Path, data: Any) -> None:
     and creates missing parent directories. Errors propagate untranslated.
     """
     atomic_write(path, yaml.safe_dump(data, default_flow_style=False, sort_keys=False))
+
+
+def load_data_model_file(path: str | Path | None) -> dict[str, Any]:
+    """Load the data model file, returning ``{}`` if it is unset, missing or unreadable."""
+    try:
+        return load_yaml_file(path, {})
+    except Exception as e:
+        logger.warning("Could not load data model: %s", e)
+        return {}

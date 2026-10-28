@@ -355,22 +355,17 @@ export async function getModelSchema(
     modelName: string,
     version?: number
 ): Promise<ModelSchema | null> {
-    try {
-        const encodedModel = encodeURIComponent(modelName);
-        const url = version
-            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
-            : `${API_BASE}/models/${encodedModel}/schema`;
-        const res = await request(url);
-        if (!res.ok) {
-            res.record();
-            if (res.status === 404) return null;
-            throw new Error(`Failed to fetch schema: ${res.status}`);
-        }
-        return await res.readJson<ModelSchema>();
-    } catch (e) {
-        console.error("Error fetching schema:", e);
-        return null;
+    const encodedModel = encodeURIComponent(modelName);
+    const url = version
+        ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
+        : `${API_BASE}/models/${encodedModel}/schema`;
+    const res = await request(url);
+    if (!res.ok) {
+        res.record();
+        if (res.status === 404) return null;
+        throw new Error(`Failed to fetch schema: ${res.status}`);
     }
+    return await res.readJson<ModelSchema>();
 }
 
 export async function updateModelSchema(
@@ -1095,8 +1090,9 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
             changed: result.changed,
         };
     } catch (e) {
+        // Boot must not fail because reconcile did, so report instead of throwing.
         console.error('Error reconciling models:', e);
-        return { status: 'success', changed: false };
+        return { status: 'error', changed: false };
     }
 }
 

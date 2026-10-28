@@ -1,8 +1,6 @@
 /**
- * Correctness cases for entity prefix operations.
- * (Timing budgets were removed: a 5ms-per-call budget cannot fail in practice.)
+ * Correctness cases for entity prefix stripping and model-name label formatting (utils.ts).
  */
-
 import { describe, it, expect } from 'vitest';
 import { stripEntityPrefixes, formatModelNameForLabel } from './utils';
 

@@ -21,15 +21,18 @@
     let normalizedTags = $derived(normalizeTags(tags));
     let normalizedReadOnlyTags = $derived(new Set(normalizeTags(readOnlyTags)));
 
-    function handleAddTag(tag: string) {
-        const trimmed = tag.trim();
-        if (!trimmed) return;
+    function handleAddTags(candidates: string[]) {
+        const added = [...new Set(candidates.map((tag) => tag.trim()).filter(Boolean))].filter(
+            (tag) => !normalizedTags.includes(tag)
+        );
+        if (added.length === 0) return;
 
-        if (normalizedTags.includes(trimmed)) return;
-
-        const newTags = [...normalizedTags, trimmed];
-        onUpdate(newTags);
+        onUpdate([...normalizedTags, ...added]);
         tagInput = '';
+    }
+
+    function handleAddTag(tag: string) {
+        handleAddTags([tag]);
     }
 
     function handleRemoveTag(tag: string) {
@@ -48,12 +51,7 @@
             showTagInput = false;
         } else if (e.key === ',') {
             e.preventDefault();
-            const parts = tagInput.split(',');
-            parts.forEach((part) => {
-                if (part.trim()) {
-                    handleAddTag(part.trim());
-                }
-            });
+            handleAddTags(tagInput.split(','));
             tagInput = '';
         }
     }

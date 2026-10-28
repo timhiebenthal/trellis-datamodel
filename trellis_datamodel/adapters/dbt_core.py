@@ -10,8 +10,7 @@ import logging
 import os
 import re
 import time
-from collections import deque
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, Optional
 
@@ -29,7 +28,16 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.utils.path_validation import validate_path_is_safe
-from trellis_datamodel.utils.structured_data import load_yaml_file, try_load_yaml_file
+from trellis_datamodel.models.schemas import FrameworkEnum
+from trellis_datamodel.adapters.lineage import (
+    source_systems_from_lineage,
+    walk_upstream,
+)
+from trellis_datamodel.utils.structured_data import (
+    load_data_model_file,
+    load_yaml_file,
+    try_load_yaml_file,
+)
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
 from .base import (
@@ -47,7 +55,7 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
-FRAMEWORK_NAME = "dbt-core"
+FRAMEWORK_NAME = FrameworkEnum.DBT_CORE.value
 
 
 def _extract_folder_from_path(original_file_path: str) -> Optional[str]:
@@ -103,6 +111,144 @@ def _canonicalize_catalog_type(raw_type: str | None) -> str | None:
     return _CATALOG_TYPE_ALIASES.get(raw_type.lower(), raw_type)
 
 
+def _drafted_field_column(field: Mapping[str, Any]) -> dict[str, Any]:
+    """Column payload for one drafted field, as the YAML handler merges it."""
+    col_payload: dict[str, Any] = {
+        "name": field.get("name"),
+        "description": field.get("description"),
+    }
+    if field.get("source") == "dbt":
+        # dbt/the warehouse owns the declared type once it exists in
+        # schema.yml — only backfill it the first time this column is
+        # synced, never overwrite an existing value (#111).
+        col_payload["data_type_fallback"] = _canonicalize_catalog_type(
+            get_physical_datatype(field)
+        ) or field.get("datatype")
+    else:
+        col_payload["data_type"] = field.get("datatype")
+    origin_meta = _origin_meta(field.get("origin"))
+    if origin_meta:
+        col_payload["meta"] = origin_meta
+    return col_payload
+
+
+def _index_foreign_keys(
+    relationships: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, list[dict[str, str]]], dict[str, set[str]]]:
+    """Place each relationship's FK and group the FKs by the entity holding it.
+
+    Also returns, per entity, every field at either end of a relationship —
+    the fields whose relationship tests Trellis manages.
+    """
+    fk_by_entity: dict[str, list[dict[str, str]]] = {}
+    relationship_fields: dict[str, set[str]] = {}
+    for rel in relationships:
+        source_id = rel.get("source")
+        target_id = rel.get("target")
+        source_field = rel.get("source_field")
+        target_field = rel.get("target_field")
+        if not source_field or not target_field:
+            continue
+
+        placement = place_foreign_key(
+            rel.get("type", "one_to_many"),
+            source_id,
+            source_field,
+            target_id,
+            target_field,
+        )
+        fk_by_entity.setdefault(placement.fk_entity, []).append(
+            {
+                "fk_field": placement.fk_field,
+                "ref_entity": placement.ref_entity,
+                "ref_field": placement.ref_field,
+            }
+        )
+        relationship_fields.setdefault(source_id, set()).add(source_field)
+        relationship_fields.setdefault(target_id, set()).add(target_field)
+    return fk_by_entity, relationship_fields
+
+
+def _version_number(value: object) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _schema_yml_paths(model_dirs: Iterable[str]) -> Iterator[str]:
+    """Yield every schema yml file under the model dirs that exist."""
+    for models_dir in model_dirs:
+        if not os.path.exists(models_dir):
+            continue
+        for root, _, files in os.walk(models_dir):
+            for filename in files:
+                if filename.endswith((".yml", ".yaml")):
+                    yield os.path.join(root, filename)
+
+
+def _versioned_columns(model: Mapping[str, Any]) -> list[tuple[Any, list]]:
+    """(version, columns) per version of a schema yml model.
+
+    An unversioned model yields one (None, columns) pair. Versioned models may
+    declare columns inside the versions list.
+    """
+    version_entries = model.get("versions", [])
+    base_columns = model.get("columns", []) or []
+    if not (isinstance(version_entries, list) and version_entries):
+        return [(None, base_columns)]
+
+    versioned_columns = []
+    # Carry forward columns when a version uses "include: all"
+    previous_columns = copy.deepcopy(base_columns)
+    for ver in version_entries:
+        expanded_columns: list[dict] = []
+        for col in ver.get("columns", []) or []:
+            if isinstance(col, dict) and col.get("include") == "all":
+                expanded_columns.extend(copy.deepcopy(previous_columns))
+            else:
+                expanded_columns.append(col)
+
+        # If no columns are explicitly provided, fall back to previous set
+        if not expanded_columns and previous_columns:
+            expanded_columns = copy.deepcopy(previous_columns)
+
+        versioned_columns.append((ver.get("v") or ver.get("version"), expanded_columns))
+        previous_columns = copy.deepcopy(expanded_columns)
+    return versioned_columns
+
+
+def _relationship_tests(column: Mapping[str, Any]) -> list[Any]:
+    """The `relationships` test bodies declared on a schema yml column."""
+    test_blocks = []
+    for key in ("tests", "data_tests"):
+        value = column.get(key, [])
+        if isinstance(value, list):
+            test_blocks.extend(value)
+    return [
+        test["relationships"]
+        for test in test_blocks
+        if isinstance(test, dict) and "relationships" in test
+    ]
+
+
+def _dedupe_relationships(relationships: list[Relationship]) -> list[Relationship]:
+    """Drop repeated source/target/field relationships, keeping the first."""
+    seen: set[tuple] = set()
+    unique_relationships: list[Relationship] = []
+    for rel in relationships:
+        key = (
+            rel["source"],
+            rel["target"],
+            rel.get("source_field"),
+            rel.get("target_field"),
+        )
+        if key not in seen:
+            seen.add(key)
+            unique_relationships.append(rel)
+    return unique_relationships
+
+
 def _resolve_origin_from_column(
     col_data: dict[str, Any], description: str | None
 ) -> tuple[str | None, list[dict[str, str]]]:
@@ -131,7 +277,7 @@ class DbtCoreAdapter:
     def _get_artifact_snapshot(self) -> ArtifactSnapshot:
         """Return the shared snapshot used by read-only adapter operations."""
         if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
         catalog_path = (
             self.catalog_path
@@ -150,7 +296,7 @@ class DbtCoreAdapter:
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
-        return try_load_yaml_file(self.data_model_path, {})
+        return load_data_model_file(self.data_model_path)
 
     def get_model_dirs(self) -> list[str]:
         """
@@ -312,110 +458,105 @@ class DbtCoreAdapter:
             entity_id = entity.get("id")
             dbt_model = get_model_ref(entity)
             if dbt_model:
-                parts = dbt_model.split(".")
-                version_part = None
-                if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
-                    version_part = parts[-1].lstrip("v")
-                    base_name = parts[-2]
-                else:
-                    base_name = parts[-1]
-
-                # Map the raw unique_id as well as base/version variants
-                model_to_entity[dbt_model] = entity_id
-                for key in self._build_model_keys(base_name, version_part):
-                    model_to_entity[key] = entity_id
-
-                # Also map the dbt YAML-documented model name (if different from unique_id)
-                # Read the YAML file to see if it documents a different model name
-                yml_path = self._get_model_yml_path(base_name, manifest=manifest)
-                if yml_path and os.path.exists(yml_path):
-                    try:
-                        yml_content = load_yaml_file(yml_path, {})
-                        models_list = yml_content.get("models", [])
-                        for model_entry in models_list:
-                            yml_name = model_entry.get("name")
-                            if yml_name and yml_name != base_name:
-                                # YAML documents a model with a different name
-                                model_to_entity[yml_name] = entity_id
-                                model_to_entity[yml_name.lower()] = entity_id
-                    except Exception as e:
-                        pass  # Gracefully skip if YAML parsing fails
+                base_name = self._map_model_ref(model_to_entity, dbt_model, entity_id)
+                self._map_own_yaml_names(model_to_entity, base_name, entity_id, manifest)
             # Map additional models to the same entity
-            additional_models = entity.get("additional_models", [])
-            for add_model in additional_models:
-                parts = add_model.split(".")
-                version_part = None
-                if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
-                    version_part = parts[-1].lstrip("v")
-                    base_name = parts[-2]
-                else:
-                    base_name = parts[-1]
-
-                model_to_entity[add_model] = entity_id
-                for key in self._build_model_keys(base_name, version_part):
-                    model_to_entity[key] = entity_id
+            for add_model in entity.get("additional_models", []):
+                self._map_model_ref(model_to_entity, add_model, entity_id)
             if entity_id:
                 model_to_entity[entity_id] = entity_id
-                if (
-                    cfg.ENTITY_MODELING_CONFIG.enabled
-                    and cfg.ENTITY_MODELING_CONFIG.entity_prefix
-                    and not dbt_model
-                ):
-                    # Add prefixed variants so inference can map prefixed model names back
-                    for prefix in cfg.ENTITY_MODELING_CONFIG.entity_prefix:
-                        prefixed = f"{prefix}{entity_id}"
-                        model_to_entity[prefixed] = entity_id
-                        model_to_entity[prefixed.lower()] = entity_id
-                if cfg.DIMENSIONAL_MODELING_CONFIG.enabled and not dbt_model:
-                    # Add prefixed variants for dimensional modeling prefixes
-                    for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix:
-                        prefixed = f"{prefix}{entity_id}"
-                        model_to_entity[prefixed] = entity_id
-                        model_to_entity[prefixed.lower()] = entity_id
-                    for prefix in cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix:
-                        prefixed = f"{prefix}{entity_id}"
-                        model_to_entity[prefixed] = entity_id
-                        model_to_entity[prefixed.lower()] = entity_id
+                if not dbt_model:
+                    self._map_prefixed_entity_ids(model_to_entity, entity_id)
 
-        # Second pass: Map YAML-documented model names to their file-based names
-        # This handles cases where the YAML name differs from the SQL file name,
-        # even for models not yet bound to entities in data_model.yml
-        model_dirs = self.get_model_dirs()
-        for models_dir in model_dirs:
-            if not os.path.exists(models_dir):
-                continue
-            for root, _, files in os.walk(models_dir):
-                for filename in files:
-                    if not filename.endswith((".yml", ".yaml")):
-                        continue
-                    yml_path = os.path.join(root, filename)
-                    try:
-                        yml_content = load_yaml_file(yml_path, {})
-                        models_list = yml_content.get("models", [])
-                        # A file base name only identifies the model in
-                        # single-model files; shared files (schema.yml) do not.
-                        if len(models_list) != 1:
-                            continue
-                        for model_entry in models_list:
-                            yml_name = model_entry.get("name")
-                            if not yml_name:
-                                continue
-                            # Derive the file-based name from the YAML filename
-                            # e.g., fact_procurement.yml -> fact_procurement
-                            file_base = os.path.splitext(filename)[0]
-                            # Only map if the YAML name differs from the file name
-                            if yml_name != file_base:
-                                # Map yml_name -> file_base, so entity_procurement -> fact_procurement
-                                # If file_base is already in the map (bound to an entity), map yml_name to that entity
-                                target_entity = model_to_entity.get(
-                                    file_base, file_base
-                                )
-                                model_to_entity[yml_name] = target_entity
-                                model_to_entity[yml_name.lower()] = target_entity
-                    except Exception:
-                        pass  # Gracefully skip if YAML parsing fails
-
+        self._map_documented_model_names(model_to_entity)
         return model_to_entity
+
+    def _map_model_ref(
+        self, model_to_entity: dict[str, str], model_ref: str, entity_id: str
+    ) -> str:
+        """Map a model ref and its base/version variants; return the base name."""
+        parts = model_ref.split(".")
+        version_part = None
+        if len(parts) >= 2 and re.match(r"v\d+$", parts[-1]):
+            version_part = parts[-1].lstrip("v")
+            base_name = parts[-2]
+        else:
+            base_name = parts[-1]
+
+        # Map the raw unique_id as well as base/version variants
+        model_to_entity[model_ref] = entity_id
+        for key in self._build_model_keys(base_name, version_part):
+            model_to_entity[key] = entity_id
+        return base_name
+
+    def _map_own_yaml_names(
+        self,
+        model_to_entity: dict[str, str],
+        base_name: str,
+        entity_id: str,
+        manifest: dict,
+    ) -> None:
+        """Map the names a bound model's own YAML documents, if they differ."""
+        yml_path = self._get_model_yml_path(base_name, manifest=manifest)
+        if not (yml_path and os.path.exists(yml_path)):
+            return
+        try:
+            yml_content = load_yaml_file(yml_path, {})
+            for model_entry in yml_content.get("models", []):
+                yml_name = model_entry.get("name")
+                if yml_name and yml_name != base_name:
+                    model_to_entity[yml_name] = entity_id
+                    model_to_entity[yml_name.lower()] = entity_id
+        except Exception:
+            pass  # Gracefully skip if YAML parsing fails
+
+    @staticmethod
+    def _map_prefixed_entity_ids(
+        model_to_entity: dict[str, str], entity_id: str
+    ) -> None:
+        """Map prefixed model names back to an unbound entity for inference."""
+        prefixes: list[str] = []
+        if (
+            cfg.ENTITY_MODELING_CONFIG.enabled
+            and cfg.ENTITY_MODELING_CONFIG.entity_prefix
+        ):
+            prefixes.extend(cfg.ENTITY_MODELING_CONFIG.entity_prefix)
+        if cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
+            prefixes.extend(cfg.DIMENSIONAL_MODELING_CONFIG.dimension_prefix)
+            prefixes.extend(cfg.DIMENSIONAL_MODELING_CONFIG.fact_prefix)
+        for prefix in prefixes:
+            prefixed = f"{prefix}{entity_id}"
+            model_to_entity[prefixed] = entity_id
+            model_to_entity[prefixed.lower()] = entity_id
+
+    def _map_documented_model_names(self, model_to_entity: dict[str, str]) -> None:
+        """Map YAML-documented model names to their file-based names.
+
+        This handles cases where the YAML name differs from the SQL file name,
+        even for models not yet bound to entities in data_model.yml.
+        """
+        for yml_path in _schema_yml_paths(self.get_model_dirs()):
+            try:
+                yml_content = load_yaml_file(yml_path, {})
+                models_list = yml_content.get("models", [])
+                # A file base name only identifies the model in
+                # single-model files; shared files (schema.yml) do not.
+                if len(models_list) != 1:
+                    continue
+                for model_entry in models_list:
+                    yml_name = model_entry.get("name")
+                    if not yml_name:
+                        continue
+                    # e.g., fact_procurement.yml -> fact_procurement
+                    file_base = os.path.splitext(os.path.basename(yml_path))[0]
+                    if yml_name != file_base:
+                        # Map yml_name -> file_base, or to the entity file_base
+                        # is already bound to (entity_procurement -> fact_procurement)
+                        target_entity = model_to_entity.get(file_base, file_base)
+                        model_to_entity[yml_name] = target_entity
+                        model_to_entity[yml_name.lower()] = target_entity
+            except Exception:
+                pass  # Gracefully skip if YAML parsing fails
 
     def _get_model_yml_path(
         self,
@@ -661,7 +802,7 @@ class DbtCoreAdapter:
     ) -> ModelSchema:
         """Get the current schema definition for a specific model from its YAML file."""
         if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
         snapshot = self._get_artifact_snapshot()
         candidate_nodes = [
@@ -740,7 +881,7 @@ class DbtCoreAdapter:
         the live tag list.
         """
         if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
         manifest = self._load_manifest()
 
@@ -842,12 +983,6 @@ class DbtCoreAdapter:
         """Convert indexed manifest relationship tests to adapter results."""
         relationships: list[Relationship] = []
 
-        def version_number(value: object) -> int | None:
-            try:
-                return int(value) if value is not None else None
-            except (TypeError, ValueError):
-                return None
-
         for unique_id, entries in snapshot.relationship_index.items():
             node = snapshot.model_index.get(unique_id)
             if not node:
@@ -895,11 +1030,9 @@ class DbtCoreAdapter:
                         "source_field": source_field,
                         "target_field": column_name,
                         "source_model_name": source_model_name,
-                        "source_model_version": version_number(source_version),
+                        "source_model_version": _version_number(source_version),
                         "target_model_name": model_name,
-                        "target_model_version": (
-                            version_number(model_version)
-                        ),
+                        "target_model_version": _version_number(model_version),
                     }
                 )
 
@@ -920,212 +1053,105 @@ class DbtCoreAdapter:
         # relationships for unbound entities in large projects.
         # When include_unbound is True, skip filtering entirely - return all relationships
         # using raw model names so the frontend can map them to current canvas state.
-        bound_entities: set[str] = set()
-        data_model_entities: set[str] = set()
-        if not include_unbound:
-            data_model = self._load_data_model()
-            data_model_entities = {
-                e.get("id") for e in data_model.get("entities", []) if e.get("id")
-            }
-            bound_entities = {
-                e.get("id")
-                for e in data_model.get("entities", [])
-                if e.get("id") and (get_model_ref(e) or e.get("additional_models"))
-            }
+        bound_entities = set() if include_unbound else self._bound_entity_ids()
         indexed_relationships = self._relationships_from_snapshot(
             snapshot, model_to_entity, bound_entities, include_unbound
         )
-        if indexed_relationships:
-            yml_found = any(
-                filename.endswith((".yml", ".yaml"))
-                for models_dir in model_dirs
-                if os.path.exists(models_dir)
-                for _, _, files in os.walk(models_dir)
-                for filename in files
+        if not any(_schema_yml_paths(model_dirs)):
+            raise ConfigurationError(
+                f"No schema yml files found under configured dbt model paths: {model_dirs}"
             )
-            if not yml_found:
-                raise FileNotFoundError(
-                    f"No schema yml files found under configured dbt model paths: {model_dirs}"
-                )
+        if indexed_relationships:
             return indexed_relationships
 
         relationships: list[Relationship] = []
-        yml_found = False
-
-        for models_dir in model_dirs:
-            if not os.path.exists(models_dir):
+        for filepath in _schema_yml_paths(model_dirs):
+            try:
+                # extend() keeps what a file yielded before it failed to parse
+                relationships.extend(
+                    self._relationships_from_schema_file(
+                        filepath, model_to_entity, bound_entities, include_unbound
+                    )
+                )
+            except Exception as e:
+                logger.warning("Could not parse %s: %s", filepath, e)
                 continue
 
-            for root, _, files in os.walk(models_dir):
-                for filename in files:
-                    if not filename.endswith((".yml", ".yaml")):
-                        continue
-                    yml_found = True
+        return _dedupe_relationships(relationships)
 
-                    filepath = os.path.join(root, filename)
-                    try:
-                        schema_data = load_yaml_file(filepath, {})
+    def _bound_entity_ids(self) -> set[str]:
+        """Entities bound to at least one dbt model (incl. additional_models)."""
+        data_model = self._load_data_model()
+        return {
+            e.get("id")
+            for e in data_model.get("entities", [])
+            if e.get("id") and (get_model_ref(e) or e.get("additional_models"))
+        }
 
-                        models_list = schema_data.get("models", [])
-                        for model in models_list:
-                            base_model_name = model.get("name")
-                            if not base_model_name:
-                                continue
+    def _relationships_from_schema_file(
+        self,
+        filepath: str,
+        model_to_entity: dict[str, str],
+        bound_entities: set[str],
+        include_unbound: bool,
+    ) -> Iterator[Relationship]:
+        """Yield the relationship tests one schema yml file declares."""
+        schema_data = load_yaml_file(filepath, {})
 
-                            # Versioned models may declare columns inside versions list
-                            version_entries = model.get("versions", [])
-                            versioned_columns = []
-                            base_columns = model.get("columns", []) or []
+        for model in schema_data.get("models", []):
+            base_model_name = model.get("name")
+            if not base_model_name:
+                continue
 
-                            if isinstance(version_entries, list) and version_entries:
-                                # Carry forward columns when a version uses "include: all"
-                                previous_columns = copy.deepcopy(base_columns)
-                                for ver in version_entries:
-                                    raw_columns = ver.get("columns", []) or []
-                                    expanded_columns: list[dict] = []
-                                    for col in raw_columns:
-                                        if (
-                                            isinstance(col, dict)
-                                            and col.get("include") == "all"
-                                        ):
-                                            expanded_columns.extend(
-                                                copy.deepcopy(previous_columns)
-                                            )
-                                        else:
-                                            expanded_columns.append(col)
+            for model_version, columns in _versioned_columns(model):
+                # Always resolve model names to entity IDs using the model_to_entity map
+                # This handles YAML-documented names that differ from file names
+                # If not found in map and include_unbound, fall back to raw name
+                entity_id = (
+                    self._resolve_entity_id(
+                        model_to_entity, base_model_name, model_version
+                    )
+                    or base_model_name
+                )
+                for column in columns or []:
+                    for rel_test in _relationship_tests(column):
+                        args = rel_test.get("arguments", {}) or {}
+                        # Support both the recommended arguments block and legacy top-level keys
+                        to_ref = rel_test.get("to", "") or args.get("to", "")
+                        target_field = rel_test.get("field", "") or args.get(
+                            "field", ""
+                        )
+                        if not to_ref or not target_field:
+                            continue
 
-                                    # If no columns are explicitly provided, fall back to previous set
-                                    if not expanded_columns and previous_columns:
-                                        expanded_columns = copy.deepcopy(
-                                            previous_columns
-                                        )
+                        target_base, target_version_str = self._parse_ref(to_ref)
+                        target_entity_id = (
+                            self._resolve_entity_id(
+                                model_to_entity, target_base, target_version_str
+                            )
+                            or target_base
+                        )
+                        # Skip relationships where either side is not bound (only when NOT include_unbound)
+                        if not include_unbound and (
+                            entity_id not in bound_entities
+                            or target_entity_id not in bound_entities
+                        ):
+                            continue
 
-                                    versioned_columns.append(
-                                        (
-                                            ver.get("v") or ver.get("version"),
-                                            expanded_columns,
-                                        )
-                                    )
-                                    previous_columns = copy.deepcopy(expanded_columns)
-                            else:
-                                versioned_columns.append((None, base_columns))
-
-                            for model_version, columns in versioned_columns:
-                                # Always resolve model names to entity IDs using the model_to_entity map
-                                # This handles YAML-documented names that differ from file names
-                                entity_id = self._resolve_entity_id(
-                                    model_to_entity, base_model_name, model_version
-                                )
-                                # If not found in map and include_unbound, fall back to raw name
-                                if not entity_id:
-                                    entity_id = base_model_name
-                                for column in columns or []:
-                                    test_blocks = []
-                                    for key in ("tests", "data_tests"):
-                                        value = column.get(key, [])
-                                        if isinstance(value, list):
-                                            test_blocks.extend(value)
-
-                                    for test in test_blocks:
-                                        if (
-                                            not isinstance(test, dict)
-                                            or "relationships" not in test
-                                        ):
-                                            continue
-
-                                        rel_test = test["relationships"]
-                                        args = rel_test.get("arguments", {}) or {}
-
-                                        # Support both the recommended arguments block and legacy top-level keys
-                                        to_ref = rel_test.get("to", "") or args.get(
-                                            "to", ""
-                                        )
-                                        target_field = rel_test.get(
-                                            "field", ""
-                                        ) or args.get("field", "")
-                                        # If either ref target or field is missing, skip
-                                        if not to_ref or not target_field:
-                                            continue
-
-                                        target_base, target_version_str = (
-                                            self._parse_ref(to_ref)
-                                        )
-
-                                        # Convert version string to int if present
-                                        target_version_int = None
-                                        if target_version_str:
-                                            try:
-                                                target_version_int = int(
-                                                    target_version_str
-                                                )
-                                            except ValueError:
-                                                pass
-
-                                        # Convert model_version to int if present
-                                        source_version_int = None
-                                        if model_version is not None:
-                                            try:
-                                                source_version_int = int(model_version)
-                                            except (ValueError, TypeError):
-                                                pass
-
-                                        # Always resolve model names to entity IDs
-                                        target_entity_id = self._resolve_entity_id(
-                                            model_to_entity,
-                                            target_base,
-                                            target_version_str,
-                                        )
-                                        # If not found in map and include_unbound, fall back to raw name
-                                        if not target_entity_id:
-                                            target_entity_id = target_base
-
-                                        # Skip relationships where either side is not bound (only when NOT include_unbound)
-                                        if not include_unbound:
-                                            if (
-                                                entity_id not in bound_entities
-                                                or target_entity_id
-                                                not in bound_entities
-                                            ):
-                                                continue
-
-                                        relationships.append(
-                                            {
-                                                "source": target_entity_id,
-                                                "target": entity_id,
-                                                "label": "",
-                                                "type": "one_to_many",
-                                                "source_field": target_field,
-                                                "target_field": column.get("name"),
-                                                "source_model_name": target_base,
-                                                "source_model_version": target_version_int,
-                                                "target_model_name": base_model_name,
-                                                "target_model_version": source_version_int,
-                                            }
-                                        )
-                    except Exception as e:
-                        logger.warning("Could not parse %s: %s", filepath, e)
-                        continue
-
-        if not yml_found:
-            raise FileNotFoundError(
-                f"No schema yml files found under configured dbt model paths: {model_dirs}"
-            )
-
-        # Remove duplicates
-        seen: set[tuple] = set()
-        unique_relationships: list[Relationship] = []
-        for rel in relationships:
-            key = (
-                rel["source"],
-                rel["target"],
-                rel.get("source_field"),
-                rel.get("target_field"),
-            )
-            if key not in seen:
-                seen.add(key)
-                unique_relationships.append(rel)
-
-        return unique_relationships
+                        yield {
+                            "source": target_entity_id,
+                            "target": entity_id,
+                            "label": "",
+                            "type": "one_to_many",
+                            "source_field": target_field,
+                            "target_field": column.get("name"),
+                            "source_model_name": target_base,
+                            "source_model_version": _version_number(
+                                target_version_str
+                            ),
+                            "target_model_name": base_model_name,
+                            "target_model_version": _version_number(model_version),
+                        }
 
     def sync_relationships(
         self,
@@ -1133,54 +1159,12 @@ class DbtCoreAdapter:
         relationships: list[dict[str, Any]],
     ) -> list[Path]:
         """Sync relationship definitions from data model to dbt yml files."""
-        # Build entity lookup
-        entity_map = {e["id"]: e for e in entities if e.get("id")}
         # Map entity_id -> dbt model name (best-effort)
         entity_model_name: dict[str, str] = {
-            eid: self._entity_to_model_name(ent) for eid, ent in entity_map.items()
+            e["id"]: self._entity_to_model_name(e) for e in entities if e.get("id")
         }
-
-        # Group relationships by entity (the one with the FK)
         # FK is always on the "many" side of the relationship
-        fk_by_entity: dict[str, list[dict]] = {}
-
-        # Track all fields that appear in ANY relationship in the data model
-        # This helps us identify which relationship tests are managed by us vs manually added
-        all_relationship_fields_by_entity: dict[str, set[str]] = {}
-
-        for rel in relationships:
-            source_id = rel.get("source")
-            target_id = rel.get("target")
-            rel_type = rel.get("type", "one_to_many")
-            source_field = rel.get("source_field")
-            target_field = rel.get("target_field")
-
-            if not source_field or not target_field:
-                continue
-
-            placement = place_foreign_key(
-                rel_type, source_id, source_field, target_id, target_field
-            )
-            fk_entity = placement.fk_entity
-            fk_field = placement.fk_field
-            ref_entity = placement.ref_entity
-            ref_field = placement.ref_field
-
-            fk_by_entity.setdefault(fk_entity, []).append(
-                {
-                    "fk_field": fk_field,
-                    "ref_entity": ref_entity,
-                    "ref_field": ref_field,
-                }
-            )
-
-            # Track which fields are involved in relationships
-            all_relationship_fields_by_entity.setdefault(source_id, set()).add(
-                source_field
-            )
-            all_relationship_fields_by_entity.setdefault(target_id, set()).add(
-                target_field
-            )
+        fk_by_entity, relationship_fields = _index_foreign_keys(relationships)
 
         models_dir = self.get_model_dirs()[0]
         os.makedirs(models_dir, exist_ok=True)
@@ -1202,106 +1186,96 @@ class DbtCoreAdapter:
             if not yml_path:
                 yml_path = self._default_schema_yml_path(models_dir, model_name)
 
-            data = self.yaml_handler.load_file(yml_path)
-            if not data:
-                data = {"version": 2, "models": []}
-
+            data = self._load_schema_data(yml_path)
             model_entry = self.yaml_handler.ensure_model(data, model_name)
 
-            if entity.get("description"):
-                self.yaml_handler.update_model_description(
-                    model_entry, entity.get("description")
-                )
-
-            # Sync Tags: drop only tags this entity's previous pushes put there,
-            # and hand the new record back to the caller on the entity itself.
-            pushed_tags = self.yaml_handler.merge_model_tags(
-                model_entry, entity.get("ui_tags"), entity.get(PUSHED_TAGS_KEY)
+            self._push_entity_metadata(model_entry, entity)
+            self._push_foreign_keys(
+                model_entry,
+                fk_by_entity.get(entity_id, []),
+                relationship_fields.get(entity_id, set()),
+                entity_model_name,
             )
-            if pushed_tags is not None:
-                entity[PUSHED_TAGS_KEY] = pushed_tags
-
-            # Sync Drafted Fields. When drafted_fields is provided we treat it as
-            # the authoritative column list — fields removed/renamed in the data
-            # model must disappear from schema.yml (issue #98). Entities without a
-            # drafted_fields key are left untouched so relationship-only syncs
-            # don't wipe existing columns.
-            if "drafted_fields" in entity:
-                columns_payload: list[dict[str, Any]] = []
-                for field in entity.get("drafted_fields") or []:
-                    f_name = field.get("name")
-                    if not f_name:
-                        continue
-                    f_desc = field.get("description")
-                    f_origin = field.get("origin")
-                    col_payload: dict[str, Any] = {
-                        "name": f_name,
-                        "description": f_desc,
-                    }
-                    if field.get("source") == "dbt":
-                        # dbt/the warehouse owns the declared type once it
-                        # exists in schema.yml — only backfill it the first
-                        # time this column is synced, never overwrite an
-                        # existing value (#111).
-                        col_payload["data_type_fallback"] = _canonicalize_catalog_type(
-                            get_physical_datatype(field)
-                        ) or field.get("datatype")
-                    else:
-                        col_payload["data_type"] = field.get("datatype")
-                    origin_meta = _origin_meta(f_origin)
-                    if origin_meta:
-                        col_payload["meta"] = origin_meta
-                    columns_payload.append(col_payload)
-
-                self.yaml_handler.update_columns_batch(model_entry, columns_payload)
-
-            # Sync Relationships (FKs)
-            # Build a map of which fields should have which relationship tests
-            fk_list = fk_by_entity.get(entity_id, [])
-            fk_fields = {fk_info["fk_field"] for fk_info in fk_list}
-
-            # Get all fields that appear in relationships for this entity
-            relationship_fields = all_relationship_fields_by_entity.get(
-                entity_id, set()
-            )
-
-            # Clean up: Remove relationship tests from fields that:
-            # 1. Are in a relationship in the data model (relationship_fields)
-            # 2. But are NOT currently FKs (not in fk_fields)
-            # This removes tests when relationships are moved or type changes
-            # But preserves manually added tests (not in relationship_fields)
-            if "columns" in model_entry:
-                for col in model_entry.get("columns", []):
-                    col_name = col.get("name")
-                    if (
-                        col_name
-                        and col_name in relationship_fields
-                        and col_name not in fk_fields
-                    ):
-                        # This field was in a relationship but is no longer an FK
-                        # Remove its relationship test
-                        self.yaml_handler.remove_relationship_test(col)
-
-            # Now add/update relationship tests for current FKs
-            for fk_info in fk_list:
-                fk_field = fk_info["fk_field"]
-                ref_entity = fk_info["ref_entity"]
-                ref_field = fk_info["ref_field"]
-
-                # Resolve reference model name (dbt model) for relationship test
-                ref_model_name = entity_model_name.get(ref_entity, ref_entity)
-
-                col = self.yaml_handler.ensure_column(model_entry, fk_field)
-
-                if "data_type" not in col:
-                    col["data_type"] = "text"
-
-                self.yaml_handler.add_relationship_test(col, ref_model_name, ref_field)
 
             self.yaml_handler.save_file(yml_path, data)
             updated_files.append(Path(yml_path))
 
         return updated_files
+
+    def _load_schema_data(self, yml_path: str) -> Any:
+        """Load a schema yml file, or start an empty one."""
+        data = self.yaml_handler.load_file(yml_path)
+        if not data:
+            data = {"version": 2, "models": []}
+        return data
+
+    def _push_entity_metadata(self, model_entry: Any, entity: dict[str, Any]) -> None:
+        """Write an entity's description, tags and drafted fields onto its model."""
+        if entity.get("description"):
+            self.yaml_handler.update_model_description(
+                model_entry, entity.get("description")
+            )
+
+        # Sync Tags: drop only tags this entity's previous pushes put there,
+        # and hand the new record back to the caller on the entity itself.
+        pushed_tags = self.yaml_handler.merge_model_tags(
+            model_entry, entity.get("ui_tags"), entity.get(PUSHED_TAGS_KEY)
+        )
+        if pushed_tags is not None:
+            entity[PUSHED_TAGS_KEY] = pushed_tags
+
+        # Sync Drafted Fields. When drafted_fields is provided we treat it as
+        # the authoritative column list — fields removed/renamed in the data
+        # model must disappear from schema.yml (issue #98). Entities without a
+        # drafted_fields key are left untouched so relationship-only syncs
+        # don't wipe existing columns.
+        if "drafted_fields" in entity:
+            columns_payload = [
+                _drafted_field_column(field)
+                for field in entity.get("drafted_fields") or []
+                if field.get("name")
+            ]
+            self.yaml_handler.update_columns_batch(model_entry, columns_payload)
+
+    def _push_foreign_keys(
+        self,
+        model_entry: Any,
+        fk_list: list[dict[str, str]],
+        relationship_fields: set[str],
+        entity_model_name: dict[str, str],
+    ) -> None:
+        """Write the model's FK relationship tests and prune stale managed ones."""
+        fk_fields = {fk_info["fk_field"] for fk_info in fk_list}
+
+        # Clean up: Remove relationship tests from fields that:
+        # 1. Are in a relationship in the data model (relationship_fields)
+        # 2. But are NOT currently FKs (not in fk_fields)
+        # This removes tests when relationships are moved or type changes
+        # But preserves manually added tests (not in relationship_fields)
+        if "columns" in model_entry:
+            for col in model_entry.get("columns", []):
+                col_name = col.get("name")
+                if (
+                    col_name
+                    and col_name in relationship_fields
+                    and col_name not in fk_fields
+                ):
+                    self.yaml_handler.remove_relationship_test(col)
+
+        # Now add/update relationship tests for current FKs
+        for fk_info in fk_list:
+            # Resolve reference model name (dbt model) for relationship test
+            ref_entity = fk_info["ref_entity"]
+            ref_model_name = entity_model_name.get(ref_entity, ref_entity)
+
+            col = self.yaml_handler.ensure_column(model_entry, fk_info["fk_field"])
+
+            if "data_type" not in col:
+                col["data_type"] = "text"
+
+            self.yaml_handler.add_relationship_test(
+                col, ref_model_name, fk_info["ref_field"]
+            )
 
     @staticmethod
     def _default_schema_yml_path(models_dir: str, model_name: str) -> str:
@@ -1333,34 +1307,24 @@ class DbtCoreAdapter:
         the live tag list.
         """
         data_model = self._load_data_model()
-
-        # Use description from request if available, otherwise fallback to data model
-        entity_description = description
-        if not entity_description:
-            entities = data_model.get("entities", [])
-            for entity in entities:
-                if entity.get("id") == entity_id:
-                    entity_description = entity.get("description")
-                    break
-
-        # Apply prefix logic to model_name for unbound entities
         entity = next(
             (e for e in data_model.get("entities", []) if e.get("id") == entity_id),
             None,
         )
-        if entity:
-            # If entity is bound, use the bound model name from _entity_to_model_name
-            if get_model_ref(entity):
-                model_name = self._entity_to_model_name(entity)
-            # If entity is unbound and entity modeling is enabled, apply prefix
-            elif cfg.ENTITY_MODELING_CONFIG.enabled:
-                model_name = self._entity_to_model_name(entity)
 
-        # Build a map of field names to relationships for this entity
-        relationships = data_model.get("relationships", [])
-        field_to_relationship: dict[str, dict] = {}
-        # Track ALL fields involved in any relationship for this entity (for stale test cleanup)
-        all_relationship_fields: set[str] = set()
+        # Use description from request if available, otherwise fallback to data model
+        entity_description = description
+        if not entity_description and entity:
+            entity_description = entity.get("description")
+
+        # A bound entity uses its bound model name; an unbound one gets the
+        # entity-modeling prefix when that is enabled.
+        if entity and (get_model_ref(entity) or cfg.ENTITY_MODELING_CONFIG.enabled):
+            model_name = self._entity_to_model_name(entity)
+
+        # This entity's FKs, by field name
+        fk_by_entity, _ = _index_foreign_keys(data_model.get("relationships", []))
+        field_to_fk = {fk["fk_field"]: fk for fk in fk_by_entity.get(entity_id, [])}
         # Map entity -> dbt model name for refs
         entity_model_name = {
             e.get("id"): self._entity_to_model_name(e)
@@ -1368,54 +1332,8 @@ class DbtCoreAdapter:
             if e.get("id")
         }
 
-        for rel in relationships:
-            source_id = rel.get("source")
-            target_id = rel.get("target")
-            rel_type = rel.get("type", "one_to_many")
-            source_field = rel.get("source_field")
-            target_field = rel.get("target_field")
-
-            if not source_field or not target_field:
-                continue
-
-            placement = place_foreign_key(
-                rel_type, source_id, source_field, target_id, target_field
-            )
-            fk_entity = placement.fk_entity
-            fk_field = placement.fk_field
-            ref_entity = placement.ref_entity
-            ref_field = placement.ref_field
-
-            # Track all fields involved in relationships for this entity
-            if source_id == entity_id:
-                all_relationship_fields.add(source_field)
-            if target_id == entity_id:
-                all_relationship_fields.add(target_field)
-
-            if fk_entity == entity_id:
-                field_to_relationship[fk_field] = {
-                    "target_entity": ref_entity,
-                    "target_field": ref_field,
-                }
-
         # Build plain column schema (without tests — tests are applied via yaml_handler below)
-        columns = []
-        for field in fields:
-            desc = field.get("description")
-            origin = field.get("origin")
-            col: dict = {"name": field["name"]}
-            if field.get("source") == "dbt":
-                col["data_type_fallback"] = _canonicalize_catalog_type(
-                    get_physical_datatype(field)
-                ) or field["datatype"]
-            else:
-                col["data_type"] = field["datatype"]
-            if desc:
-                col["description"] = desc
-            origin_meta = _origin_meta(origin)
-            if origin_meta:
-                col["meta"] = origin_meta
-            columns.append(col)
+        columns = [_drafted_field_column(field) for field in fields]
 
         target_version = self._resolve_model_version(
             model_name=model_name, entity_id=entity_id, data_model=data_model
@@ -1428,78 +1346,85 @@ class DbtCoreAdapter:
             os.makedirs(models_dir, exist_ok=True)
             yml_path = self._default_schema_yml_path(models_dir, model_name)
 
-        data = self.yaml_handler.load_file(yml_path)
-        if not data:
-            data = {"version": 2, "models": []}
-
+        data = self._load_schema_data(yml_path)
         model_entry = self.yaml_handler.ensure_model(data, model_name)
+        schema_entry = self._merge_schema_entry(
+            model_entry, columns, entity_description, tags, target_version
+        )
 
+        self._remove_stale_relationship_tests(schema_entry, set(field_to_fk))
+
+        # Apply relationship tests after columns are written
+        for field in fields:
+            field_name = field["name"]
+            if field_name not in field_to_fk:
+                continue
+            fk_info = field_to_fk[field_name]
+            ref_model = entity_model_name.get(
+                fk_info["ref_entity"], fk_info["ref_entity"]
+            )
+            col = self.yaml_handler.ensure_column(schema_entry, field_name)
+            self.yaml_handler.add_relationship_test(col, ref_model, fk_info["ref_field"])
+
+        self.yaml_handler.save_file(yml_path, data)
+        return Path(yml_path)
+
+    def _merge_schema_entry(
+        self,
+        model_entry: Any,
+        columns: list[dict[str, Any]],
+        description: Optional[str],
+        tags: Optional[list[str]],
+        target_version: Optional[int],
+    ) -> Any:
+        """Merge columns, description and tags; return the entry holding columns."""
         if target_version is not None:
             # Versioned model: update version block and latest_version
             self.yaml_handler.set_latest_version(model_entry, target_version)
-            if entity_description:
-                self.yaml_handler.update_model_description(
-                    model_entry, entity_description
-                )
+            if description:
+                self.yaml_handler.update_model_description(model_entry, description)
 
             version_entry = self.yaml_handler.ensure_model_version(
                 model_entry, target_version
             )
             self.yaml_handler.merge_columns_non_destructive(version_entry, columns)
 
-            if entity_description:
-                self.yaml_handler.update_model_description(
-                    version_entry, entity_description
-                )
+            if description:
+                self.yaml_handler.update_model_description(version_entry, description)
             if tags is not None:
                 self.yaml_handler.merge_version_tags(version_entry, tags)
 
-            schema_entry = version_entry
-        else:
-            # Non-versioned model: update columns and metadata directly
-            if entity_description:
-                self.yaml_handler.update_model_description(
-                    model_entry, entity_description
-                )
+            return version_entry
 
-            self.yaml_handler.merge_columns_non_destructive(model_entry, columns)
+        # Non-versioned model: update columns and metadata directly
+        if description:
+            self.yaml_handler.update_model_description(model_entry, description)
 
-            if tags is not None:
-                self.yaml_handler.merge_model_tags(model_entry, tags)
+        self.yaml_handler.merge_columns_non_destructive(model_entry, columns)
 
-            schema_entry = model_entry
+        if tags is not None:
+            self.yaml_handler.merge_model_tags(model_entry, tags)
 
-        # Remove stale relationship tests: any column that has a relationship test
-        # but is not a current FK for this entity.
-        fk_fields = set(field_to_relationship.keys())
-        if "columns" in schema_entry:
-            for col in schema_entry.get("columns", []):
-                col_name = col.get("name")
-                if not col_name or col_name in fk_fields:
-                    continue
-                # Check whether this column currently has a relationship test
-                has_rel_test = any(
-                    isinstance(t, dict) and "relationships" in t
-                    for key in ("data_tests", "tests")
-                    for t in col.get(key, [])
-                )
-                if has_rel_test:
-                    self.yaml_handler.remove_relationship_test(col)
+        return model_entry
 
-        # Apply relationship tests after columns are written
-        for field in fields:
-            field_name = field["name"]
-            if field_name not in field_to_relationship:
+    def _remove_stale_relationship_tests(
+        self, schema_entry: Any, fk_fields: set[str]
+    ) -> None:
+        """Drop the relationship test of any column that is not a current FK."""
+        if "columns" not in schema_entry:
+            return
+        for col in schema_entry.get("columns", []):
+            col_name = col.get("name")
+            if not col_name or col_name in fk_fields:
                 continue
-            rel_info = field_to_relationship[field_name]
-            ref_model = entity_model_name.get(
-                rel_info["target_entity"], rel_info["target_entity"]
+            # Check whether this column currently has a relationship test
+            has_rel_test = any(
+                isinstance(t, dict) and "relationships" in t
+                for key in ("data_tests", "tests")
+                for t in col.get(key, [])
             )
-            col = self.yaml_handler.ensure_column(schema_entry, field_name)
-            self.yaml_handler.add_relationship_test(col, ref_model, rel_info["target_field"])
-
-        self.yaml_handler.save_file(yml_path, data)
-        return Path(yml_path)
+            if has_rel_test:
+                self.yaml_handler.remove_relationship_test(col)
 
     @classmethod
     def reset_inference_cache(cls) -> None:
@@ -1572,37 +1497,23 @@ class DbtCoreAdapter:
         if model_unique_id not in nodes:
             raise NotFoundError(self._model_not_found_message(model_unique_id, nodes))
 
-        node_ids: set[str] = {model_unique_id}
-        edges: list[dict[str, str]] = []
-
-        queue = deque([model_unique_id])
-        visited = {model_unique_id}
-
-        while queue:
-            current_id = queue.popleft()
-            current_node = nodes.get(current_id)
+        def upstreams_of(node_id: str):
+            current_node = nodes.get(node_id)
             if not current_node:
-                continue
-
+                return ()
             depends_on = current_node.get("depends_on")
             if not depends_on:
-                continue
-
-            upstream_ids = snapshot.dependency_index.get(current_id, ())
+                return ()
             if isinstance(depends_on, Mapping):
-                upstream_ids = depends_on.get("nodes", [])
-            elif isinstance(depends_on, (list, tuple)):
-                upstream_ids = depends_on
+                return depends_on.get("nodes", [])
+            if isinstance(depends_on, (list, tuple)):
+                return depends_on
+            return snapshot.dependency_index.get(node_id, ())
 
-            for upstream_id in upstream_ids:
-                edges.append({"source": upstream_id, "target": current_id})
-                node_ids.add(upstream_id)
-
-                if upstream_id not in visited:
-                    visited.add(upstream_id)
-                    # Sources terminate the walk; only models have upstreams.
-                    if upstream_id.startswith("model."):
-                        queue.append(upstream_id)
+        # Sources terminate the walk; only models have upstreams.
+        node_ids, edges = walk_upstream(
+            model_unique_id, upstreams_of, lambda uid: uid.startswith("model.")
+        )
 
         return LineageGraph(
             nodes=[self._lineage_node(nid, nodes, sources) for nid in node_ids],
@@ -1665,22 +1576,8 @@ class DbtCoreAdapter:
         Never raises: this backs optional display, so an unreadable manifest or
         an unknown model yields no source systems rather than an error.
         """
-        try:
-            graph = self.get_lineage(model_unique_id)
-        except Exception as e:
-            logger.warning(
-                "Failed to extract source systems for model %s: %s",
-                model_unique_id,
-                e,
-            )
-            return []
-
-        return sorted(
-            {
-                node["source_name"]
-                for node in graph["nodes"]
-                if node["is_source"] and node["source_name"]
-            }
+        return source_systems_from_lineage(
+            self.get_lineage, model_unique_id, "model"
         )
 
     def get_source_systems_for_models(
