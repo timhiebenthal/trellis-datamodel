@@ -21,12 +21,12 @@ from trellis_datamodel.adapters.base import (
     ColumnSchema,
     ModelInfo,
     ModelSchema,
-    semantic_dataset_name,
 )
 from trellis_datamodel.models.entity_keys import (
     get_model_ref,
     get_physical_datatype,
 )
+from trellis_datamodel.models.semantic_names import semantic_dataset_name
 from trellis_datamodel.models.metric import MetricEntry, MetricTreeFile
 from trellis_datamodel.services.fk_placement import place_foreign_key
 from trellis_datamodel.services.metric_tree import load_metric_tree

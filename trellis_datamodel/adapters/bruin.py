@@ -48,6 +48,7 @@ from trellis_datamodel.utils.bruin_rewriter import (
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
 from trellis_datamodel.models.schemas import FrameworkEnum
+from trellis_datamodel.observability import timed_phase
 from trellis_datamodel.adapters.lineage import (
     source_systems_from_lineage,
     walk_upstream,
@@ -374,6 +375,13 @@ class BruinAdapter:
         ]
 
     def get_model_schema(
+        self, model_name: str, version: Optional[int] = None
+    ) -> ModelSchema:
+        """Get a model schema while timing the adapter-owned lookup."""
+        with timed_phase("schema_read"):
+            return self._get_model_schema(model_name, version=version)
+
+    def _get_model_schema(
         self,
         model_name: str,
         version: Optional[int] = None,
@@ -556,7 +564,12 @@ class BruinAdapter:
     # Relationships
     # ------------------------------------------------------------------
 
-    def infer_relationships(
+    def infer_relationships(self, include_unbound: bool = False) -> list[Relationship]:
+        """Read relationships while timing the adapter-owned scan."""
+        with timed_phase("relationship_scan"):
+            return self._infer_relationships(include_unbound=include_unbound)
+
+    def _infer_relationships(
         self,
         include_unbound: bool = False,
     ) -> list[Relationship]:
@@ -900,12 +913,13 @@ class BruinAdapter:
         if not cfg.DIMENSIONAL_MODELING_CONFIG.enabled:
             return {}
 
-        return entity_type_inference.infer_entity_types(
-            framework=FRAMEWORK_NAME,
-            cache_key=self._inference_cache_key(),
-            get_models=self.get_models,
-            get_model_to_entity_map=self._get_model_to_entity_map,
-        )
+        with timed_phase("entity_inference"):
+            return entity_type_inference.infer_entity_types(
+                framework=FRAMEWORK_NAME,
+                cache_key=self._inference_cache_key(),
+                get_models=self.get_models,
+                get_model_to_entity_map=self._get_model_to_entity_map,
+            )
 
     def _inference_cache_key(self) -> str:
         """Staleness token for inference: the newest asset file's mtime.
@@ -941,6 +955,11 @@ class BruinAdapter:
     # ------------------------------------------------------------------
 
     def get_lineage(self, model_unique_id: str) -> LineageGraph:
+        """Build lineage while timing the adapter-owned source walk."""
+        with timed_phase("source_lineage"):
+            return self._get_lineage(model_unique_id)
+
+    def _get_lineage(self, model_unique_id: str) -> LineageGraph:
         """Build the upstream lineage graph for an asset from `depends:`."""
         assets = self._scan_all_assets()
         by_name = _assets_by_name(assets)
