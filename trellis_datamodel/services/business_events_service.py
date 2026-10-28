@@ -39,6 +39,7 @@ from trellis_datamodel.services.data_model import (
     load_data_model_raw,
     save_data_model_raw,
 )
+from trellis_datamodel.utils.structured_data import load_yaml_file, save_yaml_file
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,91 @@ def _get_business_events_path() -> str:
     return os.path.abspath("business_events.yml")
 
 
+def _parse_events(data: dict) -> List[BusinessEvent]:
+    if "events" not in data:
+        raise ValueError("Missing 'events' key")
+    return BusinessEventsFile(**data).events
+
+
+def _parse_processes(data: dict) -> List[BusinessEventProcess]:
+    processes = []
+    for proc_data in data.get("processes", []) or []:
+        # Handle resolved_at being None
+        if "resolved_at" in proc_data and proc_data["resolved_at"] is None:
+            proc_data = {k: v for k, v in proc_data.items() if k != "resolved_at"}
+        processes.append(BusinessEventProcess(**proc_data))
+    return processes
+
+
+# The sections of business_events.yml and how each is parsed from the raw file.
+_SECTION_PARSERS = {"events": _parse_events, "processes": _parse_processes}
+
+
+def _load_section(key: str, path: Optional[str] = None) -> list:
+    """
+    Load one section ("events" or "processes") of the business events file.
+
+    A missing file yields an empty list.
+
+    Raises:
+        FileOperationError: If the file exists but cannot be read, is not valid
+            YAML, or the section does not have the expected structure.
+    """
+    if path is None:
+        path = _get_business_events_path()
+
+    if not os.path.exists(path):
+        logger.info(f"Business events file not found at {path}, returning empty {key} list")
+        return []
+
+    try:
+        data = load_yaml_file(path, {})
+    except yaml.YAMLError as e:
+        logger.error(f"YAML parse error in business events file {path}: {e}")
+        raise FileOperationError("Invalid business events file format")
+    except Exception as e:
+        logger.error(f"Error reading business events file {path}: {e}")
+        raise FileOperationError(f"Failed to read business events file: {e}")
+
+    try:
+        return _SECTION_PARSERS[key](data)
+    except Exception as e:
+        logger.error(f"Invalid {key} structure in business events file {path}: {e}")
+        raise FileOperationError("Invalid business events file format")
+
+
+def _save_section(key: str, items: list, path: Optional[str] = None) -> None:
+    """
+    Replace one section ("events" or "processes") of the business events file.
+
+    The other section is preserved as it is on disk; if it cannot be loaded it
+    is written empty.
+
+    Raises:
+        FileOperationError: If the file cannot be written.
+    """
+    if path is None:
+        path = _get_business_events_path()
+
+    sections = {}
+    for section in _SECTION_PARSERS:
+        if section == key:
+            sections[section] = items
+            continue
+        try:
+            sections[section] = _load_section(section, path)
+        except Exception:
+            sections[section] = []
+
+    events_file = BusinessEventsFile(**sections)
+
+    try:
+        save_yaml_file(path, events_file.model_dump(mode="json"))
+        logger.info(f"Saved {len(items)} business event {key} to {path}")
+    except Exception as e:
+        raise FileOperationError(f"Failed to write business events file: {e}")
+
+
 def load_business_events(path: Optional[str] = None) -> List[BusinessEvent]:
     """
     Load business events from YAML file.
@@ -71,48 +157,19 @@ def load_business_events(path: Optional[str] = None) -> List[BusinessEvent]:
               configured BUSINESS_EVENTS_PATH or default location.
 
     Returns:
-        List of BusinessEvent objects.
+        List of BusinessEvent objects; empty if the file does not exist.
 
     Raises:
         FileOperationError: If file exists but cannot be read or parsed.
     """
-    if path is None:
-        path = _get_business_events_path()
-
-    # If file doesn't exist, return empty list
-    if not os.path.exists(path):
-        logger.info(f"Business events file not found at {path}, returning empty list")
-        return []
-
-    try:
-        with open(path, "r") as f:
-            data = yaml.safe_load(f) or {}
-    except yaml.YAMLError as e:
-        logger.error(f"YAML parse error in business events file {path}: {e}")
-        raise FileOperationError("Invalid business events file format")
-    except Exception as e:
-        logger.error(f"Error reading business events file {path}: {e}")
-        raise FileOperationError(f"Failed to read business events file: {e}")
-
-    # Parse file structure
-    try:
-        if "events" not in data:
-            logger.error(f"Missing 'events' key in business events file {path}")
-            raise FileOperationError("Invalid business events file format")
-        events_file = BusinessEventsFile(**data)
-        return events_file.events
-    except Exception as e:
-        logger.error(f"Invalid business events file structure in {path}: {e}")
-        raise FileOperationError("Invalid business events file format")
+    return _load_section("events", path)
 
 
 def save_business_events(
     events: List[BusinessEvent], path: Optional[str] = None
 ) -> None:
     """
-    Save business events to YAML file.
-
-    This function preserves existing processes when saving events.
+    Save business events to YAML file, preserving existing processes.
 
     Args:
         events: List of BusinessEvent objects to save.
@@ -122,33 +179,7 @@ def save_business_events(
     Raises:
         FileOperationError: If file cannot be written.
     """
-    if path is None:
-        path = _get_business_events_path()
-
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
-    # Load existing processes to preserve them
-    existing_processes = []
-    if os.path.exists(path):
-        try:
-            existing_processes = load_processes(path)
-        except Exception:
-            # If we can't load processes, continue without them
-            pass
-
-    # Create file structure with events and processes
-    events_file = BusinessEventsFile(events=events, processes=existing_processes)
-
-    try:
-        # Convert to dict for YAML serialization
-        data = events_file.model_dump(mode="json")
-
-        with open(path, "w") as f:
-            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-        logger.info(f"Saved {len(events)} business events to {path}")
-    except Exception as e:
-        raise FileOperationError(f"Failed to write business events file: {e}")
+    _save_section("events", events, path)
 
 
 def get_unique_domains() -> List[str]:
@@ -914,55 +945,19 @@ def load_processes(path: Optional[str] = None) -> List[BusinessEventProcess]:
               configured BUSINESS_EVENTS_PATH or default location.
 
     Returns:
-        List of BusinessEventProcess objects.
+        List of BusinessEventProcess objects; empty if the file does not exist.
 
     Raises:
         FileOperationError: If file exists but cannot be read or parsed.
     """
-    if path is None:
-        path = _get_business_events_path()
-
-    # If file doesn't exist, return empty list
-    if not os.path.exists(path):
-        logger.info(f"Business events file not found at {path}, returning empty processes list")
-        return []
-
-    try:
-        with open(path, "r") as f:
-            data = yaml.safe_load(f) or {}
-    except yaml.YAMLError as e:
-        logger.error(f"YAML parse error in business events file {path}: {e}")
-        raise FileOperationError("Invalid business events file format")
-    except Exception as e:
-        logger.error(f"Error reading business events file {path}: {e}")
-        raise FileOperationError(f"Failed to read business events file: {e}")
-
-    # Parse file structure
-    try:
-        processes_data = data.get("processes", [])
-        if not processes_data:
-            return []
-        
-        processes = []
-        for proc_data in processes_data:
-            # Handle resolved_at being None
-            if "resolved_at" in proc_data and proc_data["resolved_at"] is None:
-                proc_data = {k: v for k, v in proc_data.items() if k != "resolved_at"}
-            processes.append(BusinessEventProcess(**proc_data))
-        return processes
-    except Exception as e:
-        logger.error(f"Invalid processes structure in {path}: {e}")
-        raise FileOperationError("Invalid business events file format")
+    return _load_section("processes", path)
 
 
 def save_processes(
     processes: List[BusinessEventProcess], path: Optional[str] = None
 ) -> None:
     """
-    Save business event processes to YAML file.
-
-    Processes are saved alongside events in the same file, under a 'processes' key.
-    This function preserves existing events and only updates the processes section.
+    Save business event processes to YAML file, preserving existing events.
 
     Args:
         processes: List of BusinessEventProcess objects to save.
@@ -972,33 +967,7 @@ def save_processes(
     Raises:
         FileOperationError: If file cannot be written.
     """
-    if path is None:
-        path = _get_business_events_path()
-
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
-    # Load existing events to preserve them
-    existing_events = []
-    if os.path.exists(path):
-        try:
-            existing_events = load_business_events(path)
-        except Exception:
-            # If we can't load events, continue without them
-            pass
-
-    # Create file structure with events and processes
-    events_file = BusinessEventsFile(events=existing_events, processes=processes)
-
-    try:
-        # Convert to dict for YAML serialization
-        data = events_file.model_dump(mode="json")
-
-        with open(path, "w") as f:
-            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-        logger.info(f"Saved {len(processes)} business event processes to {path}")
-    except Exception as e:
-        raise FileOperationError(f"Failed to write business events file: {e}")
+    _save_section("processes", processes, path)
 
 
 def _compute_annotation_union(

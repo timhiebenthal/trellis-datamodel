@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, List
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
+from trellis_datamodel.utils.atomic_write import atomic_write
 from trellis_datamodel.utils.bruin_parser import is_yaml_asset
 from trellis_datamodel.utils.bruin_yaml import bruin_yaml
 
@@ -236,17 +237,8 @@ def _replace_meta(parsed: CommentedMap, meta: Dict[str, Any]) -> None:
 
 
 def _atomic_write(path: Path, content: str) -> None:
-    """Write *content* to *path* atomically, within the same directory."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
-            tmp_file.write(content)
-        os.replace(tmp_path, str(path))
-    except Exception:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise
+    """Write an asset file atomically, UTF-8, owner-only permissions (0600)."""
+    atomic_write(path, content, encoding="utf-8", mode=0o600)
 
 
 def _apply_updates(yaml_rt: YAML, yaml_str: str, updates: dict) -> str:

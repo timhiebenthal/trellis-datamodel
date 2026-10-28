@@ -14,29 +14,20 @@ used.
 """
 
 import logging
-import os
 from typing import Any
-
-import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.exceptions import FeatureDisabledError
 from trellis_datamodel.models.entity_keys import get_model_ref
+from trellis_datamodel.utils.structured_data import try_load_yaml_file
 
 logger = logging.getLogger(__name__)
 
 
 def _load_data_model() -> dict[str, Any]:
-    """Load data model YAML."""
-    if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
-        return {}
-    try:
-        with open(cfg.DATA_MODEL_PATH, "r") as f:
-            return yaml.safe_load(f) or {}
-    except Exception as e:
-        logger.warning("Could not load data model: %s", e)
-        return {}
+    """Load data model YAML; {} if it is missing or unreadable."""
+    return try_load_yaml_file(cfg.DATA_MODEL_PATH, {})
 
 
 def _find_entities_for_model(unique_id: str, data_model: dict[str, Any]) -> list[str]:

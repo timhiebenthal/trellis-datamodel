@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import ConfigurationError, FileOperationError, ValidationError
+from trellis_datamodel.exceptions import ConfigurationError, ValidationError
 
 
 def validate_data_model_path() -> str:
@@ -28,59 +28,6 @@ def validate_data_model_path() -> str:
         )
 
     return cfg.DATA_MODEL_PATH
-
-
-def ensure_data_model_path_exists() -> str:
-    """
-    Ensure data_model_path exists, creating parent directories if needed.
-
-    Returns:
-        The validated data_model_path
-
-    Raises:
-        ConfigurationError: If path is not configured
-        FileOperationError: If directory creation fails
-    """
-    path = validate_data_model_path()
-
-    parent_dir = os.path.dirname(path)
-    if parent_dir and not os.path.exists(parent_dir):
-        try:
-            os.makedirs(parent_dir, exist_ok=True)
-        except OSError as e:
-            raise FileOperationError(
-                f"Failed to create directory for data_model.yml: {e}"
-            ) from e
-
-    return path
-
-
-def ensure_canvas_layout_path_exists() -> str:
-    """
-    Ensure canvas_layout_path exists, creating parent directories if needed.
-
-    Returns:
-        The validated canvas_layout_path
-
-    Raises:
-        ConfigurationError: If path is not configured
-        FileOperationError: If directory creation fails
-    """
-    if not cfg.CANVAS_LAYOUT_PATH:
-        raise ConfigurationError(
-            "canvas_layout_file is not configured. Please set it in trellis.yml"
-        )
-
-    parent_dir = os.path.dirname(cfg.CANVAS_LAYOUT_PATH)
-    if parent_dir and not os.path.exists(parent_dir):
-        try:
-            os.makedirs(parent_dir, exist_ok=True)
-        except OSError as e:
-            raise FileOperationError(
-                f"Failed to create directory for canvas_layout.yml: {e}"
-            ) from e
-
-    return cfg.CANVAS_LAYOUT_PATH
 
 
 def validate_path_is_safe(path: str, base_dir: str) -> Path:

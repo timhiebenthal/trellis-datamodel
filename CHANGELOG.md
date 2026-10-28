@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manifest, lineage, metric tree, reconcile and health endpoints. Write
   endpoints answer one success envelope, `{"status": "success"}`, plus only
   the fields their callers read (`changed`, `warnings`, `message`) (#179).
+- **`business_events.yml` is written atomically:** like `data_model.yml`,
+  `trellis.yml` and Bruin assets, a failed save now leaves the previous file in
+  place instead of a partially written one (#179).
 
 ### Fixed
 - **Config page showed the entity creation wizard as off by default:** with

@@ -8,7 +8,6 @@ import hashlib
 import logging
 import os
 import re
-import tempfile
 from datetime import datetime
 from io import StringIO
 from pathlib import Path, PureWindowsPath
@@ -16,9 +15,7 @@ from typing import Any, Dict, Optional, Tuple
 import json
 from enum import Enum
 
-import yaml
 from pydantic import ValidationError
-from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from trellis_datamodel.config import resolve_config_path
@@ -36,6 +33,9 @@ from trellis_datamodel.models.schemas import (
     ConfigSchemaResponse,
     ConfigFieldMetadata,
 )
+from trellis_datamodel.utils.atomic_write import atomic_write
+from trellis_datamodel.utils.structured_data import load_yaml_file
+from trellis_datamodel.utils.yaml_handler import round_trip_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -686,16 +686,6 @@ def _validate_paths(config: Dict[str, Any], config_path: str) -> list[str]:
 
 
 
-def _round_trip_yaml() -> YAML:
-    """Round-trip YAML with the indentation trellis.yml is written in."""
-    ryaml = YAML()
-    ryaml.preserve_quotes = True
-    ryaml.default_flow_style = False
-    ryaml.width = 4096
-    ryaml.indent(mapping=2, sequence=4, offset=2)
-    return ryaml
-
-
 def _merge_into_document(raw: Any, normalized: Dict[str, Any]) -> Any:
     """
     Merge the normalized config into the document read from disk.
@@ -720,7 +710,7 @@ def _merge_into_document(raw: Any, normalized: Dict[str, Any]) -> Any:
 
 def render_config(text: str, normalized: Dict[str, Any]) -> str:
     """Merge the normalized config into trellis.yml text and return the new text."""
-    ryaml = _round_trip_yaml()
+    ryaml = round_trip_yaml()
     document = _merge_into_document(ryaml.load(text), normalized)
     out = StringIO()
     ryaml.dump(document, out)
@@ -732,7 +722,7 @@ def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
     Atomically write config to file, merged into the existing document so
     unknown keys, comments and key order survive.
 
-    Uses temp file + move to ensure atomic operation.
+    The file is replaced atomically and ends up owner-only (0600).
     """
     try:
         with open(config_path, "r") as f:
@@ -740,28 +730,11 @@ def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
     except Exception as e:
         raise ConfigurationError(f"Failed to read config file: {e}")
 
-    # Write to temp file
     try:
-        fd, temp_path = tempfile.mkstemp(
-            prefix=os.path.basename(config_path), dir=os.path.dirname(config_path)
-        )
-    except OSError as e:
-        raise FileOperationError(f"Failed to write config: {e}") from e
-
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write(rendered)
-
-        # Atomic move
-        os.replace(temp_path, config_path)
-        logger.info(f"Atomically wrote config to: {config_path}")
+        atomic_write(config_path, rendered, mode=0o600)
     except Exception as e:
-        # Clean up temp file on error
-        try:
-            os.unlink(temp_path)
-        except Exception:
-            pass
         raise FileOperationError(f"Failed to write config: {e}") from e
+    logger.info(f"Atomically wrote config to: {config_path}")
 
 
 def get_schema_metadata() -> ConfigSchemaResponse:
@@ -804,8 +777,7 @@ def read_config(
     config_path = require_config_path(config_path)
 
     try:
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f) or {}
+        config = load_yaml_file(config_path, {})
     except Exception as e:
         raise ConfigurationError(f"Failed to read config file: {e}")
     if not isinstance(config, dict):
@@ -887,8 +859,7 @@ def save_config(
         raise CustomValidationError(f"Config validation failed: {error_msg}")
 
     try:
-        with open(config_path, "r") as f:
-            current = yaml.safe_load(f) or {}
+        current = load_yaml_file(config_path, {})
     except Exception as e:
         raise ConfigurationError(f"Failed to read config file: {e}")
     unsafe = _unsafe_write_paths(normalized, current)

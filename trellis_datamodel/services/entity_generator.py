@@ -7,11 +7,8 @@ with proper naming, labels, and relationships following dimensional modeling con
 """
 
 import logging
-import os
 import re
 from typing import Dict, List, Optional
-
-import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ValidationError
@@ -23,6 +20,7 @@ from trellis_datamodel.models.business_event import (
 )
 from trellis_datamodel.services.business_events_service import load_business_events
 from trellis_datamodel.services.data_model import merge_roles
+from trellis_datamodel.utils.structured_data import load_yaml_file
 
 logger = logging.getLogger(__name__)
 
@@ -202,14 +200,10 @@ def _load_existing_entities() -> Dict[str, dict]:
     Returns:
         Dictionary mapping entity IDs to entity dictionaries
     """
-    if not cfg.DATA_MODEL_PATH or not os.path.exists(cfg.DATA_MODEL_PATH):
-        return {}
-
     try:
-        with open(cfg.DATA_MODEL_PATH, "r") as f:
-            data = yaml.safe_load(f) or {}
-            entities = data.get("entities", [])
-            return {entity["id"]: entity for entity in entities if "id" in entity}
+        data = load_yaml_file(cfg.DATA_MODEL_PATH, {})
+        entities = data.get("entities", [])
+        return {entity["id"]: entity for entity in entities if "id" in entity}
     except Exception as e:
         logger.warning(f"Could not load data_model.yml: {e}")
         return {}

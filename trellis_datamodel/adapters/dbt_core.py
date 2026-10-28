@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import time
-import yaml
 from collections import deque
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -30,6 +29,7 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.utils.path_validation import validate_path_is_safe
+from trellis_datamodel.utils.structured_data import load_yaml_file, try_load_yaml_file
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
 from .base import (
@@ -150,14 +150,7 @@ class DbtCoreAdapter:
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
-        if not self.data_model_path or not os.path.exists(self.data_model_path):
-            return {}
-        try:
-            with open(self.data_model_path, "r") as f:
-                return yaml.safe_load(f) or {}
-        except Exception as e:
-            logger.warning("Could not load data model: %s", e)
-            return {}
+        return try_load_yaml_file(self.data_model_path, {})
 
     def get_model_dirs(self) -> list[str]:
         """
@@ -337,15 +330,14 @@ class DbtCoreAdapter:
                 yml_path = self._get_model_yml_path(base_name, manifest=manifest)
                 if yml_path and os.path.exists(yml_path):
                     try:
-                        with open(yml_path, "r") as f:
-                            yml_content = yaml.safe_load(f) or {}
-                            models_list = yml_content.get("models", [])
-                            for model_entry in models_list:
-                                yml_name = model_entry.get("name")
-                                if yml_name and yml_name != base_name:
-                                    # YAML documents a model with a different name
-                                    model_to_entity[yml_name] = entity_id
-                                    model_to_entity[yml_name.lower()] = entity_id
+                        yml_content = load_yaml_file(yml_path, {})
+                        models_list = yml_content.get("models", [])
+                        for model_entry in models_list:
+                            yml_name = model_entry.get("name")
+                            if yml_name and yml_name != base_name:
+                                # YAML documents a model with a different name
+                                model_to_entity[yml_name] = entity_id
+                                model_to_entity[yml_name.lower()] = entity_id
                     except Exception as e:
                         pass  # Gracefully skip if YAML parsing fails
             # Map additional models to the same entity
@@ -398,8 +390,7 @@ class DbtCoreAdapter:
                         continue
                     yml_path = os.path.join(root, filename)
                     try:
-                        with open(yml_path, "r") as f:
-                            yml_content = yaml.safe_load(f) or {}
+                        yml_content = load_yaml_file(yml_path, {})
                         models_list = yml_content.get("models", [])
                         # A file base name only identifies the model in
                         # single-model files; shared files (schema.yml) do not.
@@ -973,8 +964,7 @@ class DbtCoreAdapter:
 
                     filepath = os.path.join(root, filename)
                     try:
-                        with open(filepath, "r") as f:
-                            schema_data = yaml.safe_load(f) or {}
+                        schema_data = load_yaml_file(filepath, {})
 
                         models_list = schema_data.get("models", [])
                         for model in models_list:
@@ -1822,13 +1812,7 @@ class DbtCoreAdapter:
         if not exposures_path:
             return []
 
-        try:
-            with open(exposures_path, "r") as f:
-                data = yaml.safe_load(f) or {}
-        except Exception as e:
-            logger.warning("Could not read %s: %s", exposures_path, e)
-            return []
-
+        data = try_load_yaml_file(exposures_path, {})
         exposures = data.get("exposures", [])
         return exposures if isinstance(exposures, list) else []
 

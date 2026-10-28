@@ -14,6 +14,7 @@ from typing import Any, Optional
 import yaml
 
 from trellis_datamodel.models import schemas as _schemas
+from trellis_datamodel.utils.structured_data import load_yaml_or_json, try_load_yaml_file
 
 logger = logging.getLogger(__name__)
 
@@ -188,12 +189,7 @@ else:
 
 def _load_yaml_config(path: str) -> dict[str, Any]:
     """Load YAML config, returning an empty dict on error."""
-    try:
-        with open(path, "r") as f:
-            return yaml.safe_load(f) or {}
-    except Exception as e:
-        logger.warning("Error loading config file %s: %s", path, e)
-        return {}
+    return try_load_yaml_file(path, {})
 
 
 def resolve_config_path(config_path: Optional[str]) -> Optional[str]:
@@ -860,8 +856,7 @@ def reload_config(config_path: Optional[str] = None) -> None:
         # load_config tolerates unparseable YAML (startup falls back to defaults),
         # which on reload would report success while keeping stale values.
         try:
-            with open(config_path, "r") as f:
-                yaml.safe_load(f)
+            load_yaml_or_json(config_path)
         except yaml.YAMLError as e:
             raise ConfigurationError(f"Invalid YAML in {config_path}: {e}") from e
 
