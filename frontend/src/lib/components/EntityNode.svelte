@@ -41,6 +41,7 @@
         classifyModelTypeFromPrefixes,
     } from "$lib/utils";
     import { mergeFields } from "$lib/utils/merged-fields";
+    import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
     import type { MergedField } from "$lib/utils/merged-fields";
     import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
     import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
@@ -1083,13 +1084,7 @@
             {#if isDimensionalModeling && data.entity_type}
                 <button
                     type="button"
-                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 cursor-pointer"
-                    class:bg-blue-100={data.entity_type === 'fact'}
-                    class:bg-green-100={data.entity_type === 'dimension'}
-                    class:bg-gray-100={data.entity_type === 'unclassified'}
-                    class:text-blue-800={data.entity_type === 'fact'}
-                    class:text-green-800={data.entity_type === 'dimension'}
-                    class:text-gray-800={data.entity_type === 'unclassified'}
+                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 cursor-pointer {getEntityTypeStyle(data.entity_type).badge}"
                     class:opacity-80={true}
                     onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
                     title={data.entity_type === 'fact'
@@ -1099,7 +1094,7 @@
                         : 'Unclassified: Generic entity (click to change)'}
                 >
                     <Icon
-                        icon={data.entity_type === 'fact' ? 'lucide:bar-chart-3' : data.entity_type === 'dimension' ? 'lucide:list' : 'lucide:circle-dashed'}
+                        icon={getEntityTypeStyle(data.entity_type).icon}
                         class="w-3 h-3"
                     />
                 </button>
@@ -1197,7 +1192,7 @@
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
+                <Icon icon={getEntityTypeStyle('fact').icon} class="w-4 h-4 {getEntityTypeStyle('fact').iconClass}" />
                 <span class="text-gray-700">Set as Fact</span>
             </button>
             <button
@@ -1205,7 +1200,7 @@
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-green-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:list" class="w-4 h-4 text-green-600" />
+                <Icon icon={getEntityTypeStyle('dimension').icon} class="w-4 h-4 {getEntityTypeStyle('dimension').iconClass}" />
                 <span class="text-gray-700">Set as Dimension</span>
             </button>
             <button
@@ -1213,7 +1208,7 @@
                 class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left transition-colors"
                 role="menuitem"
             >
-                <Icon icon="lucide:circle-dashed" class="w-4 h-4 text-gray-500" />
+                <Icon icon={getEntityTypeStyle('unclassified').icon} class="w-4 h-4 {getEntityTypeStyle('unclassified').iconClass}" />
                 <span class="text-gray-700">Set as Unclassified</span>
             </button>
         </div>

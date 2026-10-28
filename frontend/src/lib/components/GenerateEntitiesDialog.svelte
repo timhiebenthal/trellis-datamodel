@@ -10,6 +10,7 @@
     import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import { readModelRef } from '$lib/utils/entity-compat';
+    import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
     import { buildEntityNodes, findLegacyAliasNodeIds } from '$lib/utils/entity-generation';
     import CustomEntitySelect from './CustomEntitySelect.svelte';
     import type { Node, Edge } from '@xyflow/svelte';
@@ -1055,21 +1056,9 @@
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-4 py-3">
                                                 <span
-                                                    class="px-2 py-1 text-xs font-medium rounded {entity.entity_type === 'dimension'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : entity.entity_type === 'fact'
-                                                          ? 'bg-blue-100 text-blue-700'
-                                                          : entity.entity_type === 'entity'
-                                                            ? 'bg-purple-100 text-purple-700'
-                                                            : 'bg-gray-100 text-gray-800'}"
+                                                    class="px-2 py-1 text-xs font-medium rounded {getEntityTypeStyle(entity.entity_type).badge}"
                                                 >
-                                                    {entity.entity_type === 'dimension'
-                                                        ? 'Dimension'
-                                                        : entity.entity_type === 'fact'
-                                                          ? 'Fact'
-                                                          : entity.entity_type === 'entity'
-                                                            ? 'Entity'
-                                                            : 'Unclassified'}
+                                                    {getEntityTypeStyle(entity.entity_type).label}
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3">

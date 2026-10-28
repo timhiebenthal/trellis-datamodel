@@ -12,6 +12,7 @@
 	import type { Node } from '@xyflow/svelte';
 	import type { Entity, EntityData } from '$lib/types';
 	import { filterEntities } from '$lib/utils/entity-filtering';
+	import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
 	import { groupEntitiesByDomain } from '$lib/utils/entity-grouping';
 	import { readModelRef } from '$lib/utils/entity-compat';
 	import EntityRow from './EntityRow.svelte';
@@ -291,16 +292,17 @@
 						<div class="bg-white border-b border-gray-200 overflow-hidden">
 							{#if $entityListFilters.groupByEntityType}
 								{#each subGroupByType(domainEntities) as [typeName, typeEntities]}
+									{@const groupStyle = getEntityTypeStyle(typeName === 'Dimensions' ? 'dimension' : typeName === 'Facts' ? 'fact' : 'unclassified')}
 									<button
 										onclick={() => toggleTypeGroupCollapse(domain, typeName)}
 										class="w-full flex items-center gap-2 px-4 py-1.5 bg-gray-50 border-b border-gray-100 hover:bg-gray-100 transition-colors group"
 									>
 										<CollapseChevron expanded={isTypeGroupExpanded(domain, typeName)} sizeClass="w-3 h-3" />
 										<Icon
-											icon={typeName === 'Dimensions' ? 'lucide:list' : typeName === 'Facts' ? 'lucide:bar-chart-3' : 'lucide:circle-dashed'}
-											class="w-3 h-3 {typeName === 'Dimensions' ? 'text-green-600' : typeName === 'Facts' ? 'text-blue-600' : 'text-gray-400'}"
+											icon={groupStyle.icon}
+											class="w-3 h-3 {groupStyle.iconClass}"
 										/>
-										<span class="text-xs font-semibold uppercase tracking-wide {typeName === 'Dimensions' ? 'text-green-700' : typeName === 'Facts' ? 'text-blue-700' : 'text-gray-500'}">
+										<span class="text-xs font-semibold uppercase tracking-wide {groupStyle.textClass}">
 											{typeName}
 										</span>
 										<span class="text-xs text-gray-400 ml-1">({typeEntities.length})</span>

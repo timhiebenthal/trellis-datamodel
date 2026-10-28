@@ -4,6 +4,7 @@
 	import { getSourceSystemSuggestions, getBusinessEventProcesses, updateModelSchema, getManifest, getModelSchema } from '$lib/api';
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry, ModelInfo } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
+	import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
 	import type { MergedField } from '$lib/utils/merged-fields';
 	import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
 	import { readModelRef, readFrameworkTags } from '$lib/utils/entity-compat';
@@ -1002,7 +1003,7 @@
 									: 'bg-white border-transparent text-gray-600 hover:bg-gray-100'}"
 								onclick={() => (entityType = 'dimension')}
 							>
-								<Icon icon="lucide:list" class="w-3.5 h-3.5 {entityType === 'dimension' ? 'text-green-700' : 'text-gray-500'}" />
+								<Icon icon={getEntityTypeStyle('dimension').icon} class="w-3.5 h-3.5 {entityType === 'dimension' ? getEntityTypeStyle('dimension').iconClass : 'text-gray-500'}" />
 								Dimension
 							</button>
 							<button
@@ -1013,7 +1014,7 @@
 									: 'bg-white border-transparent text-gray-600 hover:bg-gray-100'}"
 								onclick={() => (entityType = 'fact')}
 							>
-								<Icon icon="lucide:bar-chart-3" class="w-3.5 h-3.5 {entityType === 'fact' ? 'text-blue-700' : 'text-gray-500'}" />
+								<Icon icon={getEntityTypeStyle('fact').icon} class="w-3.5 h-3.5 {entityType === 'fact' ? getEntityTypeStyle('fact').iconClass : 'text-gray-500'}" />
 								Fact
 							</button>
 							<button
@@ -1024,7 +1025,7 @@
 									: 'bg-white border-transparent text-gray-600 hover:bg-gray-100'}"
 								onclick={() => (entityType = 'unclassified')}
 							>
-								<Icon icon="lucide:circle-help" class="w-3.5 h-3.5 text-gray-500" />
+								<Icon icon={getEntityTypeStyle('unclassified').icon} class="w-3.5 h-3.5 {getEntityTypeStyle('unclassified').iconClass}" />
 								Unclassified
 							</button>
 						</div>

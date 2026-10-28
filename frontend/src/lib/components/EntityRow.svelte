@@ -8,6 +8,7 @@
 	import { bindEntityToModel } from "$lib/utils/entity-binding";
 	import { getEntityDetailPath } from "$lib/utils/entity-list-route";
 	import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
+import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 
 	type Props = {
 		entity: Entity;
@@ -16,40 +17,8 @@
 	let { entity }: Props = $props();
 
 	// Determine entity type icon
-	const typeIcon = $derived(() => {
-		if ($modelingStyle === 'dimensional_model') {
-			if (entity.entity_type === "dimension") {
-				return "lucide:list";
-			} else if (entity.entity_type === "fact") {
-				return "lucide:bar-chart-3";
-			} else {
-				return "lucide:help-circle";
-			}
-		}
-		return "lucide:box";
-	});
-
-	// Type label
-	const typeLabel = $derived(() => {
-		if (entity.entity_type === "dimension") {
-			return "Dimension";
-		} else if (entity.entity_type === "fact") {
-			return "Fact";
-		} else {
-			return "Unclassified";
-		}
-	});
-
-	// Type badge color
-	const typeBadgeColor = $derived(() => {
-		if (entity.entity_type === "dimension") {
-			return "bg-green-100 text-green-700 border-green-300";
-		} else if (entity.entity_type === "fact") {
-			return "bg-blue-100 text-blue-700 border-blue-300";
-		} else {
-			return "bg-gray-100 text-gray-700 border-gray-300";
-		}
-	});
+	const typeStyle = $derived(getEntityTypeStyle(entity.entity_type));
+	const typeIcon = $derived($modelingStyle === 'dimensional_model' ? typeStyle.icon : "lucide:box");
 
 	// 7Ws annotation type badge (for dimensions)
 	const annotationTypeLabel = $derived(() => {
@@ -208,13 +177,9 @@
 
 	<!-- Entity Icon -->
 	<div
-		class="flex-shrink-0"
-		class:text-green-600={$modelingStyle === 'dimensional_model' && entity.entity_type === "dimension"}
-		class:text-blue-600={$modelingStyle === 'dimensional_model' && entity.entity_type === "fact"}
-		class:text-gray-600={$modelingStyle === 'dimensional_model' && entity.entity_type !== "dimension" && entity.entity_type !== "fact"}
-		class:text-slate-500={$modelingStyle !== 'dimensional_model'}
+		class="flex-shrink-0 {$modelingStyle === 'dimensional_model' ? typeStyle.iconClass : 'text-slate-500'}"
 	>
-		<Icon icon={typeIcon()} class="w-5 h-5" />
+		<Icon icon={typeIcon} class="w-5 h-5" />
 	</div>
 
 	<!-- Entity Info (name, type, domain, tags) - Horizontal Layout -->
@@ -237,10 +202,10 @@
 		<!-- Type badge (only visible in dimensional modeling) -->
 		{#if $modelingStyle === 'dimensional_model'}
 			<span
-				class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {typeBadgeColor()}"
-				title={`Entity Type: ${typeLabel()}`}
+				class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap flex-shrink-0 {typeStyle.badge}"
+				title={`Entity Type: ${typeStyle.label}`}
 			>
-				{typeLabel()}
+				{typeStyle.label}
 			</span>
 		{/if}
 
