@@ -5,7 +5,7 @@ import { METRIC_TREE_PATH } from './ensure-e2e-trellis-config';
 
 /**
  * End-to-end path for the metric tree: enable the feature, add two draft
- * metrics, draw one influence, reload, and check that the graph and
+ * metrics, link one influence, reload, and check that the graph and
  * `metric_tree.yml` survive.
  *
  * The feature is enabled in the e2e `trellis.yml` written by
@@ -23,29 +23,28 @@ function readYaml(path: string): any {
     return parse(fs.readFileSync(path, 'utf8')) ?? {};
 }
 
-async function fillSelectedDraft(page: Page, label: string, expression: string): Promise<void> {
+/** Fill the New metric form and create it; the metric joins the tree only on Create. */
+async function createDraft(page: Page, label: string, expression: string): Promise<void> {
     await page.getByTestId('metric-field-label').fill(label);
     await page.getByTestId('metric-field-expression').fill(expression);
+    await page.getByTestId('metric-create').click();
 }
 
-/** Drag from the upper effect node's bottom source handle onto the lower driver node's top target handle. */
-async function connectMetrics(page: Page, driverId: string, effectId: string): Promise<void> {
-    const source = page.locator(
-        `[data-testid="metric-node"][data-metric-id="${effectId}"] .svelte-flow__handle.source`,
-    );
-    const target = page.locator(
-        `[data-testid="metric-node"][data-metric-id="${driverId}"] .svelte-flow__handle.target`,
-    );
-
-    const from = await source.boundingBox();
-    const to = await target.boundingBox();
-    expect(from).not.toBeNull();
-    expect(to).not.toBeNull();
-
-    await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 12 });
-    await page.mouse.up();
+/**
+ * Link two metrics through the effect node's "+ Add driver" picker. The mouse
+ * cannot start a drag on the connection handle: the add button is drawn over it.
+ */
+async function linkDriver(
+    page: Page,
+    effectId: string,
+    driverLabel: string,
+): Promise<void> {
+    const effect = page.locator(`[data-testid="metric-node"][data-metric-id="${effectId}"]`);
+    await effect.getByTestId('metric-node-add-driver').click();
+    await page
+        .getByTestId('metric-node-picker-tree-item')
+        .filter({ hasText: driverLabel })
+        .click();
 }
 
 test.describe('Metric tree - E2E', () => {
@@ -65,12 +64,18 @@ test.describe('Metric tree - E2E', () => {
         await page.goto('/metrics-tree');
         await expect(page.getByTestId('metric-canvas-empty')).toBeVisible();
 
-        // 1. Two drafts. Each needs an expression or autosave stays paused.
+        // A cancelled new metric leaves the canvas empty.
         await page.getByTestId('metric-canvas-empty-cta').click();
-        await fillSelectedDraft(page, 'Revenue', 'sum(amount) from fct__order');
+        await page.getByTestId('metric-field-label').fill('Discarded');
+        await page.getByTestId('metric-cancel').click();
+        await expect(page.getByTestId('metric-canvas-empty')).toBeVisible();
+
+        // 1. Two drafts. Each joins the tree only once it has a label and an expression.
+        await page.getByTestId('metric-canvas-empty-cta').click();
+        await createDraft(page, 'Revenue', 'sum(amount) from fct__order');
 
         await page.getByTestId('metric-sidebar-add').click();
-        await fillSelectedDraft(page, 'Order count', 'count(*) from fct__order');
+        await createDraft(page, 'Order count', 'count(*) from fct__order');
 
         // The inspector overlaps the right edge of the canvas; close it so both
         // nodes are reachable for the connection drag.
@@ -84,8 +89,8 @@ test.describe('Metric tree - E2E', () => {
         expect(driverId).toBeTruthy();
         expect(effectId).toBeTruthy();
 
-        // 2. One directed influence: the drag source is the driver.
-        await connectMetrics(page, driverId!, effectId!);
+        // 2. One directed influence: Revenue drives Order count.
+        await linkDriver(page, effectId!, 'Revenue');
 
         const edge = page.locator(`.svelte-flow__edge[data-id="influence:${driverId}:${effectId}"]`);
         await expect(edge).toHaveCount(1);
