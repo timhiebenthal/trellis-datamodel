@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tree, and the file, only on Create, so a cancelled metric leaves nothing behind.
 
 ### Fixed
+- **`PUT /api/config` can no longer point a write path outside the project (#160):**
+  `data_model_file`, `business_events.file` and `ossie.file` each become a file
+  the server writes (creating parent directories), and a saved value such as
+  `../../etc/x.yml` or an absolute path was accepted as is. The save now rejects
+  a *changed* value that is absolute or contains `..` with a 422 and writes
+  nothing. A value already in `trellis.yml` is left alone, so a hand-edited
+  `data_model_file: ../shared/dm.yml` still loads, exports and re-saves from the
+  UI; to point outside the project, edit `trellis.yml` directly.
 - **The local API is no longer open to the network (#161):** `trellis run` bound
   `0.0.0.0` and answered any origin (`allow_origins=["*"]`), while `PUT
   /api/config`, `POST /api/sync-tests` and `POST /api/data-model` write project

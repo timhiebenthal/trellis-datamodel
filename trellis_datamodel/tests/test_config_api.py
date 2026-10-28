@@ -822,3 +822,71 @@ async def test_get_config_does_not_probe_an_arbitrary_path(client: AsyncClient):
     )
 
     assert "/etc/does-not-exist.yml" not in response.text
+
+
+async def _put_with(client: AsyncClient, mutate) -> "httpx.Response":
+    config = (await client.get("/api/config")).json()["config"]
+    mutate(config)
+    return await client.put("/api/config", json={"config": config})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("data_model_file", "/tmp/outside.yml"),
+        ("data_model_file", "../outside.yml"),
+        ("data_model_file", "sub/../../outside.yml"),
+        ("data_model_file", "C:\\outside.yml"),
+        ("business_events.file", "/tmp/outside.yml"),
+        ("ossie.file", "../../etc/x.yml"),
+    ],
+)
+async def test_put_config_rejects_write_paths_that_escape_the_project(
+    client: AsyncClient, temp_config_dir, field, value
+):
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    before = config_path.read_bytes()
+
+    def mutate(config):
+        node = config
+        *parents, leaf = field.split(".")
+        for key in parents:
+            node = node.setdefault(key, {})
+        node[leaf] = value
+
+    response = await _put_with(client, mutate)
+
+    assert response.status_code == 422, response.text
+    assert field in response.json()["detail"]["message"]
+    assert config_path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_put_config_accepts_a_relative_write_path_inside_the_project(
+    client: AsyncClient, temp_config_dir
+):
+    response = await _put_with(
+        client, lambda config: config.update(data_model_file="models/dm.yml")
+    )
+
+    assert response.status_code == 200, response.text
+    saved = yaml.safe_load((Path(temp_config_dir) / "trellis.yml").read_text())
+    assert saved["data_model_file"] == "models/dm.yml"
+
+
+@pytest.mark.asyncio
+async def test_put_config_keeps_a_hand_edited_path_outside_the_project(
+    client: AsyncClient, temp_config_dir
+):
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    config_path.write_text(
+        config_path.read_text().replace(
+            "data_model_file: data_model.yml", "data_model_file: ../shared/dm.yml"
+        )
+    )
+
+    await _load_then_save(client)
+
+    saved = yaml.safe_load(config_path.read_text())
+    assert saved["data_model_file"] == "../shared/dm.yml"
