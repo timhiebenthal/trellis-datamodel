@@ -13,7 +13,6 @@ import type {
     BusinessEventType,
     BusinessEventAnnotations,
     AnnotationEntry,
-    SevenWType,
     AnnotationType,
     Dimension,
     Annotation,
@@ -751,109 +750,6 @@ export async function getDimensions(filterByType?: AnnotationType, includeAllEnt
 }
 
 /**
- * Add a new 7 Ws entry to a business event.
- * @param eventId - Event ID to add entry to
- * @param wType - W category ('who', 'what', 'when', 'where', 'how', 'how_many', 'why')
- * @param text - Entry text
- * @param description - Optional entry description
- * @param dimensionId - Optional reference to existing dimension in data_model.yml
- * @returns Promise containing the updated BusinessEvent
- */
-export async function addAnnotationEntry(
-    eventId: string,
-    wType: SevenWType,
-    text: string,
-    description?: string,
-    dimensionId?: string
-): Promise<BusinessEvent> {
-    try {
-        const body: any = { w_type: wType, text };
-        if (description !== undefined) body.description = description;
-        if (dimensionId !== undefined) body.dimension_id = dimensionId;
-
-        const res = await fetch(`${API_BASE}/business-events/${eventId}/seven-entries`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to add 7 Ws entry: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error adding 7 Ws entry: ${message}`);
-    }
-}
-
-/**
- * Update an existing 7 Ws entry in a business event.
- * @param eventId - Event ID containing the entry
- * @param entryId - Entry ID to update
- * @param text - New entry text
- * @param description - Optional new entry description
- * @param dimensionId - Optional new dimension_id reference
- * @returns Promise containing the updated BusinessEvent
- */
-export async function updateAnnotationEntry(
-    eventId: string,
-    entryId: string,
-    text: string,
-    description?: string,
-    dimensionId?: string
-): Promise<BusinessEvent> {
-    try {
-        const body: any = { text };
-        if (description !== undefined) body.description = description;
-        if (dimensionId !== undefined) body.dimension_id = dimensionId;
-
-        const res = await fetch(`${API_BASE}/business-events/${eventId}/seven-entries/${entryId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to update 7 Ws entry: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error updating 7 Ws entry: ${message}`);
-    }
-}
-
-/**
- * Remove a 7 Ws entry from a business event.
- * @param eventId - Event ID containing the entry
- * @param entryId - Entry ID to remove
- * @returns Promise containing the updated BusinessEvent
- */
-export async function removeAnnotationEntry(
-    eventId: string,
-    entryId: string
-): Promise<BusinessEvent> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${eventId}/seven-entries/${entryId}`, {
-            method: 'DELETE',
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to remove 7 Ws entry: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error removing 7 Ws entry: ${message}`);
-    }
-}
-
-export const addSevenWsEntry = addAnnotationEntry;
-export const updateSevenWsEntry = updateAnnotationEntry;
-export const removeSevenWsEntry = removeAnnotationEntry;
-
-/**
  * Delete a business event.
  * @param id - Event ID to delete
  */
@@ -869,64 +765,6 @@ export async function deleteBusinessEvent(id: string): Promise<void> {
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         throw new Error(`Error deleting business event: ${message}`);
-    }
-}
-
-/**
- * Add an annotation to a business event.
- * @param eventId - Event ID
- * @param text - Annotated text segment
- * @param type - Annotation type ('dimension' or 'fact')
- * @param startPos - Start position in event text
- * @param endPos - End position in event text
- * @returns Promise containing the updated BusinessEvent
- */
-export async function addAnnotation(
-    eventId: string,
-    text: string,
-    type: 'dimension' | 'fact',
-    startPos: number,
-    endPos: number
-): Promise<BusinessEvent> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${eventId}/annotations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, type, start_pos: startPos, end_pos: endPos }),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to add annotation: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error adding annotation: ${message}`);
-    }
-}
-
-/**
- * Remove an annotation from a business event.
- * @param eventId - Event ID
- * @param index - Index of annotation to remove
- * @returns Promise containing the updated BusinessEvent
- */
-export async function removeAnnotation(
-    eventId: string,
-    index: number
-): Promise<BusinessEvent> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${eventId}/annotations/${index}`, {
-            method: 'DELETE',
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to remove annotation: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error removing annotation: ${message}`);
     }
 }
 

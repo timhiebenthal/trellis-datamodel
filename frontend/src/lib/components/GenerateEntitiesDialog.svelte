@@ -10,6 +10,7 @@
     import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import { readModelRef } from '$lib/utils/entity-compat';
+    import { buildEntityNodes, findLegacyAliasNodeIds } from '$lib/utils/entity-generation';
     import CustomEntitySelect from './CustomEntitySelect.svelte';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
@@ -350,24 +351,6 @@
         validateEntities();
     }
 
-    function escapeRegex(value: string): string {
-        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    function isLegacyGeneratedAlias(candidateId: string, canonicalId: string): boolean {
-        const collapsedId = canonicalId.replace(/_+/g, '_');
-        if (collapsedId === canonicalId) {
-            return false;
-        }
-
-        if (candidateId === collapsedId) {
-            return true;
-        }
-
-        const collapsedAliasPattern = new RegExp(`^${escapeRegex(collapsedId)}_\\d+$`);
-        return collapsedAliasPattern.test(candidateId);
-    }
-
     function removeDraftedField(index: number) {
         editedDraftedFields.splice(index, 1);
         validateEntities();
@@ -484,21 +467,13 @@
                         .map((derived) => derived.entity_id)
                         .filter(Boolean)
                 );
-                const canonicalEntityIds = new Set(
-                    editedEntities
-                        .map((entity) => generateEntityId(entity.id.trim(), []))
-                        .filter(Boolean)
-                );
                 const removableEntityIds = new Set<string>([
                     ...eventLevelEntityIds,
                     ...processDerivedEntityIds,
                 ]);
 
-                for (const node of $nodes) {
-                    if (node.type !== 'entity') continue;
-                    if ([...canonicalEntityIds].some((canonicalId) => isLegacyGeneratedAlias(node.id, canonicalId))) {
-                        removableEntityIds.add(node.id);
-                    }
+                for (const aliasId of findLegacyAliasNodeIds(editedEntities, $nodes)) {
+                    removableEntityIds.add(aliasId);
                 }
 
                 // Capture drafted_fields from entities about to be removed so they can be
@@ -519,8 +494,6 @@
                 });
             }
             // Create entities on canvas (skip ones that already exist)
-            const createdEntityIds: string[] = [];
-            const entityIdByIndex: string[] = [];
             const maxZIndex = Math.max(
                 ...nodesToUse.map((n) => n.zIndex || (n.type === 'group' ? 1 : 10)),
                 10
@@ -542,183 +515,24 @@
                 }
             }
 
-            for (let i = 0; i < editedEntities.length; i++) {
-                const edited = editedEntities[i];
-                const original = previewData.entities[i];
-                const trimmedId = edited.id.trim();
-                const inheritedDomain =
-                    mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
-                const normalizedEditedId = generateEntityId(trimmedId, []);
-
-                const generatedFieldsForMerge: any[] =
-                    $modelingStyle === 'entity_model'
-                        ? (fieldsByEntity.get(normalizedEditedId) ?? [])
-                        : Array.isArray((original as any).drafted_fields)
-                          ? (original as any).drafted_fields
-                          : [];
-
-                // Check against current nodesToUse (updated in-loop) to avoid duplicates
-                // when the same generation is run more than once
-                const currentEntityIds = new Set(
-                    nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
-                );
-
-                if (currentEntityIds.has(normalizedEditedId)) {
-                    const previewAnnotation =
-                        (original as any)?.annotation_type ||
-                        (original as any)?.metadata?.annotation_type;
-                    const previewRoles = (original as any)?.roles;
-                    if (previewAnnotation) {
-                        nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === normalizedEditedId) {
-                                return {
-                                    ...n,
-                                    data: {
-                                        ...n.data,
-                                        annotation_type: (n.data as any)?.annotation_type || previewAnnotation,
-                                    },
-                                };
-                            }
-                            return n;
-                        });
-                    }
-                    if (Array.isArray(previewRoles) && previewRoles.length > 0) {
-                        nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === normalizedEditedId) {
-                                return {
-                                    ...n,
-                                    data: {
-                                        ...n.data,
-                                        roles: previewRoles,
-                                    },
-                                };
-                            }
-                            return n;
-                        });
-                    }
-                    if (inheritedDomain) {
-                        nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === normalizedEditedId) {
-                                const existingDomains = Array.isArray((n.data as any)?.domains)
-                                    ? ((n.data as any)?.domains as string[])
-                                    : (n.data as any)?.domain
-                                        ? [String((n.data as any)?.domain)]
-                                        : [];
-                                const nextDomains = Array.from(
-                                    new Set(
-                                        existingDomains
-                                            .map((domain) => domain.trim())
-                                            .filter(Boolean)
-                                            .concat(inheritedDomain)
-                                    )
-                                );
-                                return {
-                                    ...n,
-                                    data: {
-                                        ...n.data,
-                                        domains: nextDomains.length > 0 ? nextDomains : undefined,
-                                        domain: nextDomains.length > 0 ? nextDomains[0] : undefined,
-                                    },
-                                };
-                            }
-                            return n;
-                        });
-                    }
-                    // Entity already exists - merge drafted_fields (preserve manually added fields)
-                    // and update description if provided
-                    if (
-                        (edited.entity_type === 'fact' || edited.entity_type === 'entity') &&
-                        (generatedFieldsForMerge.length > 0 || original.description)
-                    ) {
-                        nodesToUse = nodesToUse.map((n) => {
-                            if (n.id === normalizedEditedId) {
-                                const existingDraftedFields: any[] = Array.isArray((n.data as any)?.drafted_fields)
-                                    ? (n.data as any).drafted_fields
-                                    : [];
-                                // Keep all existing (manually drafted) fields; add generated fields
-                                // only if no field with the same name already exists
-                                const existingNames = new Set(existingDraftedFields.map((f: any) => f.name));
-                                const mergedFields = [
-                                    ...existingDraftedFields,
-                                    ...generatedFieldsForMerge.filter((f: any) => !existingNames.has(f.name)),
-                                ];
-                                return {
-                                    ...n,
-                                    data: {
-                                        ...n.data,
-                                        ...(generatedFieldsForMerge.length > 0 || existingDraftedFields.length > 0
-                                            ? { drafted_fields: mergedFields }
-                                            : {}),
-                                        ...(original.description ? { description: original.description } : {}),
-                                    },
-                                };
-                            }
-                            return n;
-                        });
-                    }
-                    entityIdByIndex.push(normalizedEditedId);
-                    continue;
-                }
-
-                // Generate unique ID while preserving configured prefixes like dim__/fact__
-                const id = generateEntityId(trimmedId, [
-                    ...nodesToUse.map((n) => n.id),
-                    ...createdEntityIds,
-                ]);
-
-                // Calculate position based on entity type
-                let position: { x: number; y: number };
-                if ($modelingStyle === 'dimensional_model' && edited.entity_type) {
-                    position = positioner.calculateSmartPosition(
-                        edited.entity_type as 'fact' | 'dimension' | 'unclassified',
-                        nodesToUse
-                    );
-                } else {
-                    position = {
-                        x: 100 + Math.random() * 200,
-                        y: 100 + Math.random() * 200,
-                    };
-                }
-
-                // Merge drafted_fields: start with any manually drafted fields that were on
-                // the previous node with this ID (captured before the removal step), then
-                // append generated fields that don't already exist by name.
-                const _prevFields: any[] = previousDraftedFieldsMap.get(normalizedEditedId) ?? [];
-                const _prevNames = new Set(_prevFields.map((f: any) => f.name));
-                const _mergedDraftedFields = [
-                    ..._prevFields,
-                    ...generatedFieldsForMerge.filter((f: any) => !_prevNames.has(f.name)),
-                ];
-
-                // Create node (include tags, domain, annotation_type, and drafted_fields from preview data)
-                const newNode: Node = {
-                    id,
-                    type: 'entity',
-                    position,
-                    data: {
-                        label: edited.label.trim() || edited.id.trim(),
-                        description: original.description || '',
-                        entity_type: edited.entity_type,
-                        annotation_type:
-                            (original as any).annotation_type ||
-                            (original as any)?.metadata?.annotation_type ||
-                            undefined,
-                        tags: original.tags || [],
-                        drafted_fields: _mergedDraftedFields.length > 0 ? _mergedDraftedFields : undefined,
-                        roles: (original as any).roles || undefined,
-                        domain: inheritedDomain || undefined,
-                        domains: inheritedDomain ? [inheritedDomain] : undefined,
-                        width: 280,
-                        panelHeight: 200,
-                        collapsed: false,
-                    },
-                    zIndex: maxZIndex + i + 1,
-                };
-                // Add new node to the filtered nodes list
-                nodesToUse = [...nodesToUse, newNode];
-                createdEntityIds.push(id);
-                entityIdByIndex.push(id);
-            }
+            const inheritedDomain =
+                mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
+            const {
+                nodes: createdNodes,
+                createdEntityIds,
+                entityIdByIndex,
+            } = buildEntityNodes({
+                editedEntities,
+                previewEntities: previewData.entities,
+                initialNodes: nodesToUse,
+                previousDraftedFieldsMap,
+                fieldsByEntity,
+                modelingStyle: $modelingStyle,
+                inheritedDomain,
+                maxZIndex,
+                positioner,
+            });
+            nodesToUse = createdNodes;
 
             if ($modelingStyle === 'entity_model') {
                 // Create stub entities for relationship endpoints that are neither in the

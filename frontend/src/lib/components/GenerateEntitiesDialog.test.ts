@@ -1,84 +1,34 @@
 import { describe, it, expect } from 'vitest';
-import { generateEntityId } from '$lib/utils';
+import { buildEntityNodes, findLegacyAliasNodeIds } from '$lib/utils/entity-generation';
 import type { Node } from '@xyflow/svelte';
 
-function escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+type TestEntity = { id: string; label: string; entity_type: string };
+
+const positioner = {
+    calculateSmartPosition: () => ({ x: 100, y: 100 }),
+};
+
+function runEntityCreationLoop(editedEntities: TestEntity[], initialNodes: Node[] = []): Node[] {
+    return buildEntityNodes({
+        editedEntities,
+        previewEntities: editedEntities.map((e) => ({
+            id: e.id,
+            label: e.label,
+            entity_type: e.entity_type as 'fact' | 'dimension' | 'unclassified',
+        })),
+        initialNodes,
+        previousDraftedFieldsMap: new Map(),
+        fieldsByEntity: new Map(),
+        modelingStyle: 'dimensional_model',
+        inheritedDomain: undefined,
+        maxZIndex: 10,
+        positioner,
+    }).nodes;
 }
 
-function isLegacyGeneratedAlias(candidateId: string, canonicalId: string): boolean {
-    const collapsedId = canonicalId.replace(/_+/g, '_');
-    if (collapsedId === canonicalId) {
-        return false;
-    }
-
-    if (candidateId === collapsedId) {
-        return true;
-    }
-
-    return new RegExp(`^${escapeRegex(collapsedId)}_\\d+$`).test(candidateId);
-}
-
-/**
- * Replicates the entity-creation loop from GenerateEntitiesDialog.svelte
- * `handleCreateAll`. The critical invariant: `currentEntityIds` is recomputed
- * from `nodesToUse` on every iteration so entities added in earlier passes are
- * visible to later ones — preventing duplicates when two annotation entries
- * resolve to the same entity ID.
- */
-function runEntityCreationLoop(
-    editedEntities: Array<{ id: string; label: string; entity_type: string }>,
-    initialNodes: Node[] = []
-): Node[] {
-    let nodesToUse: Node[] = [...initialNodes];
-
-    for (let i = 0; i < editedEntities.length; i++) {
-        const edited = editedEntities[i];
-        const trimmedId = edited.id.trim();
-        const normalizedEditedId = generateEntityId(trimmedId, []);
-
-        // Recompute on each iteration — the fix under test.
-        const currentEntityIds = new Set(
-            nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id)
-        );
-
-        if (currentEntityIds.has(normalizedEditedId)) {
-            // Entity already present; skip.
-            continue;
-        }
-
-        const id = generateEntityId(trimmedId, [...nodesToUse.map((n) => n.id)]);
-
-        const newNode: Node = {
-            id,
-            type: 'entity',
-            position: { x: 100, y: 100 },
-            data: {
-                label: edited.label || edited.id,
-                entity_type: edited.entity_type,
-            },
-        };
-
-        nodesToUse = [...nodesToUse, newNode];
-    }
-
-    return nodesToUse;
-}
-
-function removeLegacyAliasNodes(
-    editedEntities: Array<{ id: string; label: string; entity_type: string }>,
-    initialNodes: Node[]
-): Node[] {
-    const canonicalEntityIds = new Set(
-        editedEntities.map((entity) => generateEntityId(entity.id.trim(), [])).filter(Boolean)
-    );
-
-    return initialNodes.filter((node) => {
-        if (node.type !== 'entity') return true;
-        return ![...canonicalEntityIds].some((canonicalId) =>
-            isLegacyGeneratedAlias(node.id, canonicalId)
-        );
-    });
+function removeLegacyAliasNodes(editedEntities: TestEntity[], initialNodes: Node[]): Node[] {
+    const aliasIds = new Set(findLegacyAliasNodeIds(editedEntities, initialNodes));
+    return initialNodes.filter((node) => !aliasIds.has(node.id));
 }
 
 describe('GenerateEntitiesDialog – entity creation loop deduplication', () => {
@@ -199,9 +149,7 @@ describe('GenerateEntitiesDialog – entity creation loop deduplication', () => 
 
         const filteredNodes = removeLegacyAliasNodes(editedEntities, existingNodes);
 
-        expect(filteredNodes.map((node) => node.id)).toEqual(
-            expect.arrayContaining(['dim__employee'])
-        );
+        expect(filteredNodes.map((node) => node.id)).toEqual(['dim__employee']);
         expect(filteredNodes.map((node) => node.id)).not.toEqual(
             expect.arrayContaining([
                 'dim_employee',
