@@ -15,117 +15,149 @@ from trellis_datamodel.models.business_event import (
 )
 
 
+def _who_event(*who_entries, event_id="evt_20260101_001"):
+    """A discrete event whose only dimensions come from the given `who` entries."""
+    now = datetime.now()
+    return BusinessEvent(
+        domain=None,
+        id=event_id,
+        text="something happens",
+        type=BusinessEventType.DISCRETE,
+        created_at=now,
+        updated_at=now,
+        annotations=BusinessEventAnnotations(
+            who=list(who_entries),
+            how_many=[
+                AnnotationEntry(id="hm1", text="count", description=None, attributes={})
+            ],
+        ),
+        derived_entities=[],
+    )
+
+
+def _prefix_config(dimension_prefix=("dim_",)):
+    config = Mock()
+    config.dimension_prefix = list(dimension_prefix)
+    config.fact_prefix = ["fct_"]
+    return config
+
+
+@pytest.fixture
+def data_model_file(tmp_path, monkeypatch):
+    """Point the generator at a tmp data_model.yml holding the given entities."""
+    import yaml
+
+    from trellis_datamodel import config as cfg
+
+    path = tmp_path / "data_model.yml"
+
+    def write(entities):
+        path.write_text(yaml.safe_dump({"entities": entities}))
+
+    monkeypatch.setattr(cfg, "DATA_MODEL_PATH", str(path))
+    return write
+
+
+def _generated_dimension(text):
+    """Generate from a lone `who` annotation with this text; return its dimension."""
+    entry = AnnotationEntry(id="w1", text=text, dimension_id=None, description=None, attributes={})
+    result = entity_generator.generate_entities_from_event(
+        _who_event(entry), _prefix_config()
+    )
+    (dimension,) = [e for e in result.entities if e["entity_type"] == "dimension"]
+    return dimension
+
+
 class TestDimensionReuseAnnotationType:
     """Test annotation type behavior when reusing existing dimensions."""
 
-    def test_existing_dimension_without_annotation_type_gets_inferred_type(self):
+    def test_existing_dimension_without_annotation_type_gets_inferred_type(
+        self, data_model_file
+    ):
+        data_model_file(
+            [
+                {
+                    "id": "dim_employee",
+                    "label": "Employee",
+                    "entity_type": "dimension",
+                    "description": "Employee dimension",
+                    # annotation_type intentionally missing
+                }
+            ]
+        )
         entry = AnnotationEntry(
             id="w1", text="employee", dimension_id="dim_employee", description=None, attributes={}
         )
-        existing_entities = {
-            "dim_employee": {
-                "id": "dim_employee",
-                "label": "Employee",
-                "entity_type": "dimension",
-                "description": "Employee dimension",
-                # annotation_type intentionally missing
-            }
-        }
 
-        result = entity_generator._create_dimension_from_annotation_entry(
-            entry=entry,
-            annotation_type="who",
-            prefixes=["dim_"],
-            existing_entities=existing_entities,
+        result = entity_generator.generate_entities_from_event(
+            _who_event(entry), _prefix_config()
         )
 
-        assert result["id"] == "dim_employee"
-        assert result["annotation_type"] == "who"
+        (dimension,) = [e for e in result.entities if e["entity_type"] == "dimension"]
+        assert dimension["id"] == "dim_employee"
+        assert dimension["annotation_type"] == "who"
 
 
-class TestTextToSnakeCase:
-    """Test _text_to_snake_case() helper function."""
+class TestAnnotationTextToDimensionId:
+    """Annotation text becomes a snake_case dimension id (observed via generated id)."""
 
-    def test_converts_spaces_to_underscores(self):
-        """Test that spaces are converted to underscores."""
-        assert entity_generator._text_to_snake_case("customer name") == "customer_name"
-
-    def test_converts_hyphens_to_underscores(self):
-        """Test that hyphens are converted to underscores."""
-        assert entity_generator._text_to_snake_case("customer-name") == "customer_name"
-
-    def test_handles_special_characters(self):
-        """Test that special characters are replaced with underscores."""
-        assert (
-            entity_generator._text_to_snake_case("customer@name#123")
-            == "customer_name_123"
-        )
-
-    def test_handles_multiple_spaces(self):
-        """Test that multiple spaces are collapsed to single underscore."""
-        assert (
-            entity_generator._text_to_snake_case("customer    name") == "customer_name"
-        )
-
-    def test_handles_mixed_case(self):
-        """Test that text is lowercased."""
-        assert entity_generator._text_to_snake_case("Customer Name") == "customer_name"
-
-    def test_handles_numbers(self):
-        """Test that numbers are preserved."""
-        assert entity_generator._text_to_snake_case("customer123") == "customer123"
-
-    def test_handles_empty_string(self):
-        """Test that empty string returns 'entity'."""
-        assert entity_generator._text_to_snake_case("") == "entity"
-
-    def test_handles_only_special_chars(self):
-        """Test that only special characters returns 'entity'."""
-        assert entity_generator._text_to_snake_case("!!!") == "entity"
-
-    def test_removes_leading_trailing_underscores(self):
-        """Test that leading/trailing underscores are removed."""
-        assert (
-            entity_generator._text_to_snake_case("  customer name  ") == "customer_name"
-        )
+    @pytest.mark.parametrize(
+        "text, expected_id",
+        [
+            ("customer name", "dim_customer_name"),
+            ("customer-name", "dim_customer_name"),
+            ("customer@name#123", "dim_customer_name_123"),
+            ("customer    name", "dim_customer_name"),
+            ("Customer Name", "dim_customer_name"),
+            ("customer123", "dim_customer123"),
+            ("", "dim_entity"),
+            ("!!!", "dim_entity"),
+            ("  customer name  ", "dim_customer_name"),
+        ],
+        ids=[
+            "spaces",
+            "hyphens",
+            "special_characters",
+            "multiple_spaces",
+            "mixed_case",
+            "numbers",
+            "empty_text_falls_back_to_entity",
+            "only_special_chars_falls_back_to_entity",
+            "leading_trailing_whitespace_trimmed",
+        ],
+    )
+    def test_dimension_id_is_snake_cased_prefixed_text(self, text, expected_id):
+        assert _generated_dimension(text)["id"] == expected_id
 
 
-class TestTextToTitleCase:
-    """Test _text_to_title_case() helper function."""
+class TestAnnotationTextToDimensionLabel:
+    """Annotation text becomes a Title Case label (observed via generated label)."""
 
-    def test_converts_snake_case_to_title_case(self):
-        """Test that snake_case is converted to Title Case."""
-        assert entity_generator._text_to_title_case("customer_name") == "Customer Name"
-
-    def test_converts_spaces_to_title_case(self):
-        """Test that space-separated words are capitalized."""
-        assert entity_generator._text_to_title_case("customer name") == "Customer Name"
-
-    def test_converts_hyphens_to_title_case(self):
-        """Test that hyphen-separated words are capitalized."""
-        assert entity_generator._text_to_title_case("customer-name") == "Customer Name"
-
-    def test_handles_mixed_case(self):
-        """Test that mixed case is normalized."""
-        assert entity_generator._text_to_title_case("CuStOmEr NaMe") == "Customer Name"
-
-    def test_handles_single_word(self):
-        """Test that single word is capitalized."""
-        assert entity_generator._text_to_title_case("customer") == "Customer"
-
-    def test_handles_multiple_spaces(self):
-        """Test that multiple spaces are handled."""
-        assert (
-            entity_generator._text_to_title_case("customer    name") == "Customer Name"
-        )
-
-    def test_handles_empty_string(self):
-        """Test that empty string returns as-is."""
-        assert entity_generator._text_to_title_case("") == ""
-
-    def test_handles_numbers(self):
-        """Test that numbers are preserved."""
-        assert entity_generator._text_to_title_case("customer123") == "Customer123"
+    @pytest.mark.parametrize(
+        "text, expected_label",
+        [
+            ("customer_name", "Customer Name"),
+            ("customer name", "Customer Name"),
+            ("customer-name", "Customer Name"),
+            ("CuStOmEr NaMe", "Customer Name"),
+            ("customer", "Customer"),
+            ("customer    name", "Customer Name"),
+            ("customer123", "Customer123"),
+            ("", ""),
+        ],
+        ids=[
+            "snake_case",
+            "spaces",
+            "hyphens",
+            "mixed_case",
+            "single_word",
+            "multiple_spaces",
+            "numbers",
+            "empty_text",
+        ],
+    )
+    def test_dimension_label_is_title_cased_text(self, text, expected_label):
+        assert _generated_dimension(text)["label"] == expected_label
 
 
 class TestGenerateEntitiesFromSevenWs:
@@ -487,9 +519,9 @@ class TestDimensionIdRolePlaying:
             derived_entities=[],
         )
 
-    def test_a_dimension_id_fallthrough_creates_entity_from_id_not_text(self, monkeypatch):
+    def test_a_dimension_id_fallthrough_creates_entity_from_id_not_text(self, data_model_file):
         """When dimension_id exists but entity NOT in data_model, id comes from dimension_id not text."""
-        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: {})
+        data_model_file([])
 
         entry = AnnotationEntry(
             id="w1",
@@ -513,17 +545,18 @@ class TestDimensionIdRolePlaying:
         # label derived from the id remainder ("employee" → "Employee")
         assert dim["label"] == "Employee"
 
-    def test_b_dimension_id_found_reuses_entity_and_attaches_role(self, monkeypatch):
+    def test_b_dimension_id_found_reuses_entity_and_attaches_role(self, data_model_file):
         """When dimension_id exists in data_model, entity is reused and role entry is attached."""
-        existing = {
-            "dim__employee": {
-                "id": "dim__employee",
-                "label": "Employee",
-                "entity_type": "dimension",
-                "description": "Employee dimension",
-            }
-        }
-        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: existing)
+        data_model_file(
+            [
+                {
+                    "id": "dim__employee",
+                    "label": "Employee",
+                    "entity_type": "dimension",
+                    "description": "Employee dimension",
+                }
+            ]
+        )
 
         entry = AnnotationEntry(
             id="w1",
@@ -549,9 +582,9 @@ class TestDimensionIdRolePlaying:
         assert role_entry["role"] == "employee"
         assert role_entry["source"] == "evt_20260101_001"
 
-    def test_c_no_dimension_id_no_roles_key(self, monkeypatch):
+    def test_c_no_dimension_id_no_roles_key(self, data_model_file):
         """When annotation has no dimension_id, the generated entity has no roles key."""
-        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: {})
+        data_model_file([])
 
         entry = AnnotationEntry(
             id="w1",
@@ -568,9 +601,9 @@ class TestDimensionIdRolePlaying:
         assert len(dim_entities) == 1
         assert "roles" not in dim_entities[0]
 
-    def test_d_same_dimension_id_twice_roles_merged_not_duplicated(self, monkeypatch):
+    def test_d_same_dimension_id_twice_roles_merged_not_duplicated(self, data_model_file):
         """Two annotations referencing the same dimension_id produce one entity with merged roles."""
-        monkeypatch.setattr(entity_generator, "_load_existing_entities", lambda: {})
+        data_model_file([])
 
         entry1 = AnnotationEntry(
             id="w1",
@@ -603,19 +636,40 @@ class TestDimensionIdRolePlaying:
         labels = {r["label"] for r in roles}
         assert labels == {"Sales Agent", "Support Agent"}
 
-    def test_e_merge_role_entries_deduplicates(self):
-        """_merge_role_entries deduplicates by (label, source)."""
-        existing = [{"label": "A", "source": "p1"}]
-        incoming = [{"label": "A", "source": "p1"}, {"label": "B", "source": "p2"}]
+    def test_e_same_label_and_source_twice_yields_single_role_entry(self, data_model_file):
+        """Roles are deduplicated by (label, source): same text twice keeps one entry."""
+        data_model_file([])
+        entries = [
+            AnnotationEntry(
+                id=f"w{i}",
+                text="Sales Agent",
+                dimension_id="dim__employee",
+                description=None,
+                attributes={},
+                role=role,
+            )
+            for i, role in enumerate(["sales", "sales_again"], start=1)
+        ]
+        entries.append(
+            AnnotationEntry(
+                id="w3",
+                text="Support Agent",
+                dimension_id="dim__employee",
+                description=None,
+                attributes={},
+                role="support",
+            )
+        )
+        event = self._make_event(entries, event_id="evt_20260101_001")
 
-        result = entity_generator._merge_role_entries(existing, incoming)
+        result = entity_generator.generate_entities_from_event(event, self._make_config())
 
-        assert len(result) == 2
-        labels = {r["label"] for r in result}
-        assert labels == {"A", "B"}
-        # No duplicate A/p1
-        a_entries = [r for r in result if r["label"] == "A"]
-        assert len(a_entries) == 1
+        (dim,) = [e for e in result.entities if e["entity_type"] == "dimension"]
+        assert [(r["label"], r["source"]) for r in dim["roles"]] == [
+            ("Sales Agent", "evt_20260101_001"),
+            ("Support Agent", "evt_20260101_001"),
+        ]
+        assert dim["roles"][0]["role"] == "sales"
 
 
 class TestEntityModelGeneration:

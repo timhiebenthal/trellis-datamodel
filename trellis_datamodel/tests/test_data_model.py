@@ -94,10 +94,14 @@ class TestGetDataModel:
         entity = response.json()["entities"][0]
         assert entity["tags"] == ["nightly", "customer_360", "pii"]
 
-        with open(temp_data_model_path, "r") as f:
-            on_disk = yaml.safe_load(f)
-        assert "tags" not in on_disk["entities"][0], (
-            "computed display tags must never be written back to data_model.yml"
+        # Saving the GET payload back (which carries the computed `tags`) must
+        # not freeze those tags: once ui_tags change, the display tags follow.
+        payload = response.json()
+        payload["entities"][0]["ui_tags"] = []
+        assert test_client.post("/api/data-model", json=payload).status_code == 200
+        entity = test_client.get("/api/data-model").json()["entities"][0]
+        assert entity["tags"] == ["nightly", "customer_360"], (
+            "computed display tags must never be persisted back as `tags`"
         )
 
     def test_unbound_entity_display_tags_are_its_own_tags_field(
