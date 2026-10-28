@@ -13,7 +13,7 @@ import type {
     BusinessEventProcess,
     BusinessEventAnnotations,
 } from '$lib/types';
-import { toTitleCase } from '$lib/utils';
+import { toTitleCase } from '$lib/utils/model-naming';
 import { getCanvasFilterEntityIdsForProcessGroup } from '$lib/businessEventCanvasFilter';
 import { modelingStyle } from '$lib/stores';
     import { onMount } from 'svelte';

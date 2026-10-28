@@ -3,7 +3,7 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import { frameworkModels, folderFilter, tagFilter, nodes, activeFramework } from '$lib/stores';
 import { FRAMEWORK_DISPLAY_KEYS, isFeatureAvailable, missingArtifactHints } from '$lib/utils/framework-display';
-import { getModelFolder } from '$lib/utils';
+import { getModelFolder } from '$lib/utils/folder-utils';
 import Sidebar from './Sidebar.svelte';
 
 // Mock DbtModel data

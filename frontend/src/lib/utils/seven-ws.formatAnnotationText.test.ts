@@ -1,9 +1,9 @@
 /**
- * Unit tests for formatAnnotationText (utils.ts): annotation display text with optional role.
+ * Unit tests for formatAnnotationText (seven-ws.ts): annotation display text with optional role.
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatAnnotationText } from './utils';
+import { formatAnnotationText } from './seven-ws';
 
 describe('formatAnnotationText', () => {
     describe('Basic Functionality', () => {

@@ -11,10 +11,11 @@ from pathlib import Path
 
 API_TS = Path(__file__).parents[2] / "frontend" / "src" / "lib" / "api.ts"
 
-# `${API_BASE}` followed by path segments; a `${...}` only counts as a path
-# parameter when it is a whole segment, so `bus-matrix${queryString}` stops at
+# The literal path passed to `apiJson(...)` (every request in api.ts goes
+# through it), as path segments; a `${...}` only counts as a path parameter
+# when it is a whole segment, so `bus-matrix${queryString}` stops at
 # `bus-matrix`.
-_CALL = re.compile(r"\$\{API_BASE\}((?:/[\w-]+|/\$\{[^}]+\})*)")
+_CALL = re.compile(r"apiJson\b[^(]*\(\s*['`]((?:/[\w-]+|/\$\{[^}]+\})*)")
 _METHOD = re.compile(r"method:\s*'(\w+)'")
 _PARAM = re.compile(r"\$\{[^}]+\}|\{[^}]+\}")
 # Lines after the URL in which the request options (and `method`) may appear.

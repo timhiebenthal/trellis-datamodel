@@ -1,10 +1,12 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
+    import Modal from "./Modal.svelte";
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
     import { onMount, untrack } from "svelte";
     import { get } from "svelte/store";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
     import { dimensionPrefixes, modelingStyle } from "$lib/stores";
+    import { SEVEN_W_LABELS, SEVEN_W_ICONS } from "$lib/utils/seven-ws";
 
     type Props = {
         event: BusinessEvent;
@@ -16,13 +18,13 @@
 
     // Annotation type configuration
     const ANNOTATION_TYPES: Array<{ type: AnnotationType; label: string; icon: string; placeholder: string; description: string; tooltip: string }> = [
-        { type: 'who', label: 'Who', icon: 'lucide:user', placeholder: 'e.g., customer, employee, supplier', description: 'People and organizations involved', tooltip: '1. Customer\n2. Employee (Salesperson, Technician)\n3. Supplier' },
-        { type: 'what', label: 'What', icon: 'lucide:box', placeholder: 'e.g., product, service, order', description: 'The things or objects being acted upon', tooltip: '1. Product (SKU)\n2. Service (Consulting, Warranty)\n3. Digital Asset (Web page, App feature)' },
-        { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', description: 'Defining points in time or timestamps', tooltip: '1. Order Date\n2. Delivery Due Date\n3. Treatment Time (Clock Dimension)' },
-        { type: 'where', label: 'Where', icon: 'lucide:map-pin', placeholder: 'e.g., store location, region', description: 'Specific locations or virtual addresses', tooltip: '1. Retail Store\n2. Website URL\n3. Delivery Address' },
-        { type: 'how', label: 'How', icon: 'lucide:settings', placeholder: 'e.g., online, in-store, phone', description: 'The method, manner, or status', tooltip: '1. Order Channel (Online, In-store, Phone)\n2. Payment Method (Credit card, PO)\n3. Call Status (Connected, Busy)' },
-        { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
-        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
+        { type: 'who', label: SEVEN_W_LABELS.who, icon: SEVEN_W_ICONS.who, placeholder: 'e.g., customer, employee, supplier', description: 'People and organizations involved', tooltip: '1. Customer\n2. Employee (Salesperson, Technician)\n3. Supplier' },
+        { type: 'what', label: SEVEN_W_LABELS.what, icon: SEVEN_W_ICONS.what, placeholder: 'e.g., product, service, order', description: 'The things or objects being acted upon', tooltip: '1. Product (SKU)\n2. Service (Consulting, Warranty)\n3. Digital Asset (Web page, App feature)' },
+        { type: 'when', label: SEVEN_W_LABELS.when, icon: SEVEN_W_ICONS.when, placeholder: 'e.g., order date, delivery time', description: 'Defining points in time or timestamps', tooltip: '1. Order Date\n2. Delivery Due Date\n3. Treatment Time (Clock Dimension)' },
+        { type: 'where', label: SEVEN_W_LABELS.where, icon: SEVEN_W_ICONS.where, placeholder: 'e.g., store location, region', description: 'Specific locations or virtual addresses', tooltip: '1. Retail Store\n2. Website URL\n3. Delivery Address' },
+        { type: 'how', label: SEVEN_W_LABELS.how, icon: SEVEN_W_ICONS.how, placeholder: 'e.g., online, in-store, phone', description: 'The method, manner, or status', tooltip: '1. Order Channel (Online, In-store, Phone)\n2. Payment Method (Credit card, PO)\n3. Call Status (Connected, Busy)' },
+        { type: 'why', label: SEVEN_W_LABELS.why, icon: SEVEN_W_ICONS.why, placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
+        { type: 'how_many', label: SEVEN_W_LABELS.how_many, icon: SEVEN_W_ICONS.how_many, placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
     ];
 
     // Filtered annotation types: entity_model hides how_many from UI (data is preserved)
@@ -383,16 +385,8 @@
         await loadDimensionsWithRetry();
     });
 
-    function handleBackdropClick(e: MouseEvent) {
-        if (e.target === e.currentTarget) {
-            onCancel();
-        }
-    }
-
     function handleKeydown(event: KeyboardEvent) {
-        if (event.key === "Escape") {
-            onCancel();
-        } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             handleSave();
         }
     }
@@ -809,538 +803,521 @@
 </script>
 
 {#if true}
-    <!-- Backdrop -->
-    <div
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center backdrop-blur-sm"
-        onclick={handleBackdropClick}
+    <Modal
+        onClose={onCancel}
+        size="4xl"
+        class="bg-white rounded-lg shadow-xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        labelledBy="seven-ws-modal-title"
         onkeydown={handleKeydown}
-        role="dialog"
-        tabindex="-1"
-        aria-modal="true"
-        aria-labelledby="seven-ws-modal-title"
     >
-        <!-- Modal -->
-        <div
-            class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-            role="document"
-            tabindex="-1"
-        >
-            <!-- Header -->
-            <div class="p-6 border-b border-gray-200 space-y-3">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 id="seven-ws-modal-title" class="text-xl font-semibold text-gray-900">
-                            Annotations - Business Event
-                        </h2>
-                        <p class="text-sm text-gray-500 mt-1">
-                            {event.text}
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-3 ml-4 flex-shrink-0">
-                        <!-- Progress Badge -->
-                        <div
-                            class="px-3 py-1 rounded-full text-sm font-medium {isValid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}"
-                        >
-                            {filledAnnotationsCount}/{annotationTypesForUi.length} completed
-                        </div>
-                        <button
-                            class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
-                            onclick={handleCancel}
-                            aria-label="Close"
-                            disabled={loading}
-                        >
-                            <Icon icon="lucide:x" class="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
-                <!-- Business event / process description -->
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-200 space-y-3">
+            <div class="flex items-center justify-between">
                 <div>
-                    <label for="event-description" class="block text-xs font-medium text-gray-600 mb-1">
-                        Description
-                        <span class="text-gray-400 font-normal">(optional — {$modelingStyle === 'entity_model' ? 'used as the central entity description' : 'will be used as fact table description'})</span>
-                    </label>
-                    <textarea
-                        id="event-description"
-                        bind:value={description}
-                        placeholder="Describe what this business event or process represents..."
-                        rows={2}
-                        maxlength={1000}
+                    <h2 id="seven-ws-modal-title" class="text-xl font-semibold text-gray-900">
+                        Annotations - Business Event
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {event.text}
+                    </p>
+                </div>
+                <div class="flex items-center gap-3 ml-4 flex-shrink-0">
+                    <!-- Progress Badge -->
+                    <div
+                        class="px-3 py-1 rounded-full text-sm font-medium {isValid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}"
+                    >
+                        {filledAnnotationsCount}/{annotationTypesForUi.length} completed
+                    </div>
+                    <button
+                        class="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                        onclick={handleCancel}
+                        aria-label="Close"
                         disabled={loading}
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
-                    ></textarea>
+                    >
+                        <Icon icon="lucide:x" class="w-5 h-5" />
+                    </button>
                 </div>
             </div>
+            <!-- Business event / process description -->
+            <div>
+                <label for="event-description" class="block text-xs font-medium text-gray-600 mb-1">
+                    Description
+                    <span class="text-gray-400 font-normal">(optional — {$modelingStyle === 'entity_model' ? 'used as the central entity description' : 'will be used as fact table description'})</span>
+                </label>
+                <textarea
+                    id="event-description"
+                    bind:value={description}
+                    placeholder="Describe what this business event or process represents..."
+                    rows={2}
+                    maxlength={1000}
+                    disabled={loading}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                ></textarea>
+            </div>
+        </div>
 
-            <!-- Form -->
-            <div class="p-6 space-y-4">
-                <!-- Annotation Sections -->
-                {#each annotationTypesForUi as annotationType}
-                    <div class="border border-gray-200 rounded-lg overflow-visible">
-                        <!-- Section Header -->
-                        <button
-                            class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-                            onclick={() => toggleCollapse(annotationType.type)}
-                            aria-expanded={!collapsedState[annotationType.type]}
-                            aria-controls={`section-${annotationType.type}`}
-                        >
-                            <div class="flex items-center gap-3">
-                                <div
-                                    class="p-2 rounded-md {annotationType.type === 'how_many' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'}"
-                                >
-                                    <Icon icon={annotationType.icon} class="w-5 h-5" />
-                                </div>
-                                <div class="text-left">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-medium text-gray-900">{annotationType.label}</span>
-                                        {#if annotations[annotationType.type].length > 0}
-                                            <span class="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                                                {annotations[annotationType.type].length}
-                                            </span>
-                                        {/if}
-                                    </div>
-                                    <p class="text-xs text-gray-500">{sectionDescription(annotationType)}</p>
-                                </div>
+        <!-- Form -->
+        <div class="p-6 space-y-4">
+            <!-- Annotation Sections -->
+            {#each annotationTypesForUi as annotationType}
+                <div class="border border-gray-200 rounded-lg overflow-visible">
+                    <!-- Section Header -->
+                    <button
+                        class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
+                        onclick={() => toggleCollapse(annotationType.type)}
+                        aria-expanded={!collapsedState[annotationType.type]}
+                        aria-controls={`section-${annotationType.type}`}
+                    >
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="p-2 rounded-md {annotationType.type === 'how_many' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'}"
+                            >
+                                <Icon icon={annotationType.icon} class="w-5 h-5" />
                             </div>
-                            <div class="flex items-center gap-2">
-                                <!-- Tooltip icon -->
-                                <div class="group relative">
-                                    <Icon
-                                        icon="lucide:info"
-                                        class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
-                                    />
-                                    <div class="absolute right-0 bottom-full mb-2 w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
-                                        <div class="font-semibold mb-1">Common Examples:</div>
-                                        {annotationType.tooltip}
-                                        <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                                    </div>
+                            <div class="text-left">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-gray-900">{annotationType.label}</span>
+                                    {#if annotations[annotationType.type].length > 0}
+                                        <span class="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                                            {annotations[annotationType.type].length}
+                                        </span>
+                                    {/if}
                                 </div>
+                                <p class="text-xs text-gray-500">{sectionDescription(annotationType)}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <!-- Tooltip icon -->
+                            <div class="group relative">
                                 <Icon
-                                    icon={collapsedState[annotationType.type] ? 'lucide:chevron-down' : 'lucide:chevron-up'}
-                                    class="w-5 h-5 text-gray-500 transition-transform"
+                                    icon="lucide:info"
+                                    class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
                                 />
+                                <div class="absolute right-0 bottom-full mb-2 w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
+                                    <div class="font-semibold mb-1">Common Examples:</div>
+                                    {annotationType.tooltip}
+                                    <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                </div>
                             </div>
-                        </button>
+                            <Icon
+                                icon={collapsedState[annotationType.type] ? 'lucide:chevron-down' : 'lucide:chevron-up'}
+                                class="w-5 h-5 text-gray-500 transition-transform"
+                            />
+                        </div>
+                    </button>
 
-                                 <!-- Section Content -->
-                        {#if !collapsedState[annotationType.type]}
-                            <div id={`section-${annotationType.type}`} class="p-4 space-y-3 rounded-b-lg">
-                                {#if annotationType.type !== 'how_many'}
-                                    <datalist id={`annotation-suggestions-${annotationType.type}`}>
-                                        {#each getTextSuggestionsForType(annotationType.type) as suggestion}
-                                            <option value={suggestion}></option>
-                                        {/each}
-                                    </datalist>
-                                {/if}
-                                <!-- Entries List -->
-                                {#if dimensionsLoading && annotations[annotationType.type].length === 0}
-                                    <!-- Skeleton Loader -->
-                                    <div class="space-y-3">
-                                        <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
-                                            <div class="flex-1 space-y-2">
-                                                <div class="h-10 bg-gray-200 rounded animate-pulse"></div>
-                                                <div class="h-6 bg-gray-200 rounded w-3/4 animate-pulse"></div>
-                                            </div>
-                                            <div class="w-8 h-8 bg-gray-200 rounded-md animate-pulse"></div>
+                             <!-- Section Content -->
+                    {#if !collapsedState[annotationType.type]}
+                        <div id={`section-${annotationType.type}`} class="p-4 space-y-3 rounded-b-lg">
+                            {#if annotationType.type !== 'how_many'}
+                                <datalist id={`annotation-suggestions-${annotationType.type}`}>
+                                    {#each getTextSuggestionsForType(annotationType.type) as suggestion}
+                                        <option value={suggestion}></option>
+                                    {/each}
+                                </datalist>
+                            {/if}
+                            <!-- Entries List -->
+                            {#if dimensionsLoading && annotations[annotationType.type].length === 0}
+                                <!-- Skeleton Loader -->
+                                <div class="space-y-3">
+                                    <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
+                                        <div class="flex-1 space-y-2">
+                                            <div class="h-10 bg-gray-200 rounded animate-pulse"></div>
+                                            <div class="h-6 bg-gray-200 rounded w-3/4 animate-pulse"></div>
                                         </div>
+                                        <div class="w-8 h-8 bg-gray-200 rounded-md animate-pulse"></div>
                                     </div>
-                                {:else if annotations[annotationType.type].length > 0}
-                                    {#each annotations[annotationType.type] as entry}
-                                        <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
-                                            <div class="flex-1 space-y-2">
-                                                {#if annotationType.type === 'how_many'}
-                                                    <!-- Text Input -->
-                                                    <input
-                                                        type="text"
-                                                        value={entry.text}
-                                                        oninput={(e) =>
-                                                            updateEntryText(
-                                                                annotationType.type,
-                                                                entry.id,
-                                                                e.currentTarget.value,
-                                                            )
-                                                        }
-                                                        placeholder={annotationType.placeholder}
-                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                        maxlength={200}
-                                                        disabled={loading}
-                                                    />
-                                                {:else}
-                                                    <!-- Primary Text Input (becomes the role) -->
-                                                    <input
-                                                        type="text"
-                                                        value={entry.text}
-                                                        list={`annotation-suggestions-${annotationType.type}`}
-                                                        onfocus={() => { activeSuggestionEntryId = entry.id; }}
-                                                        onblur={() => {
-                                                            setTimeout(() => {
-                                                                if (activeSuggestionEntryId === entry.id) {
-                                                                    activeSuggestionEntryId = null;
-                                                                }
-                                                            }, 120);
-                                                        }}
-                                                        onkeydown={(e) => {
-                                                            if (e.key === 'Escape') {
+                                </div>
+                            {:else if annotations[annotationType.type].length > 0}
+                                {#each annotations[annotationType.type] as entry}
+                                    <div class="flex items-start gap-2 p-3 bg-gray-50 rounded-md">
+                                        <div class="flex-1 space-y-2">
+                                            {#if annotationType.type === 'how_many'}
+                                                <!-- Text Input -->
+                                                <input
+                                                    type="text"
+                                                    value={entry.text}
+                                                    oninput={(e) =>
+                                                        updateEntryText(
+                                                            annotationType.type,
+                                                            entry.id,
+                                                            e.currentTarget.value,
+                                                        )
+                                                    }
+                                                    placeholder={annotationType.placeholder}
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                    maxlength={200}
+                                                    disabled={loading}
+                                                />
+                                            {:else}
+                                                <!-- Primary Text Input (becomes the role) -->
+                                                <input
+                                                    type="text"
+                                                    value={entry.text}
+                                                    list={`annotation-suggestions-${annotationType.type}`}
+                                                    onfocus={() => { activeSuggestionEntryId = entry.id; }}
+                                                    onblur={() => {
+                                                        setTimeout(() => {
+                                                            if (activeSuggestionEntryId === entry.id) {
                                                                 activeSuggestionEntryId = null;
                                                             }
-                                                        }}
-                                                        oninput={(e) =>
-                                                            handleEntryTextInput(
-                                                                annotationType.type,
-                                                                entry.id,
-                                                                e.currentTarget.value,
-                                                            )
+                                                        }, 120);
+                                                    }}
+                                                    onkeydown={(e) => {
+                                                        if (e.key === 'Escape') {
+                                                            activeSuggestionEntryId = null;
                                                         }
-                                                        placeholder={annotationType.placeholder}
-                                                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                        maxlength={200}
-                                                        disabled={loading}
-                                                    />
-                                                    {#if activeSuggestionEntryId === entry.id}
-                                                        {@const entitySuggestions = getEntitySuggestionsForType(annotationType.type, entry.text)}
-                                                        {@const textSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
-                                                        {@const showNewEntityOption = $modelingStyle === 'entity_model' && entry.text.trim() && !entitySuggestions.some(e => e.label.toLowerCase() === entry.text.trim().toLowerCase())}
-                                                        {#if entitySuggestions.length > 0 || textSuggestions.length > 0 || showNewEntityOption}
-                                                            <div class="mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-44 overflow-y-auto">
-                                                                {#if showNewEntityOption}
-                                                                    <button
-                                                                        type="button"
-                                                                        class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 font-medium border-b border-gray-100"
-                                                                        onmousedown={(e) => {
-                                                                            e.preventDefault();
-                                                                            activeSuggestionEntryId = null;
-                                                                            newDimensionName = entry.text;
-                                                                            creatingDimensionForEntry = entry.id;
-                                                                        }}
-                                                                    >+ New entity "{entry.text}"</button>
-                                                                {/if}
-                                                                {#if entitySuggestions.length > 0 && textSuggestions.length > 0}
-                                                                    <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100">Entities</div>
-                                                                {/if}
-                                                                {#each entitySuggestions as entity}
-                                                                    <button
-                                                                        type="button"
-                                                                        class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-green-50 flex items-center gap-2"
-                                                                        onmousedown={(e) => {
-                                                                            e.preventDefault();
-                                                                            applyEntitySuggestion(annotationType.type, entry.id, entity);
-                                                                        }}
-                                                                    >
-                                                                        <span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium flex-shrink-0">entity</span>
-                                                                            {entity.label}
-                                                                        </button>
-                                                                    {/each}
-                                                                {#if textSuggestions.length > 0}
-                                                                    {#if entitySuggestions.length > 0}
-                                                                        <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100 border-t">Previous entries</div>
-                                                                    {/if}
-                                                                    {#each textSuggestions as suggestion}
-                                                                        <button
-                                                                            type="button"
-                                                                            class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-blue-50"
-                                                                            onmousedown={(e) => {
-                                                                                e.preventDefault();
-                                                                                applySuggestion(annotationType.type, entry.id, suggestion);
-                                                                            }}
-                                                                        >
-                                                                            {suggestion}
-                                                                        </button>
-                                                                    {/each}
-                                                                {/if}
-                                                            </div>
-                                                        {/if}
-                                                    {/if}
-
-                                                    <!-- Inline linked entity badge (entity_model) -->
-                                                    {#if $modelingStyle === 'entity_model' && entry.dimension_id}
-                                                        {@const linkedEntity = dimensions.find(d => d.id === entry.dimension_id)}
-                                                        <div class="flex items-center gap-1.5 mt-1">
-                                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 border border-green-300 rounded-full text-xs font-medium">
-                                                                <Icon icon="lucide:link" class="w-3 h-3" />
-                                                                {linkedEntity?.label || entry.dimension_id}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onclick={() => unlinkEntry(annotationType.type, entry.id)}
-                                                                class="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                                                                title="Remove entity link (keep as free text)"
-                                                            >unlink</button>
-                                                        </div>
-                                                    {/if}
-
-                                                    <!-- Inline create entity form (entity_model only) -->
-                                                    {#if $modelingStyle === 'entity_model' && creatingDimensionForEntry === entry.id}
-                                                        <div class="mt-2 space-y-1 border-l-2 border-blue-200 pl-3">
-                                                            <label class="text-xs font-medium text-gray-600">Create new entity</label>
-                                                            <div class="flex items-center gap-2">
-                                                                <input
-                                                                    type="text"
-                                                                    bind:value={newDimensionName}
-                                                                    placeholder="e.g., Employee, Project"
-                                                                    class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                                                    disabled={loading}
-                                                                    onkeydown={(e) => {
-                                                                        if (e.key === 'Enter') submitCreateDimension(annotationType.type, entry.id);
-                                                                        else if (e.key === 'Escape') cancelCreateDimension();
+                                                    }}
+                                                    oninput={(e) =>
+                                                        handleEntryTextInput(
+                                                            annotationType.type,
+                                                            entry.id,
+                                                            e.currentTarget.value,
+                                                        )
+                                                    }
+                                                    placeholder={annotationType.placeholder}
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                    maxlength={200}
+                                                    disabled={loading}
+                                                />
+                                                {#if activeSuggestionEntryId === entry.id}
+                                                    {@const entitySuggestions = getEntitySuggestionsForType(annotationType.type, entry.text)}
+                                                    {@const textSuggestions = getVisibleSuggestions(annotationType.type, entry.text)}
+                                                    {@const showNewEntityOption = $modelingStyle === 'entity_model' && entry.text.trim() && !entitySuggestions.some(e => e.label.toLowerCase() === entry.text.trim().toLowerCase())}
+                                                    {#if entitySuggestions.length > 0 || textSuggestions.length > 0 || showNewEntityOption}
+                                                        <div class="mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-44 overflow-y-auto">
+                                                            {#if showNewEntityOption}
+                                                                <button
+                                                                    type="button"
+                                                                    class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 font-medium border-b border-gray-100"
+                                                                    onmousedown={(e) => {
+                                                                        e.preventDefault();
+                                                                        activeSuggestionEntryId = null;
+                                                                        newDimensionName = entry.text;
+                                                                        creatingDimensionForEntry = entry.id;
                                                                     }}
-                                                                />
-                                                                <button type="button" onclick={() => submitCreateDimension(annotationType.type, entry.id)} disabled={!newDimensionName.trim() || loading} class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Create</button>
-                                                                <button type="button" onclick={cancelCreateDimension} class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" disabled={loading}>Cancel</button>
-                                                            </div>
-                                                        </div>
-                                                    {/if}
-
-                                                    <!-- Collapsible Dimension Link (generalization) — dimensional_model only -->
-                                                    {#if $modelingStyle !== 'entity_model' && showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
-                                                        <div class="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
-                                                            {#if creatingDimensionForEntry === entry.id}
-                                                                <!-- Create new dimension inline -->
-                                                                <div class="space-y-2">
-                                                                    <label class="text-xs font-medium text-gray-600">
-                                                                        Create new dimension
-                                                                    </label>
-                                                                    <div class="flex items-center gap-2">
-                                                                        <input
-                                                                            type="text"
-                                                                            bind:value={newDimensionName}
-                                                                            placeholder="e.g., Employee, Date, Location"
-                                                                            class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                                                            disabled={loading}
-                                                                            onkeydown={(e) => {
-                                                                                if (e.key === 'Enter') {
-                                                                                    submitCreateDimension(annotationType.type, entry.id);
-                                                                                } else if (e.key === 'Escape') {
-                                                                                    cancelCreateDimension();
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onclick={() => submitCreateDimension(annotationType.type, entry.id)}
-                                                                            disabled={!newDimensionName.trim() || loading}
-                                                                            class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                        >
-                                                                            Create
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onclick={cancelCreateDimension}
-                                                                            class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-                                                                            disabled={loading}
-                                                                        >
-                                                                            Cancel
-                                                                        </button>
-                                                                    </div>
-                                                                    <p class="text-xs text-gray-500 italic">
-                                                                        Press Enter to create, Escape to cancel
-                                                                    </p>
-                                                                </div>
-                                                            {:else}
-                                                                <!-- Normal dimension selection -->
-                                                                <div class="flex items-center gap-2">
-                                                                    <label
-                                                                        for={`dimension-select-${entry.id}`}
-                                                                        class="text-xs font-medium text-gray-600 whitespace-nowrap"
-                                                                    >
-                                                                        Generalize to
-                                                                    </label>
-                                                                    <select
-                                                                        id={`dimension-select-${entry.id}`}
-                                                                        value={entry.dimension_id || ''}
-                                                                        onchange={(e) => {
-                                                                            const value = e.currentTarget.value;
-                                                                            handleDimensionSelectChange(
-                                                                                annotationType.type,
-                                                                                entry.id,
-                                                                                value
-                                                                            );
-                                                                        }}
-                                                                        class="flex-1 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
-                                                                        disabled={loading || dimensionsLoading}
-                                                                    >
-                                                                        <option value="">None (keep as free text)</option>
-                                                                        {#each getAllowedDimensionsForType(annotationType.type) as dimension}
-                                                                            <option value={dimension.id}>{dimension.label}</option>
-                                                                        {/each}
-                                                                        <option value="__create_new__" class="text-blue-600 font-medium">+ Create new dimension...</option>
-                                                                    </select>
-                                                                </div>
-                                                                {#if entry.dimension_id}
-                                                                    {@const linkedDim = dimensions.find(d => d.id === entry.dimension_id)}
-                                                                    <div class="text-xs text-gray-500 italic">
-                                                                        Will display as: <span class="font-medium text-gray-700">{linkedDim?.label || entry.dimension_id} ({entry.text})</span>
-                                                                    </div>
+                                                                >+ New entity "{entry.text}"</button>
+                                                            {/if}
+                                                            {#if entitySuggestions.length > 0 && textSuggestions.length > 0}
+                                                                <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100">Entities</div>
+                                                            {/if}
+                                                            {#each entitySuggestions as entity}
+                                                                <button
+                                                                    type="button"
+                                                                    class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-green-50 flex items-center gap-2"
+                                                                    onmousedown={(e) => {
+                                                                        e.preventDefault();
+                                                                        applyEntitySuggestion(annotationType.type, entry.id, entity);
+                                                                    }}
+                                                                >
+                                                                    <span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium flex-shrink-0">entity</span>
+                                                                        {entity.label}
+                                                                    </button>
+                                                                {/each}
+                                                            {#if textSuggestions.length > 0}
+                                                                {#if entitySuggestions.length > 0}
+                                                                    <div class="px-2 py-1 text-xs font-medium text-gray-400 bg-gray-50 border-b border-gray-100 border-t">Previous entries</div>
                                                                 {/if}
+                                                                {#each textSuggestions as suggestion}
+                                                                    <button
+                                                                        type="button"
+                                                                        class="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-blue-50"
+                                                                        onmousedown={(e) => {
+                                                                            e.preventDefault();
+                                                                            applySuggestion(annotationType.type, entry.id, suggestion);
+                                                                        }}
+                                                                    >
+                                                                        {suggestion}
+                                                                    </button>
+                                                                {/each}
                                                             {/if}
                                                         </div>
                                                     {/if}
                                                 {/if}
-                                                <!-- Description Input -->
-                                                <input
-                                                    type="text"
-                                                    value={entry.description || ''}
-                                                    oninput={(e) => updateEntryDescription(annotationType.type, entry.id, e.currentTarget.value)}
-                                                    placeholder="Optional description..."
-                                                    class="w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs text-gray-600"
-                                                    maxlength={500}
-                                                    disabled={loading}
-                                                />
-                                            </div>
-                                            <div class="flex flex-col gap-1">
-                                                {#if annotationType.type !== 'how_many' && $modelingStyle !== 'entity_model'}
-                                                    <!-- Generalize to dimension button (dimensional_model only) -->
-                                                    <div class="group relative">
+
+                                                <!-- Inline linked entity badge (entity_model) -->
+                                                {#if $modelingStyle === 'entity_model' && entry.dimension_id}
+                                                    {@const linkedEntity = dimensions.find(d => d.id === entry.dimension_id)}
+                                                    <div class="flex items-center gap-1.5 mt-1">
+                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 border border-green-300 rounded-full text-xs font-medium">
+                                                            <Icon icon="lucide:link" class="w-3 h-3" />
+                                                            {linkedEntity?.label || entry.dimension_id}
+                                                        </span>
                                                         <button
                                                             type="button"
-                                                            class="p-2 rounded-md transition-colors {entry.dimension_id ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}"
-                                                            onclick={() => toggleGeneralizeSection(entry.id)}
-                                                            aria-label="Generalize to a dimension"
-                                                            disabled={loading}
-                                                        >
-                                                            <Icon icon="material-symbols:groups" class="w-4 h-4" />
-                                                        </button>
-                                                        <div class="absolute right-0 bottom-full mb-2 w-[300px] p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
-                                                            Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date).
-                                                            <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                                            onclick={() => unlinkEntry(annotationType.type, entry.id)}
+                                                            class="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                                            title="Remove entity link (keep as free text)"
+                                                        >unlink</button>
+                                                    </div>
+                                                {/if}
+
+                                                <!-- Inline create entity form (entity_model only) -->
+                                                {#if $modelingStyle === 'entity_model' && creatingDimensionForEntry === entry.id}
+                                                    <div class="mt-2 space-y-1 border-l-2 border-blue-200 pl-3">
+                                                        <label class="text-xs font-medium text-gray-600">Create new entity</label>
+                                                        <div class="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                bind:value={newDimensionName}
+                                                                placeholder="e.g., Employee, Project"
+                                                                class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                                disabled={loading}
+                                                                onkeydown={(e) => {
+                                                                    if (e.key === 'Enter') submitCreateDimension(annotationType.type, entry.id);
+                                                                    else if (e.key === 'Escape') cancelCreateDimension();
+                                                                }}
+                                                            />
+                                                            <button type="button" onclick={() => submitCreateDimension(annotationType.type, entry.id)} disabled={!newDimensionName.trim() || loading} class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Create</button>
+                                                            <button type="button" onclick={cancelCreateDimension} class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" disabled={loading}>Cancel</button>
                                                         </div>
                                                     </div>
                                                 {/if}
-                                                <!-- Delete button -->
-                                                <button
-                                                    type="button"
-                                                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                                    onclick={() => removeEntry(annotationType.type, entry.id)}
-                                                    aria-label="Remove entry"
-                                                    disabled={loading}
-                                                    title="Remove entry"
-                                                >
-                                                    <Icon icon="lucide:trash-2" class="w-4 h-4" />
-                                                </button>
-                                            </div>
+
+                                                <!-- Collapsible Dimension Link (generalization) — dimensional_model only -->
+                                                {#if $modelingStyle !== 'entity_model' && showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
+                                                    <div class="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
+                                                        {#if creatingDimensionForEntry === entry.id}
+                                                            <!-- Create new dimension inline -->
+                                                            <div class="space-y-2">
+                                                                <label class="text-xs font-medium text-gray-600">
+                                                                    Create new dimension
+                                                                </label>
+                                                                <div class="flex items-center gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        bind:value={newDimensionName}
+                                                                        placeholder="e.g., Employee, Date, Location"
+                                                                        class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                                        disabled={loading}
+                                                                        onkeydown={(e) => {
+                                                                            if (e.key === 'Enter') {
+                                                                                submitCreateDimension(annotationType.type, entry.id);
+                                                                            } else if (e.key === 'Escape') {
+                                                                                cancelCreateDimension();
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onclick={() => submitCreateDimension(annotationType.type, entry.id)}
+                                                                        disabled={!newDimensionName.trim() || loading}
+                                                                        class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        Create
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onclick={cancelCreateDimension}
+                                                                        class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                                                                        disabled={loading}
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                                <p class="text-xs text-gray-500 italic">
+                                                                    Press Enter to create, Escape to cancel
+                                                                </p>
+                                                            </div>
+                                                        {:else}
+                                                            <!-- Normal dimension selection -->
+                                                            <div class="flex items-center gap-2">
+                                                                <label
+                                                                    for={`dimension-select-${entry.id}`}
+                                                                    class="text-xs font-medium text-gray-600 whitespace-nowrap"
+                                                                >
+                                                                    Generalize to
+                                                                </label>
+                                                                <select
+                                                                    id={`dimension-select-${entry.id}`}
+                                                                    value={entry.dimension_id || ''}
+                                                                    onchange={(e) => {
+                                                                        const value = e.currentTarget.value;
+                                                                        handleDimensionSelectChange(
+                                                                            annotationType.type,
+                                                                            entry.id,
+                                                                            value
+                                                                        );
+                                                                    }}
+                                                                    class="flex-1 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+                                                                    disabled={loading || dimensionsLoading}
+                                                                >
+                                                                    <option value="">None (keep as free text)</option>
+                                                                    {#each getAllowedDimensionsForType(annotationType.type) as dimension}
+                                                                        <option value={dimension.id}>{dimension.label}</option>
+                                                                    {/each}
+                                                                    <option value="__create_new__" class="text-blue-600 font-medium">+ Create new dimension...</option>
+                                                                </select>
+                                                            </div>
+                                                            {#if entry.dimension_id}
+                                                                {@const linkedDim = dimensions.find(d => d.id === entry.dimension_id)}
+                                                                <div class="text-xs text-gray-500 italic">
+                                                                    Will display as: <span class="font-medium text-gray-700">{linkedDim?.label || entry.dimension_id} ({entry.text})</span>
+                                                                </div>
+                                                            {/if}
+                                                        {/if}
+                                                    </div>
+                                                {/if}
+                                            {/if}
+                                            <!-- Description Input -->
+                                            <input
+                                                type="text"
+                                                value={entry.description || ''}
+                                                oninput={(e) => updateEntryDescription(annotationType.type, entry.id, e.currentTarget.value)}
+                                                placeholder="Optional description..."
+                                                class="w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs text-gray-600"
+                                                maxlength={500}
+                                                disabled={loading}
+                                            />
                                         </div>
-                                    {/each}
-                                {:else}
-                                    <div class="text-center py-6 text-gray-400 text-sm">
-                                        No entries yet. Click "Add Entry" to add one.
+                                        <div class="flex flex-col gap-1">
+                                            {#if annotationType.type !== 'how_many' && $modelingStyle !== 'entity_model'}
+                                                <!-- Generalize to dimension button (dimensional_model only) -->
+                                                <div class="group relative">
+                                                    <button
+                                                        type="button"
+                                                        class="p-2 rounded-md transition-colors {entry.dimension_id ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}"
+                                                        onclick={() => toggleGeneralizeSection(entry.id)}
+                                                        aria-label="Generalize to a dimension"
+                                                        disabled={loading}
+                                                    >
+                                                        <Icon icon="material-symbols:groups" class="w-4 h-4" />
+                                                    </button>
+                                                    <div class="absolute right-0 bottom-full mb-2 w-[300px] p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-pre-line text-left">
+                                                        Generalize to a dimension. Use when multiple annotations refer to the same underlying concept (e.g., 'Order Date' and 'Ship Date' are both Date).
+                                                        <div class="absolute right-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                            <!-- Delete button -->
+                                            <button
+                                                type="button"
+                                                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                onclick={() => removeEntry(annotationType.type, entry.id)}
+                                                aria-label="Remove entry"
+                                                disabled={loading}
+                                                title="Remove entry"
+                                            >
+                                                <Icon icon="lucide:trash-2" class="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                {/if}
-
-                                <!-- Add Entry Button -->
-                                <button
-                                    type="button"
-                                    onclick={() => addEntry(annotationType.type)}
-                                    class="w-full py-2 px-4 border-2 border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
-                                    disabled={loading}
-                                >
-                                    <Icon icon="lucide:plus" class="w-4 h-4" />
-                                    <span>Add Entry</span>
-                                </button>
-                            </div>
-                        {/if}
-                    </div>
-                {/each}
-
-                <!-- Validation Errors -->
-                {#if validationErrors.length > 0}
-                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
-                        <div class="flex items-center gap-2 text-amber-800 font-medium">
-                            <Icon icon="lucide:alert-triangle" class="w-5 h-5" />
-                            <span>Entity Generation Requirements</span>
-                        </div>
-                        <ul class="space-y-1 pl-7">
-                            {#each validationErrors as error}
-                                <li class="text-sm text-amber-700">• {error}</li>
-                            {/each}
-                        </ul>
-                        <p class="text-xs text-amber-600 mt-2">
-                            You can still save the event, but you won't be able to generate entities until these requirements are met.
-                        </p>
-                    </div>
-                {/if}
-
-                <!-- Error Message -->
-                {#if error}
-                    <div
-                        class="flex items-center gap-3 text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3"
-                    >
-                        <Icon icon="lucide:alert-circle" class="w-5 h-5 flex-shrink-0" />
-                        <span class="text-sm">{error}</span>
-                    </div>
-                {/if}
-
-                <!-- Actions -->
-                <div class="flex justify-between items-center pt-4 border-t border-gray-200">
-                    <p class="text-xs text-gray-500">
-                        Press Ctrl+Enter to save
-                    </p>
-                    <div class="flex gap-3">
-                        <button
-                            onclick={handleCancel}
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={loading}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onclick={handleSave}
-                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            disabled={loading}
-                        >
-                            {#if loading}
-                                <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
-                                <span>Saving...</span>
+                                {/each}
                             {:else}
-                                <Icon icon="lucide:save" class="w-4 h-4" />
-                                <span>Save Annotations</span>
+                                <div class="text-center py-6 text-gray-400 text-sm">
+                                    No entries yet. Click "Add Entry" to add one.
+                                </div>
                             {/if}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Delete Confirmation Modal -->
-    {#if showDeleteConfirm}
-        <div
-            class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center"
-            onclick={(e) => { if (e.target === e.currentTarget) handleDeleteCancel(); }}
-            role="dialog"
-            tabindex="-1"
-            aria-modal="true"
-            aria-labelledby="delete-entry-modal-title"
-        >
-            <div
-                class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full mx-4"
-                role="document"
-                tabindex="-1"
-            >
-                <h2 id="delete-entry-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
-                    Delete Entry?
-                </h2>
-                <p class="text-sm text-gray-600 mb-6">
-                    {#if entryToDelete && entryToDelete.annotationType}
-                        {@const entry = annotations[entryToDelete!.annotationType].find(e => e.id === entryToDelete!.entryId)}
-                        This entry has a dimension reference ({entry?.dimension_id}). Deleting it will remove the reference from the dimension entity. This action cannot be undone.
-                    {:else}
-                        This entry cannot be undone. Are you sure you want to delete it?
+                            <!-- Add Entry Button -->
+                            <button
+                                type="button"
+                                onclick={() => addEntry(annotationType.type)}
+                                class="w-full py-2 px-4 border-2 border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                                disabled={loading}
+                            >
+                                <Icon icon="lucide:plus" class="w-4 h-4" />
+                                <span>Add Entry</span>
+                            </button>
+                        </div>
                     {/if}
+                </div>
+            {/each}
+
+            <!-- Validation Errors -->
+            {#if validationErrors.length > 0}
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                    <div class="flex items-center gap-2 text-amber-800 font-medium">
+                        <Icon icon="lucide:alert-triangle" class="w-5 h-5" />
+                        <span>Entity Generation Requirements</span>
+                    </div>
+                    <ul class="space-y-1 pl-7">
+                        {#each validationErrors as error}
+                            <li class="text-sm text-amber-700">• {error}</li>
+                        {/each}
+                    </ul>
+                    <p class="text-xs text-amber-600 mt-2">
+                        You can still save the event, but you won't be able to generate entities until these requirements are met.
+                    </p>
+                </div>
+            {/if}
+
+            <!-- Error Message -->
+            {#if error}
+                <div
+                    class="flex items-center gap-3 text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3"
+                >
+                    <Icon icon="lucide:alert-circle" class="w-5 h-5 flex-shrink-0" />
+                    <span class="text-sm">{error}</span>
+                </div>
+            {/if}
+
+            <!-- Actions -->
+            <div class="flex justify-between items-center pt-4 border-t border-gray-200">
+                <p class="text-xs text-gray-500">
+                    Press Ctrl+Enter to save
                 </p>
-                <div class="flex justify-end gap-3">
+                <div class="flex gap-3">
                     <button
-                        onclick={handleDeleteCancel}
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        onclick={handleCancel}
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={loading}
                     >
                         Cancel
                     </button>
                     <button
-                        onclick={handleDeleteConfirm}
-                        class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        onclick={handleSave}
+                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        disabled={loading}
                     >
-                        Delete
+                        {#if loading}
+                            <Icon icon="lucide:loader-2" class="w-4 h-4 animate-spin" />
+                            <span>Saving...</span>
+                        {:else}
+                            <Icon icon="lucide:save" class="w-4 h-4" />
+                            <span>Save Annotations</span>
+                        {/if}
                     </button>
                 </div>
             </div>
         </div>
+    </Modal>
+
+    <!-- Delete Confirmation Modal (stacked above the form; Escape closes only this one) -->
+    {#if showDeleteConfirm}
+        <Modal
+            onClose={handleDeleteCancel}
+            size="lg"
+            zIndex={60}
+            class="bg-white rounded-lg shadow-xl p-8 w-full mx-4"
+            labelledBy="delete-entry-modal-title"
+        >
+            <h2 id="delete-entry-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
+                Delete Entry?
+            </h2>
+            <p class="text-sm text-gray-600 mb-6">
+                {#if entryToDelete && entryToDelete.annotationType}
+                    {@const entry = annotations[entryToDelete!.annotationType].find(e => e.id === entryToDelete!.entryId)}
+                    This entry has a dimension reference ({entry?.dimension_id}). Deleting it will remove the reference from the dimension entity. This action cannot be undone.
+                {:else}
+                    This entry cannot be undone. Are you sure you want to delete it?
+                {/if}
+            </p>
+            <div class="flex justify-end gap-3">
+                <button
+                    onclick={handleDeleteCancel}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                    Cancel
+                </button>
+                <button
+                    onclick={handleDeleteConfirm}
+                    class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                    Delete
+                </button>
+            </div>
+        </Modal>
 
         <!-- Success Notification -->
         {#if showSuccessNotification}

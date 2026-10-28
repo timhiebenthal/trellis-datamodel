@@ -23,27 +23,22 @@
         closeDeleteConfirmModal,
         activeFramework,
     } from "$lib/stores";
-    import type { ModelInfo, DraftedField, EntityData, EntityRole } from "$lib/types";
+    import type { ModelInfo, DraftedField, EntityFlowNode } from "$lib/types";
+    import { isEntityNode } from "$lib/types";
     import {
         inferRelationships,
         getLineage,
         getModelSchema,
     } from "$lib/api";
-    import {
-        getParallelOffset,
-        generateSlug,
-        normalizeTags,
-        mergeRelationshipIntoEdges,
-        detectFieldSemantics,
-        formatModelNameForLabel,
-        extractModelNameFromUniqueId,
-        toTitleCase,
-        classifyModelTypeFromPrefixes,
-    } from "$lib/utils";
+    import { getParallelOffset } from "$lib/utils/edge-calculations";
+    import { generateSlug } from "$lib/utils/slug";
+    import { mergeRelationshipIntoEdges } from "$lib/utils/relationship-edges";
+    import { detectFieldSemantics } from "$lib/utils/field-semantics";
+    import { formatModelNameForLabel, extractModelNameFromUniqueId, toTitleCase, classifyModelTypeFromPrefixes } from "$lib/utils/model-naming";
     import { mergeFields } from "$lib/utils/merged-fields";
     import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
     import type { MergedField } from "$lib/utils/merged-fields";
-    import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
+    import { normalizeTags, computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
     import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
     import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";
@@ -61,9 +56,7 @@
         goto('/exposures');
     }
 
-    let { data: rawData, id, selected }: NodeProps = $props();
-    // Cast data to EntityData for proper typing - use $derived to maintain reactivity
-    let data = $derived(rawData as unknown as EntityData);
+    let { data, id, selected }: NodeProps<EntityFlowNode> = $props();
 
     const { updateNodeData } = useSvelteFlow();
     let showEntityTypeMenu = $state(false);
@@ -456,7 +449,7 @@
                     }
                 } else {
                     // Other nodes: get all bound models
-                    const primary = readModelRef((node.data ?? {}) as any);
+                    const primary = isEntityNode(node) ? readModelRef(node.data) : undefined;
                     const additional = (node.data?.additional_models as string[]) || [];
                     if (primary) {
                         boundModels = [primary, ...additional];
@@ -682,7 +675,7 @@
     // EntityRole is an object with { role, label, source } — extract the role string
     // Deduplicate case-insensitively (e.g., "Creation Date" and "creation date" should be one)
     let entityRoles = $derived.by(() => {
-        const roles = (((data as any).roles || []) as EntityRole[]).map((r) => r.role || r.label || '');
+        const roles = (data.roles || []).map((r) => r.role || r.label || '');
         const seen = new Set<string>();
         return roles.filter((role) => {
             if (!role) return false;
@@ -697,8 +690,8 @@
         const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
 
         allSelectedIds.forEach((nodeId) => {
-            const node = $nodes.find((n) => n.id === nodeId);
-            const nodeIsBound = !!readModelRef((node?.data ?? {}) as any);
+            const node = $nodes.find((n): n is EntityFlowNode => isEntityNode(n) && n.id === nodeId);
+            const nodeIsBound = !!readModelRef(node?.data ?? {});
 
             if (nodeIsBound) {
                 // `dbt_tags` is a dbt-mirrored, reconcile-owned field for bound
@@ -706,7 +699,7 @@
                 // An edit in the tag editor only ever changes `ui_tags`; a
                 // dbt-mirrored tag missing from `newTags` (e.g. the user tried to
                 // remove a read-only chip) is not treated as a removal, since dbt wins.
-                const uiTags = computeUiTagsAfterEdit(readFrameworkTags((node?.data ?? {}) as any), newTags);
+                const uiTags = computeUiTagsAfterEdit(readFrameworkTags(node?.data ?? {}), newTags);
                 updateNodeData(nodeId, { ui_tags: uiTags });
             } else {
                 // Unbound entities have no schema.yml to mirror; `tags` is the
@@ -870,8 +863,8 @@
         }
 
         // Get active model information for source and target nodes (prefer ephemeral active model data)
-        const sourceNodeData = $nodes.find(n => n.id === sourceNodeId)?.data as any;
-        const targetNodeData = $nodes.find(n => n.id === targetNodeId)?.data as any;
+        const sourceNodeData = $nodes.find((n): n is EntityFlowNode => isEntityNode(n) && n.id === sourceNodeId)?.data;
+        const targetNodeData = $nodes.find((n): n is EntityFlowNode => isEntityNode(n) && n.id === targetNodeId)?.data;
         
         const sourceActiveModel = (() => {
             if (sourceNodeData?._activeModelName) {
@@ -880,8 +873,9 @@
                     version: sourceNodeData._activeModelVersion as number | null | undefined,
                 };
             }
-            if (readModelRef(sourceNodeData ?? {})) {
-                return $frameworkModels.find(m => m.unique_id === readModelRef(sourceNodeData)) || null;
+            const primaryModelRef = readModelRef(sourceNodeData ?? {});
+            if (primaryModelRef) {
+                return $frameworkModels.find(m => m.unique_id === primaryModelRef) || null;
             }
             const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
@@ -897,8 +891,9 @@
                     version: targetNodeData._activeModelVersion as number | null | undefined,
                 };
             }
-            if (readModelRef(targetNodeData ?? {})) {
-                return $frameworkModels.find(m => m.unique_id === readModelRef(targetNodeData)) || null;
+            const primaryModelRef = readModelRef(targetNodeData ?? {});
+            if (primaryModelRef) {
+                return $frameworkModels.find(m => m.unique_id === primaryModelRef) || null;
             }
             const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
             if (firstAdditional) {
@@ -1456,7 +1451,7 @@
                                                             updateDraftedField(
                                                                 field.draftIndex,
                                                                 {
-                                                                    datatype: (e.target as HTMLSelectElement).value as any,
+                                                                    datatype: (e.target as HTMLSelectElement).value as DraftedField['datatype'],
                                                                 },
                                                             )}
                                                         class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
@@ -1717,7 +1712,7 @@
                                                                 updateDraftedField(
                                                                     field.draftIndex,
                                                                     {
-                                                                        datatype: (e.target as HTMLSelectElement).value as any,
+                                                                        datatype: (e.target as HTMLSelectElement).value as DraftedField['datatype'],
                                                                     },
                                                                 )}
                                                             class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"

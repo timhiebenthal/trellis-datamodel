@@ -5,7 +5,6 @@ import type { Node, Edge } from '@xyflow/svelte';
 // Mock API function
 vi.mock('$lib/api', () => ({
     saveDataModel: vi.fn().mockResolvedValue(undefined),
-    getApiBase: vi.fn().mockReturnValue('http://localhost:8089/api'),
 }));
 
 // Mock stores
@@ -20,20 +19,9 @@ import { saveDataModel as apiSaveDataModel } from '$lib/api';
 describe('AutoSaveService', () => {
     let service: AutoSaveService;
     let onSavingChangeMock: ReturnType<typeof vi.fn<(isSaving: boolean) => void>>;
-    let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 
     beforeEach(() => {
         vi.useFakeTimers();
-
-        // Set API base URL for flushSync tests
-        process.env.VITE_API_BASE = 'http://localhost:8089';
-
-        // Mock global fetch for flushSync tests
-        fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve({}),
-        } as Response);
-        global.fetch = fetchMock as unknown as typeof fetch;
 
         onSavingChangeMock = vi.fn<(isSaving: boolean) => void>();
         service = new AutoSaveService(400, onSavingChangeMock);
@@ -202,7 +190,6 @@ describe('AutoSaveService', () => {
             await vi.runAllTimersAsync();
 
             expect(apiSaveDataModel).not.toHaveBeenCalled();
-            expect(fetchMock).not.toHaveBeenCalled();
             expect(service.isSavingActive()).toBe(false);
         });
 
@@ -292,22 +279,14 @@ describe('AutoSaveService', () => {
 
             await service.flushSync(mockNodes, mockEdges);
 
-            expect(fetchMock).not.toHaveBeenCalled();
+            expect(apiSaveDataModel).not.toHaveBeenCalled();
         });
 
         it('should perform synchronous save on state change', async () => {
-            vi.mocked(fetchMock).mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({}),
-            } as Response);
-
             await service.flushSync(mockNodes, mockEdges);
 
-            expect(fetchMock).toHaveBeenCalledTimes(1);
-            const [url, init] = fetchMock.mock.calls[0];
-            expect(url).toBe('http://localhost:8089/api/data-model');
-            expect(init?.method).toBe('POST');
-            expect(JSON.parse(init?.body as string).entities[0].id).toBe('node1');
+            expect(apiSaveDataModel).toHaveBeenCalledTimes(1);
+            expect(vi.mocked(apiSaveDataModel).mock.calls[0][0].entities?.[0].id).toBe('node1');
             expect(service.hasUnsavedChanges(mockNodes, mockEdges)).toBe(false);
         });
 
@@ -319,7 +298,7 @@ describe('AutoSaveService', () => {
             
             // Ensure state is fresh
             service.clearLastSavedState();
-            vi.mocked(fetchMock).mockRejectedValueOnce(error);
+            vi.mocked(apiSaveDataModel).mockRejectedValueOnce(error);
 
             await expect(service.flushSync(differentNodes, mockEdges)).rejects.toThrow('Network error');
         });
@@ -331,12 +310,9 @@ describe('AutoSaveService', () => {
             
             // Ensure state is fresh
             service.clearLastSavedState();
-            vi.mocked(fetchMock).mockResolvedValueOnce({
-                ok: false,
-                status: 500,
-            } as Response);
+            vi.mocked(apiSaveDataModel).mockRejectedValueOnce(new Error('Failed to save data model: 500'));
 
-            await expect(service.flushSync(differentNodes, mockEdges)).rejects.toThrow('HTTP error! status: 500');
+            await expect(service.flushSync(differentNodes, mockEdges)).rejects.toThrow('Failed to save data model: 500');
         });
     });
 

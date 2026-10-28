@@ -1,17 +1,10 @@
 import type { Node } from "@xyflow/svelte";
+import type { Point } from "$lib/types";
 
 /**
  * Entity type classification for dimensional modeling
  */
 export type EntityType = "fact" | "dimension" | "unclassified";
-
-/**
- * Position coordinates in 2D space
- */
-export interface Position {
-    x: number;
-    y: number;
-}
 
 /**
  * Configuration for smart positioning algorithms
@@ -71,7 +64,7 @@ const DEFAULT_CONFIG: Required<PositioningConfig> = {
 export function calculateCanvasCenter(
     nodes: Node[],
     config?: PositioningConfig,
-): Position {
+): Point {
     const { defaultCenterX, defaultCenterY } = { ...DEFAULT_CONFIG, ...config };
 
     // Filter for entity nodes only (not groups or other node types)
@@ -108,9 +101,9 @@ export function calculateCanvasCenter(
  * ```
  */
 export function calculateFactPosition(
-    center: Position,
+    center: Point,
     config?: PositioningConfig,
-): Position {
+): Point {
     const { factOffsetRange } = { ...DEFAULT_CONFIG, ...config };
 
     // Random offset within specified range (-range to +range)
@@ -139,9 +132,9 @@ export function calculateFactPosition(
  * ```
  */
 export function calculateDimensionPosition(
-    center: Position,
+    center: Point,
     config?: PositioningConfig,
-): Position {
+): Point {
     const { dimensionMinRadius, dimensionRadiusOffset } = {
         ...DEFAULT_CONFIG,
         ...config,
@@ -172,7 +165,7 @@ export function calculateDimensionPosition(
  * // Returns position like { x: 150, y: 180 }
  * ```
  */
-export function calculateUnclassifiedPosition(): Position {
+export function calculateUnclassifiedPosition(): Point {
     return {
         x: 100 + Math.random() * 200,
         y: 100 + Math.random() * 200,
@@ -203,7 +196,7 @@ export function calculateSmartPosition(
     entityType: EntityType,
     nodes: Node[],
     config?: PositioningConfig,
-): Position {
+): Point {
     switch (entityType) {
         case "fact":
             const center = calculateCanvasCenter(nodes, config);
@@ -240,7 +233,7 @@ export function calculateSmartPosition(
  * ```
  */
 export function isPositionNearEntity(
-    position: Position,
+    position: Point,
     nodes: Node[],
     minDistance: number = 50,
 ): boolean {
@@ -279,7 +272,7 @@ export function findNonOverlappingPosition(
     nodes: Node[],
     maxAttempts: number = 10,
     config?: PositioningConfig,
-): Position {
+): Point {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const position = calculateSmartPosition(entityType, nodes, config);
 

@@ -1,4 +1,12 @@
+import type { Node } from '@xyflow/svelte';
+
 export type OriginEntry = Record<string, string>;
+
+/** A 2D coordinate (canvas position, edge endpoint, label anchor, ...). */
+export interface Point {
+    x: number;
+    y: number;
+}
 
 export interface DbtColumn {
     name: string;
@@ -49,7 +57,9 @@ export interface DraftedField {
     physical_datatype?: string; // exact type from the framework's catalog, preserved so push doesn't downgrade to the `datatype` bucket
 }
 
-export interface EntityData {
+// A type alias (not an interface) so it satisfies Svelte Flow's
+// `Node<Data extends Record<string, unknown>>` constraint.
+export type EntityData = {
     label: string;
     description?: string;
     model_ref?: string; // unique_id of the bound model (e.g. "model.elmo.entity_booking")
@@ -58,7 +68,7 @@ export interface EntityData {
     width?: number;
     panelHeight?: number;
     collapsed?: boolean;
-    folder?: string; // relative folder path (excluding main path)
+    folder?: string | null; // relative folder path (excluding main path); null when the bound model has none
     // For a bound entity, `tags` is a computed display union (framework_tags + ui_tags)
     // sent by the backend — never persisted, never hand-edited. Unbound entities
     // persist `tags` directly as their single, freely-editable field.
@@ -70,6 +80,38 @@ export interface EntityData {
     source_system?: string[]; // Array of source system names (bound = derived from lineage, unbound = persisted)
     domain?: string; // Optional business domain (supports entities created outside business events)
     domains?: string[]; // Optional multi-domain assignment (dimension can belong to many)
+    roles?: EntityRole[]; // Role-playing dimensions (see Entity.roles)
+};
+
+/**
+ * Data on a canvas entity node: the entity fields plus the active-model fields
+ * EntityNode publishes for its edges (ephemeral; never persisted).
+ */
+export type EntityNodeData = EntityData & {
+    _activeModelId?: string | null;
+    _activeModelName?: string | null;
+    _activeModelVersion?: number | null;
+};
+
+/** Data on a canvas folder group node. */
+export type GroupNodeData = {
+    label: string;
+    description?: string;
+    width?: number;
+    height?: number;
+    collapsed?: boolean;
+    manuallyResized?: boolean;
+};
+
+/**
+ * Canvas nodes, discriminated by Svelte Flow's `type` (which lives on the node,
+ * not in `data`). The `nodes` store stays `Node[]`; narrow with `isEntityNode`.
+ */
+export type EntityFlowNode = Node<EntityNodeData, 'entity'>;
+export type GroupFlowNode = Node<GroupNodeData, 'group'>;
+
+export function isEntityNode(node: Node): node is EntityFlowNode {
+    return node.type === 'entity';
 }
 
 /**
@@ -83,7 +125,7 @@ export interface Entity {
     model_ref?: string;
     additional_models?: string[];
     drafted_fields?: DraftedField[];
-    position: { x: number; y: number };
+    position: Point;
     width?: number;
     panel_height?: number;
     collapsed?: boolean;
@@ -139,6 +181,17 @@ export interface Relationship {
     target_model_name?: string; // name of the target model (e.g., "employee_history")
     target_model_version?: number | null; // version of the target model if versioned
 }
+
+/** One model-level relationship aggregated onto a canvas edge (`edge.data.models`). */
+export type RelationshipEdgeModel = Pick<
+    Relationship,
+    | 'source_model_name'
+    | 'source_model_version'
+    | 'target_model_name'
+    | 'target_model_version'
+    | 'source_field'
+    | 'target_field'
+>;
 
 /**
  * The data model structure as persisted in YAML.
@@ -375,12 +428,6 @@ export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
 
 export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'why' | 'how_many';
 
-export type SevenWType = AnnotationType;
-
-export type SevenWsEntry = AnnotationEntry;
-
-export type BusinessEventSevenWs = BusinessEventAnnotations;
-
 export type Annotation = AnnotationEntry;
 
 export interface AnnotationEntry {
@@ -521,19 +568,10 @@ export interface EntityListFilters {
     groupByEntityType: boolean;
 }
 
+/** Canvas domain/tag filter selection (same key names as `EntityListFilters`). */
 export interface CanvasFilterState {
-    domains: string[];
-    tags: string[];
-}
-
-export interface EntityDetailModalState {
-    open: boolean;
-    entityId: string | null;
-}
-
-export interface BulkEditModalState {
-    open: boolean;
-    selectedEntityIds: string[];
+    selectedDomains: string[];
+    selectedTags: string[];
 }
 
 // Metric Tree types
@@ -550,7 +588,7 @@ export interface MetricEntry {
     expression?: string;
     dataset_ref?: string; // semantic-model dataset the draft is written under; drafts only
     binding?: { dataset: string; name: string }; // semantic_model.yml reference; bound only
-    position?: { x: number; y: number }; // optional runtime canvas position override
+    position?: Point; // optional runtime canvas position override
     unresolved?: boolean; // set by GET when dataset_ref or binding no longer resolves
     // Set by GET for a bound metric whose definition resolves: the expression read
     // from semantic_model.yml. Display only; never sent back on save.
@@ -610,7 +648,7 @@ export interface MetricNodeData {
 export interface MetricTreeNode {
     id: string;
     type: 'metric';
-    position: { x: number; y: number };
+    position: Point;
     data: MetricNodeData;
 }
 

@@ -1,7 +1,9 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
+    import Modal from "./Modal.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
-    import { generateSlug, toTitleCase } from "$lib/utils";
+    import { generateSlug } from "$lib/utils/slug";
+    import { toTitleCase } from "$lib/utils/model-naming";
     import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 
     type Props = {
@@ -171,9 +173,7 @@
     }
 
     function handleKeydown(event: KeyboardEvent) {
-        if (event.key === "Escape") {
-            onCancel();
-        } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             // Ctrl/Cmd+Enter to submit
             event.preventDefault();
             const maxStep = modelingStyle === "entity_model" ? 3 : 4;
@@ -182,12 +182,6 @@
             } else {
                 complete();
             }
-        }
-    }
-
-    function handleBackdropClick(event: MouseEvent) {
-        if (event.target === event.currentTarget) {
-            onCancel();
         }
     }
 
@@ -217,329 +211,317 @@
     });
 </script>
 
-{#if open}
-    <!-- Backdrop -->
-    <div
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center backdrop-blur-sm"
-        onclick={handleBackdropClick}
-        onkeydown={handleKeydown}
-        role="dialog"
-        tabindex="-1"
-        aria-modal="true"
-        aria-labelledby="wizard-title"
-    >
-        <!-- Modal -->
-        <div
-            class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto"
-            role="document"
-            tabindex="-1"
-            aria-label="Entity creation wizard"
+<Modal
+    {open}
+    onClose={onCancel}
+    size="lg"
+    class="bg-white rounded-lg shadow-xl p-6 w-full mx-4 max-h-[90vh] overflow-y-auto"
+    labelledBy="wizard-title"
+    onkeydown={handleKeydown}
+>
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <h2 id="wizard-title" class="text-xl font-semibold text-gray-900">
+            Create New Entity
+        </h2>
+        <button
+            onclick={onCancel}
+            class="p-1 rounded-md hover:bg-gray-100 text-gray-500"
+            aria-label="Close"
         >
-            <!-- Header -->
-            <div class="flex items-center justify-between mb-4">
-                <h2 id="wizard-title" class="text-xl font-semibold text-gray-900">
-                    Create New Entity
-                </h2>
-                <button
-                    onclick={onCancel}
-                    class="p-1 rounded-md hover:bg-gray-100 text-gray-500"
-                    aria-label="Close"
-                >
-                    <Icon icon="lucide:x" class="w-5 h-5" />
-                </button>
+            <Icon icon="lucide:x" class="w-5 h-5" />
+        </button>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">
+                Step {currentStep} of {modelingStyle === "entity_model" ? 3 : 4}
+            </span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+            <div
+                class="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                style="width: {(currentStep / (modelingStyle === "entity_model" ? 3 : 4)) * 100}%"
+            ></div>
+        </div>
+    </div>
+
+    <!-- Step 1: Entity Name -->
+    {#if currentStep === 1}
+        <div class="space-y-4">
+            <div>
+                <label for="entity-label" class="block text-sm font-medium text-gray-700 mb-2">
+                    Entity Label
+                </label>
+                <input
+                    id="entity-label"
+                    type="text"
+                    bind:value={formData.label}
+                    class="inline-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors.label ? 'border-red-500' : validationErrors.label === null && formData.label && formData.label !== 'New Entity' ? 'border-green-500' : ''}"
+                    placeholder="e.g., Customer, Order, Product"
+                />
+                {#if validationErrors.label}
+                    <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                        <Icon icon="lucide:alert-circle" class="w-4 h-4" />
+                        {validationErrors.label}
+                    </p>
+                {:else if formData.label && formData.label !== "New Entity" && !validationErrors.label}
+                    <p class="mt-1 text-sm text-green-600 flex items-center gap-1">
+                        <Icon icon="lucide:check-circle" class="w-4 h-4" />
+                        Unique name
+                    </p>
+                {/if}
             </div>
 
-            <!-- Progress Indicator -->
-            <div class="mb-6">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-700">
-                        Step {currentStep} of {modelingStyle === "entity_model" ? 3 : 4}
-                    </span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                        class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                        style="width: {(currentStep / (modelingStyle === "entity_model" ? 3 : 4)) * 100}%"
-                    ></div>
-                </div>
-            </div>
-
-            <!-- Step 1: Entity Name -->
-            {#if currentStep === 1}
-                <div class="space-y-4">
-                    <div>
-                        <label for="entity-label" class="block text-sm font-medium text-gray-700 mb-2">
-                            Entity Label
-                        </label>
-                        <input
-                            id="entity-label"
-                            type="text"
-                            bind:value={formData.label}
-                            class="inline-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {validationErrors.label ? 'border-red-500' : validationErrors.label === null && formData.label && formData.label !== 'New Entity' ? 'border-green-500' : ''}"
-                            placeholder="e.g., Customer, Order, Product"
-                        />
-                        {#if validationErrors.label}
-                            <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                                <Icon icon="lucide:alert-circle" class="w-4 h-4" />
-                                {validationErrors.label}
-                            </p>
-                        {:else if formData.label && formData.label !== "New Entity" && !validationErrors.label}
-                            <p class="mt-1 text-sm text-green-600 flex items-center gap-1">
-                                <Icon icon="lucide:check-circle" class="w-4 h-4" />
-                                Unique name
-                            </p>
-                        {/if}
-                    </div>
-
-                    <!-- Slug Preview -->
-                    {#if formData.label && formData.label !== "New Entity"}
-                        <div class="text-xs text-gray-500">
-                            <span class="font-medium">ID:</span> {generateSlug(formData.label, existingEntityIds)}
-                        </div>
-                    {/if}
-
-                    <!-- Guidance -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <div class="flex items-start gap-2">
-                            <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <p class="text-sm text-blue-800">
-                                Choose a clear, descriptive name (e.g., 'Customer', 'Order', 'Product')
-                            </p>
-                        </div>
-                    </div>
+            <!-- Slug Preview -->
+            {#if formData.label && formData.label !== "New Entity"}
+                <div class="text-xs text-gray-500">
+                    <span class="font-medium">ID:</span> {generateSlug(formData.label, existingEntityIds)}
                 </div>
             {/if}
 
-            <!-- Step 2: Entity Type (only shown in dimensional_model mode) -->
-            {#if currentStep === 2 && modelingStyle === "dimensional_model"}
-                <div class="space-y-4">
-                    <div>
-                        <span class="block text-sm font-medium text-gray-700 mb-3">
-                            Entity Type (Optional)
-                        </span>
-                        <div class="space-y-3" role="radiogroup" aria-label="Entity type selection">
-                            <!-- Fact Option -->
-                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors {formData.entity_type === 'fact' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : ''}">
-                                <input
-                                    type="radio"
-                                    bind:group={formData.entity_type}
-                                    value="fact"
-                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                />
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <Icon icon={getEntityTypeStyle('fact').icon} class="w-5 h-5 {getEntityTypeStyle('fact').iconClass}" />
-                                        <span class="font-medium text-gray-900">Fact</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">
-                                        Describing and event or activity within a business process
-                                    </p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Examples: Order Transactions, Account Transfers, Inventory Movements, Website Events
-                                    </p>
-                                </div>
-                            </label>
-
-                            <!-- Dimension Option -->
-                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-colors {formData.entity_type === 'dimension' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : ''}">
-                                <input
-                                    type="radio"
-                                    bind:group={formData.entity_type}
-                                    value="dimension"
-                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                />
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <Icon icon={getEntityTypeStyle('dimension').icon} class="w-5 h-5 {getEntityTypeStyle('dimension').iconClass}" />
-                                        <span class="font-medium text-gray-900">Dimension</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">
-                                        Describing the "Who?", "When?", "Where?", "Why?", ... of an event or process
-                                    </p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Examples: Customer, Product, Time, Country, Employee
-                                    </p>
-                                </div>
-                            </label>
-
-                            <!-- Unclassified Option -->
-                            <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors {formData.entity_type === 'unclassified' ? 'bg-gray-50 border-gray-500 ring-2 ring-gray-200' : ''}">
-                                <input
-                                    type="radio"
-                                    bind:group={formData.entity_type}
-                                    value="unclassified"
-                                    class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                />
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <Icon icon={getEntityTypeStyle('unclassified').icon} class="w-5 h-5 {getEntityTypeStyle('unclassified').iconClass}" />
-                                        <span class="font-medium text-gray-900">Unclassified</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">
-                                        Generic entity that doesn't fit the fact/dimension pattern
-                                    </p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Default option - you can change this later
-                                    </p>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Guidance -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <div class="flex items-start gap-2">
-                            <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <p class="text-sm text-blue-800">
-                                Entity type helps with smart positioning and visualization in dimensional modeling. You can always change this later from the entity node.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            {/if}
-
-            <!-- Step 3: Description -->
-            {#if currentStep === 3}
-                <div class="space-y-4">
-                    <div>
-                        <label for="entity-description" class="block text-sm font-medium text-gray-700 mb-2">
-                            Description
-                        </label>
-                        <textarea
-                            id="entity-description"
-                            bind:value={formData.description}
-                            rows="4"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y {validationErrors.description ? 'border-red-500' : validationErrors.description === null && formData.description.trim().length >= config.min_description_length ? 'border-green-500' : ''}"
-                            placeholder="Describe what this entity represents in business terms..."
-                        ></textarea>
-                        <div class="mt-1 flex items-center justify-between">
-                            {#if validationErrors.description}
-                                <p class="text-sm text-red-600 flex items-center gap-1">
-                                    <Icon icon="lucide:alert-circle" class="w-4 h-4" />
-                                    {validationErrors.description}
-                                </p>
-                            {:else if formData.description.trim().length >= config.min_description_length}
-                                <p class="text-sm text-green-600 flex items-center gap-1">
-                                    <Icon icon="lucide:check-circle" class="w-4 h-4" />
-                                    Valid description
-                                </p>
-                            {:else}
-                                <p class="text-sm text-gray-500">
-                                    Minimum {config.min_description_length} characters
-                                </p>
-                            {/if}
-                            <span class="text-xs text-gray-500">
-                                {formData.description.length} / {config.min_description_length}+
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Examples Panel -->
-                    <div>
-                        <button
-                            onclick={() => showExamples = !showExamples}
-                            class="w-full flex items-center justify-between p-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
-                        >
-                            <span class="flex items-center gap-2">
-                                <Icon icon="lucide:book-open" class="w-4 h-4" />
-                                Example Descriptions
-                            </span>
-                            <Icon
-                                icon="lucide:chevron-down"
-                                class="w-4 h-4 transition-transform {showExamples ? 'rotate-180' : ''}"
-                            />
-                        </button>
-                        {#if showExamples}
-                            <div class="mt-2 space-y-3 p-3 bg-gray-50 rounded-md border border-gray-200">
-                                {#each DESCRIPTION_EXAMPLES as example}
-                                    <div class="border-l-2 border-primary-500 pl-3">
-                                        <p class="text-xs font-semibold text-gray-700 mb-1">
-                                            {example.entity}
-                                        </p>
-                                        <p class="text-xs text-gray-600">{example.description}</p>
-                                    </div>
-                                {/each}
-                            </div>
-                        {/if}
-                    </div>
-
-                    <!-- Guidance -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <div class="flex items-start gap-2">
-                            <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <p class="text-sm text-blue-800">
-                                Describe what this entity represents in business terms
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            {/if}
-
-            <!-- Step 4: Attributes (Optional) -->
-            {#if currentStep === 3}
-                <div class="space-y-4">
-                    <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
-                        <div class="flex items-start gap-3">
-                            <Icon icon="lucide:info" class="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
-                            <div class="flex-1">
-                                <h3 class="text-sm font-medium text-gray-900 mb-2">
-                                    Consider adding key fields/attributes describing the entity records
-                                </h3>
-                                <p class="text-sm text-gray-600 mb-3">
-                                    Common fields:
-                                </p>
-                                <ul class="text-sm text-gray-600 list-disc list-inside space-y-1 mb-3">
-                                    <li>Unique Identifiers (Primary/Foreign Keys)</li>
-                                    <li>Timestamps</li>
-                                    <li>Status Indicators</li>
-                                    <li>Categorical Fields</li>
-                                </ul>
-                                <p class="text-xs text-gray-500">
-                                    You can add fields after creating the entity by editing it in logical view.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {/if}
-
-            <!-- Footer Actions -->
-            <div class="mt-6 flex items-center justify-between gap-3">
-                <div>
-                    {#if currentStep > 1}
-                        <button
-                            onclick={previousStep}
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                        >
-                            Previous
-                        </button>
-                    {/if}
-                </div>
-                <div class="flex gap-3">
-                    {#if currentStep < (modelingStyle === "entity_model" ? 3 : 4)}
-                        <button
-                            onclick={skipStep}
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                        >
-                            Skip
-                        </button>
-                        <button
-                            onclick={nextStep}
-                            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                        >
-                            Next
-                        </button>
-                    {:else}
-                        <button
-                            onclick={complete}
-                            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                        >
-                            Done
-                        </button>
-                    {/if}
+            <!-- Guidance -->
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <div class="flex items-start gap-2">
+                    <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p class="text-sm text-blue-800">
+                        Choose a clear, descriptive name (e.g., 'Customer', 'Order', 'Product')
+                    </p>
                 </div>
             </div>
         </div>
+    {/if}
+
+    <!-- Step 2: Entity Type (only shown in dimensional_model mode) -->
+    {#if currentStep === 2 && modelingStyle === "dimensional_model"}
+        <div class="space-y-4">
+            <div>
+                <span class="block text-sm font-medium text-gray-700 mb-3">
+                    Entity Type (Optional)
+                </span>
+                <div class="space-y-3" role="radiogroup" aria-label="Entity type selection">
+                    <!-- Fact Option -->
+                    <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors {formData.entity_type === 'fact' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : ''}">
+                        <input
+                            type="radio"
+                            bind:group={formData.entity_type}
+                            value="fact"
+                            class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                        />
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <Icon icon={getEntityTypeStyle('fact').icon} class="w-5 h-5 {getEntityTypeStyle('fact').iconClass}" />
+                                <span class="font-medium text-gray-900">Fact</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Describing and event or activity within a business process
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Examples: Order Transactions, Account Transfers, Inventory Movements, Website Events
+                            </p>
+                        </div>
+                    </label>
+
+                    <!-- Dimension Option -->
+                    <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-colors {formData.entity_type === 'dimension' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : ''}">
+                        <input
+                            type="radio"
+                            bind:group={formData.entity_type}
+                            value="dimension"
+                            class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                        />
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <Icon icon={getEntityTypeStyle('dimension').icon} class="w-5 h-5 {getEntityTypeStyle('dimension').iconClass}" />
+                                <span class="font-medium text-gray-900">Dimension</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Describing the "Who?", "When?", "Where?", "Why?", ... of an event or process
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Examples: Customer, Product, Time, Country, Employee
+                            </p>
+                        </div>
+                    </label>
+
+                    <!-- Unclassified Option -->
+                    <label class="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors {formData.entity_type === 'unclassified' ? 'bg-gray-50 border-gray-500 ring-2 ring-gray-200' : ''}">
+                        <input
+                            type="radio"
+                            bind:group={formData.entity_type}
+                            value="unclassified"
+                            class="mt-1 w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                        />
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <Icon icon={getEntityTypeStyle('unclassified').icon} class="w-5 h-5 {getEntityTypeStyle('unclassified').iconClass}" />
+                                <span class="font-medium text-gray-900">Unclassified</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Generic entity that doesn't fit the fact/dimension pattern
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Default option - you can change this later
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Guidance -->
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <div class="flex items-start gap-2">
+                    <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p class="text-sm text-blue-800">
+                        Entity type helps with smart positioning and visualization in dimensional modeling. You can always change this later from the entity node.
+                    </p>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Step 3: Description -->
+    {#if currentStep === 3}
+        <div class="space-y-4">
+            <div>
+                <label for="entity-description" class="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                </label>
+                <textarea
+                    id="entity-description"
+                    bind:value={formData.description}
+                    rows="4"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y {validationErrors.description ? 'border-red-500' : validationErrors.description === null && formData.description.trim().length >= config.min_description_length ? 'border-green-500' : ''}"
+                    placeholder="Describe what this entity represents in business terms..."
+                ></textarea>
+                <div class="mt-1 flex items-center justify-between">
+                    {#if validationErrors.description}
+                        <p class="text-sm text-red-600 flex items-center gap-1">
+                            <Icon icon="lucide:alert-circle" class="w-4 h-4" />
+                            {validationErrors.description}
+                        </p>
+                    {:else if formData.description.trim().length >= config.min_description_length}
+                        <p class="text-sm text-green-600 flex items-center gap-1">
+                            <Icon icon="lucide:check-circle" class="w-4 h-4" />
+                            Valid description
+                        </p>
+                    {:else}
+                        <p class="text-sm text-gray-500">
+                            Minimum {config.min_description_length} characters
+                        </p>
+                    {/if}
+                    <span class="text-xs text-gray-500">
+                        {formData.description.length} / {config.min_description_length}+
+                    </span>
+                </div>
+            </div>
+
+            <!-- Examples Panel -->
+            <div>
+                <button
+                    onclick={() => showExamples = !showExamples}
+                    class="w-full flex items-center justify-between p-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <Icon icon="lucide:book-open" class="w-4 h-4" />
+                        Example Descriptions
+                    </span>
+                    <Icon
+                        icon="lucide:chevron-down"
+                        class="w-4 h-4 transition-transform {showExamples ? 'rotate-180' : ''}"
+                    />
+                </button>
+                {#if showExamples}
+                    <div class="mt-2 space-y-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+                        {#each DESCRIPTION_EXAMPLES as example}
+                            <div class="border-l-2 border-primary-500 pl-3">
+                                <p class="text-xs font-semibold text-gray-700 mb-1">
+                                    {example.entity}
+                                </p>
+                                <p class="text-xs text-gray-600">{example.description}</p>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+
+            <!-- Guidance -->
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <div class="flex items-start gap-2">
+                    <Icon icon="lucide:lightbulb" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p class="text-sm text-blue-800">
+                        Describe what this entity represents in business terms
+                    </p>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Step 4: Attributes (Optional) -->
+    {#if currentStep === 3}
+        <div class="space-y-4">
+            <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
+                <div class="flex items-start gap-3">
+                    <Icon icon="lucide:info" class="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+                    <div class="flex-1">
+                        <h3 class="text-sm font-medium text-gray-900 mb-2">
+                            Consider adding key fields/attributes describing the entity records
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Common fields:
+                        </p>
+                        <ul class="text-sm text-gray-600 list-disc list-inside space-y-1 mb-3">
+                            <li>Unique Identifiers (Primary/Foreign Keys)</li>
+                            <li>Timestamps</li>
+                            <li>Status Indicators</li>
+                            <li>Categorical Fields</li>
+                        </ul>
+                        <p class="text-xs text-gray-500">
+                            You can add fields after creating the entity by editing it in logical view.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Footer Actions -->
+    <div class="mt-6 flex items-center justify-between gap-3">
+        <div>
+            {#if currentStep > 1}
+                <button
+                    onclick={previousStep}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                    Previous
+                </button>
+            {/if}
+        </div>
+        <div class="flex gap-3">
+            {#if currentStep < (modelingStyle === "entity_model" ? 3 : 4)}
+                <button
+                    onclick={skipStep}
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                    Skip
+                </button>
+                <button
+                    onclick={nextStep}
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                    Next
+                </button>
+            {:else}
+                <button
+                    onclick={complete}
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                    Done
+                </button>
+            {/if}
+        </div>
     </div>
-{/if}
+</Modal>
 

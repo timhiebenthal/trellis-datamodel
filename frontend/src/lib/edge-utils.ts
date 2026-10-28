@@ -3,16 +3,13 @@
  * Extracted for testability
  */
 
+import type { Point } from '$lib/types';
+
 export type Side = 'top' | 'bottom' | 'left' | 'right';
 
 export interface NodeDimensions {
   width: number;
   height: number;
-}
-
-export interface Point {
-  x: number;
-  y: number;
 }
 
 export interface ConnectionInfo {

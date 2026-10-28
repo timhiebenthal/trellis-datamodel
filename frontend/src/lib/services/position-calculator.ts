@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/svelte";
-import type { Position } from "$lib/utils/position-utils";
+import type { Point } from "$lib/types";
 import { readModelRef } from "$lib/utils/entity-compat";
 
 /**
@@ -109,7 +109,7 @@ export class DimensionalModelPositioner {
      * @param nodes - Array of all nodes in the canvas
      * @returns Center coordinates as {x, y}
      */
-    calculateCenter(nodes: Node[]): Position {
+    calculateCenter(nodes: Node[]): Point {
         // Filter for entity nodes only (not groups or other node types)
         const entityNodes = nodes.filter((n) => n.type === "entity");
 
@@ -140,7 +140,7 @@ export class DimensionalModelPositioner {
      * @param center - Center coordinates from calculateCenter
      * @returns Position coordinates for fact entity
      */
-    calculateFactPosition(center: Position): Position {
+    calculateFactPosition(center: Point): Point {
         const factOffsetRange = 200;
 
         // Random offset within specified range (-range to +range)
@@ -160,7 +160,7 @@ export class DimensionalModelPositioner {
      * @param center - Center coordinates from calculateCenter
      * @returns Position coordinates for dimension entity
      */
-    calculateDimensionPosition(center: Position): Position {
+    calculateDimensionPosition(center: Point): Point {
         const dimensionMinRadius = 500;
         const dimensionRadiusOffset = 300;
 
@@ -184,7 +184,7 @@ export class DimensionalModelPositioner {
      *
      * @returns Position coordinates for unclassified entity
      */
-    calculateUnclassifiedPosition(): Position {
+    calculateUnclassifiedPosition(): Point {
         return {
             x: 100 + Math.random() * 200,
             y: 100 + Math.random() * 200,
@@ -202,7 +202,7 @@ export class DimensionalModelPositioner {
     calculateSmartPosition(
         entityType: "fact" | "dimension" | "unclassified",
         nodes: Node[],
-    ): Position {
+    ): Point {
         const center = this.calculateCenter(nodes);
 
 

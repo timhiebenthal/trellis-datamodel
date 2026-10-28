@@ -25,6 +25,7 @@
     type EdgeCalculationContext
   } from '$lib/utils/edge-calculations';
   import { readModelRef } from '$lib/utils/entity-compat';
+  import { isEntityNode, type EntityNodeData, type RelationshipEdgeModel } from '$lib/types';
 
   let { 
     id,
@@ -124,14 +125,14 @@
   let type = $derived((data?.type as string) || 'one_to_many');
   
   // Get models array from edge data
-  const edgeModels = $derived((data?.models as any[]) || []);
+  const edgeModels = $derived((data?.models as RelationshipEdgeModel[] | undefined) || []);
   const modelCount = $derived((data?.modelCount as number) || edgeModels.length || 0);
 
   // Get active models for source and target nodes (prefer ephemeral active model data)
-  const sourceNodeData = $derived(sourceNode?.data as any);
-  const targetNodeData = $derived(targetNode?.data as any);
+  const sourceNodeData = $derived(sourceNode && isEntityNode(sourceNode) ? sourceNode.data : undefined);
+  const targetNodeData = $derived(targetNode && isEntityNode(targetNode) ? targetNode.data : undefined);
   
-  const resolveActiveModel = (nodeData: any) => {
+  const resolveActiveModel = (nodeData: EntityNodeData | undefined) => {
     // Prefer explicit active model id if present
     if (nodeData?._activeModelId) {
       const byId = $frameworkModels.find((m) => m.unique_id === nodeData._activeModelId);
@@ -145,8 +146,9 @@
       };
     }
     // Next: primary bound model
-    if (readModelRef(nodeData ?? {})) {
-      const byPrimary = $frameworkModels.find((m) => m.unique_id === readModelRef(nodeData));
+    const primaryModelRef = readModelRef(nodeData ?? {});
+    if (primaryModelRef) {
+      const byPrimary = $frameworkModels.find((m) => m.unique_id === primaryModelRef);
       if (byPrimary) return byPrimary;
     }
     // Next: first additional model
@@ -163,7 +165,7 @@
   
   // Normalize model info for matching/display: if model names are missing, fall back to resolved active models
   const normalizedEdgeModels = $derived.by(() =>
-    edgeModels.map((m: any) => ({
+    edgeModels.map((m) => ({
       source_model_name: m.source_model_name || sourceActiveModel?.name || null,
       source_model_version:
         m.source_model_version === undefined
@@ -189,7 +191,7 @@
     }
     
     // Match by model name and version
-    return normalizedEdgeModels.find((m: any) => {
+    return normalizedEdgeModels.find((m) => {
       const srcVer = normalizeVersion(m.source_model_version as number | null | undefined);
       const tgtVer = normalizeVersion(m.target_model_version as number | null | undefined);
       const activeSrcVer = normalizeVersion(sourceActiveModel.version as number | null | undefined);
@@ -364,7 +366,7 @@
     
     // Models array doesn't need to be swapped since we're not changing direction
     // We're only changing the type, which affects FK location but not the arrow direction
-    const currentModels = (currentEdge.data?.models as any[]) || [];
+    const currentModels = (currentEdge.data?.models as RelationshipEdgeModel[] | undefined) || [];
     
     // Update edge with swapped values
     edges.update((list) =>

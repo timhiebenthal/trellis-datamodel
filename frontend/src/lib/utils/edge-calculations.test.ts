@@ -4,6 +4,7 @@ import {
   calculateLabelPosition,
   buildEdgePath,
   EDGE_CALCULATION_CONSTANTS,
+  getParallelOffset,
   type EdgeCalculationContext
 } from './edge-calculations';
 
@@ -782,4 +783,27 @@ describe('edge calculations integration', () => {
     // Path should include the combined offset
     expect(path).toContain(String(150 + storedOffsetX + dragOffsetX));
   });
+});
+
+describe('getParallelOffset', () => {
+    it('returns 0 for index 0 (center)', () => {
+        expect(getParallelOffset(0)).toBe(0);
+    });
+
+    it('returns positive offset for odd indices (above)', () => {
+        expect(getParallelOffset(1)).toBe(20);
+        expect(getParallelOffset(3)).toBe(40);
+        expect(getParallelOffset(5)).toBe(60);
+    });
+
+    it('returns negative offset for even indices > 0 (below)', () => {
+        expect(getParallelOffset(2)).toBe(-20);
+        expect(getParallelOffset(4)).toBe(-40);
+        expect(getParallelOffset(6)).toBe(-60);
+    });
+
+    it('alternates correctly: 0, +20, -20, +40, -40, ...', () => {
+        const offsets = [0, 1, 2, 3, 4, 5, 6].map(getParallelOffset);
+        expect(offsets).toEqual([0, 20, -20, 40, -40, 60, -60]);
+    });
 });

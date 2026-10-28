@@ -26,7 +26,8 @@
         tagFilter,
         activeFramework,
     } from "$lib/stores";
-    import { getParallelOffset, generateSlug } from "$lib/utils";
+    import { getParallelOffset } from "$lib/utils/edge-calculations";
+    import { generateSlug } from "$lib/utils/slug";
     import { getFrameworkCopy } from "$lib/utils/framework-display";
     import { DimensionalModelPositioner, GroupSizeCalculator } from "$lib/services/position-calculator";
     import EntityNode from "./EntityNode.svelte";

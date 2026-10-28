@@ -221,11 +221,14 @@ describe('ProcessGroupModal', () => {
             onCancel
         });
 
-        // The backdrop is the modal's dialog element; clicking inside the content must not close it.
+        // The backdrop wraps the dialog panel; clicking inside the content must not close it.
         await fireEvent.click(screen.getByLabelText(/process name/i));
         expect(onCancel).not.toHaveBeenCalled();
 
         await fireEvent.click(screen.getByRole('dialog'));
+        expect(onCancel).not.toHaveBeenCalled();
+
+        await fireEvent.click(screen.getByRole('dialog').parentElement!);
         expect(onCancel).toHaveBeenCalledTimes(1);
     });
 

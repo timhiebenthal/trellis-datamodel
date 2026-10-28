@@ -1,6 +1,6 @@
 import type { ModelInfo, ModelSchema, ModelSchemaColumn } from '$lib/types';
 import { getModelSchema, updateModelSchema } from '$lib/api';
-import { normalizeTags } from '$lib/utils';
+import { normalizeTags } from '$lib/utils/entity-tags';
 
 /**
  * Schema manager state for tracking schema editing lifecycle.

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
 import DimensionAutocomplete from './DimensionAutocomplete.svelte';
-import type { Dimension, SevenWType } from '$lib/types';
+import type { Dimension, AnnotationType } from '$lib/types';
 
 describe('DimensionAutocomplete', () => {
     beforeEach(() => {

@@ -1,66 +1,74 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, untrack } from 'svelte';
     import { getConfig, getConfigSchema, updateConfig, validateConfig, reloadConfig } from '$lib/api';
     import type { ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
     import Icon from '$lib/components/Icon.svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
     import { frameworkModels, nodes } from '$lib/stores';
-    import { normalizeTags } from '$lib/utils';
+    import { normalizeTags } from '$lib/utils/entity-tags';
     import { readModelRef } from '$lib/utils/entity-compat';
     import { getFrameworkCopy } from '$lib/utils/framework-display';
 
-    let loading = true;
-    let saving = false;
-    let error: string | null = null;
+    let loading = $state(true);
+    let saving = $state(false);
+    let error: string | null = $state(null);
 
     // Config state
-    let config: Record<string, any> = {};
-    let schema: ConfigSchema = { fields: {}, beta_flags: [] };
-    let fileInfo: { path: string; mtime: number; hash: string } | null = null;
-    let trellisVersion: string | null = null;
+    let config: Record<string, any> = $state({});
+    let schema: ConfigSchema = $state({ fields: {}, beta_flags: [] });
+    let fileInfo: { path: string; mtime: number; hash: string } | null = $state(null);
+    let trellisVersion: string | null = $state(null);
 
     // Form validation state
-    let validationErrors: Record<string, string> = {};
-    let showValidationSummary = false;
+    let validationErrors: Record<string, string> = $state({});
+    let showValidationSummary = $state(false);
 
     // Danger Zone acknowledgment
-    let dangerZoneAcknowledged = false;
+    let dangerZoneAcknowledged = $state(false);
 
     // Reactive state for danger zone
-    $: isDangerZoneEnabled = dangerZoneAcknowledged;
+    let isDangerZoneEnabled = $derived(dangerZoneAcknowledged);
 
     // Conflict state
-    let conflictWarning: string | null = null;
-    let conflictInfo: any = null;
+    let conflictWarning: string | null = $state(null);
+    let conflictInfo: any = $state(null);
 
     // Reactive modeling style for conditional rendering
-    $: modelingStyle = config.modeling_style;
+    let modelingStyle = $derived(config.modeling_style);
 
     // Entity guidance toggle state for dependent fields
-    $: entityGuidanceEnabled = !!config?.entity_creation_guidance?.enabled;
-    $: if (!entityGuidanceEnabled && getFieldValue('entity_creation_guidance.push_warning_enabled')) {
-        handleNestedFieldChange('entity_creation_guidance.push_warning_enabled', false);
-    }
+    let entityGuidanceEnabled = $derived(!!config?.entity_creation_guidance?.enabled);
+    // Re-runs only when entityGuidanceEnabled changes (as the old `$:` block did):
+    // the config read/write inside is untracked.
+    $effect(() => {
+        if (!entityGuidanceEnabled) {
+            untrack(() => {
+                if (getFieldValue('entity_creation_guidance.push_warning_enabled')) {
+                    handleNestedFieldChange('entity_creation_guidance.push_warning_enabled', false);
+                }
+            });
+        }
+    });
     
     // Reactive lineage layers for UI updates
-    $: lineageLayers = config.lineage?.layers || [];
-    $: dbtModelPaths = config.dbt_model_paths || [];
-    $: bruinAssetPaths = config.bruin_asset_paths || [];
-    $: canvasDefaultFilters = config.canvas?.default_filters || {};
-    $: canvasDefaultDomains = Array.isArray(canvasDefaultFilters.domains) ? canvasDefaultFilters.domains : [];
-    $: canvasDefaultTags = Array.isArray(canvasDefaultFilters.tags) ? canvasDefaultFilters.tags : [];
-    $: canvasEntityData = $nodes
+    let lineageLayers = $derived(config.lineage?.layers || []);
+    let dbtModelPaths = $derived(config.dbt_model_paths || []);
+    let bruinAssetPaths = $derived(config.bruin_asset_paths || []);
+    let canvasDefaultFilters = $derived(config.canvas?.default_filters || {});
+    let canvasDefaultDomains = $derived(Array.isArray(canvasDefaultFilters.domains) ? canvasDefaultFilters.domains : []);
+    let canvasDefaultTags = $derived(Array.isArray(canvasDefaultFilters.tags) ? canvasDefaultFilters.tags : []);
+    let canvasEntityData = $derived($nodes
         .filter((node) => node.type === 'entity')
-        .map((node) => node.data as Record<string, unknown>);
-    $: availableCanvasDomains = Array.from(
+        .map((node) => node.data as Record<string, unknown>));
+    let availableCanvasDomains = $derived(Array.from(
         new Set(
             canvasEntityData.flatMap((entity) => [
                 ...normalizeTags(entity.domain),
                 ...normalizeTags(entity.domains),
             ]),
         ),
-    ).sort();
-    $: availableCanvasTags = Array.from(
+    ).sort());
+    let availableCanvasTags = $derived(Array.from(
         new Set(
             canvasEntityData.flatMap((entity) => {
                 const modelRefs = [
@@ -78,15 +86,15 @@
                 ];
             }),
         ),
-    ).sort();
-    $: canAddCanvasDomain = availableCanvasDomains.some((value) => !canvasDefaultDomains.includes(value));
-    $: canAddCanvasTag = availableCanvasTags.some((value) => !canvasDefaultTags.includes(value));
+    ).sort());
+    let canAddCanvasDomain = $derived(availableCanvasDomains.some((value) => !canvasDefaultDomains.includes(value)));
+    let canAddCanvasTag = $derived(availableCanvasTags.some((value) => !canvasDefaultTags.includes(value)));
 
     // Path fields are framework-specific: a dbt project has no pipeline and a
     // Bruin pipeline has no manifest, so showing both sets would invite a user
     // to fill in config nothing reads.
-    $: selectedFramework = config.framework || 'dbt-core';
-    $: frameworkCopy = getFrameworkCopy(selectedFramework);
+    let selectedFramework = $derived(config.framework || 'dbt-core');
+    let frameworkCopy = $derived(getFrameworkCopy(selectedFramework));
 
     onMount(async () => {
         await loadConfig();

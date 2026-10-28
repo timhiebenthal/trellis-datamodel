@@ -11,7 +11,7 @@
     } from '$lib/stores';
     import { getExposures } from '$lib/api';
     import type { Exposure, EntityUsage, EntityData } from '$lib/types';
-    import { normalizeTags } from '$lib/utils';
+    import { normalizeTags } from '$lib/utils/entity-tags';
     import Icon from '@iconify/svelte';
 
 interface Props {

@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/svelte';
 import type { EntityData, ModelInfo } from '$lib/types';
-import { classifyModelTypeFromPrefixes } from '$lib/utils';
+import { classifyModelTypeFromPrefixes } from './model-naming';
 import { readModelRef } from './entity-compat';
 import { get } from 'svelte/store';
 import { factPrefixes, dimensionPrefixes, nodes as nodesStore, pushHistory } from '$lib/stores';

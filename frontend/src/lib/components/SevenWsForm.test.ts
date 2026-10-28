@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/svelte';
 import SevenWsForm from './SevenWsForm.svelte';
-import type { BusinessEvent, BusinessEventSevenWs } from '$lib/types';
+import type { BusinessEvent, BusinessEventAnnotations } from '$lib/types';
 
 describe('SevenWsForm', () => {
     beforeEach(() => {

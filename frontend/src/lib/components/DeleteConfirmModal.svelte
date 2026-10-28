@@ -1,4 +1,6 @@
 <script lang="ts">
+    import Modal from "./Modal.svelte";
+
     type Props = {
         open: boolean;
         entityLabel: string;
@@ -9,67 +11,43 @@
 
     let { open, entityLabel, entityCount, onConfirm, onCancel }: Props = $props();
 
-    function handleKeydown(event: KeyboardEvent) {
-        if (event.key === 'Escape') {
-            onCancel();
-        }
-    }
-
-    function handleBackdropClick(event: MouseEvent) {
-        if (event.target === event.currentTarget) {
-            onCancel();
-        }
-    }
-
     function handleConfirm() {
         onConfirm();
     }
 </script>
 
-{#if open}
-    <!-- Backdrop -->
-    <div
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-        onclick={handleBackdropClick}
-        onkeydown={handleKeydown}
-        role="dialog"
-        tabindex="-1"
-        aria-modal="true"
-        aria-labelledby="delete-modal-title"
-    >
-        <!-- Modal -->
-        <div
-            class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full mx-4"
-            role="document"
-            tabindex="-1"
+<Modal
+    {open}
+    onClose={onCancel}
+    size="lg"
+    class="bg-white rounded-lg shadow-xl p-8 w-full mx-4"
+    labelledBy="delete-modal-title"
+>
+    <h2 id="delete-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
+        Delete Entity?
+    </h2>
+    <p class="text-sm text-gray-600 mb-8">
+        {#if entityCount > 1}
+            Are you sure you want to delete <span class="font-medium">these {entityCount} entities</span>?
+            This will also remove all relationships connected to them.
+        {:else}
+            Are you sure you want to delete <span class="font-medium">'{entityLabel}'</span>?
+            This will also remove all relationships connected to this entity.
+        {/if}
+    </p>
+    <div class="flex justify-end gap-3">
+        <button
+            onclick={onCancel}
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-            <h2 id="delete-modal-title" class="text-xl font-semibold text-gray-900 mb-3">
-                Delete Entity?
-            </h2>
-            <p class="text-sm text-gray-600 mb-8">
-                {#if entityCount > 1}
-                    Are you sure you want to delete <span class="font-medium">these {entityCount} entities</span>?
-                    This will also remove all relationships connected to them.
-                {:else}
-                    Are you sure you want to delete <span class="font-medium">'{entityLabel}'</span>?
-                    This will also remove all relationships connected to this entity.
-                {/if}
-            </p>
-            <div class="flex justify-end gap-3">
-                <button
-                    onclick={onCancel}
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                    Cancel
-                </button>
-                <button
-                    onclick={handleConfirm}
-                    class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                    Delete
-                </button>
-            </div>
-        </div>
+            Cancel
+        </button>
+        <button
+            onclick={handleConfirm}
+            class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+        >
+            Delete
+        </button>
     </div>
-{/if}
+</Modal>
 
