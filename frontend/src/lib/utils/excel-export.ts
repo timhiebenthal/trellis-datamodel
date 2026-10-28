@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { Node } from '@xyflow/svelte';
 import type { AnnotationType, EntityData, OriginEntry } from '$lib/types';
 import { stringifyOrigin } from './origin';
+import { SEVEN_W_LABELS } from './seven-ws';
 import { readModelRef } from '$lib/utils/entity-compat';
 
 type ExportAttribute = {
@@ -98,17 +99,7 @@ export function formatEntityType(type?: string): string {
  * @returns Formatted annotation type string
  */
 export function formatAnnotationType(type?: AnnotationType): string {
-	const typeMap: Record<string, string> = {
-		who: 'Who',
-		what: 'What',
-		when: 'When',
-		where: 'Where',
-		how: 'How',
-		why: 'Why',
-		how_many: 'How Many'
-	};
-
-	return typeMap[type || ''] || 'None';
+	return (type && SEVEN_W_LABELS[type]) || 'None';
 }
 
 /**

@@ -16,6 +16,7 @@
 ## Coding Style
 - Python: 3.11+, 4-space indents, type hints, small focused functions. Names `snake_case`. Follow FastAPI/Typer router/CLI patterns.
 - Frontend: Svelte components PascalCase (`Component.svelte`), colocate helpers, prefer TS types over `any`, Tailwind consistent. Run `npm run check` before commit.
+- Frontend `src/lib` placement: `utils/` = pure functions (no stores, no I/O), one cohesive module per topic, with a colocated `*.test.ts`; `services/` = stateful or I/O helpers; lib root = only `api.ts`, `stores.ts`, `types.ts` (a few older root modules predate this rule). No grab-bag `utils.ts`.
 - Config: `trellis.yml` snake_case keys (`dbt_project_path`, `dbt_manifest_path`, etc.). Keep secrets out of version control.
 - **Dimension & Fact**: Green for dimensions (`bg-green-100`, `text-green-700` badges, `text-green-600` icons, `lucide:list`), blue for facts (`bg-blue-100`, `text-blue-700` badges, `text-blue-600` icons, `lucide:bar-chart-3`) — canvas, annotations, badges, etc. See `.claude/skills/trellis-visual-guidance/`.
 

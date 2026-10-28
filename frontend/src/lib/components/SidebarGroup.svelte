@@ -4,7 +4,7 @@
     import Icon from "@iconify/svelte";
     import { folderFilter, nodes, modelingStyle, dimensionPrefixes, factPrefixes } from "$lib/stores";
     import { extractRelativePath, toggleFolderFilter } from "$lib/utils/folder-utils";
-    import { classifyModelTypeFromPrefixes } from "$lib/utils";
+    import { classifyModelTypeFromPrefixes } from "$lib/utils/model-naming";
     import { readModelRef } from "$lib/utils/entity-compat";
     import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 

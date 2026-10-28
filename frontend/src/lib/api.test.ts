@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
+    apiJson,
+    ApiError,
+    updateConfig,
     inferRelationships,
     getDimensions,
     getDataModel,
@@ -24,7 +27,6 @@ import { useApiStub } from './test-helpers/stub-api';
 import type {
     BusinessEvent,
     BusinessEventAnnotations,
-    BusinessEventSevenWs,
     CreateProcessRequest,
     DataModel,
     UpdateProcessRequest,
@@ -41,7 +43,7 @@ afterEach(() => {
     vi.unstubAllEnvs();
 });
 
-const emptySevenWs = (overrides: Partial<BusinessEventSevenWs> = {}): BusinessEventSevenWs => ({
+const emptySevenWs = (overrides: Partial<BusinessEventAnnotations> = {}): BusinessEventAnnotations => ({
     who: [],
     what: [],
     when: [],
@@ -145,6 +147,105 @@ describe('boot request diagnostics', () => {
         const [request] = recordedSince(before);
         expect(request.path).toBe('/api/models/orders/schema');
         expect(request.status).toBeUndefined();
+    });
+});
+
+describe('apiJson', () => {
+    async function caught(promise: Promise<unknown>): Promise<ApiError> {
+        const error = await promise.then(
+            () => undefined,
+            (e: unknown) => e,
+        );
+        expect(error).toBeInstanceOf(ApiError);
+        return error as ApiError;
+    }
+
+    it('returns the parsed body and sends JSON bodies', async () => {
+        api.route({ 'POST /api/things': { json: { id: 'x' } } });
+
+        await expect(apiJson('/things', { method: 'POST', body: { a: 1 } })).resolves.toEqual({ id: 'x' });
+        expect(api.sent).toEqual([{ method: 'POST', path: '/api/things', body: { a: 1 } }]);
+    });
+
+    it('resolves undefined for an empty success body', async () => {
+        api.route({ 'DELETE /api/things': { status: 200 } });
+
+        await expect(apiJson('/things', { method: 'DELETE' })).resolves.toBeUndefined();
+    });
+
+    it('throws ApiError with the server detail string as message', async () => {
+        api.route({ 'GET /api/things': { status: 422, json: { detail: 'Process not found' } } });
+
+        const error = await caught(apiJson('/things'));
+        expect(error.message).toBe('Process not found');
+        expect(error.status).toBe(422);
+        expect(error.detail).toBe('Process not found');
+    });
+
+    it('prefixes the message with errorMessage and status', async () => {
+        api.route({ 'GET /api/things': { status: 500, json: { detail: 'boom' } } });
+
+        const error = await caught(apiJson('/things', { errorMessage: 'Failed to fetch things' }));
+        expect(error.message).toBe('Failed to fetch things: 500 - boom');
+    });
+
+    it('reads detail.message objects and validation error lists', async () => {
+        api.route({
+            'GET /api/object': { status: 400, json: { detail: { message: 'Invalid config', field: 'x' } } },
+            'GET /api/list': { status: 422, json: { detail: [{ msg: 'field required' }, { msg: 'bad type' }] } },
+        });
+
+        const objectError = await caught(apiJson('/object'));
+        expect(objectError.message).toBe('Invalid config');
+        expect(objectError.detail).toEqual({ message: 'Invalid config', field: 'x' });
+
+        const listError = await caught(apiJson('/list'));
+        expect(listError.message).toBe('field required; bad type');
+    });
+
+    it('keeps a non-JSON error body as text instead of throwing a parse error', async () => {
+        api.route({ 'GET /api/things': { status: 502, text: '<html>Bad Gateway</html>' } });
+
+        const error = await caught(apiJson('/things', { errorMessage: 'Failed to fetch things' }));
+        expect(error.message).toBe('Failed to fetch things: 502 - <html>Bad Gateway</html>');
+        expect(error.detail).toBe('<html>Bad Gateway</html>');
+    });
+
+    it('falls back to the status when the error body is empty', async () => {
+        api.route({ 'GET /api/things': { status: 500 } });
+
+        const error = await caught(apiJson('/things'));
+        expect(error.message).toBe('Request failed: 500');
+        expect(error.detail).toBeUndefined();
+    });
+
+    it('returns notFound on 404, and throws a 404 ApiError otherwise', async () => {
+        api.route({ 'GET /api/things': { status: 404, json: { detail: 'Not here' } } });
+
+        await expect(apiJson<string[]>('/things', { notFound: [] })).resolves.toEqual([]);
+
+        const error = await caught(apiJson('/things'));
+        expect(error.status).toBe(404);
+        expect(error.message).toBe('Not here');
+    });
+
+    it('propagates network failures unchanged', async () => {
+        const failure = new TypeError('Failed to fetch');
+        api.route({ 'POST /api/things': { networkError: failure } });
+
+        await expect(apiJson('/things', { method: 'post' })).rejects.toBe(failure);
+    });
+});
+
+describe('updateConfig conflict contract', () => {
+    it('throws CONFLICT: <detail JSON> on 409', async () => {
+        const detail = { error: 'conflict', message: 'Changed on disk', conflict: { mtime: 1 } };
+        api.route({ 'PUT /api/config': { status: 409, json: { detail } } });
+
+        const error = await updateConfig({}).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(ApiError);
+        expect((error as ApiError).status).toBe(409);
+        expect((error as ApiError).message).toBe(`CONFLICT: ${JSON.stringify(detail)}`);
     });
 });
 
@@ -330,7 +431,7 @@ describe('business events', () => {
         api.route({ 'GET /api/business-events': { status: 503, json: { detail: 'down' } } });
 
         await expect(getBusinessEvents()).rejects.toMatchObject({
-            message: 'Failed to fetch business events: down',
+            message: 'Failed to fetch business events: 503 - down',
             status: 503,
         });
     });

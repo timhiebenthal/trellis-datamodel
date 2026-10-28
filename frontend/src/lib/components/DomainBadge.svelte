@@ -1,6 +1,6 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import { toTitleCase } from "$lib/utils";
+    import { toTitleCase } from "$lib/utils/model-naming";
 
     type Props = {
         domain: string;

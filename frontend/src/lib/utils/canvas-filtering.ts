@@ -1,10 +1,6 @@
-import { normalizeTags } from '$lib/utils';
+import type { CanvasFilterState } from '$lib/types';
+import { normalizeTags } from './entity-tags';
 import { readFrameworkTags, readModelRef } from './entity-compat';
-
-export interface CanvasFilterState {
-	selectedDomains: string[];
-	selectedTags: string[];
-}
 
 export interface CanvasEntityMetadata {
 	id?: string;

@@ -4,11 +4,7 @@
  */
 
 import type { Side } from '$lib/edge-utils';
-
-export interface Point {
-  x: number;
-  y: number;
-}
+import type { Point } from '$lib/types';
 
 export interface EdgeCalculationContext {
   parallelIndex: number;
@@ -270,4 +266,15 @@ export function buildEdgePathWithContext(context: EdgeCalculationContext): strin
     context.storedOffsetX + context.dragOffsetX,
     context.storedOffsetY + context.dragOffsetY
   );
+}
+
+/**
+ * Calculate parallel offset for multiple edges between the same pair of nodes.
+ * Index 0 = center, then alternates above/below.
+ */
+export function getParallelOffset(index: number): number {
+    if (index === 0) return 0;
+    const level = Math.ceil(index / 2);
+    const offset = level * 20;
+    return index % 2 === 1 ? offset : -offset;
 }

@@ -2,7 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { frameworkModels } from '$lib/stores';
 	import type { ModelInfo } from '$lib/types';
-	import { getModelFolder } from '$lib/utils';
+	import { getModelFolder } from '$lib/utils/folder-utils';
 
 	type Props = {
 		selectedModelIds?: string[];
