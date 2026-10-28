@@ -12,6 +12,7 @@
     import { getLineage } from "$lib/api";
     import type { LineageResponse, LineageNode, LineageEdge } from "$lib/types";
     import Icon from "@iconify/svelte";
+    import Modal from "./Modal.svelte";
     import LineageSourceNode from "./LineageSourceNode.svelte";
     import LineageModelNode from "./LineageModelNode.svelte";
     import LineagePlaceholderNode from "./LineagePlaceholderNode.svelte";
@@ -747,143 +748,106 @@
         applyConnectionHighlight(selectedNodeId);
     }
 
-    function handleBackdropClick(event: MouseEvent) {
-        if (event.target === event.currentTarget) {
-            onClose();
-        }
-    }
-
-    function handleBackdropKeydown(event: KeyboardEvent) {
-        if (event.key === "Escape") {
-            onClose();
-        }
-    }
-
-    function handleEscapeKey(event: KeyboardEvent) {
-        if (event.key === "Escape") {
-            onClose();
-        }
-    }
-
-    // Listen for escape key
-    $effect(() => {
-        if (open) {
-            window.addEventListener("keydown", handleEscapeKey);
-            return () => {
-                window.removeEventListener("keydown", handleEscapeKey);
-            };
-        }
-    });
-
 </script>
 
-{#if open}
-    <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-        onclick={handleBackdropClick}
-        onkeydown={handleBackdropKeydown}
-        tabindex="-1"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="lineage-modal-title"
-    >
-        <div
-            class="bg-white rounded-xl shadow-2xl w-[94vw] h-[92vh] max-w-[1600px] max-h-[920px] border border-gray-200 flex flex-col"
+<Modal
+    {open}
+    {onClose}
+    class="bg-white rounded-xl shadow-2xl w-[94vw] h-[92vh] max-w-[1600px] max-h-[920px] border border-gray-200 flex flex-col"
+    labelledBy="lineage-modal-title"
+>
+    <!-- Header -->
+    <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
+        <div class="flex items-center gap-2">
+            <Icon icon="lucide:git-branch" class="w-5 h-5 text-primary-600" />
+            <h2 id="lineage-modal-title" class="text-lg font-semibold text-gray-900">
+                Upstream Lineage
+            </h2>
+            {#if modelId}
+                <span class="text-sm text-gray-500 font-mono">{modelId}</span>
+            {/if}
+        </div>
+        <button
+            class="p-2 rounded-md hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
+            onclick={onClose}
+            aria-label="Close"
+            title="Close (Esc)"
         >
-            <!-- Header -->
-            <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
-                <div class="flex items-center gap-2">
-                    <Icon icon="lucide:git-branch" class="w-5 h-5 text-primary-600" />
-                    <h2 id="lineage-modal-title" class="text-lg font-semibold text-gray-900">
-                        Upstream Lineage
-                    </h2>
-                    {#if modelId}
-                        <span class="text-sm text-gray-500 font-mono">{modelId}</span>
-                    {/if}
-                </div>
-                <button
-                    class="p-2 rounded-md hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
-                    onclick={onClose}
-                    aria-label="Close"
-                    title="Close (Esc)"
-                >
-                    <Icon icon="lucide:x" class="w-6 h-6 font-bold" />
-                </button>
-            </div>
+            <Icon icon="lucide:x" class="w-6 h-6 font-bold" />
+        </button>
+    </div>
 
-            <!-- Content -->
-            <div class="flex-1 overflow-hidden relative">
-                {#if loading}
-                    <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                        <div class="flex flex-col items-center gap-3 text-gray-600">
-                            <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin" />
-                            <span class="text-sm">Generating lineage...</span>
-                        </div>
-                    </div>
-                {:else if error}
-                    <div class="p-5 flex flex-col items-center gap-4">
-                        <div class="flex items-center gap-3 text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-4 py-3">
-                            <Icon icon="lucide:alert-triangle" class="w-5 h-5" />
-                            <span class="text-sm">{error}</span>
-                        </div>
-                        {#if error.includes("catalog") || error.includes("Catalog")}
-                            <div class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-                                <p class="font-medium mb-1">To generate lineage, you need to:</p>
-                                <code class="block bg-white px-2 py-1 rounded border border-gray-300 mt-2">
-                                    dbt docs generate
-                                </code>
-                            </div>
-                        {/if}
-                        <button
-                            class="px-4 py-2 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700"
-                            onclick={loadLineage}
-                        >
-                            Retry
-                        </button>
-                    </div>
-                {:else if lineageData && lineageNodes.length > 0}
-                    {#key flowKey}
-                    <SvelteFlow
-                        bind:nodes={lineageNodes}
-                        edges={$lineageEdgesStore}
-                        nodeTypes={nodeTypes}
-                        defaultEdgeOptions={{
-                            type: LINEAGE_EDGE_TYPE,
-                            style: DEFAULT_EDGE_STYLE
-                        }}
-                        fitView
-                        fitViewOptions={{
-                            // Only fit the nodes that are NOT background bands
-                            nodes: lineageNodes.filter(n => !n.id.toString().startsWith('layer-band-')),
-                            padding: 0.2
-                        }}
-                        panOnDrag={true}
-                        selectionOnDrag={false}
-                        nodesDraggable={true}
-                        nodesConnectable={false}
-                        onlyRenderVisibleElements={false}
-                        elevateEdgesOnSelect={true}
-                        onnodedragstop={handleNodeDragStop}
-                        onnodeclick={handleNodeClick}
-                        onpaneclick={handlePaneClick}
-                        class="w-full h-full"
-                    >
-                        <Controls />
-                        {#if layerBandMeta.length > 0}
-                            <LineageViewportSync bands={layerBandMeta} />
-                        {/if}
-                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-                        <MiniMap />
-                    </SvelteFlow>
-                    {/key}
-                {:else if lineageData}
-                    <div class="p-5 text-center text-gray-500 text-sm">
-                        No upstream dependencies found for this model.
+    <!-- Content -->
+    <div class="flex-1 overflow-hidden relative">
+        {#if loading}
+            <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                <div class="flex flex-col items-center gap-3 text-gray-600">
+                    <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin" />
+                    <span class="text-sm">Generating lineage...</span>
+                </div>
+            </div>
+        {:else if error}
+            <div class="p-5 flex flex-col items-center gap-4">
+                <div class="flex items-center gap-3 text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-4 py-3">
+                    <Icon icon="lucide:alert-triangle" class="w-5 h-5" />
+                    <span class="text-sm">{error}</span>
+                </div>
+                {#if error.includes("catalog") || error.includes("Catalog")}
+                    <div class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                        <p class="font-medium mb-1">To generate lineage, you need to:</p>
+                        <code class="block bg-white px-2 py-1 rounded border border-gray-300 mt-2">
+                            dbt docs generate
+                        </code>
                     </div>
                 {/if}
+                <button
+                    class="px-4 py-2 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700"
+                    onclick={loadLineage}
+                >
+                    Retry
+                </button>
             </div>
-
-        </div>
+        {:else if lineageData && lineageNodes.length > 0}
+            {#key flowKey}
+            <SvelteFlow
+                bind:nodes={lineageNodes}
+                edges={$lineageEdgesStore}
+                nodeTypes={nodeTypes}
+                defaultEdgeOptions={{
+                    type: LINEAGE_EDGE_TYPE,
+                    style: DEFAULT_EDGE_STYLE
+                }}
+                fitView
+                fitViewOptions={{
+                    // Only fit the nodes that are NOT background bands
+                    nodes: lineageNodes.filter(n => !n.id.toString().startsWith('layer-band-')),
+                    padding: 0.2
+                }}
+                panOnDrag={true}
+                selectionOnDrag={false}
+                nodesDraggable={true}
+                nodesConnectable={false}
+                onlyRenderVisibleElements={false}
+                elevateEdgesOnSelect={true}
+                onnodedragstop={handleNodeDragStop}
+                onnodeclick={handleNodeClick}
+                onpaneclick={handlePaneClick}
+                class="w-full h-full"
+            >
+                <Controls />
+                {#if layerBandMeta.length > 0}
+                    <LineageViewportSync bands={layerBandMeta} />
+                {/if}
+                <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+                <MiniMap />
+            </SvelteFlow>
+            {/key}
+        {:else if lineageData}
+            <div class="p-5 text-center text-gray-500 text-sm">
+                No upstream dependencies found for this model.
+            </div>
+        {/if}
     </div>
-{/if}
+
+</Modal>
 

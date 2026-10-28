@@ -13,6 +13,7 @@
     import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
     import { buildEntityNodes, findLegacyAliasNodeIds } from '$lib/utils/entity-generation';
     import CustomEntitySelect from './CustomEntitySelect.svelte';
+    import Modal from './Modal.svelte';
     import type { Node, Edge } from '@xyflow/svelte';
     import Icon from '@iconify/svelte';
     import { untrack } from 'svelte';
@@ -893,18 +894,6 @@
         return editedId || originalId;
     }
 
-    function handleKeydown(event: KeyboardEvent) {
-        if (event.key === 'Escape') {
-            onCancel();
-        }
-    }
-
-    function handleBackdropClick(event: MouseEvent) {
-        if (event.target === event.currentTarget) {
-            onCancel();
-        }
-    }
-
     // Validate on entity changes - only when dialog is open to prevent infinite loops
     $effect(() => {
         const hasEntityModelContent =
@@ -922,367 +911,355 @@
     });
 </script>
 
-{#if open}
-    <!-- Backdrop -->
-    <div
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-        onclick={handleBackdropClick}
-        onkeydown={handleKeydown}
-        role="dialog"
-        tabindex="-1"
-        aria-modal="true"
-        aria-labelledby="generate-entities-dialog-title"
-    >
-        <!-- Modal -->
-        <div
-            class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-            role="document"
-            tabindex="-1"
-            onclick={(e) => e.stopPropagation()}
+<Modal
+    {open}
+    onClose={onCancel}
+    size="4xl"
+    class="bg-white rounded-lg shadow-xl p-6 w-full mx-4 max-h-[90vh] overflow-y-auto"
+    labelledBy="generate-entities-dialog-title"
+    onclick={(e) => e.stopPropagation()}
+>
+    <div class="flex items-center justify-between mb-4">
+        <h2
+            id="generate-entities-dialog-title"
+            class="text-xl font-semibold text-gray-900"
         >
-            <div class="flex items-center justify-between mb-4">
-                <h2
-                    id="generate-entities-dialog-title"
-                    class="text-xl font-semibold text-gray-900"
-                >
-                    {#if $modelingStyle === 'entity_model'}
-                        {mode === 'process' ? 'Generate Entities and Relationships from Process' : 'Generate Entities and Relationships from Event'}
-                    {:else}
-                        {mode === 'process' ? 'Generate Entities from Process' : 'Generate Entities from Event'}
-                    {/if}
-                </h2>
-                <button
-                    onclick={onCancel}
-                    class="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
-                    title="Close"
-                >
-                    <Icon icon="lucide:x" class="w-5 h-5" />
-                </button>
-            </div>
-
-            {#if loading}
-                <div class="flex items-center justify-center py-12">
-                    <div class="text-center">
-                        <div class="w-8 h-8 animate-spin border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                        <p class="text-sm text-gray-600">Generating preview...</p>
-                    </div>
-                </div>
-            {:else if error}
-                <div class="bg-red-50 border border-red-200 rounded p-4 mb-4">
-                    <div class="flex items-center gap-2">
-                        <Icon icon="lucide:alert-circle" class="w-5 h-5 text-red-600" />
-                        <p class="text-sm text-red-800">{error}</p>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-2">
-                    <button
-                        onclick={onCancel}
-                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                        Close
-                    </button>
-                </div>
-            {:else if success}
-                <div class="bg-green-50 border border-green-200 rounded p-4 mb-4">
-                    <div class="flex items-center gap-2">
-                        <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
-                        <p class="text-sm text-green-800">
-                            {$modelingStyle === 'entity_model'
-                                ? 'Entities and relationships created successfully!'
-                                : 'Entities created successfully!'}
-                        </p>
-                    </div>
-                </div>
-            {:else if previewData && (editedEntities.length > 0 || ($modelingStyle === 'entity_model' && (editedRelationships.length > 0 || editedDraftedFields.length > 0)))}
-                <div class="space-y-4">
-                    <!-- Validation Errors -->
-                    {#if validationErrors.length > 0}
-                        <div class="bg-red-50 border border-red-200 rounded p-4">
-                            <div class="flex items-start gap-2">
-                                <Icon icon="lucide:alert-triangle" class="w-5 h-5 text-red-600 mt-0.5" />
-                                <div class="flex-1">
-                                    <p class="text-sm font-medium text-red-800 mb-1">Validation Errors:</p>
-                                    <ul class="text-sm text-red-700 list-disc list-inside">
-                                        {#each validationErrors as err}
-                                            <li>{err}</li>
-                                        {/each}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    {/if}
-
-                    <!-- Domain Tag Note -->
-                    {#if (mode === 'event' && event?.domain) || (mode === 'process' && process?.domain)}
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                            <div class="flex items-start gap-2">
-                                <Icon icon="lucide:info" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                                <p class="text-sm text-blue-800">
-                                    <strong>Domain Tag:</strong> All entities will inherit the "<span class="font-mono font-semibold">{mode === 'event' ? event?.domain : process?.domain}</span>" tag from this {mode === 'event' ? 'event' : 'process'}.
-                                </p>
-                            </div>
-                        </div>
-                    {/if}
-
-                    {#if $modelingStyle === 'entity_model'}
-                        <p class="text-sm text-gray-600">
-                            Assign each attribute to an entity and choose the source for each relationship. New entities
-                            from this preview and other relationship endpoints from the event appear under “From this
-                            generation”; entities already on the canvas (in scope) appear under “Available in this
-                            {mode === 'process' ? 'process' : 'event'}”.
-                        </p>
-                    {:else}
-                        <!-- Dimensional: editable entity rows -->
-                        <div class="border border-gray-200 rounded-lg overflow-hidden">
-                            <table class="w-full">
-                                <thead class="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                                            Entity Type
-                                        </th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                                            Name
-                                        </th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                                            Label
-                                        </th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                                            Tags
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    {#each editedEntities as entity, index}
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-4 py-3">
-                                                <span
-                                                    class="px-2 py-1 text-xs font-medium rounded {getEntityTypeStyle(entity.entity_type).badge}"
-                                                >
-                                                    {getEntityTypeStyle(entity.entity_type).label}
-                                                </span>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    value={entity.id}
-                                                    oninput={(e) =>
-                                                        updateEntityName(
-                                                            index,
-                                                            (e.target as HTMLInputElement).value
-                                                        )}
-                                                    class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                                    placeholder="Entity name"
-                                                />
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    value={entity.label}
-                                                    oninput={(e) =>
-                                                        updateEntityLabel(
-                                                            index,
-                                                            (e.target as HTMLInputElement).value
-                                                        )}
-                                                    class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                                    placeholder="Display label"
-                                                />
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                {#if previewData.entities[index]?.tags && previewData.entities[index].tags!.length > 0}
-                                                    <div class="flex flex-wrap gap-1">
-                                                        {#each previewData.entities[index].tags! as tag}
-                                                            <span
-                                                                class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded border border-blue-200 font-mono"
-                                                                title="Inherited tag from event domain"
-                                                            >
-                                                                {tag}
-                                                            </span>
-                                                        {/each}
-                                                    </div>
-                                                {:else}
-                                                    <span class="text-xs text-gray-400">—</span>
-                                                {/if}
-                                            </td>
-                                        </tr>
-                                    {/each}
-                                </tbody>
-                            </table>
-                        </div>
-                    {/if}
-
-                    {#if $modelingStyle === 'entity_model' && fullExistingCanvasEntityOptions.length > 0}
-                        <label
-                            class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200/90 bg-gradient-to-r from-gray-50/90 to-white px-4 py-3 text-sm text-gray-600 shadow-sm"
-                        >
-                            <input
-                                type="checkbox"
-                                class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                bind:checked={topologyShowAllCanvasEntities}
-                            />
-                            <span>
-                                <span class="font-medium text-gray-800">Show all entities on the canvas</span>
-                                <span class="mt-0.5 block text-xs text-gray-500">
-                                    Off by default: only entities linked in this {mode === 'process' ? 'process' : 'event'}
-                                    (annotations, relationships, derived) appear in the lists below.
-                                </span>
-                            </span>
-                        </label>
-                    {/if}
-
-                    <!-- Drafted Fields (entity_model only) -->
-                    {#if $modelingStyle === 'entity_model' && editedDraftedFields.length > 0}
-                        <div
-                            class="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/95 to-white p-4 shadow-sm"
-                        >
-                            <div class="mb-3 flex items-start gap-2.5">
-                                <Icon icon="lucide:list" class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-                                <div>
-                                    <h3 class="text-sm font-semibold text-amber-900">Attributes (drafted fields)</h3>
-                                    <p class="mt-0.5 text-xs text-amber-800/80">
-                                        Choose which entity each attribute belongs to.
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="space-y-2.5">
-                                {#each editedDraftedFields as field, i}
-                                    <div
-                                        class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-100/90 bg-white/90 px-3 py-2.5 shadow-sm"
-                                    >
-                                        <span
-                                            class="min-w-0 shrink-0 rounded-md border border-amber-200 bg-amber-50/80 px-2 py-1 font-mono text-xs font-medium text-amber-950"
-                                        >
-                                            {field.name}
-                                        </span>
-                                        <span class="shrink-0 text-xs font-medium text-gray-400">on</span>
-                                        <div class="min-w-[12rem] max-w-full flex-1">
-                                            <CustomEntitySelect
-                                                value={field.targetEntityId}
-                                                groups={selectGroups}
-                                                onChange={(val) => {
-                                                    editedDraftedFields[i] = {
-                                                        ...field,
-                                                        targetEntityId: val,
-                                                    };
-                                                }}
-                                            />
-                                        </div>
-                                        <button
-                                            onclick={() => removeDraftedField(i)}
-                                            class="ml-auto text-gray-400 hover:text-red-500 transition-colors"
-                                            title="Remove attribute"
-                                        >
-                                            <Icon icon="lucide:x" class="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
-
-                    <!-- Relationships Section -->
-                    {#if previewData.relationships && previewData.relationships.length > 0}
-                        <div
-                            class="rounded-xl border border-gray-200/90 bg-gradient-to-b from-white to-gray-50/90 p-4 shadow-sm"
-                        >
-                            <h3 class="mb-3 text-sm font-semibold text-gray-800">Relationships</h3>
-                            {#if $modelingStyle === 'entity_model'}
-                                <div class="space-y-2.5">
-                                    {#each editedRelationships as rel, i}
-                                        <div
-                                            class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 bg-white/95 px-3 py-2.5 text-sm shadow-sm"
-                                        >
-                                            <div class="min-w-[12rem] max-w-full flex-1 sm:max-w-[18rem]">
-                                                <CustomEntitySelect
-                                                    value={rel.source}
-                                                    groups={selectGroups}
-                                                    onChange={(val) => {
-                                                        editedRelationships[i] = {
-                                                            ...rel,
-                                                            source: val,
-                                                        };
-                                                    }}
-                                                />
-                                            </div>
-                                            <span class="text-gray-300">→</span>
-                                            <span class="font-mono text-sm text-gray-800">{getPreviewDisplayId(rel.target)}</span>
-                                            {#if rel.label}
-                                                <span class="text-xs text-gray-500">({rel.label})</span>
-                                            {/if}
-                                            <button
-                                                onclick={() => removeRelationship(i)}
-                                                class="ml-auto text-gray-400 hover:text-red-500 transition-colors"
-                                                title="Remove relationship"
-                                            >
-                                                <Icon icon="lucide:x" class="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    {/each}
-                                </div>
-                            {:else}
-                                <div class="space-y-1">
-                                    {#each previewData.relationships as rel}
-                                        <p class="text-sm text-gray-600">
-                                            <span class="font-mono">{getPreviewDisplayId(rel.source)}</span>
-                                            <span class="mx-2">→</span>
-                                            <span class="font-mono">{getPreviewDisplayId(rel.target)}</span>
-                                            {#if rel.label}<span class="text-gray-500 ml-2">({rel.label})</span>{/if}
-                                        </p>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
-                    {/if}
-
-                    <!-- Actions -->
-                    <div class="flex justify-end gap-2 pt-4 border-t border-gray-200">
-                        <button
-                            onclick={onCancel}
-                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-                            disabled={creating}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onclick={handleCreateAll}
-                            class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                            disabled={creating || validationErrors.length > 0}
-                        >
-                            {#if creating}
-                                <div class="w-4 h-4 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
-                                <span>Creating...</span>
-                            {:else}
-                                <Icon icon="lucide:sparkles" class="w-4 h-4" />
-                                <span>Create All</span>
-                            {/if}
-                        </button>
-                    </div>
-                </div>
+            {#if $modelingStyle === 'entity_model'}
+                {mode === 'process' ? 'Generate Entities and Relationships from Process' : 'Generate Entities and Relationships from Event'}
             {:else}
-                <div class="text-center py-8 text-gray-500">
-                    {#if previewData?.errors && previewData.errors.length > 0}
-                        <p class="font-medium text-red-700 mb-2">
-                            No entities could be generated from this {mode === 'process' ? 'process' : 'event'}.
-                        </p>
-                        <ul class="text-sm text-red-700 list-disc list-inside space-y-1 text-left max-w-2xl mx-auto">
-                            {#each previewData.errors as generationError}
-                                <li>{generationError}</li>
-                            {/each}
-                        </ul>
-                    {:else}
-                        <p>
-                            No entities to generate. Please add annotations to the {mode === 'process' ? 'process' : 'event'} first.
-                        </p>
-                    {/if}
-                </div>
-                <div class="flex justify-end gap-2 pt-4">
-                    <button
-                        onclick={onCancel}
-                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                        Close
-                    </button>
+                {mode === 'process' ? 'Generate Entities from Process' : 'Generate Entities from Event'}
+            {/if}
+        </h2>
+        <button
+            onclick={onCancel}
+            class="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+            title="Close"
+        >
+            <Icon icon="lucide:x" class="w-5 h-5" />
+        </button>
+    </div>
+
+    {#if loading}
+        <div class="flex items-center justify-center py-12">
+            <div class="text-center">
+                <div class="w-8 h-8 animate-spin border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p class="text-sm text-gray-600">Generating preview...</p>
+            </div>
+        </div>
+    {:else if error}
+        <div class="bg-red-50 border border-red-200 rounded p-4 mb-4">
+            <div class="flex items-center gap-2">
+                <Icon icon="lucide:alert-circle" class="w-5 h-5 text-red-600" />
+                <p class="text-sm text-red-800">{error}</p>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2">
+            <button
+                onclick={onCancel}
+                class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+                Close
+            </button>
+        </div>
+    {:else if success}
+        <div class="bg-green-50 border border-green-200 rounded p-4 mb-4">
+            <div class="flex items-center gap-2">
+                <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-600" />
+                <p class="text-sm text-green-800">
+                    {$modelingStyle === 'entity_model'
+                        ? 'Entities and relationships created successfully!'
+                        : 'Entities created successfully!'}
+                </p>
+            </div>
+        </div>
+    {:else if previewData && (editedEntities.length > 0 || ($modelingStyle === 'entity_model' && (editedRelationships.length > 0 || editedDraftedFields.length > 0)))}
+        <div class="space-y-4">
+            <!-- Validation Errors -->
+            {#if validationErrors.length > 0}
+                <div class="bg-red-50 border border-red-200 rounded p-4">
+                    <div class="flex items-start gap-2">
+                        <Icon icon="lucide:alert-triangle" class="w-5 h-5 text-red-600 mt-0.5" />
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-red-800 mb-1">Validation Errors:</p>
+                            <ul class="text-sm text-red-700 list-disc list-inside">
+                                {#each validationErrors as err}
+                                    <li>{err}</li>
+                                {/each}
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             {/if}
+
+            <!-- Domain Tag Note -->
+            {#if (mode === 'event' && event?.domain) || (mode === 'process' && process?.domain)}
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <div class="flex items-start gap-2">
+                        <Icon icon="lucide:info" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <p class="text-sm text-blue-800">
+                            <strong>Domain Tag:</strong> All entities will inherit the "<span class="font-mono font-semibold">{mode === 'event' ? event?.domain : process?.domain}</span>" tag from this {mode === 'event' ? 'event' : 'process'}.
+                        </p>
+                    </div>
+                </div>
+            {/if}
+
+            {#if $modelingStyle === 'entity_model'}
+                <p class="text-sm text-gray-600">
+                    Assign each attribute to an entity and choose the source for each relationship. New entities
+                    from this preview and other relationship endpoints from the event appear under “From this
+                    generation”; entities already on the canvas (in scope) appear under “Available in this
+                    {mode === 'process' ? 'process' : 'event'}”.
+                </p>
+            {:else}
+                <!-- Dimensional: editable entity rows -->
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                                    Entity Type
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                                    Name
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                                    Label
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                                    Tags
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {#each editedEntities as entity, index}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3">
+                                        <span
+                                            class="px-2 py-1 text-xs font-medium rounded {getEntityTypeStyle(entity.entity_type).badge}"
+                                        >
+                                            {getEntityTypeStyle(entity.entity_type).label}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <input
+                                            type="text"
+                                            value={entity.id}
+                                            oninput={(e) =>
+                                                updateEntityName(
+                                                    index,
+                                                    (e.target as HTMLInputElement).value
+                                                )}
+                                            class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            placeholder="Entity name"
+                                        />
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <input
+                                            type="text"
+                                            value={entity.label}
+                                            oninput={(e) =>
+                                                updateEntityLabel(
+                                                    index,
+                                                    (e.target as HTMLInputElement).value
+                                                )}
+                                            class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            placeholder="Display label"
+                                        />
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {#if previewData.entities[index]?.tags && previewData.entities[index].tags!.length > 0}
+                                            <div class="flex flex-wrap gap-1">
+                                                {#each previewData.entities[index].tags! as tag}
+                                                    <span
+                                                        class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded border border-blue-200 font-mono"
+                                                        title="Inherited tag from event domain"
+                                                    >
+                                                        {tag}
+                                                    </span>
+                                                {/each}
+                                            </div>
+                                        {:else}
+                                            <span class="text-xs text-gray-400">—</span>
+                                        {/if}
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
+            {/if}
+
+            {#if $modelingStyle === 'entity_model' && fullExistingCanvasEntityOptions.length > 0}
+                <label
+                    class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200/90 bg-gradient-to-r from-gray-50/90 to-white px-4 py-3 text-sm text-gray-600 shadow-sm"
+                >
+                    <input
+                        type="checkbox"
+                        class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        bind:checked={topologyShowAllCanvasEntities}
+                    />
+                    <span>
+                        <span class="font-medium text-gray-800">Show all entities on the canvas</span>
+                        <span class="mt-0.5 block text-xs text-gray-500">
+                            Off by default: only entities linked in this {mode === 'process' ? 'process' : 'event'}
+                            (annotations, relationships, derived) appear in the lists below.
+                        </span>
+                    </span>
+                </label>
+            {/if}
+
+            <!-- Drafted Fields (entity_model only) -->
+            {#if $modelingStyle === 'entity_model' && editedDraftedFields.length > 0}
+                <div
+                    class="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/95 to-white p-4 shadow-sm"
+                >
+                    <div class="mb-3 flex items-start gap-2.5">
+                        <Icon icon="lucide:list" class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                        <div>
+                            <h3 class="text-sm font-semibold text-amber-900">Attributes (drafted fields)</h3>
+                            <p class="mt-0.5 text-xs text-amber-800/80">
+                                Choose which entity each attribute belongs to.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="space-y-2.5">
+                        {#each editedDraftedFields as field, i}
+                            <div
+                                class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-100/90 bg-white/90 px-3 py-2.5 shadow-sm"
+                            >
+                                <span
+                                    class="min-w-0 shrink-0 rounded-md border border-amber-200 bg-amber-50/80 px-2 py-1 font-mono text-xs font-medium text-amber-950"
+                                >
+                                    {field.name}
+                                </span>
+                                <span class="shrink-0 text-xs font-medium text-gray-400">on</span>
+                                <div class="min-w-[12rem] max-w-full flex-1">
+                                    <CustomEntitySelect
+                                        value={field.targetEntityId}
+                                        groups={selectGroups}
+                                        onChange={(val) => {
+                                            editedDraftedFields[i] = {
+                                                ...field,
+                                                targetEntityId: val,
+                                            };
+                                        }}
+                                    />
+                                </div>
+                                <button
+                                    onclick={() => removeDraftedField(i)}
+                                    class="ml-auto text-gray-400 hover:text-red-500 transition-colors"
+                                    title="Remove attribute"
+                                >
+                                    <Icon icon="lucide:x" class="h-4 w-4" />
+                                </button>
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Relationships Section -->
+            {#if previewData.relationships && previewData.relationships.length > 0}
+                <div
+                    class="rounded-xl border border-gray-200/90 bg-gradient-to-b from-white to-gray-50/90 p-4 shadow-sm"
+                >
+                    <h3 class="mb-3 text-sm font-semibold text-gray-800">Relationships</h3>
+                    {#if $modelingStyle === 'entity_model'}
+                        <div class="space-y-2.5">
+                            {#each editedRelationships as rel, i}
+                                <div
+                                    class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 bg-white/95 px-3 py-2.5 text-sm shadow-sm"
+                                >
+                                    <div class="min-w-[12rem] max-w-full flex-1 sm:max-w-[18rem]">
+                                        <CustomEntitySelect
+                                            value={rel.source}
+                                            groups={selectGroups}
+                                            onChange={(val) => {
+                                                editedRelationships[i] = {
+                                                    ...rel,
+                                                    source: val,
+                                                };
+                                            }}
+                                        />
+                                    </div>
+                                    <span class="text-gray-300">→</span>
+                                    <span class="font-mono text-sm text-gray-800">{getPreviewDisplayId(rel.target)}</span>
+                                    {#if rel.label}
+                                        <span class="text-xs text-gray-500">({rel.label})</span>
+                                    {/if}
+                                    <button
+                                        onclick={() => removeRelationship(i)}
+                                        class="ml-auto text-gray-400 hover:text-red-500 transition-colors"
+                                        title="Remove relationship"
+                                    >
+                                        <Icon icon="lucide:x" class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            {/each}
+                        </div>
+                    {:else}
+                        <div class="space-y-1">
+                            {#each previewData.relationships as rel}
+                                <p class="text-sm text-gray-600">
+                                    <span class="font-mono">{getPreviewDisplayId(rel.source)}</span>
+                                    <span class="mx-2">→</span>
+                                    <span class="font-mono">{getPreviewDisplayId(rel.target)}</span>
+                                    {#if rel.label}<span class="text-gray-500 ml-2">({rel.label})</span>{/if}
+                                </p>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            {/if}
+
+            <!-- Actions -->
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-200">
+                <button
+                    onclick={onCancel}
+                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                    disabled={creating}
+                >
+                    Cancel
+                </button>
+                <button
+                    onclick={handleCreateAll}
+                    class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    disabled={creating || validationErrors.length > 0}
+                >
+                    {#if creating}
+                        <div class="w-4 h-4 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Creating...</span>
+                    {:else}
+                        <Icon icon="lucide:sparkles" class="w-4 h-4" />
+                        <span>Create All</span>
+                    {/if}
+                </button>
+            </div>
         </div>
-    </div>
-{/if}
+    {:else}
+        <div class="text-center py-8 text-gray-500">
+            {#if previewData?.errors && previewData.errors.length > 0}
+                <p class="font-medium text-red-700 mb-2">
+                    No entities could be generated from this {mode === 'process' ? 'process' : 'event'}.
+                </p>
+                <ul class="text-sm text-red-700 list-disc list-inside space-y-1 text-left max-w-2xl mx-auto">
+                    {#each previewData.errors as generationError}
+                        <li>{generationError}</li>
+                    {/each}
+                </ul>
+            {:else}
+                <p>
+                    No entities to generate. Please add annotations to the {mode === 'process' ? 'process' : 'event'} first.
+                </p>
+            {/if}
+        </div>
+        <div class="flex justify-end gap-2 pt-4">
+            <button
+                onclick={onCancel}
+                class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+                Close
+            </button>
+        </div>
+    {/if}
+</Modal>
