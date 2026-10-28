@@ -6,6 +6,7 @@ from fastapi import APIRouter, Body, Depends
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.models.metric import MetricTreeUpdate
+from trellis_datamodel.models.schemas import MetricTreeResponse, MetricTreeSaveResponse
 from trellis_datamodel.routes.dependencies import require_feature
 from trellis_datamodel.services.metric_tree import (
     load_metric_tree,
@@ -36,7 +37,7 @@ def _build_catalog() -> list[dict[str, Any]]:
     return resolve_catalog()
 
 
-@router.get("/metric-tree")
+@router.get("/metric-tree", response_model=MetricTreeResponse)
 async def get_metric_tree():
     """
     Return the metric tree document.
@@ -61,7 +62,7 @@ async def get_metric_tree():
     }
 
 
-@router.post("/metric-tree")
+@router.post("/metric-tree", response_model=MetricTreeSaveResponse)
 async def post_metric_tree(payload: MetricTreeUpdate = Body(...)):
     """
     Save the metric tree document.
@@ -78,4 +79,4 @@ async def post_metric_tree(payload: MetricTreeUpdate = Body(...)):
     """
     warnings = save_metric_tree(payload)
 
-    return {"status": "success", "warnings": warnings}
+    return MetricTreeSaveResponse(warnings=warnings)

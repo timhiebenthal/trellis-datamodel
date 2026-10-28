@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Tuple
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.adapters import get_adapter
-from trellis_datamodel.exceptions import ValidationError
+from trellis_datamodel.exceptions import FileOperationError, ValidationError
 from trellis_datamodel.models.entity_keys import (
     FRAMEWORK_TAGS_KEY,
     LEGACY_FRAMEWORK_TAGS_KEY,
@@ -75,7 +75,7 @@ def load_data_model_raw() -> Dict[str, Any]:
 
         return model_data
     except Exception as e:
-        raise RuntimeError(f"Error loading data model: {e}") from e
+        raise FileOperationError(f"Error loading data model: {e}") from e
 
 
 def save_data_model_raw(model_data: Dict[str, Any]) -> None:
@@ -88,7 +88,7 @@ def save_data_model_raw(model_data: Dict[str, Any]) -> None:
     try:
         YamlHandler().save_file(cfg.DATA_MODEL_PATH, model_data)
     except Exception as e:
-        raise RuntimeError(f"Error saving data model: {e}") from e
+        raise FileOperationError(f"Error saving data model: {e}") from e
 
 
 def _empty_layout() -> Dict[str, Any]:
@@ -271,7 +271,10 @@ def get_data_model() -> Dict[str, Any]:
             "source_colors": layout_data.get("source_colors", {}),
         }
 
-    model_data = load_yaml_or_json(cfg.DATA_MODEL_PATH) or {}
+    try:
+        model_data = load_yaml_or_json(cfg.DATA_MODEL_PATH) or {}
+    except Exception as e:
+        raise FileOperationError(f"Error reading data model: {e}") from e
 
     if not model_data.get("entities"):
         model_data["entities"] = []
@@ -604,6 +607,8 @@ def save_data_model(content: Dict[str, Any]) -> None:
 
     Raises:
         ValidationError: An entity carries an invalid entity_type or roles value.
+        FileOperationError: data_model.yml or canvas_layout.yml cannot be
+            read or written.
     """
     for entity in content.get("entities", []):
         entity_type = entity.get("entity_type")
@@ -616,11 +621,14 @@ def save_data_model(content: Dict[str, Any]) -> None:
     existing_model_data = load_data_model_raw()
     model_data, layout_data = split_model_and_layout(content, existing_model_data)
 
-    logger.info("Saving data model to: %s", cfg.DATA_MODEL_PATH)
-    YamlHandler().save_file(cfg.DATA_MODEL_PATH, model_data)
+    try:
+        logger.info("Saving data model to: %s", cfg.DATA_MODEL_PATH)
+        YamlHandler().save_file(cfg.DATA_MODEL_PATH, model_data)
 
-    logger.info("Saving canvas layout to: %s", cfg.CANVAS_LAYOUT_PATH)
-    YamlHandler().save_file(cfg.CANVAS_LAYOUT_PATH, layout_data)
+        logger.info("Saving canvas layout to: %s", cfg.CANVAS_LAYOUT_PATH)
+        YamlHandler().save_file(cfg.CANVAS_LAYOUT_PATH, layout_data)
+    except Exception as e:
+        raise FileOperationError(f"Error saving data model: {e}") from e
 
 
 def get_source_system_suggestions() -> List[str]:

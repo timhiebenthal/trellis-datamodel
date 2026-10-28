@@ -35,6 +35,7 @@ from trellis_datamodel.observability import (
     serialize_server_timing,
     set_collector,
 )
+from trellis_datamodel.models.schemas import HealthResponse
 from trellis_datamodel.routes import (
     bus_matrix_router,
     business_events_router,
@@ -443,7 +444,7 @@ def create_app() -> FastAPI:
     _register_exception_handlers(app)
 
     # Health check endpoint
-    @app.get("/health")
+    @app.get("/health", response_model=HealthResponse)
     def health_check():
         return {"status": "ok"}
 

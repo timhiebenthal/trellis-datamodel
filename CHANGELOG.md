@@ -26,6 +26,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `{"detail": "Internal Server Error", "error": "internal_error"}` instead of
   echoing the exception text. Status conventions are documented in
   `CONTRIBUTING.md` (#179).
+- **Config API answers config errors with 4xx instead of 200 + `error`:**
+  `GET /api/config` with no `trellis.yml`, or one that cannot be read or is not
+  a mapping, now returns `400` with
+  `{"detail": <message>, "error": "configuration_error"}` instead of `200` with
+  an empty config and an `error` field (a non-mapping file used to answer
+  `500`). `PUT /api/config` and `POST /api/config/reload` errors use the same
+  flat body instead of `{"detail": {"error", "message"}}`; a config file that
+  cannot be written answers `500` with `"error": "file_operation_error"` (was
+  `400`, or `500` without a message). The `409` conflict body is unchanged. The
+  config page shows the same messages as before. `/api/config-status` still
+  reports a missing config with `200`, since onboarding reads it (#179).
+- **Data model read/write failures keep their message:** a malformed or
+  unwritable `data_model.yml` answers `500` with
+  `{"detail": "Error reading/saving data model: ...", "error": "file_operation_error"}`;
+  other unexpected errors on these routes answer the generic
+  `internal_error` body (#179).
+- **Every JSON endpoint declares its response model:** the OpenAPI schema now
+  documents the responses of the data model, config, config status/info,
+  manifest, lineage, metric tree, reconcile and health endpoints. Write
+  endpoints answer one success envelope, `{"status": "success"}`, plus only
+  the fields their callers read (`changed`, `warnings`, `message`) (#179).
 
 ### Fixed
 - **Config page showed the entity creation wizard as off by default:** with

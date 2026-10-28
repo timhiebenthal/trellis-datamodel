@@ -226,6 +226,8 @@ It raises `FeatureDisabledError` (403). Pass `status_code=404` only where a spec
 ### Request and response models
 Pydantic request/response models live in `trellis_datamodel/models/`, not in route modules.
 
+Every route that answers JSON declares `response_model=`. Write endpoints with nothing else to report return `SuccessResponse` (`{"status": "success"}`); one that reports more subclasses it and adds only the fields the frontend reads (`ReconcileResponse.changed`, `MetricTreeSaveResponse.warnings`, ...). A request that cannot be served is an error status, never a `200` with an `error` field; `/api/config-status` is the exception because it is a status report that onboarding reads.
+
 ## Reporting issues
 - Use GitHub issues with clear reproduction steps, expected vs. actual behavior, and environment details.
 

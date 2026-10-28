@@ -176,13 +176,17 @@ class ModelSchemaRequest(BaseModel):
 
 # Response Models
 class SuccessResponse(BaseModel):
-    """Standard success response."""
-    status: str = "success"
-    message: Optional[str] = None
+    """Success envelope for write endpoints: `{"status": "success"}`.
+
+    Endpoints that report more than success subclass it and add only the
+    fields their callers read.
+    """
+    status: Literal["success"] = "success"
 
 
 class SyncTestsResponse(SuccessResponse):
     """Response for sync-dbt-tests endpoint."""
+    message: Optional[str] = None
     files: List[str] = []
     warnings: List[str] = Field(default_factory=list)
 
@@ -200,6 +204,56 @@ class ModelSchemaResponse(BaseModel):
     columns: List[Dict[str, Any]]
     tags: List[str]
     file_path: str
+
+
+class HealthResponse(BaseModel):
+    """Response for GET /health (a liveness probe, not a success envelope)."""
+    status: Literal["ok"] = "ok"
+
+
+class ReconcileResponse(SuccessResponse):
+    """Response for POST /api/reconcile."""
+    changed: bool
+
+
+class MetricTreeSaveResponse(SuccessResponse):
+    """Response for POST /api/metric-tree."""
+    warnings: List[str] = Field(default_factory=list)
+
+
+class DataModelResponse(BaseModel):
+    """Response for GET /api/data-model.
+
+    Entities and relationships stay free-form dicts, and unknown top-level keys
+    in data_model.yml pass through, so the response carries the file as read.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    version: Union[float, str] = 0.1
+    entities: List[Dict[str, Any]] = Field(default_factory=list)
+    relationships: List[Dict[str, Any]] = Field(default_factory=list)
+    source_colors: Dict[str, str] = Field(default_factory=dict)
+
+
+class SourceSystemSuggestionsResponse(BaseModel):
+    """Response for GET /api/source-systems/suggestions."""
+    suggestions: List[str]
+
+
+class LineageResponse(BaseModel):
+    """Response for GET /api/lineage/{model_id}."""
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+
+class MetricTreeResponse(BaseModel):
+    """Response for GET /api/metric-tree."""
+    version: float
+    metrics: List[Dict[str, Any]]
+    influences: List[Dict[str, Any]]
+    catalog: List[Dict[str, Any]]
+    datasets: List[str]
 
 
 class ManifestResponse(BaseModel):
@@ -248,7 +302,105 @@ class ConfigGetResponse(BaseModel):
     schema_metadata: ConfigSchemaResponse
     file_info: Optional[Dict[str, Any]] = None
     trellis_version: Optional[str] = None
+
+
+class ConfigFileInfo(BaseModel):
+    """trellis.yml identity used for conflict detection."""
+    path: str
+    mtime: float
+    hash: str
+
+
+class ConfigUpdateResponse(BaseModel):
+    """Response for PUT /api/config."""
+    config: Dict[str, Any]
+    file_info: ConfigFileInfo
+
+
+class ConfigReloadResponse(SuccessResponse):
+    """Response for POST /api/config/reload."""
+    message: str
+
+
+class ConfigValidateResponse(BaseModel):
+    """Response for POST /api/config/validate."""
+    valid: bool
     error: Optional[str] = None
+
+
+class _ProjectStatusFields(BaseModel):
+    """Project health fields shared by /api/config-status and /api/config-info.
+
+    The legacy dbt-named keys are only present for frameworks that have a
+    manifest or catalog; the routes serialize with `exclude_unset` so they stay
+    absent rather than `null` elsewhere.
+    """
+    framework: str
+    project_path: Optional[str] = None
+    project_path_exists: bool
+    artifacts_present: bool
+    artifacts: Dict[str, Dict[str, Any]]
+    capabilities: Dict[str, Any]
+    dbt_project_path: Optional[str] = None
+    manifest_path: Optional[str] = None
+    manifest_exists: Optional[bool] = None
+    catalog_path: Optional[str] = None
+    catalog_exists: Optional[bool] = None
+
+
+class ConfigStatusResponse(_ProjectStatusFields):
+    """Response for GET /api/config-status.
+
+    A status report, not a request outcome: a missing config or project is
+    reported in `config_present` and `error` with HTTP 200 so the frontend can
+    show onboarding.
+    """
+    config_present: bool
+    config_filename: str
+    data_model_exists: bool
+    error: Optional[str] = None
+
+
+class GuidanceInfo(BaseModel):
+    """Entity creation guidance flags as the frontend reads them.
+
+    `push_warning_enabled` and `min_description_length` are passed through as
+    written in trellis.yml (config loading does not coerce them), so a
+    hand-edited value cannot fail the boot request.
+    """
+    entity_wizard_enabled: bool
+    push_warning_enabled: Any
+    min_description_length: Any
+    disabled_guidance: List[Any]
+
+
+class ConfigInfoResponse(_ProjectStatusFields):
+    """Response for GET /api/config-info: resolved config for the frontend."""
+    config_path: Optional[str] = None
+    trellis_version: str
+    data_model_path: Optional[str] = None
+    data_model_exists: bool
+    canvas_layout_path: Optional[str] = None
+    canvas_layout_exists: bool
+    frontend_build_dir: Optional[str] = None
+    start_page: Optional[str] = None
+    canvas_default_filters: CanvasDefaultFilters
+    model_paths_configured: List[str]
+    model_paths_resolved: List[str]
+    guidance: GuidanceInfo
+    entity_creation_guidance: GuidanceInfo
+    lineage_enabled: bool
+    lineage_layers: List[str]
+    exposures_enabled: bool
+    exposures_default_layout: Optional[str] = None
+    bus_matrix_enabled: bool
+    business_events_enabled: bool
+    metrics_enabled: bool
+    modeling_style: Optional[str] = None
+    entity_prefix: List[str]
+    label_prefixes: List[str]
+    dimension_prefix: List[str]
+    fact_prefix: List[str]
 
 
 class ConfigUpdateRequest(BaseModel):

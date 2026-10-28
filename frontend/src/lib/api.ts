@@ -414,10 +414,27 @@ export async function getSourceSystemSuggestions(): Promise<string[]> {
 }
 
 // Config API
+
+/**
+ * Message from a config API error body. Domain errors answer
+ * `{detail: <message>, error: <code>}`; the 409 conflict keeps a structured
+ * `{detail: {message, ...}}`.
+ */
+async function readConfigErrorMessage(res: Response): Promise<string> {
+    const body = await res.json().catch(() => null);
+    const detail = body?.detail;
+    if (typeof detail === 'string') return detail;
+    return detail?.message || `Status: ${res.status}`;
+}
+
+/**
+ * Load trellis.yml for the config page. Never throws: a missing or unreadable
+ * config (a 400 from the API) comes back as `error` with an empty config.
+ */
 export async function getConfig(): Promise<ConfigGetResponse> {
     try {
         const res = await fetch(`${API_BASE}/config`);
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        if (!res.ok) throw new Error(await readConfigErrorMessage(res));
         return await res.json();
     } catch (e) {
         console.error("Error fetching config:", e);
@@ -461,8 +478,7 @@ export async function updateConfig(
     }
 
     if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail?.message || `Status: ${res.status}`);
+        throw new Error(await readConfigErrorMessage(res));
     }
 
     return await res.json();
@@ -477,8 +493,7 @@ export async function validateConfig(config: Record<string, any>): Promise<{ val
         });
 
         if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail?.message || `Status: ${res.status}`);
+            throw new Error(await readConfigErrorMessage(res));
         }
 
         return await res.json();
@@ -501,8 +516,7 @@ export async function reloadConfig(): Promise<{ status: string; message: string 
         });
 
         if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail?.message || `Status: ${res.status}`);
+            throw new Error(await readConfigErrorMessage(res));
         }
 
         return await res.json();

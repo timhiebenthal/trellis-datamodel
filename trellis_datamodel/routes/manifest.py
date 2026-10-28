@@ -7,6 +7,11 @@ from trellis_datamodel import __version__
 from trellis_datamodel import config as cfg
 from trellis_datamodel.config import resolve_config_path
 from trellis_datamodel.adapters import get_adapter
+from trellis_datamodel.models.schemas import (
+    ConfigInfoResponse,
+    ConfigStatusResponse,
+    ManifestResponse,
+)
 from trellis_datamodel.services.manifest import get_models
 
 router = APIRouter(prefix="/api", tags=["manifest"])
@@ -35,7 +40,13 @@ def _resolve_label_prefixes() -> list[str]:
     return []
 
 
-@router.get("/config-status")
+# exclude_unset keeps the legacy dbt-named keys absent (not null) for
+# frameworks without a manifest or catalog.
+@router.get(
+    "/config-status",
+    response_model=ConfigStatusResponse,
+    response_model_exclude_unset=True,
+)
 async def get_config_status():
     """Return configuration status for the frontend."""
     found_config = _resolve_config_path()
@@ -92,7 +103,11 @@ def _legacy_artifact_keys(status: dict) -> dict:
     return legacy
 
 
-@router.get("/config-info")
+@router.get(
+    "/config-info",
+    response_model=ConfigInfoResponse,
+    response_model_exclude_unset=True,
+)
 async def get_config_info():
     """
     Return resolved config paths and their existence for transparency/debugging.
@@ -167,7 +182,7 @@ async def get_config_info():
     }
 
 
-@router.get("/manifest")
+@router.get("/manifest", response_model=ManifestResponse)
 async def get_manifest():
     """Return parsed models from the transformation framework."""
     models = get_models()

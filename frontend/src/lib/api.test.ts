@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inferRelationships, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt, getModelSchema } from './api';
+import { inferRelationships, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt, getModelSchema, getConfig, reloadConfig, updateConfig } from './api';
 import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
 import { recordBootRequest } from './boot-diagnostics';
 
@@ -877,5 +877,60 @@ describe('Business Event Process API Functions', () => {
             await expect(generateEntitiesFromProcess('proc_001'))
                 .rejects.toThrow('Error generating entities from process: Network error');
         });
+    });
+});
+
+describe('config API error bodies', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    function errorResponse(status: number, body: unknown) {
+        return { ok: false, status, json: vi.fn().mockResolvedValue(body) };
+    }
+
+    it('getConfig returns the 400 configuration error message instead of throwing', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue(
+                errorResponse(400, {
+                    detail: 'No config file found. Please create trellis.yml in the current directory.',
+                    error: 'configuration_error',
+                }),
+            ),
+        );
+
+        const response = await getConfig();
+
+        expect(response.config).toEqual({});
+        expect(response.error).toBe(
+            'No config file found. Please create trellis.yml in the current directory.',
+        );
+    });
+
+    it('reloadConfig throws the message of a string detail', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue(
+                errorResponse(400, { detail: 'Invalid YAML in trellis.yml', error: 'configuration_error' }),
+            ),
+        );
+
+        await expect(reloadConfig()).rejects.toThrow('Invalid YAML in trellis.yml');
+    });
+
+    it('updateConfig throws the message of a 422 validation error', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue(
+                errorResponse(422, { detail: 'Config validation failed: framework', error: 'validation_error' }),
+            ),
+        );
+
+        await expect(updateConfig({ framework: 'x' })).rejects.toThrow(
+            'Config validation failed: framework',
+        );
     });
 });

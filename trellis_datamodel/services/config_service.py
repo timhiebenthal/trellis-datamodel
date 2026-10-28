@@ -24,6 +24,7 @@ from ruamel.yaml.comments import CommentedMap
 from trellis_datamodel.config import resolve_config_path
 from trellis_datamodel.exceptions import (
     ConfigurationError,
+    FileOperationError,
     ValidationError as CustomValidationError,
 )
 from trellis_datamodel.models.schemas import (
@@ -740,9 +741,12 @@ def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
         raise ConfigurationError(f"Failed to read config file: {e}")
 
     # Write to temp file
-    fd, temp_path = tempfile.mkstemp(
-        prefix=os.path.basename(config_path), dir=os.path.dirname(config_path)
-    )
+    try:
+        fd, temp_path = tempfile.mkstemp(
+            prefix=os.path.basename(config_path), dir=os.path.dirname(config_path)
+        )
+    except OSError as e:
+        raise FileOperationError(f"Failed to write config: {e}") from e
 
     try:
         with os.fdopen(fd, "w") as f:
@@ -757,7 +761,7 @@ def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
             os.unlink(temp_path)
         except Exception:
             pass
-        raise ConfigurationError(f"Failed to write config: {e}")
+        raise FileOperationError(f"Failed to write config: {e}") from e
 
 
 def get_schema_metadata() -> ConfigSchemaResponse:
@@ -804,6 +808,10 @@ def read_config(
             config = yaml.safe_load(f) or {}
     except Exception as e:
         raise ConfigurationError(f"Failed to read config file: {e}")
+    if not isinstance(config, dict):
+        raise ConfigurationError(
+            "Failed to read config file: expected a mapping of settings at the top level"
+        )
 
     # Get file info for conflict detection
     file_info = {
@@ -854,8 +862,9 @@ def save_config(
         conflict_message is None if no conflict
 
     Raises:
-        ConfigurationError: If config file is not found or validation fails
+        ConfigurationError: If config file is not found or unreadable
         ValidationError: If config validation fails
+        FileOperationError: If the config file cannot be written
     """
     config_path = require_config_path(config_path)
 

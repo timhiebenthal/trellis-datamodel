@@ -51,37 +51,46 @@ def client():
         yield c
 
 
-def test_get_config_without_config_file_reports_error_and_still_serves_schema(
+def test_get_config_without_config_file_returns_400_configuration_error(
     client, no_config
 ):
     response = client.get("/api/config")
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     body = response.json()
-    assert body["config"] == {}
-    assert body["file_info"] is None
-    assert "No config file found" in body["error"]
-    assert "fields" in body["schema_metadata"]
+    assert body["error"] == "configuration_error"
+    assert "No config file found" in body["detail"]
 
 
-def test_get_config_with_unparseable_yaml_reports_read_failure(client, config_file):
+def test_config_schema_is_served_without_a_config_file(client, no_config):
+    response = client.get("/api/config/schema")
+
+    assert response.status_code == 200
+    assert "fields" in response.json()
+
+
+def test_get_config_with_unparseable_yaml_returns_400_read_failure(
+    client, config_file
+):
     config_file.write_text("framework: [unclosed\n")
 
     response = client.get("/api/config")
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     body = response.json()
-    assert body["config"] == {}
-    assert body["error"].startswith("Failed to read config file")
+    assert body["error"] == "configuration_error"
+    assert body["detail"].startswith("Failed to read config file")
 
 
-def test_get_config_with_non_mapping_yaml_returns_500(client, config_file):
+def test_get_config_with_non_mapping_yaml_returns_400(client, config_file):
     config_file.write_text("- just\n- a list\n")
 
     response = client.get("/api/config")
 
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Failed to load configuration"
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error"] == "configuration_error"
+    assert "expected a mapping" in body["detail"]
 
 
 def test_put_config_without_config_file_returns_400_configuration_error(
@@ -90,9 +99,9 @@ def test_put_config_without_config_file_returns_400_configuration_error(
     response = client.put("/api/config", json={"config": {"framework": "dbt-core"}})
 
     assert response.status_code == 400
-    detail = response.json()["detail"]
-    assert detail["error"] == "configuration_error"
-    assert "No config file found" in detail["message"]
+    body = response.json()
+    assert body["error"] == "configuration_error"
+    assert "No config file found" in body["detail"]
 
 
 def test_reload_config_with_unparseable_yaml_returns_400(client, config_file):
@@ -101,7 +110,7 @@ def test_reload_config_with_unparseable_yaml_returns_400(client, config_file):
     response = client.post("/api/config/reload")
 
     assert response.status_code == 400
-    assert response.json()["detail"]["error"] == "configuration_error"
+    assert response.json()["error"] == "configuration_error"
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
@@ -120,4 +129,6 @@ def test_put_config_when_config_file_cannot_be_written_returns_500(
         config_file.chmod(0o644)
 
     assert response.status_code == 500
-    assert response.json()["detail"]["error"] == "internal_error"
+    body = response.json()
+    assert body["error"] == "file_operation_error"
+    assert body["detail"].startswith("Failed to write config")

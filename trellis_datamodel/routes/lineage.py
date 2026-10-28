@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from trellis_datamodel import config as cfg
+from trellis_datamodel.models.schemas import LineageResponse
 from trellis_datamodel.routes.dependencies import require_feature
 from trellis_datamodel.services.lineage import extract_upstream_lineage
 
@@ -21,7 +22,7 @@ router = APIRouter(
 )
 
 
-@router.get("/lineage/{model_id}")
+@router.get("/lineage/{model_id}", response_model=LineageResponse)
 async def get_lineage(model_id: str):
     """
     Get upstream table-level lineage for a given model.
