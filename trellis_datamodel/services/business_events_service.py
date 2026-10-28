@@ -35,6 +35,10 @@ from trellis_datamodel.models.business_event import (
     AnnotationEntry,
     BusinessEventAnnotations,
 )
+from trellis_datamodel.services.data_model import (
+    load_data_model_raw,
+    save_data_model_raw,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -651,9 +655,6 @@ def _sync_roles_to_dimensions(annotations: BusinessEventAnnotations) -> None:
         annotations: BusinessEventAnnotations object containing dimension references with roles
     """
     try:
-        # Import here to avoid circular dependency
-        from trellis_datamodel.routes.data_model import load_data_model_raw, save_data_model_raw
-        
         # Collect all dimension_id + role pairs from annotations
         dimension_roles: Dict[str, set] = {}  # dimension_id -> set of roles
         

@@ -156,7 +156,7 @@ class DbtCoreAdapter:
             with open(self.data_model_path, "r") as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
-            print(f"Warning: Could not load data model: {e}")
+            logger.warning("Could not load data model: %s", e)
             return {}
 
     def get_model_dirs(self) -> list[str]:
@@ -1113,7 +1113,7 @@ class DbtCoreAdapter:
                                             }
                                         )
                     except Exception as e:
-                        print(f"Warning: Could not parse {filepath}: {e}")
+                        logger.warning("Could not parse %s: %s", filepath, e)
                         continue
 
         if not yml_found:

@@ -22,6 +22,7 @@ from trellis_datamodel.models.business_event import (
     GeneratedEntitiesResult,
 )
 from trellis_datamodel.services.business_events_service import load_business_events
+from trellis_datamodel.services.data_model import merge_roles
 
 logger = logging.getLogger(__name__)
 
@@ -212,18 +213,6 @@ def _load_existing_entities() -> Dict[str, dict]:
     except Exception as e:
         logger.warning(f"Could not load data_model.yml: {e}")
         return {}
-
-
-def _merge_role_entries(existing: list, incoming: list) -> list:
-    """Union two roles lists, deduplicating by (label, source)."""
-    seen = {(r.get("label"), r.get("source")) for r in existing}
-    result = list(existing)
-    for r in incoming:
-        key = (r.get("label"), r.get("source"))
-        if key not in seen:
-            result.append(r)
-            seen.add(key)
-    return result
 
 
 def _create_dimension_from_annotation_entry(
@@ -798,7 +787,7 @@ def _generate_from_annotations(
             # Merge roles from duplicate into existing entity
             existing = dimension_entities[dimension_ids.index(entity["id"])]
             if "roles" in entity:
-                existing["roles"] = _merge_role_entries(
+                existing["roles"] = merge_roles(
                     existing.get("roles", []), entity["roles"]
                 )
 
@@ -955,7 +944,7 @@ def generate_entities_from_process(
             # Merge roles from duplicate into existing entity
             existing = dimension_entities[dimension_ids.index(entity["id"])]
             if "roles" in entity:
-                existing["roles"] = _merge_role_entries(
+                existing["roles"] = merge_roles(
                     existing.get("roles", []), entity["roles"]
                 )
 

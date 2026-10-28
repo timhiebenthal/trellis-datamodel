@@ -6,6 +6,7 @@ This is the FastAPI application that serves the API and frontend.
 
 from importlib.resources import files
 import ipaddress
+import logging
 import os
 import re
 import socket
@@ -46,6 +47,8 @@ from trellis_datamodel.routes import (
     reconcile_router,
     schema_router,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _RequestTimingMiddleware:
@@ -455,7 +458,7 @@ def create_app() -> FastAPI:
 
     static_dir_path = _discover_static_dir()
 
-    print(f"Serving frontend from: {static_dir_path}")
+    logger.info("Serving frontend from: %s", static_dir_path)
 
     _register_routers(app)
 
@@ -465,10 +468,10 @@ def create_app() -> FastAPI:
     if static_dir_path:
         _mount_static_routes(app, static_dir_path)
     else:
-        print(
-            f"Warning: Frontend build not found. "
-            f"Bundled static files missing and {cfg.FRONTEND_BUILD_DIR} does not exist. "
-            f"Run 'npm run build' in frontend/ or install the package properly."
+        logger.warning(
+            "Frontend build not found. Bundled static files missing and %s does "
+            "not exist. Run 'npm run build' in frontend/ or install the package properly.",
+            cfg.FRONTEND_BUILD_DIR,
         )
 
     return app

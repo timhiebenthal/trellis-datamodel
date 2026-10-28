@@ -142,7 +142,7 @@ if _TEST_DIR:
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = _DEFAULT_EXPOSURES_LAYOUT
     MODELING_STYLE: str = _DEFAULT_MODELING_STYLE
-    Bus_MATRIX_ENABLED: bool = False
+    BUS_MATRIX_ENABLED: bool = False
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
     OSSIE_CONFIG: OssieConfig = OssieConfig(
@@ -177,7 +177,7 @@ else:
     EXPOSURES_ENABLED: bool = False
     EXPOSURES_DEFAULT_LAYOUT: str = _DEFAULT_EXPOSURES_LAYOUT
     MODELING_STYLE: str = _DEFAULT_MODELING_STYLE
-    Bus_MATRIX_ENABLED: bool = False
+    BUS_MATRIX_ENABLED: bool = False
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
     OSSIE_CONFIG: OssieConfig = OssieConfig()
@@ -335,14 +335,12 @@ def _load_lineage_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
             "'lineage_layers' at top level is deprecated and ignored when 'lineage' "
             "section is present. Use 'lineage.enabled' and 'lineage.layers' instead."
         )
-        print(msg)
         logger.warning(msg)
     elif not lineage_config and legacy_present:
         msg = (
             "'lineage_layers' at top level is deprecated. Use nested 'lineage.enabled' "
             "and 'lineage.layers' instead."
         )
-        print(msg)
         logger.warning(msg)
         legacy_layers = config["lineage_layers"]
         if isinstance(legacy_layers, list):
@@ -410,7 +408,6 @@ def _load_exposures_config(config: dict[str, Any]) -> tuple[bool, str]:
                 "'exposures.default_layout' must be 'dashboards-as-rows' or "
                 "'entities-as-rows'. Using default 'dashboards-as-rows'."
             )
-            print(msg)
             logger.warning(msg)
 
     return enabled, default_layout
@@ -711,7 +708,7 @@ def find_config_file(config_override: Optional[str] = None) -> Optional[str]:
 
 def load_config(config_path: Optional[str] = None) -> None:
     """Load and resolve all paths from config file."""
-    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, Bus_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, OSSIE_CONFIG, METRICS_CONFIG, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
+    global FRAMEWORK, MANIFEST_PATH, DATA_MODEL_PATH, DBT_MODEL_PATHS, CATALOG_PATH, DBT_PROJECT_PATH, CANVAS_LAYOUT_PATH, CANVAS_LAYOUT_VERSION_CONTROL, CONFIG_PATH, FRONTEND_BUILD_DIR, DBT_COMPANY_DUMMY_PATH, LINEAGE_LAYERS, GUIDANCE_CONFIG, LINEAGE_ENABLED, EXPOSURES_ENABLED, EXPOSURES_DEFAULT_LAYOUT, MODELING_STYLE, BUS_MATRIX_ENABLED, BUSINESS_EVENTS_ENABLED, BUSINESS_EVENTS_PATH, OSSIE_CONFIG, METRICS_CONFIG, DIMENSIONAL_MODELING_CONFIG, ENTITY_MODELING_CONFIG, BRUIN_PIPELINE_PATH, BRUIN_ASSET_PATHS, BRUIN_DEFAULT_ASSET_TYPE, START_PAGE, CANVAS_DEFAULT_FILTERS
 
     # Skip loading config file in test mode (paths already set via environment)
     # unless a config file is explicitly selected (TRELLIS_CONFIG_PATH or CLI --config).
@@ -787,7 +784,7 @@ def load_config(config_path: Optional[str] = None) -> None:
 
     # 13. Modeling style and bus matrix
     MODELING_STYLE = _load_modeling_style(config)
-    Bus_MATRIX_ENABLED = _resolve_bus_matrix_enabled(
+    BUS_MATRIX_ENABLED = _resolve_bus_matrix_enabled(
         MODELING_STYLE, config.get("bus_matrix")
     )
 
@@ -906,7 +903,7 @@ def print_config() -> None:
     if EXPOSURES_ENABLED:
         logger.info("Exposures default layout: %s", EXPOSURES_DEFAULT_LAYOUT)
     logger.info("Modeling style: %s", MODELING_STYLE)
-    logger.info("Bus Matrix enabled: %s", Bus_MATRIX_ENABLED)
+    logger.info("Bus Matrix enabled: %s", BUS_MATRIX_ENABLED)
     if DIMENSIONAL_MODELING_CONFIG.enabled:
         logger.info(
             "Dimensional modeling enabled: %s", DIMENSIONAL_MODELING_CONFIG.enabled

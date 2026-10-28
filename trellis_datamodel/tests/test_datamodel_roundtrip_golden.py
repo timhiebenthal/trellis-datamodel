@@ -16,7 +16,7 @@ from typing import Any, Dict
 import pytest
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.routes.data_model import load_data_model_raw, save_data_model_raw
+from trellis_datamodel.services.data_model import load_data_model_raw, save_data_model_raw
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DBT_DEMO_DATA_MODEL = REPO_ROOT / "dbt_demo" / "data_model.yml"

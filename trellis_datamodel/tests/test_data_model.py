@@ -127,7 +127,7 @@ def test_source_system_enrichment_uses_one_indexed_lineage_pass(
     test_client, temp_data_model_path, monkeypatch
 ):
     """All primary and additional bindings are sent to lineage in one pass."""
-    import trellis_datamodel.routes.data_model as data_model_route
+    import trellis_datamodel.services.data_model as data_model_service
 
     with open(temp_data_model_path, "w") as f:
         yaml.safe_dump(
@@ -154,7 +154,7 @@ def test_source_system_enrichment_uses_one_indexed_lineage_pass(
 
     batch_calls = []
     monkeypatch.setattr(
-        data_model_route,
+        data_model_service,
         "extract_source_systems_for_models",
         lambda model_ids: (
             batch_calls.append(list(model_ids))
@@ -182,8 +182,8 @@ def test_entity_type_inference_skips_adapter_when_all_entities_are_classified(
     monkeypatch,
 ):
     """Already classified entities do not trigger expensive adapter inference."""
-    from trellis_datamodel.routes.data_model import _apply_entity_type_inference
-    import trellis_datamodel.routes.data_model as data_model_route
+    from trellis_datamodel.services.data_model import _apply_entity_type_inference
+    import trellis_datamodel.services.data_model as data_model_service
 
     def fail_if_called():
         pytest.fail("infer_entity_types should not be called")
@@ -191,7 +191,7 @@ def test_entity_type_inference_skips_adapter_when_all_entities_are_classified(
     class UnexpectedAdapter:
         infer_entity_types = staticmethod(fail_if_called)
 
-    monkeypatch.setattr(data_model_route, "get_adapter", lambda: UnexpectedAdapter())
+    monkeypatch.setattr(data_model_service, "get_adapter", lambda: UnexpectedAdapter())
     model_data = {
         "entities": [
             {"id": "customer", "entity_type": "dimension"},
@@ -205,14 +205,14 @@ def test_entity_type_inference_skips_adapter_when_all_entities_are_classified(
 
 def test_entity_type_inference_still_infers_missing_entity_types(monkeypatch):
     """Missing and unclassified entities still use adapter inference."""
-    from trellis_datamodel.routes.data_model import _apply_entity_type_inference
-    import trellis_datamodel.routes.data_model as data_model_route
+    from trellis_datamodel.services.data_model import _apply_entity_type_inference
+    import trellis_datamodel.services.data_model as data_model_service
 
     class Adapter:
         def infer_entity_types(self):
             return {"customer": "dimension", "orders": "fact"}
 
-    monkeypatch.setattr(data_model_route, "get_adapter", lambda: Adapter())
+    monkeypatch.setattr(data_model_service, "get_adapter", lambda: Adapter())
     model_data = {
         "entities": [
             {"id": "customer"},
@@ -233,7 +233,7 @@ def test_batched_enrichment_matches_legacy_results_for_primary_and_additional_mo
     test_client, temp_data_model_path, monkeypatch
 ):
     """Batch enrichment preserves the legacy union and output ordering."""
-    import trellis_datamodel.routes.data_model as data_model_route
+    import trellis_datamodel.services.data_model as data_model_service
 
     with open(temp_data_model_path, "w") as f:
         yaml.safe_dump(
@@ -258,7 +258,7 @@ def test_batched_enrichment_matches_legacy_results_for_primary_and_additional_mo
         )
 
     monkeypatch.setattr(
-        data_model_route,
+        data_model_service,
         "extract_source_systems_for_models",
         lambda _model_ids: {
             "model.project.customer": ["warehouse", "crm", "crm"],
@@ -281,7 +281,7 @@ def test_data_model_request_uses_batch_source_system_lookup_once(
     test_client, temp_data_model_path, monkeypatch
 ):
     """The request calls the batch adapter lookup once instead of once per entity."""
-    import trellis_datamodel.routes.data_model as data_model_route
+    import trellis_datamodel.services.data_model as data_model_service
     import trellis_datamodel.services.lineage as lineage_service
 
     with open(temp_data_model_path, "w") as f:
@@ -327,7 +327,7 @@ def test_data_model_server_timing_includes_read_inference_and_source_enrichment_
     test_client, temp_data_model_path, monkeypatch
 ):
     """Data-model boot exposes fixed phases without request-specific values."""
-    import trellis_datamodel.routes.data_model as data_model_route
+    import trellis_datamodel.services.data_model as data_model_service
     import trellis_datamodel.services.lineage as lineage_service
 
     with open(temp_data_model_path, "w") as f:
@@ -350,7 +350,7 @@ def test_data_model_server_timing_includes_read_inference_and_source_enrichment_
             return {model_id: ["crm"] for model_id in model_ids}
 
     adapter = TimingAdapter()
-    monkeypatch.setattr(data_model_route, "get_adapter", lambda: adapter)
+    monkeypatch.setattr(data_model_service, "get_adapter", lambda: adapter)
     monkeypatch.setattr(lineage_service, "get_adapter", lambda: adapter)
     from trellis_datamodel import config as cfg
 
@@ -796,7 +796,7 @@ def test_split_preserves_ui_tags_key():
     incoming entity carries the key, and simply absent (not raising, not
     defaulted) when the incoming entity omits it.
     """
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     content = {
         "version": 0.1,
@@ -820,7 +820,7 @@ def test_split_preserves_ui_tags_key():
         "relationships": [],
     }
 
-    model_data, _layout_data = _split_model_and_layout(content)
+    model_data, _layout_data = split_model_and_layout(content)
 
     users_entity = next(e for e in model_data["entities"] if e["id"] == "users")
     assert get_framework_tags(users_entity) == ["nightly"]
@@ -837,7 +837,7 @@ def test_split_preserves_bound_entity_dbt_tags_when_omitted_by_autosave():
     key must NOT wipe the previously-reconciled tags already on disk — it must be
     preserved from existing_model_data, mirroring the `roles` preservation pattern.
     """
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     existing_model_data = {
         "entities": [
@@ -865,7 +865,7 @@ def test_split_preserves_bound_entity_dbt_tags_when_omitted_by_autosave():
         "relationships": [],
     }
 
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         incoming_content, existing_model_data
     )
 
@@ -879,7 +879,7 @@ def test_split_preserves_bound_entity_dbt_tags_when_omitted_by_autosave():
 def _split_bound_users(incoming_overrides, existing_overrides=None):
     """Split an auto-save.ts-shaped payload for a bound `users` entity against a
     disk state that recorded `pushed_tags: [pii]`."""
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     existing_entity = {
         "id": "users",
@@ -896,7 +896,7 @@ def _split_bound_users(incoming_overrides, existing_overrides=None):
         "position": {"x": 0, "y": 0},
         **incoming_overrides,
     }
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         {"version": 0.1, "entities": [incoming_entity], "relationships": []},
         {"entities": [existing_entity]},
     )
@@ -917,9 +917,9 @@ def test_split_ignores_pushed_tags_sent_by_a_client():
 
 
 def test_split_ignores_pushed_tags_from_a_client_when_none_on_disk():
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         {
             "version": 0.1,
             "entities": [
@@ -950,7 +950,7 @@ def _split_bound_users_omitting_ui_tags(
     incoming_overrides=None, with_push_record=True
 ):
     """Split a bound `users` payload that carries no ui_tags key."""
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     existing_entity = {
         "id": "users",
@@ -966,7 +966,7 @@ def _split_bound_users_omitting_ui_tags(
         "position": {"x": 0, "y": 0},
         **(incoming_overrides or {}),
     }
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         {"version": 0.1, "entities": [incoming_entity], "relationships": []},
         {"entities": [existing_entity]},
     )
@@ -1002,7 +1002,7 @@ def test_split_does_not_override_explicit_ui_tags_with_push_record():
 def test_split_never_persists_tags_for_bound_entity_even_if_sent():
     """Bound entities never persist a `tags` key at all, even if a stale
     client sends one — only unbound entities use plain `tags`."""
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     incoming_content = {
         "version": 0.1,
@@ -1018,7 +1018,7 @@ def test_split_never_persists_tags_for_bound_entity_even_if_sent():
         "relationships": [],
     }
 
-    model_data, _layout_data = _split_model_and_layout(incoming_content)
+    model_data, _layout_data = split_model_and_layout(incoming_content)
 
     users_entity = model_data["entities"][0]
     assert "tags" not in users_entity
@@ -1030,7 +1030,7 @@ def test_split_does_not_preserve_tags_for_unbound_entity_when_omitted():
     (see auto-save.ts's `displayTags.length > 0 ? displayTags : undefined`), and
     that must genuinely clear it, not resurrect the old value from disk.
     """
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     existing_model_data = {
         "entities": [
@@ -1048,7 +1048,7 @@ def test_split_does_not_preserve_tags_for_unbound_entity_when_omitted():
         "relationships": [],
     }
 
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         incoming_content, existing_model_data
     )
 
@@ -1062,7 +1062,7 @@ def test_autosave_omitting_mirrored_tags_does_not_clear_them():
     """A bound entity's framework-mirrored tags are reconcile-owned: auto-save
     never sends them (only ui_tags). Omitting the key on save must not clear
     the previously-reconciled tags already on disk."""
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     existing_model_data = {
         "entities": [
@@ -1090,7 +1090,7 @@ def test_autosave_omitting_mirrored_tags_does_not_clear_them():
         "relationships": [],
     }
 
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         incoming_content, existing_model_data
     )
 
@@ -1108,7 +1108,7 @@ def test_autosave_omitting_tags_does_clear_them():
     schema.yml to reconcile against. Omitting the key on save (how auto-save.ts
     signals the user cleared all tags) must genuinely clear it, not resurrect
     the previous value from disk."""
-    from trellis_datamodel.routes.data_model import _split_model_and_layout
+    from trellis_datamodel.services.data_model import split_model_and_layout
 
     existing_model_data = {
         "entities": [
@@ -1124,7 +1124,7 @@ def test_autosave_omitting_tags_does_clear_them():
         "relationships": [],
     }
 
-    model_data, _layout_data = _split_model_and_layout(
+    model_data, _layout_data = split_model_and_layout(
         incoming_content, existing_model_data
     )
 

@@ -45,7 +45,7 @@ def get_bus_matrix(
         FileOperationError: If data model file cannot be read
     """
     # Bus Matrix is only available in dimensional modeling mode
-    if cfg.MODELING_STYLE != "dimensional_model" or not cfg.Bus_MATRIX_ENABLED:
+    if cfg.MODELING_STYLE != "dimensional_model" or not cfg.BUS_MATRIX_ENABLED:
         raise ConfigurationError("Bus Matrix is disabled for entity_model")
 
     if not cfg.DATA_MODEL_PATH:

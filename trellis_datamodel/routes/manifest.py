@@ -142,7 +142,7 @@ async def get_config_info():
         "lineage_layers": cfg.LINEAGE_LAYERS,
         "exposures_enabled": cfg.EXPOSURES_ENABLED,
         "exposures_default_layout": cfg.EXPOSURES_DEFAULT_LAYOUT,
-        "bus_matrix_enabled": cfg.Bus_MATRIX_ENABLED,
+        "bus_matrix_enabled": cfg.BUS_MATRIX_ENABLED,
         "business_events_enabled": cfg.BUSINESS_EVENTS_ENABLED,
         "metrics_enabled": cfg.METRICS_CONFIG.enabled,
         "modeling_style": cfg.MODELING_STYLE,

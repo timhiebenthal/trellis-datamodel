@@ -3,6 +3,7 @@ YAML Handler for round-trip editing of DBT schema files.
 Preserves comments, formatting, and structure while allowing updates.
 """
 
+import logging
 import os
 from typing import Any, Callable, Dict, List, Optional
 from ruamel.yaml import YAML
@@ -10,6 +11,8 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from trellis_datamodel.services.tag_ownership import plan_tag_push
 from trellis_datamodel.utils.column_metadata import split_description_origin
+
+logger = logging.getLogger(__name__)
 
 
 class YamlHandler:
@@ -43,7 +46,7 @@ class YamlHandler:
             with open(file_path, "r") as f:
                 return self.yaml.load(f)
         except Exception as e:
-            print(f"Error loading YAML file {file_path}: {e}")
+            logger.error("Error loading YAML file %s: %s", file_path, e)
             return None
 
     def save_file(self, file_path: str, data: Dict) -> None:
