@@ -68,3 +68,32 @@ def test_startup_loads_config_when_not_preloaded(tmp_path, monkeypatch):
         assert cfg.FRAMEWORK == "bruin"
         assert cfg.CONFIG_PATH == str(config_file)
 
+
+
+@pytest.mark.parametrize(
+    "origin, allowed",
+    [
+        ("http://localhost:5173", True),
+        ("http://127.0.0.1:8089", True),
+        ("http://[::1]:5174", True),
+        ("https://evil.example", False),
+        ("http://localhost.evil.example", False),
+        ("http://192.168.1.20:5173", False),
+    ],
+)
+def test_cors_only_allows_local_origins(temp_frontend_build, origin, allowed):
+    import trellis_datamodel.config as cfg
+    import trellis_datamodel.server as srv
+
+    importlib.reload(cfg)
+    cfg.load_config(None)
+    importlib.reload(srv)
+
+    client = TestClient(srv.create_app())
+    response = client.options(
+        "/api/config",
+        headers={"Origin": origin, "Access-Control-Request-Method": "PUT"},
+    )
+
+    assert (response.headers.get("access-control-allow-origin") == origin) is allowed
+    assert "access-control-allow-credentials" not in response.headers

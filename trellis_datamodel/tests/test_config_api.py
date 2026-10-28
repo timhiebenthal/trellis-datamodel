@@ -800,3 +800,25 @@ async def test_put_config_conflict_leaves_the_file_untouched(
 
     assert response.status_code == 409
     assert config_path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_get_config_ignores_a_config_path_override(
+    client: AsyncClient, tmp_path
+):
+    other = tmp_path / "other.yml"
+    other.write_text("framework: bruin\n")
+
+    response = await client.get("/api/config", params={"config_path": str(other)})
+
+    assert response.status_code == 200
+    assert response.json()["file_info"]["path"] != str(other)
+
+
+@pytest.mark.asyncio
+async def test_get_config_does_not_probe_an_arbitrary_path(client: AsyncClient):
+    response = await client.get(
+        "/api/config", params={"config_path": "/etc/does-not-exist.yml"}
+    )
+
+    assert "/etc/does-not-exist.yml" not in response.text

@@ -101,12 +101,17 @@ class _RequestTimingMiddleware:
             reset_collector(collector_token)
 
 
+# The API is unauthenticated and writes project files, so only pages served from
+# this machine (the bundled UI, or the Vite dev server on any port) may call it
+# cross-origin. There are no cookies, so credentials stay off.
+_LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
+
+
 def _configure_cors(app: FastAPI) -> None:
-    """Allow all origins for local development."""
+    """Allow cross-origin calls from localhost pages only."""
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origin_regex=_LOCAL_ORIGIN_REGEX,
         allow_methods=["*"],
         allow_headers=["*"],
     )
