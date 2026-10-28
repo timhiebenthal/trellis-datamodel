@@ -1,12 +1,9 @@
 /**
- * Unit Tests for formatAnnotationText Utility
- *
- * Tests the core utility function that formats annotation display text
- * with optional role information for Role-Playing Dimension feature.
+ * Unit tests for formatAnnotationText (utils.ts): annotation display text with optional role.
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatAnnotationText } from '../utils';
+import { formatAnnotationText } from './utils';
 
 describe('formatAnnotationText', () => {
     describe('Basic Functionality', () => {

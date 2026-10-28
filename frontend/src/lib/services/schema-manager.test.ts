@@ -102,16 +102,22 @@ describe('SchemaManager', () => {
     });
 
     describe('loadSchema', () => {
-        it('should set loading state on start', async () => {
-            vi.mocked(getModelSchema).mockResolvedValue(
-                asModelSchema({ columns: [], tags: [] }),
+        it('should report loading while the fetch is in flight and clear it afterwards', async () => {
+            let resolveSchema!: (schema: ModelSchema) => void;
+            vi.mocked(getModelSchema).mockReturnValue(
+                new Promise<ModelSchema>((resolve) => {
+                    resolveSchema = resolve;
+                }),
             );
 
-            await manager.loadSchema('model1', null);
+            const pending = manager.loadSchema('model1', null);
+            expect(manager.isLoading()).toBe(true);
 
-            const state = manager.getState();
-            expect(state.isLoading).toBe(false);
-            expect(state.error).toBe(null);
+            resolveSchema(asModelSchema({ columns: [], tags: [] }));
+            await pending;
+
+            expect(manager.isLoading()).toBe(false);
+            expect(manager.getState().error).toBe(null);
         });
 
         it('should load schema successfully', async () => {
@@ -273,8 +279,10 @@ describe('SchemaManager', () => {
 
             await expect(manager.saveSchema()).rejects.toThrow('Save failed');
 
-            // Should update state with error
-            expect(onStateChangeMock).toHaveBeenCalled();
+            const state = manager.getState();
+            expect(state.error).toBe('Save failed');
+            expect(state.isSaving).toBe(false);
+            expect(state.editableColumns[0].name).toBe('field1'); // edits are kept for retry
         });
 
         it('should set hasUnsavedChanges to false on success', async () => {
@@ -289,7 +297,8 @@ describe('SchemaManager', () => {
 
             expect(manager.hasUnsavedChanges()).toBe(false);
 
-            manager.updateEditableColumn(0, { name: 'changed' });
+            manager.addEditableColumn();
+            manager.updateEditableColumn(0, { name: 'changed', description: 'Edited' });
 
             expect(manager.hasUnsavedChanges()).toBe(true);
 
@@ -303,6 +312,11 @@ describe('SchemaManager', () => {
 
             // After successful save, hasUnsavedChanges should be false
             expect(manager.hasUnsavedChanges()).toBe(false);
+            expect(manager.isSaving()).toBe(false);
+            // The edited columns (not the originally loaded ones) are what gets persisted
+            expect(updateModelSchema).toHaveBeenCalledWith('model1', undefined, [
+                { name: 'changed', data_type: 'text', description: 'Edited' },
+            ]);
         });
     });
 
@@ -528,35 +542,22 @@ describe('SchemaManager', () => {
     });
 
     describe('state change callback', () => {
-        it('should call callback on every state change', async () => {
+        it('should publish the latest state to the callback after every mutation', async () => {
             vi.mocked(getModelSchema).mockResolvedValue(
                 asModelSchema({ columns: [], tags: [] }),
             );
 
             await manager.loadSchema('model1', null);
-            manager.updateEditableColumn(0, { name: 'changed' });
+            const lastState = () => onStateChangeMock.mock.calls.at(-1)![0];
+            expect(lastState()).toEqual(manager.getState());
+
             manager.addEditableColumn();
+            expect(lastState().editableColumns).toHaveLength(1);
+            expect(lastState().hasUnsavedChanges).toBe(true);
 
-            expect(onStateChangeMock).toHaveBeenCalled();
-            expect(onStateChangeMock.mock.calls.length).toBeGreaterThan(2);
-        });
-
-        it('should pass complete state to callback', () => {
             manager.updateEditableColumn(0, { name: 'changed' });
-
-            const stateArg = onStateChangeMock.mock.calls.find(
-                (call) => call[0].hasUnsavedChanges === true
-            )?.[0];
-
-            expect(stateArg).toHaveProperty('editableColumns');
-            expect(stateArg).toHaveProperty('isLoading');
-            expect(stateArg).toHaveProperty('isSaving');
-            expect(stateArg).toHaveProperty('error');
-            expect(stateArg).toHaveProperty('hasUnsavedChanges');
-            expect(stateArg).toHaveProperty('schema');
-            expect(stateArg).toHaveProperty('schemaTags');
-            expect(stateArg).toHaveProperty('manifestTags');
-            expect(stateArg).toHaveProperty('displayTags');
+            expect(lastState().editableColumns[0].name).toBe('changed');
+            expect(lastState()).toEqual(manager.getState());
         });
     });
 });
