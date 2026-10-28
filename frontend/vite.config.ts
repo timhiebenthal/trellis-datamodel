@@ -4,8 +4,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     plugins: [sveltekit()],
     server: {
-        // Makes the dev server reachable from WSL/devcontainers and port-forwarding setups.
-        host: true,
+        // Loopback only: the dev server proxies the unauthenticated API. Set
+        // VITE_DEV_HOST=true for devcontainers and port-forwarding setups that need it.
+        host: process.env.VITE_DEV_HOST === 'true' ? true : 'localhost',
         port: 5173,
         strictPort: true,
         // Keep frontend code using relative `/api/...` while developing (no env var flipping).

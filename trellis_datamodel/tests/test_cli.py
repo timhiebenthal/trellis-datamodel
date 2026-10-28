@@ -349,6 +349,43 @@ class TestCLIRun:
             assert config_module.find_config_file() == pinned
 
 
+class TestRunHost:
+    """The API is unauthenticated, so the server must default to loopback."""
+
+    @staticmethod
+    def _run(monkeypatch, tmp_path, *extra):
+        from trellis_datamodel.cli import app
+
+        monkeypatch.delenv("TRELLIS_CONFIG_PATH", raising=False)
+        project_config = tmp_path / "trellis.yml"
+        project_config.write_text(
+            "framework: dbt-core\ndbt_project_path: .\ndata_model_file: dm.yml\n"
+        )
+        captured = {}
+        monkeypatch.setattr(
+            "trellis_datamodel.cli.uvicorn.run",
+            lambda *_args, **kwargs: captured.update(kwargs),
+        )
+        result = runner.invoke(
+            app, ["run", "--config", str(project_config), "--no-browser", *extra]
+        )
+        return result, captured
+
+    def test_binds_loopback_by_default(self, monkeypatch, tmp_path):
+        result, captured = self._run(monkeypatch, tmp_path)
+
+        assert captured["host"] == "127.0.0.1"
+        assert "Warning: bound to" not in result.output
+
+    def test_host_option_opts_in_to_wider_binds_with_a_warning(
+        self, monkeypatch, tmp_path
+    ):
+        result, captured = self._run(monkeypatch, tmp_path, "--host", "0.0.0.0")
+
+        assert captured["host"] == "0.0.0.0"
+        assert "Warning: bound to 0.0.0.0" in result.output
+
+
 class TestCLIHelp:
     """Test help output."""
 

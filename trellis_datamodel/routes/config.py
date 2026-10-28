@@ -6,9 +6,9 @@ with validation, conflict detection, and backup.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from trellis_datamodel import __version__ as trellis_version
 from trellis_datamodel.adapters import get_adapter
@@ -32,9 +32,7 @@ config_router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 @config_router.get("", response_model=ConfigGetResponse)
-async def get_config(
-    config_path: Optional[str] = Query(None, description="Override config file path")
-) -> ConfigGetResponse:
+async def get_config() -> ConfigGetResponse:
     """
     Get current configuration with schema metadata.
 
@@ -43,7 +41,7 @@ async def get_config(
     """
     try:
         # Load config and file info
-        config, file_info = load_config(config_path)
+        config, file_info = load_config()
 
         # Get schema metadata
         schema = get_schema_metadata()
@@ -73,7 +71,7 @@ async def get_config(
         logger.error(f"Error loading config: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to load configuration: {e}",
+            detail="Failed to load configuration",
         )
 
 
@@ -240,10 +238,7 @@ async def reload_config_endpoint() -> Dict[str, Any]:
 
 
 @config_router.post("/validate")
-async def validate_config_endpoint(
-    config: Dict[str, Any],
-    config_path: Optional[str] = Query(None, description="Override config file path"),
-) -> Dict[str, Any]:
+async def validate_config_endpoint(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate a config without saving it.
 

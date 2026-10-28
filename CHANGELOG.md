@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tree, and the file, only on Create, so a cancelled metric leaves nothing behind.
 
 ### Fixed
+- **The local API is no longer open to the network (#161):** `trellis run` bound
+  `0.0.0.0` and answered any origin (`allow_origins=["*"]`), while `PUT
+  /api/config`, `POST /api/sync-tests` and `POST /api/data-model` write project
+  files without authentication - so any web page you visited, or any host on the
+  LAN, could rewrite your config. The server now binds `127.0.0.1` by default
+  (`--host` opts into a wider bind and prints a warning), CORS only admits
+  `localhost` / `127.0.0.1` / `[::1]` origins and no longer allows credentials,
+  and the Vite dev server listens on loopback unless `VITE_DEV_HOST=true`. The
+  `?config_path=` override on `GET /api/config` (an arbitrary-file probe, never
+  sent by the UI) is removed, and the 500 response no longer echoes the
+  exception text. **If you reach Trellis from another machine or a container,
+  start it with `--host 0.0.0.0`.**
 - **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`
   was honoured when the server booted, then dropped. The Config page, its save
   and `POST /api/config/reload` each re-discovered the file with

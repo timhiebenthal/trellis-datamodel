@@ -27,6 +27,8 @@ from trellis_datamodel.init_wizard import (
 # Use the template from wizard module to keep single source of truth
 DEFAULT_CONFIG_TEMPLATE = WIZARD_DEFAULT_CONFIG_TEMPLATE
 
+_LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
 app = typer.Typer(
     name="trellis",
     help="Trellis - Visual data model editor for dbt projects",
@@ -52,6 +54,11 @@ def main(
 @app.command()
 def run(
     port: int = typer.Option(8089, "--port", "-p", help="Port to run the server on"),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Address to bind. The API is unauthenticated: only widen this on a network you trust",
+    ),
     config: Optional[str] = typer.Option(
         None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"
     ),
@@ -119,6 +126,14 @@ def run(
 
     # Start server
     url = f"http://localhost:{port}"
+    if host not in _LOOPBACK_HOSTS:
+        typer.echo(
+            typer.style(
+                f"   Warning: bound to {host}. The API has no authentication, so "
+                "anyone who can reach this address can read and rewrite your project files.",
+                fg=typer.colors.YELLOW,
+            )
+        )
     typer.echo(typer.style(f"   Server running at {url}", fg=typer.colors.CYAN))
     typer.echo("   Press Ctrl+C to stop")
     typer.echo()
@@ -133,7 +148,7 @@ def run(
     # Run server
     uvicorn.run(
         "trellis_datamodel.server:app",
-        host="0.0.0.0",
+        host=host,
         port=port,
         reload=False,  # Disable reload in production
         log_level="info",
@@ -143,6 +158,11 @@ def run(
 @app.command(name="serve")
 def serve(
     port: int = typer.Option(8089, "--port", "-p", help="Port to run the server on"),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Address to bind. The API is unauthenticated: only widen this on a network you trust",
+    ),
     config: Optional[str] = typer.Option(
         None, "--config", "-c", help="Path to config file (trellis.yml or config.yml)"
     ),
@@ -156,7 +176,7 @@ def serve(
     Looks for trellis.yml or config.yml in the current directory.
     """
     # Delegate to run function
-    run(port=port, config=config, no_browser=no_browser)
+    run(host=host, port=port, config=config, no_browser=no_browser)
 
 
 @app.command()

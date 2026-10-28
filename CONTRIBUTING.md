@@ -140,6 +140,7 @@ trellis run [OPTIONS]
 
 Options:
   --port, -p INTEGER    Port [default: 8089]
+  --host TEXT           Address to bind [default: 127.0.0.1]
   --config, -c TEXT     Path to trellis.yml or config.yml
   --no-browser          Do not open a browser
   --help                Show help
