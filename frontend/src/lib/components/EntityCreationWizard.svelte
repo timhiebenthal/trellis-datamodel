@@ -2,6 +2,7 @@
     import Icon from "@iconify/svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
     import { generateSlug, toTitleCase } from "$lib/utils";
+    import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 
     type Props = {
         open: boolean;
@@ -327,7 +328,7 @@
                                 />
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:bar-chart-3" class="w-5 h-5 text-blue-600" />
+                                        <Icon icon={getEntityTypeStyle('fact').icon} class="w-5 h-5 {getEntityTypeStyle('fact').iconClass}" />
                                         <span class="font-medium text-gray-900">Fact</span>
                                     </div>
                                     <p class="text-sm text-gray-600 mt-1">
@@ -349,7 +350,7 @@
                                 />
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:list" class="w-5 h-5 text-green-600" />
+                                        <Icon icon={getEntityTypeStyle('dimension').icon} class="w-5 h-5 {getEntityTypeStyle('dimension').iconClass}" />
                                         <span class="font-medium text-gray-900">Dimension</span>
                                     </div>
                                     <p class="text-sm text-gray-600 mt-1">
@@ -371,7 +372,7 @@
                                 />
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:circle-dashed" class="w-5 h-5 text-gray-500" />
+                                        <Icon icon={getEntityTypeStyle('unclassified').icon} class="w-5 h-5 {getEntityTypeStyle('unclassified').iconClass}" />
                                         <span class="font-medium text-gray-900">Unclassified</span>
                                     </div>
                                     <p class="text-sm text-gray-600 mt-1">

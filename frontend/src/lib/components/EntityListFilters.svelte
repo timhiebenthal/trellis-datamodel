@@ -3,6 +3,7 @@
 	import type { EntityData } from '$lib/types';
 	import { exportDataModelToExcel } from '$lib/utils/excel-export';
 	import { getCanvasFilterPath } from '$lib/utils/entity-list-route';
+	import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
 	import { getFrameworkCopy } from '$lib/utils/framework-display';
 	import Icon from '@iconify/svelte';
 
@@ -398,8 +399,9 @@
 				{#if $entityListFilters.selectedEntityTypes.length > 0}
 					<div class="flex flex-wrap gap-1">
 						{#each $entityListFilters.selectedEntityTypes as type}
-							{@const typeLabel = type === 'dimension' ? 'Dimension' : type === 'fact' ? 'Fact' : 'Unclassified'}
-							{@const typeClass = type === 'dimension' ? 'bg-green-100 text-green-700 border-green-200' : type === 'fact' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-300'}
+							{@const typeStyle = getEntityTypeStyle(type)}
+							{@const typeLabel = typeStyle.label}
+							{@const typeClass = typeStyle.badge}
 							<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border {typeClass}">
 								{typeLabel}
 								<button
