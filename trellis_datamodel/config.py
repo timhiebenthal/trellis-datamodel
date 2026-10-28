@@ -860,6 +860,14 @@ def reload_config(config_path: Optional[str] = None) -> None:
                 "No config file found. Please create trellis.yml in the current directory."
             )
         
+        # load_config tolerates unparseable YAML (startup falls back to defaults),
+        # which on reload would report success while keeping stale values.
+        try:
+            with open(config_path, "r") as f:
+                yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ConfigurationError(f"Invalid YAML in {config_path}: {e}") from e
+
         # Reload config (this updates all global variables)
         load_config(config_path)
         # Artifact paths and framework options may have changed even when a

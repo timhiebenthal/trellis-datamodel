@@ -95,11 +95,6 @@ def test_put_config_without_config_file_returns_400_configuration_error(
     assert "No config file found" in detail["message"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="POST /api/config/reload answers 200 'success' when trellis.yml is "
-    "unparseable: config.load_config only logs a warning and keeps stale values",
-)
 def test_reload_config_with_unparseable_yaml_returns_400(client, config_file):
     config_file.write_text("framework: [unclosed\n")
 
