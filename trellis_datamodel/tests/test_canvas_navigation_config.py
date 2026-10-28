@@ -85,17 +85,11 @@ def canvas_config_client(monkeypatch, tmp_path):
     cfg.load_config(str(config_path))
 
     import trellis_datamodel.config as config_module
-    import trellis_datamodel.services.config_service as config_service_module
     import trellis_datamodel.routes.config as config_route_module
     import trellis_datamodel.server as server_module
 
     monkeypatch.setattr(
         config_module, "find_config_file", lambda config_override=None: str(config_path)
-    )
-    monkeypatch.setattr(
-        config_service_module,
-        "find_config_file",
-        lambda config_override=None: str(config_path),
     )
     importlib.reload(config_route_module)
     importlib.reload(server_module)

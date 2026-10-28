@@ -47,7 +47,7 @@ class DimensionalInferencePatterns(BaseModel):
     fact_prefix: Union[str, List[str]] = Field(default_factory=lambda: ["fct_", "fact_"])
 
 
-class DimensionalModelingConfig(BaseModel):
+class DimensionalModelingConfigSchema(BaseModel):
     """Dimensional modeling configuration."""
     inference_patterns: DimensionalInferencePatterns = Field(default_factory=DimensionalInferencePatterns)
 
@@ -57,14 +57,14 @@ class EntityInferencePatterns(BaseModel):
     prefix: Union[str, List[str]] = Field(default_factory=list)
 
 
-class EntityModelingConfig(BaseModel):
+class EntityModelingConfigSchema(BaseModel):
     """Entity modeling configuration."""
     inference_patterns: EntityInferencePatterns = Field(default_factory=EntityInferencePatterns)
 
 
 class EntityCreationGuidance(BaseModel):
     """Entity creation guidance configuration."""
-    enabled: bool = False
+    enabled: bool = True
     push_warning_enabled: bool = True
     min_description_length: int = Field(default=10, ge=0)
     disabled_guidance: List[str] = Field(default_factory=list)
@@ -96,14 +96,14 @@ class OssieSourceConfig(BaseModel):
     schema_name: str = Field(default="", alias="schema")
 
 
-class OssieConfig(BaseModel):
+class OssieConfigSchema(BaseModel):
     """Apache Ossie semantic model export configuration (beta)."""
     enabled: bool = False
     file: str = ""
     source: OssieSourceConfig = Field(default_factory=OssieSourceConfig)
 
 
-class MetricsConfig(BaseModel):
+class MetricsConfigSchema(BaseModel):
     """Metric tree canvas configuration (beta)."""
     enabled: bool = False
     file: str = ""
@@ -133,7 +133,7 @@ class ConfigSchema(BaseModel):
     dbt_catalog_path: str = Field(default="", description="Path to catalog.json")
     data_model_file: str = Field(default="data_model.yml", description="Path to data model file")
     dbt_model_paths: List[str] = Field(default_factory=list, description="Path patterns to filter models")
-    dbt_company_dummy_path: Optional[str] = Field(default=None, description="Optional path to company dummy project")
+    dbt_company_dummy_path: str = Field(default="", description="Optional path to company dummy project")
     bruin_pipeline_path: str = Field(default="", description="Path to Bruin pipeline directory")
     bruin_asset_paths: List[str] = Field(default_factory=list, description="Path patterns to filter Bruin assets")
     bruin_default_asset_type: str = Field(default="duckdb.sql", description="Asset type used when Trellis scaffolds a new Bruin asset")
@@ -141,10 +141,10 @@ class ConfigSchema(BaseModel):
     entity_creation_guidance: EntityCreationGuidance = Field(default_factory=EntityCreationGuidance)
     exposures: ExposuresConfig = Field(default_factory=ExposuresConfig)
     business_events: BusinessEventsConfig = Field(default_factory=BusinessEventsConfig)
-    ossie: OssieConfig = Field(default_factory=OssieConfig)
-    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
-    dimensional_modeling: Optional[DimensionalModelingConfig] = Field(default=None)
-    entity_modeling: Optional[EntityModelingConfig] = Field(default=None)
+    ossie: OssieConfigSchema = Field(default_factory=OssieConfigSchema)
+    metrics: MetricsConfigSchema = Field(default_factory=MetricsConfigSchema)
+    dimensional_modeling: Optional[DimensionalModelingConfigSchema] = Field(default=None)
+    entity_modeling: Optional[EntityModelingConfigSchema] = Field(default=None)
 
 
 # Request Models

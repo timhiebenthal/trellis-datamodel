@@ -67,14 +67,12 @@ async def client(temp_config_dir, monkeypatch):
     """Create a test client with config path set."""
     # Monkeypatch to find the temp config BEFORE any imports
     import trellis_datamodel.config as config_module
-    import trellis_datamodel.services.config_service as config_service_module
 
     def patched_find(config_override=None):
         return str(Path(temp_config_dir) / "trellis.yml")
 
-    # Patch both the original module and the service module that imports it
+    # Handlers resolve the path through config.find_config_file
     monkeypatch.setattr(config_module, "find_config_file", patched_find)
-    monkeypatch.setattr(config_service_module, "find_config_file", patched_find)
 
     # Reload the config route to pick up the patched function
     if "trellis_datamodel.routes.config" in sys.modules:

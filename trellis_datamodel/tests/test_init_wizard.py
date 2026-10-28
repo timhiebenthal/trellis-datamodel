@@ -531,6 +531,81 @@ class TestGenerateConfigFromAnswers:
         assert "modeling_style: dimensional_model" in config
         assert "enabled: false" in config
 
+    @staticmethod
+    def _load(tmp_path, answers):
+        """Write the generated config to disk and read it back with the real loader."""
+        from trellis_datamodel.services.config_service import read_config
+
+        path = tmp_path / "trellis.yml"
+        path.write_text(generate_config_from_answers(answers))
+        loaded, _ = read_config(str(path))
+        return loaded
+
+    def test_loads_back_entity_model_answers(self, tmp_path):
+        loaded = self._load(
+            tmp_path,
+            {
+                "framework": "dbt-core",
+                "modeling_style": "entity_model",
+                "entity_creation_guidance_enabled": True,
+                "dbt_project_path": "../dbt",
+                "dbt_model_paths": ["models/staging", "models/marts"],
+            },
+        )
+
+        assert loaded["framework"] == "dbt-core"
+        assert loaded["modeling_style"] == "entity_model"
+        assert loaded["dbt_project_path"] == "../dbt"
+        assert loaded["dbt_model_paths"] == ["models/staging", "models/marts"]
+        assert loaded["dbt_manifest_path"] == "target/manifest.json"
+        assert loaded["dbt_catalog_path"] == "target/catalog.json"
+        assert loaded["data_model_file"] == "data_model.yml"
+        assert loaded["dbt_company_dummy_path"] == "./dbt_company_dummy"
+        assert loaded["entity_creation_guidance"] == {
+            "enabled": True,
+            "push_warning_enabled": True,
+            "min_description_length": 10,
+            "disabled_guidance": [],
+        }
+        assert "dimensional_modeling" not in loaded
+
+    def test_loads_back_dimensional_model_answers(self, tmp_path):
+        loaded = self._load(
+            tmp_path,
+            {
+                "modeling_style": "dimensional_model",
+                "entity_creation_guidance_enabled": False,
+                "dbt_model_paths": None,
+            },
+        )
+
+        assert loaded["modeling_style"] == "dimensional_model"
+        assert loaded["dbt_model_paths"] == []
+        assert loaded["entity_creation_guidance"]["enabled"] is False
+        assert loaded["dimensional_modeling"] == {
+            "inference_patterns": {
+                "dimension_prefix": ["dim_", "d_"],
+                "fact_prefix": ["fct_", "fact_"],
+            }
+        }
+
+    def test_without_answers_matches_template_values(self, tmp_path):
+        """Unanswered keys keep the template's values."""
+        loaded = self._load(tmp_path, {})
+
+        assert loaded["framework"] == "dbt-core"
+        assert loaded["dbt_project_path"] == "."
+        assert loaded["dbt_model_paths"] == []
+
+    def test_keeps_template_comments(self):
+        config = generate_config_from_answers(
+            {"modeling_style": "dimensional_model", "dbt_model_paths": ["models"]}
+        )
+
+        assert "# Path to the dbt project directory" in config
+        assert "# List of path patterns to include" in config
+        assert "# Helper project used by `trellis generate-company-data`." in config
+
 
 class TestRunInitWizard:
     """Test run_init_wizard function."""

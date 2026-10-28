@@ -5,7 +5,7 @@ import os
 
 from trellis_datamodel import __version__
 from trellis_datamodel import config as cfg
-from trellis_datamodel.config import find_config_file
+from trellis_datamodel.config import resolve_config_path
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.services.manifest import get_models
 
@@ -16,7 +16,7 @@ def _resolve_config_path() -> str | None:
     """Resolve config file path, preferring CONFIG_PATH from startup, falling back to search."""
     if cfg.CONFIG_PATH and os.path.exists(cfg.CONFIG_PATH):
         return cfg.CONFIG_PATH
-    return find_config_file()
+    return resolve_config_path(None)
 
 
 def _resolve_label_prefixes() -> list[str]:
