@@ -2,7 +2,7 @@
     import Icon from '$lib/components/Icon.svelte';
     import { domainFilter, frameworkModels, nodes, tagFilter } from '$lib/stores';
     import type { EntityData, ModelInfo } from '$lib/types';
-    import { normalizeTags } from '$lib/utils';
+    import { normalizeTags, toggleTag as toggleTagIn } from '$lib/utils/entity-tags';
     import { readModelRef } from '$lib/utils/entity-compat';
 
     interface Props {
@@ -80,11 +80,7 @@
     }
 
     function toggleTag(tag: string) {
-        if ($tagFilter.includes(tag)) {
-            $tagFilter = $tagFilter.filter((value) => value !== tag);
-        } else {
-            $tagFilter = [...$tagFilter, tag];
-        }
+        $tagFilter = toggleTagIn($tagFilter, tag);
     }
 
     function clearFilters() {

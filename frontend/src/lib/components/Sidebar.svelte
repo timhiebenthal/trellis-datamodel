@@ -14,7 +14,9 @@
         activeFramework,
     } from "$lib/stores";
     import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
-    import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
+    import { getModelFolder } from "$lib/utils/folder-utils";
+    import { classifyModelTypeFromPrefixes } from "$lib/utils/model-naming";
+    import { normalizeTags, toggleTag as toggleTagIn, removeTag as removeTagFrom } from "$lib/utils/entity-tags";
     import { readModelRef } from "$lib/utils/entity-compat";
     import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
     import { getFrameworkDisplay, missingArtifactHints } from "$lib/utils/framework-display";
@@ -155,11 +157,7 @@
     }
 
     function toggleTag(tag: string) {
-        if ($tagFilter.includes(tag)) {
-            $tagFilter = $tagFilter.filter((t) => t !== tag);
-        } else {
-            $tagFilter = [...$tagFilter, tag];
-        }
+        $tagFilter = toggleTagIn($tagFilter, tag);
     }
 
     function removeFolder(folder: string) {
@@ -167,7 +165,7 @@
     }
 
     function removeTag(tag: string) {
-        $tagFilter = $tagFilter.filter((t) => t !== tag);
+        $tagFilter = removeTagFrom($tagFilter, tag);
     }
 
     function clearAllFilters() {

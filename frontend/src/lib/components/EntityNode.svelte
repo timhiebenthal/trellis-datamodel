@@ -30,21 +30,15 @@
         getLineage,
         getModelSchema,
     } from "$lib/api";
-    import {
-        getParallelOffset,
-        generateSlug,
-        normalizeTags,
-        mergeRelationshipIntoEdges,
-        detectFieldSemantics,
-        formatModelNameForLabel,
-        extractModelNameFromUniqueId,
-        toTitleCase,
-        classifyModelTypeFromPrefixes,
-    } from "$lib/utils";
+    import { getParallelOffset } from "$lib/utils/edge-calculations";
+    import { generateSlug } from "$lib/utils/slug";
+    import { mergeRelationshipIntoEdges } from "$lib/utils/relationship-edges";
+    import { detectFieldSemantics } from "$lib/utils/field-semantics";
+    import { formatModelNameForLabel, extractModelNameFromUniqueId, toTitleCase, classifyModelTypeFromPrefixes } from "$lib/utils/model-naming";
     import { mergeFields } from "$lib/utils/merged-fields";
     import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
     import type { MergedField } from "$lib/utils/merged-fields";
-    import { computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
+    import { normalizeTags, computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
     import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
     import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
     import { getContext } from "svelte";

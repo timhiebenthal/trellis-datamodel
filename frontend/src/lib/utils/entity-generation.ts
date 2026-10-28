@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/svelte';
 import type { DraftedField, GeneratedEntitiesResult } from '$lib/types';
-import { generateEntityId } from '$lib/utils';
+import { generateEntityId } from './slug';
 
 export type EditedEntity = {
     id: string;

@@ -7,9 +7,9 @@ import {
     calculateSmartPosition,
     isPositionNearEntity,
     findNonOverlappingPosition,
-    type Position,
 } from "./position-utils";
 import type { Node } from "@xyflow/svelte";
+import type { Point } from "$lib/types";
 
 describe("position-utils", () => {
     describe("calculateCanvasCenter", () => {
@@ -119,7 +119,7 @@ describe("position-utils", () => {
 
     describe("calculateFactPosition", () => {
         it("should return position near center", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const position = calculateFactPosition(center);
 
             expect(position.x).toBeGreaterThan(300); // 500 - 200
@@ -129,7 +129,7 @@ describe("position-utils", () => {
         });
 
         it("should use custom offset range from config", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const position = calculateFactPosition(center, { factOffsetRange: 100 });
 
             expect(position.x).toBeGreaterThan(400); // 500 - 100
@@ -139,7 +139,7 @@ describe("position-utils", () => {
         });
 
         it("should generate different positions on multiple calls", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const positions = Array.from({ length: 10 }, () =>
                 calculateFactPosition(center),
             );
@@ -154,7 +154,7 @@ describe("position-utils", () => {
 
     describe("calculateDimensionPosition", () => {
         it("should place dimension entity on outer ring", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const position = calculateDimensionPosition(center);
 
             const dx = position.x - center.x;
@@ -167,7 +167,7 @@ describe("position-utils", () => {
         });
 
         it("should use custom radius from config", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const position = calculateDimensionPosition(center, {
                 dimensionMinRadius: 200,
                 dimensionRadiusOffset: 100,
@@ -182,7 +182,7 @@ describe("position-utils", () => {
         });
 
         it("should generate positions at different angles", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const positions = Array.from({ length: 20 }, () =>
                 calculateDimensionPosition(center),
             );
@@ -202,7 +202,7 @@ describe("position-utils", () => {
         });
 
         it("should generate different positions on multiple calls", () => {
-            const center: Position = { x: 500, y: 400 };
+            const center: Point = { x: 500, y: 400 };
             const positions = Array.from({ length: 10 }, () =>
                 calculateDimensionPosition(center),
             );
@@ -313,7 +313,7 @@ describe("position-utils", () => {
     describe("isPositionNearEntity", () => {
         it("should return false when no entities exist", () => {
             const nodes: Node[] = [];
-            const position: Position = { x: 500, y: 400 };
+            const position: Point = { x: 500, y: 400 };
 
             expect(isPositionNearEntity(position, nodes)).toBe(false);
         });
@@ -327,7 +327,7 @@ describe("position-utils", () => {
                     data: { label: "Entity 1" },
                 },
             ];
-            const position: Position = { x: 500, y: 400 };
+            const position: Point = { x: 500, y: 400 };
 
             expect(isPositionNearEntity(position, nodes, 50)).toBe(false);
         });
@@ -341,7 +341,7 @@ describe("position-utils", () => {
                     data: { label: "Entity 1" },
                 },
             ];
-            const position: Position = { x: 540, y: 430 };
+            const position: Point = { x: 540, y: 430 };
 
             expect(isPositionNearEntity(position, nodes, 50)).toBe(true);
         });
@@ -355,7 +355,7 @@ describe("position-utils", () => {
                     data: { label: "Group" },
                 },
             ];
-            const position: Position = { x: 500, y: 400 };
+            const position: Point = { x: 500, y: 400 };
 
             expect(isPositionNearEntity(position, nodes, 50)).toBe(false);
         });
@@ -369,7 +369,7 @@ describe("position-utils", () => {
                     data: { label: "Entity 1" },
                 },
             ];
-            const position: Position = { x: 540, y: 430 };
+            const position: Point = { x: 540, y: 430 };
 
             // Distance is sqrt(40^2 + 30^2) = 50
             expect(isPositionNearEntity(position, nodes, 60)).toBe(true);
@@ -397,7 +397,7 @@ describe("position-utils", () => {
                     data: { label: "Entity 3" },
                 },
             ];
-            const position: Position = { x: 230, y: 220 };
+            const position: Point = { x: 230, y: 220 };
 
             expect(isPositionNearEntity(position, nodes, 50)).toBe(true);
         });

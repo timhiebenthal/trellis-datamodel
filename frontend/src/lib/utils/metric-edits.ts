@@ -1,5 +1,5 @@
 import type { MetricCatalogEntry, MetricEntry, MetricInfluence } from '$lib/types';
-import { generateSlug } from '$lib/utils';
+import { generateSlug } from './slug';
 
 /**
  * Graph edits for the metric canvas, as pure functions over `{ metrics, influences }`.

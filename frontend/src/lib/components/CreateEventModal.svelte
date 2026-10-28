@@ -3,7 +3,7 @@
     import Modal from "./Modal.svelte";
     import { createBusinessEvent, updateBusinessEvent, getBusinessEventDomains } from "$lib/api";
     import type { BusinessEvent, BusinessEventType } from "$lib/types";
-    import { toTitleCase } from "$lib/utils";
+    import { toTitleCase } from "$lib/utils/model-naming";
     import { modelingStyle } from "$lib/stores";
 
     type Props = {

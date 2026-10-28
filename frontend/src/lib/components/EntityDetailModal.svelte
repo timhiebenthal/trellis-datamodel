@@ -6,8 +6,9 @@
 	import type { EntityData, AnnotationType, DraftedField, BusinessEventProcess, AnnotationEntry, EntityRole, ModelSchemaColumn, OriginEntry, ModelInfo } from '$lib/types';
 	import { mergeFields } from '$lib/utils/merged-fields';
 	import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
+	import { SEVEN_W_TYPES, SEVEN_W_LABELS, SEVEN_W_BADGE_CLASSES } from '$lib/utils/seven-ws';
 	import type { MergedField } from '$lib/utils/merged-fields';
-	import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
+	import { computeUiTagsAfterEdit, addTag as addTagTo, removeTag as removeTagFrom } from '$lib/utils/entity-tags';
 	import { readModelRef, readFrameworkTags } from '$lib/utils/entity-compat';
 	import { bindEntityToModel } from '$lib/utils/entity-binding';
 	import { getEntityDetailPath, isEntityDetailPath } from '$lib/utils/entity-list-route';
@@ -492,15 +493,15 @@
 	}
 
 	function addTag() {
-		const trimmed = tagInput.trim();
-		if (trimmed && !entityTags.includes(trimmed)) {
-			entityTags = [...entityTags, trimmed];
+		const next = addTagTo(entityTags, tagInput);
+		if (next) {
+			entityTags = next;
 			tagInput = '';
 		}
 	}
 
 	function removeTag(tag: string) {
-		entityTags = entityTags.filter((t) => t !== tag);
+		entityTags = removeTagFrom(entityTags, tag);
 	}
 
 	function handleTagInputKeydown(event: KeyboardEvent) {
@@ -924,19 +925,9 @@
 	}
 
 	// Annotation type options for dimensions
-	const annotationTypes: { value: AnnotationType; label: string; color: string }[] = [
-		{ value: 'who', label: 'Who', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-		{ value: 'what', label: 'What', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-		{ value: 'when', label: 'When', color: 'bg-green-100 text-green-800 border-green-200' },
-		{ value: 'where', label: 'Where', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-		{ value: 'how', label: 'How', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-		{ value: 'why', label: 'Why', color: 'bg-red-100 text-red-800 border-red-200' },
-		{
-			value: 'how_many',
-			label: 'How Many',
-			color: 'bg-indigo-100 text-indigo-800 border-indigo-200'
-		}
-	];
+	const annotationTypes: { value: AnnotationType; label: string; color: string }[] = SEVEN_W_TYPES.map(
+		(value) => ({ value, label: SEVEN_W_LABELS[value], color: SEVEN_W_BADGE_CLASSES[value] })
+	);
 </script>
 
 {#if $entityDetailModal.open && currentEntity}

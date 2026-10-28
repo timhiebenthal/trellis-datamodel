@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { normalizeTags } from '$lib/utils';
+    import { normalizeTags, addTag, removeTag } from '$lib/utils/entity-tags';
     import { activeFramework } from '$lib/stores';
     import { getFrameworkCopy } from '$lib/utils/framework-display';
 
@@ -22,19 +22,15 @@
     let normalizedReadOnlyTags = $derived(new Set(normalizeTags(readOnlyTags)));
 
     function handleAddTag(tag: string) {
-        const trimmed = tag.trim();
-        if (!trimmed) return;
+        const newTags = addTag(normalizedTags, tag);
+        if (!newTags) return;
 
-        if (normalizedTags.includes(trimmed)) return;
-
-        const newTags = [...normalizedTags, trimmed];
         onUpdate(newTags);
         tagInput = '';
     }
 
     function handleRemoveTag(tag: string) {
-        const newTags = normalizedTags.filter((t) => t !== tag);
-        onUpdate(newTags);
+        onUpdate(removeTag(normalizedTags, tag));
     }
 
     function handleTagInputKeydown(e: KeyboardEvent) {

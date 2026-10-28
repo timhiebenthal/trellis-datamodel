@@ -1,13 +1,13 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
-    import type { Dimension, SevenWType } from "$lib/types";
+    import type { Dimension, AnnotationType } from "$lib/types";
 
     type Props = {
         textValue: string;
         onTextChange: (value: string) => void;
         onSelectDimension?: (dimension: Dimension) => void;
         dimensions: Dimension[];
-        filterBy?: SevenWType;
+        filterBy?: AnnotationType;
         allowedIds?: Set<string> | null;
         textSuggestions?: Set<string>;
         onCreateNew?: (text: string) => void;

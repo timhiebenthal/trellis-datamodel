@@ -32,8 +32,8 @@ export const sourceColors = writable<Record<string, string>>({});
 
 // Filter and grouping stores
 export const folderFilter = writable<string[]>([]);
-export const domainFilter = writable<CanvasFilterState['domains']>([]);
-export const tagFilter = writable<CanvasFilterState['tags']>([]);
+export const domainFilter = writable<CanvasFilterState['selectedDomains']>([]);
+export const tagFilter = writable<CanvasFilterState['selectedTags']>([]);
 export const canvasFiltersInitialized = writable<boolean>(false);
 export const entityTypeFilter = writable<string | null>(null); // 'dimension' | 'fact' | 'unclassified' | null
 export const modelBoundFilter = writable<'bound' | 'unbound' | null>(null); // Filter by model bound status

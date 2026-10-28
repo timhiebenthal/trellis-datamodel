@@ -6,6 +6,7 @@
     import { get } from "svelte/store";
     import { getBusinessEventProcesses, getBusinessEvents, getDimensions, getDataModel, saveDataModel } from "$lib/api";
     import { dimensionPrefixes, modelingStyle } from "$lib/stores";
+    import { SEVEN_W_LABELS, SEVEN_W_ICONS } from "$lib/utils/seven-ws";
 
     type Props = {
         event: BusinessEvent;
@@ -17,13 +18,13 @@
 
     // Annotation type configuration
     const ANNOTATION_TYPES: Array<{ type: AnnotationType; label: string; icon: string; placeholder: string; description: string; tooltip: string }> = [
-        { type: 'who', label: 'Who', icon: 'lucide:user', placeholder: 'e.g., customer, employee, supplier', description: 'People and organizations involved', tooltip: '1. Customer\n2. Employee (Salesperson, Technician)\n3. Supplier' },
-        { type: 'what', label: 'What', icon: 'lucide:box', placeholder: 'e.g., product, service, order', description: 'The things or objects being acted upon', tooltip: '1. Product (SKU)\n2. Service (Consulting, Warranty)\n3. Digital Asset (Web page, App feature)' },
-        { type: 'when', label: 'When', icon: 'lucide:calendar', placeholder: 'e.g., order date, delivery time', description: 'Defining points in time or timestamps', tooltip: '1. Order Date\n2. Delivery Due Date\n3. Treatment Time (Clock Dimension)' },
-        { type: 'where', label: 'Where', icon: 'lucide:map-pin', placeholder: 'e.g., store location, region', description: 'Specific locations or virtual addresses', tooltip: '1. Retail Store\n2. Website URL\n3. Delivery Address' },
-        { type: 'how', label: 'How', icon: 'lucide:settings', placeholder: 'e.g., online, in-store, phone', description: 'The method, manner, or status', tooltip: '1. Order Channel (Online, In-store, Phone)\n2. Payment Method (Credit card, PO)\n3. Call Status (Connected, Busy)' },
-        { type: 'why', label: 'Why', icon: 'lucide:help-circle', placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
-        { type: 'how_many', label: 'How Many', icon: 'lucide:bar-chart-3', placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
+        { type: 'who', label: SEVEN_W_LABELS.who, icon: SEVEN_W_ICONS.who, placeholder: 'e.g., customer, employee, supplier', description: 'People and organizations involved', tooltip: '1. Customer\n2. Employee (Salesperson, Technician)\n3. Supplier' },
+        { type: 'what', label: SEVEN_W_LABELS.what, icon: SEVEN_W_ICONS.what, placeholder: 'e.g., product, service, order', description: 'The things or objects being acted upon', tooltip: '1. Product (SKU)\n2. Service (Consulting, Warranty)\n3. Digital Asset (Web page, App feature)' },
+        { type: 'when', label: SEVEN_W_LABELS.when, icon: SEVEN_W_ICONS.when, placeholder: 'e.g., order date, delivery time', description: 'Defining points in time or timestamps', tooltip: '1. Order Date\n2. Delivery Due Date\n3. Treatment Time (Clock Dimension)' },
+        { type: 'where', label: SEVEN_W_LABELS.where, icon: SEVEN_W_ICONS.where, placeholder: 'e.g., store location, region', description: 'Specific locations or virtual addresses', tooltip: '1. Retail Store\n2. Website URL\n3. Delivery Address' },
+        { type: 'how', label: SEVEN_W_LABELS.how, icon: SEVEN_W_ICONS.how, placeholder: 'e.g., online, in-store, phone', description: 'The method, manner, or status', tooltip: '1. Order Channel (Online, In-store, Phone)\n2. Payment Method (Credit card, PO)\n3. Call Status (Connected, Busy)' },
+        { type: 'why', label: SEVEN_W_LABELS.why, icon: SEVEN_W_ICONS.why, placeholder: 'e.g., campaign, season, promotion', description: 'Reasons, causal factors, or context', tooltip: '1. Promotion (Discount code, Campaign)\n2. Weather conditions\n3. Problem/Return Reason' },
+        { type: 'how_many', label: SEVEN_W_LABELS.how_many, icon: SEVEN_W_ICONS.how_many, placeholder: 'e.g., quantity, amount, revenue', description: 'Quantitative measures (becoming the fact table)', tooltip: '1. Quantity Sold\n2. Revenue Amount\n3. Number of Items' }
     ];
 
     // Filtered annotation types: entity_model hides how_many from UI (data is preserved)

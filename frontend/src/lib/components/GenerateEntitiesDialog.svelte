@@ -12,7 +12,10 @@
     } from '$lib/types';
     import { isEntityNode } from '$lib/types';
     import { nodes, edges, modelingStyle, sourceColors, dimensionPrefixes, factPrefixes } from '$lib/stores';
-    import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
+    import { formatModelNameForLabel, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils/model-naming';
+    import { generateEntityId, generateSlug } from '$lib/utils/slug';
+    import { mergeRelationshipIntoEdges } from '$lib/utils/relationship-edges';
+    import { normalizeTags } from '$lib/utils/entity-tags';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
     import { readModelRef } from '$lib/utils/entity-compat';
     import { getEntityTypeStyle } from '$lib/utils/entity-type-style';

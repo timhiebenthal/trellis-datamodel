@@ -4,6 +4,7 @@
 	import { bulkEditModal, entitySelection, nodes } from '$lib/stores';
 	import type { EntityData } from '$lib/types';
 	import { bulkAssignDomain, bulkAddTags, bulkRemoveTags } from '$lib/utils/bulk-operations';
+	import { addTag, toggleTag } from '$lib/utils/entity-tags';
 
 	type Props = {
 		open: boolean;
@@ -114,25 +115,17 @@
 	}
 
 	function toggleTagToAdd(tag: string) {
-		if (tagsToAdd.includes(tag)) {
-			tagsToAdd = tagsToAdd.filter((t) => t !== tag);
-		} else {
-			tagsToAdd = [...tagsToAdd, tag];
-		}
+		tagsToAdd = toggleTag(tagsToAdd, tag);
 	}
 
 	function toggleTagToRemove(tag: string) {
-		if (tagsToRemove.includes(tag)) {
-			tagsToRemove = tagsToRemove.filter((t) => t !== tag);
-		} else {
-			tagsToRemove = [...tagsToRemove, tag];
-		}
+		tagsToRemove = toggleTag(tagsToRemove, tag);
 	}
 
 	function handleAddNewTag() {
-		const trimmed = newTagInput.trim();
-		if (trimmed && !tagsToAdd.includes(trimmed)) {
-			tagsToAdd = [...tagsToAdd, trimmed];
+		const next = addTag(tagsToAdd, newTagInput);
+		if (next) {
+			tagsToAdd = next;
 			newTagInput = '';
 		}
 	}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { apiJson, ApiError, updateConfig, inferRelationships, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt, getModelSchema } from './api';
-import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
+import type { BusinessEventType, BusinessEventAnnotations, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
 import { recordBootRequest } from './boot-diagnostics';
 
 vi.mock('./boot-diagnostics', async (importOriginal) => {
@@ -414,7 +414,7 @@ describe('createBusinessEvent with annotations', () => {
     });
 
     it('creates event with annotations data', async () => {
-        const mockSevenWs: BusinessEventSevenWs = {
+        const mockSevenWs: BusinessEventAnnotations = {
             who: [{ id: 'ent1', text: 'customer' }],
             what: [{ id: 'ent2', text: 'product' }],
             when: [],
@@ -462,7 +462,7 @@ describe('updateBusinessEvent with annotations', () => {
     });
 
     it('updates event with annotations data', async () => {
-        const mockSevenWs: BusinessEventSevenWs = {
+        const mockSevenWs: BusinessEventAnnotations = {
             who: [{ id: 'ent1', text: 'customer updated' }],
             what: [],
             when: [],

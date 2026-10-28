@@ -9,6 +9,7 @@
 	import { getEntityDetailPath } from "$lib/utils/entity-list-route";
 	import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
 import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
+	import { SEVEN_W_LABELS, SEVEN_W_BADGE_CLASSES } from "$lib/utils/seven-ws";
 
 	type Props = {
 		entity: Entity;
@@ -23,30 +24,12 @@ import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 	// 7Ws annotation type badge (for dimensions)
 	const annotationTypeLabel = $derived(() => {
 		if (!entity.annotation_type) return null;
-		const typeMap: Record<string, string> = {
-			who: 'Who',
-			what: 'What',
-			when: 'When',
-			where: 'Where',
-			how: 'How',
-			why: 'Why',
-			how_many: 'How Many'
-		};
-		return typeMap[entity.annotation_type] || null;
+		return SEVEN_W_LABELS[entity.annotation_type] || null;
 	});
 
 	const annotationTypeColor = $derived(() => {
 		if (!entity.annotation_type) return '';
-		const colorMap: Record<string, string> = {
-			who: 'bg-blue-100 text-blue-800 border-blue-200',
-			what: 'bg-purple-100 text-purple-800 border-purple-200',
-			when: 'bg-green-100 text-green-800 border-green-200',
-			where: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-			how: 'bg-orange-100 text-orange-800 border-orange-200',
-			why: 'bg-red-100 text-red-800 border-red-200',
-			how_many: 'bg-indigo-100 text-indigo-800 border-indigo-200'
-		};
-		return colorMap[entity.annotation_type] || '';
+		return SEVEN_W_BADGE_CLASSES[entity.annotation_type] || '';
 	});
 
 	// Check if entity is selected

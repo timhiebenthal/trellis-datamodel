@@ -2,6 +2,12 @@ import type { Node } from '@xyflow/svelte';
 
 export type OriginEntry = Record<string, string>;
 
+/** A 2D coordinate (canvas position, edge endpoint, label anchor, ...). */
+export interface Point {
+    x: number;
+    y: number;
+}
+
 export interface DbtColumn {
     name: string;
     type: string;
@@ -119,7 +125,7 @@ export interface Entity {
     model_ref?: string;
     additional_models?: string[];
     drafted_fields?: DraftedField[];
-    position: { x: number; y: number };
+    position: Point;
     width?: number;
     panel_height?: number;
     collapsed?: boolean;
@@ -420,12 +426,6 @@ export type BusinessEventType = 'discrete' | 'evolving' | 'recurring';
 
 export type AnnotationType = 'who' | 'what' | 'when' | 'where' | 'how' | 'why' | 'how_many';
 
-export type SevenWType = AnnotationType;
-
-export type SevenWsEntry = AnnotationEntry;
-
-export type BusinessEventSevenWs = BusinessEventAnnotations;
-
 export type Annotation = AnnotationEntry;
 
 export interface AnnotationEntry {
@@ -566,19 +566,10 @@ export interface EntityListFilters {
     groupByEntityType: boolean;
 }
 
+/** Canvas domain/tag filter selection (same key names as `EntityListFilters`). */
 export interface CanvasFilterState {
-    domains: string[];
-    tags: string[];
-}
-
-export interface EntityDetailModalState {
-    open: boolean;
-    entityId: string | null;
-}
-
-export interface BulkEditModalState {
-    open: boolean;
-    selectedEntityIds: string[];
+    selectedDomains: string[];
+    selectedTags: string[];
 }
 
 // Metric Tree types
@@ -595,7 +586,7 @@ export interface MetricEntry {
     expression?: string;
     dataset_ref?: string; // semantic-model dataset the draft is written under; drafts only
     binding?: { dataset: string; name: string }; // semantic_model.yml reference; bound only
-    position?: { x: number; y: number }; // optional runtime canvas position override
+    position?: Point; // optional runtime canvas position override
     unresolved?: boolean; // set by GET when dataset_ref or binding no longer resolves
     // Set by GET for a bound metric whose definition resolves: the expression read
     // from semantic_model.yml. Display only; never sent back on save.
@@ -655,7 +646,7 @@ export interface MetricNodeData {
 export interface MetricTreeNode {
     id: string;
     type: 'metric';
-    position: { x: number; y: number };
+    position: Point;
     data: MetricNodeData;
 }
 

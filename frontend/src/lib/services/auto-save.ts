@@ -1,7 +1,7 @@
 import type { Node, Edge } from '@xyflow/svelte';
 import { isEntityNode, type DataModel, type Entity, type RelationshipEdgeModel } from '$lib/types';
 import { saveDataModel as apiSaveDataModel } from '$lib/api';
-import { normalizeTags } from '$lib/utils';
+import { normalizeTags } from '$lib/utils/entity-tags';
 import { readModelRef } from '$lib/utils/entity-compat';
 import { get } from 'svelte/store';
 import { sourceColors as sourceColorsStore, modelingStyle as modelingStyleStore } from '$lib/stores';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapEntityTagsToNodeData, computeUiTagsAfterEdit } from './entity-tags';
+import { mapEntityTagsToNodeData, computeUiTagsAfterEdit, normalizeTags, addTag, removeTag, toggleTag } from './entity-tags';
 import { readFrameworkTags } from './entity-compat';
 
 describe('mapEntityTagsToNodeData', () => {
@@ -57,5 +57,58 @@ describe('computeUiTagsAfterEdit', () => {
 
     it('removing a ui tag is reflected since the diff is keyed off newTags alone', () => {
         expect(computeUiTagsAfterEdit(['nightly'], [])).toEqual([]);
+    });
+});
+
+describe('normalizeTags', () => {
+    it('returns [] for empty or non-tag input', () => {
+        expect(normalizeTags(undefined)).toEqual([]);
+        expect(normalizeTags('')).toEqual([]);
+        expect(normalizeTags(42)).toEqual([]);
+    });
+
+    it('trims, drops empties and dedupes arrays', () => {
+        expect(normalizeTags([' a ', '', 'b', 'a'])).toEqual(['a', 'b']);
+    });
+
+    it('splits a comma-separated string instead of iterating characters', () => {
+        expect(normalizeTags('pii, nightly ,pii')).toEqual(['pii', 'nightly']);
+    });
+});
+
+describe('addTag', () => {
+    it('appends the trimmed tag', () => {
+        expect(addTag(['a'], '  b ')).toEqual(['a', 'b']);
+    });
+
+    it('returns null for blank input or an existing tag', () => {
+        expect(addTag(['a'], '   ')).toBeNull();
+        expect(addTag(['a'], ' a ')).toBeNull();
+    });
+
+    it('does not mutate the input list', () => {
+        const tags = ['a'];
+        addTag(tags, 'b');
+        expect(tags).toEqual(['a']);
+    });
+});
+
+describe('removeTag', () => {
+    it('removes every occurrence of the tag', () => {
+        expect(removeTag(['a', 'b', 'a'], 'a')).toEqual(['b']);
+    });
+
+    it('leaves the list unchanged when the tag is absent', () => {
+        expect(removeTag(['a'], 'z')).toEqual(['a']);
+    });
+});
+
+describe('toggleTag', () => {
+    it('adds a missing tag at the end', () => {
+        expect(toggleTag(['a'], 'b')).toEqual(['a', 'b']);
+    });
+
+    it('removes a present tag', () => {
+        expect(toggleTag(['a', 'b'], 'a')).toEqual(['b']);
     });
 });

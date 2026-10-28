@@ -2,7 +2,8 @@
     import Icon from "@iconify/svelte";
     import Modal from "./Modal.svelte";
     import type { GuidanceConfig, EntityWizardData } from "$lib/types";
-    import { generateSlug, toTitleCase } from "$lib/utils";
+    import { generateSlug } from "$lib/utils/slug";
+    import { toTitleCase } from "$lib/utils/model-naming";
     import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 
     type Props = {

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { stripEntityPrefixes, formatModelNameForLabel } from './utils';
+import { stripEntityPrefixes, formatModelNameForLabel } from '$lib/utils/model-naming';
 
 const SINGLE_PREFIX = ['tbl_'];
 const MULTIPLE_PREFIXES = ['tbl_', 'entity_', 't_'];

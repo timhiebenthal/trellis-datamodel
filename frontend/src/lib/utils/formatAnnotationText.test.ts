@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatAnnotationText } from '../utils';
+import { formatAnnotationText } from './seven-ws';
 
 describe('formatAnnotationText', () => {
     describe('Basic Functionality', () => {

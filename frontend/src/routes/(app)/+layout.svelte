@@ -38,16 +38,11 @@
         getExposures,
         reconcileDbt,
     } from "$lib/api";
-import {
-    getModelFolder,
-    normalizeTags,
-    aggregateRelationshipsIntoEdges,
-    mergeRelationshipIntoEdges,
-    formatModelNameForLabel,
-    getLabelPrefixesFromConfig,
-    nextExpandCollapseState,
-} from "$lib/utils";
-import { mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
+import { getModelFolder } from "$lib/utils/folder-utils";
+import { aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils/relationship-edges";
+import { formatModelNameForLabel, getLabelPrefixesFromConfig } from "$lib/utils/model-naming";
+import { nextExpandCollapseState } from "$lib/utils/expand-collapse";
+import { normalizeTags, mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
 import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
 import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-display";

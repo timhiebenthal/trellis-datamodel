@@ -5,6 +5,7 @@
 	import { getCanvasFilterPath } from '$lib/utils/entity-list-route';
 	import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
 	import { getFrameworkCopy } from '$lib/utils/framework-display';
+	import { toggleTag as toggleTagIn, removeTag as removeTagFrom } from '$lib/utils/entity-tags';
 	import Icon from '@iconify/svelte';
 
 	interface Props {
@@ -99,27 +100,17 @@
 
 	// Handle tag filter toggle
 	function toggleTag(tag: string) {
-		entityListFilters.update((filters) => {
-			const tags = [...filters.selectedTags];
-			if (tags.includes(tag)) {
-				return {
-					...filters,
-					selectedTags: tags.filter((t) => t !== tag),
-				};
-			} else {
-				return {
-					...filters,
-					selectedTags: [...tags, tag],
-				};
-			}
-		});
+		entityListFilters.update((filters) => ({
+			...filters,
+			selectedTags: toggleTagIn(filters.selectedTags, tag),
+		}));
 	}
 
 	// Remove tag from filter
 	function removeTag(tag: string) {
 		entityListFilters.update((filters) => ({
 			...filters,
-			selectedTags: filters.selectedTags.filter((t) => t !== tag),
+			selectedTags: removeTagFrom(filters.selectedTags, tag),
 		}));
 	}
 
