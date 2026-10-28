@@ -32,9 +32,19 @@ export function normalizeTags(raw: unknown): string[] {
  * trimmed input is empty or already present (callers keep their input text then).
  */
 export function addTag(tags: string[], raw: string): string[] | null {
-    const trimmed = raw.trim();
-    if (!trimmed || tags.includes(trimmed)) return null;
-    return [...tags, trimmed];
+    return addTags(tags, [raw]);
+}
+
+/**
+ * Append several user-typed tags (e.g. a pasted comma-separated list) in one go:
+ * each is trimmed, empty and already-present ones are skipped, duplicates collapse.
+ * Returns the new list, or `null` when nothing new would be added.
+ */
+export function addTags(tags: string[], raws: string[]): string[] | null {
+    const added = [...new Set(raws.map((raw) => raw.trim()).filter(Boolean))].filter(
+        (tag) => !tags.includes(tag),
+    );
+    return added.length > 0 ? [...tags, ...added] : null;
 }
 
 /** Return `tags` without `tag`. */

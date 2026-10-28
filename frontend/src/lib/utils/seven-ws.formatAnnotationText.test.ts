@@ -1,8 +1,5 @@
 /**
- * Unit Tests for formatAnnotationText Utility
- *
- * Tests the core utility function that formats annotation display text
- * with optional role information for Role-Playing Dimension feature.
+ * Unit tests for formatAnnotationText (seven-ws.ts): annotation display text with optional role.
  */
 
 import { describe, it, expect } from 'vitest';

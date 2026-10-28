@@ -608,14 +608,6 @@ class TestRoleToDimensionSync:
 
         assert _roles_of(client, "customer") == ["buyer"]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Roles on entities are structured {label, role, source} objects; "
-            "sync builds set() of existing roles, which raises TypeError for dicts "
-            "and is swallowed, so the annotation role is silently never recorded."
-        ),
-    )
     def test_role_is_synced_onto_dimension_that_already_has_structured_roles(self, client):
         _put_dimension(
             client,

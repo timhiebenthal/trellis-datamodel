@@ -98,6 +98,12 @@ describe('formatModelNameForLabel with entity prefixes', () => {
         expect(formatModelNameForLabel('entity_', ['entity_'])).toBe('Entity ');
     });
 
+    it('formats names whose prefix is not configured, or that have none', () => {
+        expect(formatModelNameForLabel('entity_booking', ['tbl_'])).toBe('Entity Booking');
+        expect(formatModelNameForLabel('customer', ['tbl_'])).toBe('Customer');
+        expect(formatModelNameForLabel('API_key', [])).toBe('Api Key');
+    });
+
     it('handles complex model names with prefixes', () => {
         expect(formatModelNameForLabel('tbl_customer_order_details', ['tbl_'])).toBe('Customer Order Details');
         expect(formatModelNameForLabel('entity_user_profile_v2', ['entity_'])).toBe('User Profile V2');

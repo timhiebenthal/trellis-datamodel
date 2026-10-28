@@ -401,6 +401,10 @@ class DbtCoreAdapter:
                         with open(yml_path, "r") as f:
                             yml_content = yaml.safe_load(f) or {}
                         models_list = yml_content.get("models", [])
+                        # A file base name only identifies the model in
+                        # single-model files; shared files (schema.yml) do not.
+                        if len(models_list) != 1:
+                            continue
                         for model_entry in models_list:
                             yml_name = model_entry.get("name")
                             if not yml_name:
@@ -821,7 +825,12 @@ class DbtCoreAdapter:
         Resolve an entity id using base model name plus optional version.
         Falls back to the base name if no mapping is found.
         """
-        for key in self._build_model_keys(base_name, version):
+        keys = self._build_model_keys(base_name, version)
+        if version is not None:
+            # The bare name is shared by every version of a model (last bound
+            # wins), so it is only a fallback once the versioned keys miss.
+            keys = keys[1:] + keys[:1]
+        for key in keys:
             if key in model_to_entity:
                 return model_to_entity[key]
         # Fallback: try the raw base name

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { normalizeTags, addTag, removeTag } from '$lib/utils/entity-tags';
+    import { normalizeTags, addTags, removeTag } from '$lib/utils/entity-tags';
     import { activeFramework } from '$lib/stores';
     import { getFrameworkCopy } from '$lib/utils/framework-display';
 
@@ -21,12 +21,16 @@
     let normalizedTags = $derived(normalizeTags(tags));
     let normalizedReadOnlyTags = $derived(new Set(normalizeTags(readOnlyTags)));
 
-    function handleAddTag(tag: string) {
-        const newTags = addTag(normalizedTags, tag);
+    function handleAddTags(candidates: string[]) {
+        const newTags = addTags(normalizedTags, candidates);
         if (!newTags) return;
 
         onUpdate(newTags);
         tagInput = '';
+    }
+
+    function handleAddTag(tag: string) {
+        handleAddTags([tag]);
     }
 
     function handleRemoveTag(tag: string) {
@@ -44,12 +48,7 @@
             showTagInput = false;
         } else if (e.key === ',') {
             e.preventDefault();
-            const parts = tagInput.split(',');
-            parts.forEach((part) => {
-                if (part.trim()) {
-                    handleAddTag(part.trim());
-                }
-            });
+            handleAddTags(tagInput.split(','));
             tagInput = '';
         }
     }

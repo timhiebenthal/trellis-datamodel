@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapEntityTagsToNodeData, computeUiTagsAfterEdit, normalizeTags, addTag, removeTag, toggleTag } from './entity-tags';
+import { mapEntityTagsToNodeData, computeUiTagsAfterEdit, normalizeTags, addTag, addTags, removeTag, toggleTag } from './entity-tags';
 import { readFrameworkTags } from './entity-compat';
 
 describe('mapEntityTagsToNodeData', () => {
@@ -89,6 +89,23 @@ describe('addTag', () => {
     it('does not mutate the input list', () => {
         const tags = ['a'];
         addTag(tags, 'b');
+        expect(tags).toEqual(['a']);
+    });
+});
+
+describe('addTags', () => {
+    it('appends every new trimmed tag in order, skipping blanks, existing tags and repeats', () => {
+        expect(addTags(['existing'], ['a', ' b ', '', 'c', 'existing', 'a'])).toEqual(['existing', 'a', 'b', 'c']);
+    });
+
+    it('returns null when nothing new would be added', () => {
+        expect(addTags(['a'], [' a ', '  ', ''])).toBeNull();
+        expect(addTags(['a'], [])).toBeNull();
+    });
+
+    it('does not mutate the input list', () => {
+        const tags = ['a'];
+        addTags(tags, ['b', 'c']);
         expect(tags).toEqual(['a']);
     });
 });

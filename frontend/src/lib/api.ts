@@ -345,26 +345,18 @@ export async function getLineage(modelId: string): Promise<LineageResponse | nul
     }
 }
 
-function schemaPath(modelName: string, version?: number): string {
-    const encodedModel = encodeURIComponent(modelName);
-    return version
-        ? `/models/${encodedModel}/schema?version=${version}`
-        : `/models/${encodedModel}/schema`;
+function versionQuery(version?: number): string {
+    return version ? `?version=${version}` : '';
 }
 
-export async function getModelSchema(
+export function getModelSchema(
     modelName: string,
     version?: number
 ): Promise<ModelSchema | null> {
-    try {
-        return await apiJson<ModelSchema | null>(schemaPath(modelName, version), {
-            notFound: null,
-            errorMessage: 'Failed to fetch schema',
-        });
-    } catch (e) {
-        console.error("Error fetching schema:", e);
-        return null;
-    }
+    return apiJson<ModelSchema | null>(`/models/${encodeURIComponent(modelName)}/schema${versionQuery(version)}`, {
+        notFound: null,
+        errorMessage: 'Failed to fetch schema',
+    });
 }
 
 export function updateModelSchema(
@@ -372,7 +364,7 @@ export function updateModelSchema(
     version: number | undefined,
     columns: ModelSchemaColumn[]
 ): Promise<ModelSchema> {
-    return apiJson<ModelSchema>(schemaPath(modelName, version), {
+    return apiJson<ModelSchema>(`/models/${encodeURIComponent(modelName)}/schema${versionQuery(version)}`, {
         method: 'POST',
         body: { columns },
         errorMessage: 'Failed to update schema',
@@ -571,18 +563,14 @@ export function updateBusinessEventAnnotations(
  * @returns Promise containing array of Dimension objects
  */
 export async function getDimensions(filterByType?: AnnotationType, includeAllEntities = false): Promise<Dimension[]> {
-    let path = '/data-model';
     const params = new URLSearchParams();
     if (filterByType) {
         params.append('annotation_type', filterByType);
     }
     const queryString = params.toString();
-    if (queryString) {
-        path += `?${queryString}`;
-    }
 
     // Treat missing data model as empty result
-    const data = await apiJson<{ entities?: Dimension[] }>(path, {
+    const data = await apiJson<{ entities?: Dimension[] }>(`/data-model${queryString ? `?${queryString}` : ''}`, {
         notFound: { entities: [] },
         errorMessage: 'Failed to fetch dimensions',
     });
@@ -629,13 +617,18 @@ function combinePreviewSignals(user: AbortSignal | undefined, timeoutMs: number)
 }
 
 /**
- * POST a generate-entities endpoint. Server errors surface as ApiError with the
- * server's detail; timeouts and network failures get a contextual message.
+ * Run a generate-entities request (`post`, given the combined abort signal).
+ * Server errors surface as ApiError with the server's detail; timeouts and
+ * network failures get a contextual message.
  */
-async function generateEntities(path: string, context: string, userSignal?: AbortSignal): Promise<GeneratedEntitiesResult> {
+async function generateEntities(
+    post: (signal: AbortSignal) => Promise<GeneratedEntitiesResult | null>,
+    context: string,
+    userSignal?: AbortSignal,
+): Promise<GeneratedEntitiesResult> {
     const signal = combinePreviewSignals(userSignal, 120_000);
     try {
-        const data = await apiJson<GeneratedEntitiesResult | null>(path, { method: 'POST', signal });
+        const data = await post(signal);
         // Handle both direct response and wrapped response formats
         return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
     } catch (e) {
@@ -662,7 +655,7 @@ export function generateEntitiesFromEvent(
     options?: { signal?: AbortSignal }
 ): Promise<GeneratedEntitiesResult> {
     return generateEntities(
-        `/business-events/${eventId}/generate-entities`,
+        (signal) => apiJson(`/business-events/${eventId}/generate-entities`, { method: 'POST', signal }),
         'Error generating entities',
         options?.signal,
     );
@@ -679,7 +672,7 @@ export function generateEntitiesFromProcess(
     options?: { signal?: AbortSignal }
 ): Promise<GeneratedEntitiesResult> {
     return generateEntities(
-        `/processes/${processId}/generate-entities`,
+        (signal) => apiJson(`/processes/${processId}/generate-entities`, { method: 'POST', signal }),
         'Error generating entities from process',
         options?.signal,
     );
@@ -776,8 +769,9 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
             changed: result.changed,
         };
     } catch (e) {
+        // Boot must not fail because reconcile did, so report instead of throwing.
         console.error('Error reconciling models:', e);
-        return fallback;
+        return { status: 'error', changed: false };
     }
 }
 

@@ -431,14 +431,6 @@ class TestYamlScannedRelationships:
             for r in rels
         ] == [("customer_v1", 1, "orders_v2", 2)]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Bug: versioned entities overwrite the bare model-name key in the "
-            "resolution map and bare name is tried first, so every version of a "
-            "model resolves to the last-bound versioned entity."
-        ),
-    )
     def test_each_model_version_resolves_to_the_entity_bound_to_that_version(self, tmp_path):
         yml = {
             "dim_customer.yml": DIM_CUSTOMER_YML,
@@ -473,13 +465,6 @@ class TestYamlScannedRelationships:
             ("orders_v2", 2),
         ]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Bug: a shared schema.yml documenting several models makes every model "
-            "name resolve to the entity id 'schema' (yml name != file base name)."
-        ),
-    )
     def test_models_documented_in_one_shared_schema_file_still_resolve_to_their_entities(
         self, tmp_path
     ):

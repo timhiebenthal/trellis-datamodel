@@ -5,7 +5,6 @@ import type { Node, Edge } from '@xyflow/svelte';
 // Mock API function
 vi.mock('$lib/api', () => ({
     saveDataModel: vi.fn().mockResolvedValue(undefined),
-    getApiBase: vi.fn().mockReturnValue('http://localhost:8089/api'),
 }));
 
 // Mock stores
@@ -34,26 +33,6 @@ describe('AutoSaveService', () => {
         vi.clearAllMocks();
     });
 
-    describe('constructor', () => {
-        it('should use default debounce when not provided', () => {
-            const defaultService = new AutoSaveService();
-            expect(defaultService).toBeDefined();
-        });
-
-        it('should use provided debounce delay', () => {
-            const customService = new AutoSaveService(1000);
-            expect(customService).toBeDefined();
-        });
-
-        it('should initialize with empty last saved state', () => {
-            expect(service.getLastSavedState()).toBe('');
-        });
-
-        it('should not be saving initially', () => {
-            expect(service.isSavingActive()).toBe(false);
-        });
-    });
-
     describe('save', () => {
         const mockNodes: Node[] = [
             { id: 'node1', type: 'entity', position: { x: 0, y: 0 }, data: { label: 'Node 1' } },
@@ -71,9 +50,10 @@ describe('AutoSaveService', () => {
             vi.advanceTimersByTime(400);
             await vi.runAllTimersAsync();
 
-            // Should trigger save after debounce
-            expect(apiSaveDataModel).toHaveBeenCalled();
-            expect(onSavingChangeMock).toHaveBeenCalledWith(false);
+            // Should trigger save after debounce, then report not-saving
+            expect(apiSaveDataModel).toHaveBeenCalledTimes(1);
+            expect(onSavingChangeMock.mock.calls.map((c) => c[0])).toEqual([true, false]);
+            expect(service.isSavingActive()).toBe(false);
         });
 
         it('should cancel previous pending save', () => {
@@ -98,13 +78,15 @@ describe('AutoSaveService', () => {
             expect(apiSaveDataModel).not.toHaveBeenCalled();
         });
 
-        it('should update saving state callback', async () => {
-            service.save(mockNodes, mockEdges);
-            vi.advanceTimersByTime(400);
-            await vi.runAllTimersAsync();
+        it('should debounce by 400ms when no delay is given', () => {
+            const defaultService = new AutoSaveService();
+            defaultService.save(mockNodes, mockEdges);
 
-            expect(onSavingChangeMock).toHaveBeenCalledWith(true);
-            expect(onSavingChangeMock).toHaveBeenCalledWith(false);
+            vi.advanceTimersByTime(399);
+            expect(apiSaveDataModel).not.toHaveBeenCalled();
+
+            vi.advanceTimersByTime(1);
+            expect(apiSaveDataModel).toHaveBeenCalledTimes(1);
         });
 
         it('should use custom debounce delay', () => {
@@ -266,13 +248,8 @@ describe('AutoSaveService', () => {
         it('should trigger immediate save', () => {
             service.saveNow(mockNodes, mockEdges);
 
-            expect(apiSaveDataModel).toHaveBeenCalled();
-        });
-
-        it('should update saving state', () => {
-            service.saveNow(mockNodes, mockEdges);
-
-            expect(onSavingChangeMock).toHaveBeenCalledWith(true);
+            expect(apiSaveDataModel).toHaveBeenCalledTimes(1);
+            expect(service.isSavingActive()).toBe(true);
         });
     });
 
@@ -294,11 +271,6 @@ describe('AutoSaveService', () => {
             expect(apiSaveDataModel).not.toHaveBeenCalled();
         });
 
-        it('should resolve immediately', async () => {
-            const promise = service.flushSync(mockNodes, mockEdges);
-            await expect(promise).resolves.not.toThrow();
-        });
-
         it('should do nothing if state has not changed', async () => {
             service.save(mockNodes, mockEdges);
             vi.advanceTimersByTime(400);
@@ -313,7 +285,9 @@ describe('AutoSaveService', () => {
         it('should perform synchronous save on state change', async () => {
             await service.flushSync(mockNodes, mockEdges);
 
-            expect(apiSaveDataModel).toHaveBeenCalled();
+            expect(apiSaveDataModel).toHaveBeenCalledTimes(1);
+            expect(vi.mocked(apiSaveDataModel).mock.calls[0][0].entities?.[0].id).toBe('node1');
+            expect(service.hasUnsavedChanges(mockNodes, mockEdges)).toBe(false);
         });
 
         it('should throw on fetch error', async () => {
@@ -725,8 +699,10 @@ describe('AutoSaveService', () => {
             vi.advanceTimersByTime(400);
             await vi.runAllTimersAsync(); // Flush promises (including rejection)
 
-            // Should not crash and should update state
-            expect(onSavingChangeMock).toHaveBeenCalled();
+            // Should not crash, must stop reporting "saving", and must not mark the failed state as saved
+            expect(service.isSavingActive()).toBe(false);
+            expect(onSavingChangeMock.mock.calls.at(-1)).toEqual([false]);
+            expect(service.getLastSavedState()).toBe('');
         });
 
         it('should set isSaving to false after successful save', async () => {
@@ -743,7 +719,8 @@ describe('AutoSaveService', () => {
 
             // Should set saving to false after successful save
             expect(service.isSavingActive()).toBe(false);
-            expect(onSavingChangeMock).toHaveBeenCalledWith(false);
+            expect(onSavingChangeMock.mock.calls.at(-1)).toEqual([false]);
+            expect(service.hasUnsavedChanges(mockNodes, mockEdges)).toBe(false);
         });
     });
 });
