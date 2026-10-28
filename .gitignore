@@ -37,6 +37,7 @@ build/
 
 # Test artifacts
 .pytest_cache/
+.coverage
 frontend/tests/test_data_model.yml
 frontend/tests/.trellis-test/
 

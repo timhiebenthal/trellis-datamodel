@@ -29,3 +29,6 @@ vite.config.ts.timestamp-*
 /playwright/.cache/
 /playwright/.auth/
 .omc/
+
+# Coverage
+/coverage/

@@ -39,13 +39,13 @@ jobs:
         run: cd frontend && npm ci
 
       - name: Run Python tests
-        run: uv run pytest
+        run: uv run pytest --cov --cov-report=term-missing:skip-covered
 
       - name: Run frontend type check
         run: cd frontend && npm run check
 
       - name: Run frontend unit tests
-        run: cd frontend && npm run test:unit
+        run: cd frontend && npm run test:coverage
 
       - name: Build static files
         run: |
