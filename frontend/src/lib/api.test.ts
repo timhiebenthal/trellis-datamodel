@@ -134,13 +134,13 @@ describe('boot request diagnostics', () => {
         expect(requests[0]).toMatchObject({ path: '/api/infer-relationships', status: 500 });
     });
 
-    it('records a network failure without a status and degrades to null', async () => {
+    it('records a network failure without a status and surfaces the error', async () => {
         api.route({
             'GET /api/models/orders/schema': { networkError: new TypeError('Failed to fetch') },
         });
         const before = recordedCount();
 
-        await expect(getModelSchema('orders')).resolves.toBeNull();
+        await expect(getModelSchema('orders')).rejects.toThrow('Failed to fetch');
 
         const [request] = recordedSince(before);
         expect(request.path).toBe('/api/models/orders/schema');
@@ -160,6 +160,12 @@ describe('model schema', () => {
         api.route({ 'GET /api/models/orders/schema': { status: 404 } });
 
         await expect(getModelSchema('orders')).resolves.toBeNull();
+    });
+
+    it('surfaces a server error instead of reporting a missing schema', async () => {
+        api.route({ 'GET /api/models/orders/schema': { status: 500 } });
+
+        await expect(getModelSchema('orders')).rejects.toThrow('Failed to fetch schema: 500');
     });
 });
 
@@ -209,6 +215,18 @@ describe('framework-neutral sync endpoints', () => {
         api.route({ 'POST /api/reconcile': { status: 404 } });
 
         await expect(reconcileDbt()).resolves.toEqual({ status: 'success', changed: false });
+    });
+
+    it('reconcileDbt reports an error without throwing when the backend fails (500)', async () => {
+        api.route({ 'POST /api/reconcile': { status: 500 } });
+
+        await expect(reconcileDbt()).resolves.toEqual({ status: 'error', changed: false });
+    });
+
+    it('reconcileDbt reports an error without throwing on a network failure', async () => {
+        api.route({ 'POST /api/reconcile': { networkError: new TypeError('Failed to fetch') } });
+
+        await expect(reconcileDbt()).resolves.toEqual({ status: 'error', changed: false });
     });
 });
 

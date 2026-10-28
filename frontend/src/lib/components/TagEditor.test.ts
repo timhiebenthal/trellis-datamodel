@@ -109,6 +109,17 @@ describe('TagEditor Component', () => {
             expect(mockOnUpdate).toHaveBeenCalledWith(['existing', 'core']);
         });
 
+        it('adds every tag of a pasted comma-separated list in one update', async () => {
+            renderEditor({ tags: ['existing'] });
+            const input = await openInput();
+
+            await fireEvent.input(input, { target: { value: 'a, b ,c,existing' } });
+            await fireEvent.keyDown(input, { key: ',', code: 'Comma' });
+
+            expect(mockOnUpdate).toHaveBeenCalledTimes(1);
+            expect(mockOnUpdate).toHaveBeenCalledWith(['existing', 'a', 'b', 'c']);
+        });
+
         it('trims whitespace when adding tags', async () => {
             renderEditor();
             const input = await openInput();
