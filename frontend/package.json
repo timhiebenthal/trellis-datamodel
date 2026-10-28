@@ -12,6 +12,7 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "test": "npm run check && npm run test:smoke && npm run test:unit -- --run && npm run test:e2e",
     "test:unit": "vitest",
+    "test:coverage": "vitest run --coverage --testTimeout=20000",
     "test:smoke": "playwright test tests/smoke.spec.ts",
     "test:e2e": "npm run check && playwright test"
   },
@@ -25,6 +26,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.2.9",
     "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "4.0.14",
     "autoprefixer": "^10.4.22",
     "jsdom": "^27.2.0",
     "postcss": "^8.5.6",
