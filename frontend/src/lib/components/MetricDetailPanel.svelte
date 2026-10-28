@@ -35,20 +35,18 @@
     } = $props();
 
     let labelInput = $state<HTMLInputElement | null>(null);
-    let datasetDropdownRef = $state<HTMLDivElement | null>(null);
-    let datasetDropdownOpen = $state(false);
-    let datasetFilterActive = $state(false);
-    let activeDatasetIndex = $state(-1);
 
     const binding = $derived(metric?.binding ?? null);
     const needsExpression = $derived(
         !!metric && !binding && !(metric.expression ?? "").trim(),
     );
-    const filteredDatasets = $derived.by(() => {
-        const query = (metric?.dataset_ref ?? "").trim().toLowerCase();
-        if (!datasetFilterActive || !query) return datasets;
-        return datasets.filter((id) => id.toLowerCase().includes(query));
+    // A draft can still name a dataset that is no longer exported. Keeping it as an
+    // option shows the broken reference instead of silently blanking the field.
+    const staleDataset = $derived.by(() => {
+        const ref = metric?.dataset_ref ?? "";
+        return ref && !datasets.includes(ref) ? ref : null;
     });
+    const noDatasets = $derived(datasets.length === 0 && !staleDataset);
 
     // `focus === 'label'` is how "Add metric" lands the caret in the name field.
     $effect(() => {
@@ -57,78 +55,6 @@
             labelInput.select();
         }
     });
-
-    $effect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (datasetDropdownRef && !datasetDropdownRef.contains(event.target as Node)) {
-                datasetDropdownOpen = false;
-                datasetFilterActive = false;
-            }
-        }
-
-        if (datasetDropdownOpen) {
-            document.addEventListener("click", handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener("click", handleClickOutside);
-        };
-    });
-
-    function openDatasetDropdown() {
-        if (datasets.length === 0) return;
-        datasetDropdownOpen = true;
-        datasetFilterActive = false;
-        activeDatasetIndex = -1;
-    }
-
-    function toggleDatasetDropdown() {
-        if (datasetDropdownOpen) {
-            datasetDropdownOpen = false;
-            datasetFilterActive = false;
-        } else {
-            openDatasetDropdown();
-        }
-    }
-
-    function selectDataset(dataset: string) {
-        onchange?.({ dataset_ref: dataset });
-        datasetDropdownOpen = false;
-        datasetFilterActive = false;
-        activeDatasetIndex = -1;
-    }
-
-    function handleDatasetKeydown(event: KeyboardEvent) {
-        if (event.key === "Escape") {
-            if (datasetDropdownOpen) {
-                datasetDropdownOpen = false;
-                datasetFilterActive = false;
-                event.preventDefault();
-            }
-        } else if (event.key === "ArrowDown") {
-            if (!datasetDropdownOpen && datasets.length > 0) {
-                openDatasetDropdown();
-            }
-            if (filteredDatasets.length > 0) {
-                event.preventDefault();
-                activeDatasetIndex = Math.min(activeDatasetIndex + 1, filteredDatasets.length - 1);
-            }
-        } else if (event.key === "ArrowUp") {
-            if (datasetDropdownOpen && filteredDatasets.length > 0) {
-                event.preventDefault();
-                activeDatasetIndex = Math.max(activeDatasetIndex - 1, 0);
-            }
-        } else if (event.key === "Enter") {
-            if (
-                datasetDropdownOpen &&
-                activeDatasetIndex >= 0 &&
-                activeDatasetIndex < filteredDatasets.length
-            ) {
-                event.preventDefault();
-                selectDataset(filteredDatasets[activeDatasetIndex]);
-            }
-        }
-    }
 
     const fieldClass =
         "w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-500";
@@ -279,92 +205,29 @@
                         <span>Dataset</span>
                         <span class="normal-case tracking-normal text-slate-400">optional</span>
                     </label>
-                    <div class="relative" bind:this={datasetDropdownRef}>
-                        <input
-                            id="metric-field-dataset-{metric.id}"
-                            class="{fieldClass} pr-8"
-                            value={metric.dataset_ref ?? ""}
-                            placeholder="fct__order"
-                            autocomplete="off"
-                            role="combobox"
-                            aria-expanded={datasetDropdownOpen && filteredDatasets.length > 0}
-                            aria-autocomplete="list"
-                            aria-controls="metric-dataset-options-{metric.id}"
-                            onfocus={openDatasetDropdown}
-                            onblur={() => {
-                                datasetDropdownOpen = false;
-                                datasetFilterActive = false;
-                            }}
-                            oninput={(event) => {
-                                datasetDropdownOpen = true;
-                                datasetFilterActive = true;
-                                activeDatasetIndex = 0;
-                                onchange?.({ dataset_ref: event.currentTarget.value });
-                            }}
-                            onkeydown={handleDatasetKeydown}
-                            data-testid="metric-field-dataset"
-                        />
-                        {#if datasets.length > 0}
-                            <button
-                                type="button"
-                                tabindex="-1"
-                                class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600"
-                                aria-label="Toggle dataset options"
-                                onmousedown={(event) => event.preventDefault()}
-                                onclick={toggleDatasetDropdown}
-                                data-testid="metric-dataset-toggle"
-                            >
-                                <Icon
-                                    icon="lucide:chevron-down"
-                                    class="h-4 w-4 shrink-0 transition-transform {datasetDropdownOpen
-                                        ? 'rotate-180'
-                                        : ''}"
-                                />
-                            </button>
+                    <select
+                        id="metric-field-dataset-{metric.id}"
+                        class="{fieldClass} bg-white"
+                        value={metric.dataset_ref ?? ""}
+                        disabled={noDatasets}
+                        onchange={(event) =>
+                            onchange?.({ dataset_ref: event.currentTarget.value || undefined })}
+                        data-testid="metric-field-dataset"
+                    >
+                        <option value="">None - document level</option>
+                        {#each datasets as dataset (dataset)}
+                            <option value={dataset}>{dataset}</option>
+                        {/each}
+                        {#if staleDataset}
+                            <option value={staleDataset}>{staleDataset} (not exported)</option>
                         {/if}
-
-                        {#if datasetDropdownOpen && filteredDatasets.length > 0}
-                            <div
-                                class="absolute left-0 z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
-                                onmousedown={(event) => event.preventDefault()}
-                            >
-                                <ul
-                                    id="metric-dataset-options-{metric.id}"
-                                    role="listbox"
-                                    class="focus:outline-none"
-                                    data-testid="metric-dataset-options"
-                                >
-                                    {#each filteredDatasets as dataset, index (dataset)}
-                                        {@const isSelected = dataset === (metric.dataset_ref ?? "")}
-                                        {@const isHighlighted = index === activeDatasetIndex}
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <li
-                                            role="option"
-                                            aria-selected={isSelected}
-                                            class="relative cursor-pointer select-none py-1.5 pl-3 pr-8 text-sm text-gray-900 transition-colors hover:bg-primary-50 hover:text-primary-700 {isSelected ||
-                                            isHighlighted
-                                                ? 'bg-primary-50 font-medium text-primary-700'
-                                                : ''}"
-                                            onclick={() => selectDataset(dataset)}
-                                            data-testid="metric-dataset-option"
-                                        >
-                                            <span class="block truncate font-mono text-xs">{dataset}</span>
-                                            {#if isSelected}
-                                                <span
-                                                    class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-primary-600"
-                                                >
-                                                    <Icon icon="lucide:check" class="h-4 w-4" />
-                                                </span>
-                                            {/if}
-                                        </li>
-                                    {/each}
-                                </ul>
-                            </div>
-                        {/if}
-                    </div>
+                    </select>
                     <p class="mt-1 text-[11px] leading-relaxed text-slate-400">
-                        The semantic-model dataset the metric is written under on push. Free text
-                        is allowed; a dataset that is not exported is badged rather than deleted.
+                        {#if noDatasets}
+                            No dataset is exported yet. Bind an entity to a model to get one.
+                        {:else}
+                            The semantic-model dataset the metric is written under on push.
+                        {/if}
                     </p>
                 </div>
             {/if}

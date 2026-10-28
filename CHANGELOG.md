@@ -28,8 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in collapsible sections - drafts, metrics already on the tree, and
   semantic-model metrics still to add - with teal marking a bound metric and
   amber a draft. A draft's `dataset_ref` names one of the datasets a push
-  writes (for example `entity_booking`), and the detail panel offers exactly
-  those.
+  writes (for example `entity_booking`), and the detail panel offers
+  exactly those in a dropdown.
 
 ### Fixed
 - **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`

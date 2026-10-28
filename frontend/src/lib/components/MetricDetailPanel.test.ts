@@ -17,10 +17,14 @@ const bound: MetricEntry = {
     binding: { dataset: 'fct__order', name: 'avg_price' },
 };
 
-function field(container: HTMLElement, name: string): HTMLInputElement | HTMLTextAreaElement {
+function field(
+    container: HTMLElement,
+    name: string,
+): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
     return container.querySelector(`[data-testid="metric-field-${name}"]`) as
         | HTMLInputElement
-        | HTMLTextAreaElement;
+        | HTMLTextAreaElement
+        | HTMLSelectElement;
 }
 
 describe('MetricDetailPanel', () => {
@@ -46,33 +50,52 @@ describe('MetricDetailPanel', () => {
 
         await fireEvent.input(field(container, 'label'), { target: { value: 'Booked revenue' } });
         await fireEvent.input(field(container, 'expression'), { target: { value: 'sum(net_amount)' } });
-        await fireEvent.input(field(container, 'dataset'), { target: { value: 'fct__booking' } });
 
         expect(onchange).toHaveBeenCalledWith({ label: 'Booked revenue' });
         expect(onchange).toHaveBeenCalledWith({ expression: 'sum(net_amount)' });
-        expect(onchange).toHaveBeenCalledWith({ dataset_ref: 'fct__booking' });
     });
 
-    it('suggests the semantic-model datasets for the dataset reference and still accepts free text', async () => {
+    it('offers only the exported datasets and reports the one picked', async () => {
         const onchange = vi.fn();
         const { container } = render(MetricDetailPanel, {
             props: { metric: draft, datasets: ['fct__order', 'dim_customer'], onchange },
         });
 
-        const datasetInput = field(container, 'dataset');
-        await fireEvent.focus(datasetInput);
-
-        const options = Array.from(
-            container.querySelectorAll('[data-testid="metric-dataset-option"]'),
-        );
-        expect(options.map((option) => option.textContent?.trim())).toEqual([
+        const select = field(container, 'dataset') as HTMLSelectElement;
+        expect(select.tagName).toBe('SELECT');
+        expect(select.value).toBe('fct__order');
+        expect(Array.from(select.options).map((option) => option.textContent?.trim())).toEqual([
+            'None - document level',
             'fct__order',
             'dim_customer',
         ]);
 
-        await fireEvent.click(options[1]);
+        await fireEvent.change(select, { target: { value: 'dim_customer' } });
         expect(onchange).toHaveBeenCalledWith({ dataset_ref: 'dim_customer' });
-        expect(container.querySelector('[data-testid="metric-dataset-options"]')).toBeNull();
+
+        await fireEvent.change(select, { target: { value: '' } });
+        expect(onchange).toHaveBeenLastCalledWith({ dataset_ref: undefined });
+    });
+
+    it('keeps a dataset that is no longer exported visible instead of blanking it', () => {
+        const { container } = render(MetricDetailPanel, {
+            props: { metric: { ...draft, dataset_ref: 'ghost' }, datasets: ['fct__order'] },
+        });
+
+        const select = field(container, 'dataset') as HTMLSelectElement;
+        expect(select.value).toBe('ghost');
+        expect(Array.from(select.options).map((option) => option.textContent?.trim())).toContain(
+            'ghost (not exported)',
+        );
+    });
+
+    it('disables the dataset picker and says why when nothing is exported', () => {
+        const { container } = render(MetricDetailPanel, {
+            props: { metric: { ...draft, dataset_ref: undefined }, datasets: [] },
+        });
+
+        expect((field(container, 'dataset') as HTMLSelectElement).disabled).toBe(true);
+        expect(container.textContent).toContain('No dataset is exported yet');
     });
 
     it('marks a draft with no expression as required', () => {
