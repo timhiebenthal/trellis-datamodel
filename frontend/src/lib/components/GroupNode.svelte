@@ -2,12 +2,15 @@
     import {
         Handle,
         Position,
+        useSvelteFlow,
         type NodeProps,
     } from "@xyflow/svelte";
     import { nodes, edges } from "$lib/stores";
     import Icon from "@iconify/svelte";
 
     let { data, id, selected }: NodeProps = $props();
+
+    const { getViewport } = useSvelteFlow();
 
     let isCollapsed = $derived(data.collapsed ?? false);
 
@@ -38,19 +41,22 @@
 
         const startX = event.clientX;
         const startY = event.clientY;
+        // Pointer deltas are in screen pixels but the size is in flow units, so
+        // scale by the zoom or the edge drifts away from the cursor (#170).
+        const zoom = getViewport().zoom || 1;
         const initialWidth = nodeWidth;
         const initialHeight = nodeHeight;
 
         function onMove(moveEvent: PointerEvent) {
             let next: number;
             if (type === "width") {
-                const delta = moveEvent.clientX - startX;
+                const delta = (moveEvent.clientX - startX) / zoom;
                 next = Math.min(
                     MAX_WIDTH,
                     Math.max(MIN_WIDTH, initialWidth + delta),
                 );
             } else {
-                const delta = moveEvent.clientY - startY;
+                const delta = (moveEvent.clientY - startY) / zoom;
                 next = Math.min(
                     MAX_HEIGHT,
                     Math.max(MIN_HEIGHT, initialHeight + delta),
