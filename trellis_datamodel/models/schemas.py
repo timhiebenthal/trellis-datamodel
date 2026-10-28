@@ -202,54 +202,6 @@ class ModelSchemaResponse(BaseModel):
     file_path: str
 
 
-class ConfigStatusResponse(BaseModel):
-    """Response for configuration status."""
-    config_present: bool
-    config_filename: str
-    framework: str
-    dbt_project_path: Optional[str]
-    manifest_path: Optional[str]
-    catalog_path: Optional[str]
-    manifest_exists: bool
-    catalog_exists: bool
-    data_model_exists: bool
-    error: Optional[str] = None
-
-
-class ConfigInfoResponse(BaseModel):
-    """Response for detailed configuration info."""
-    config_path: Optional[str]
-    framework: str
-    dbt_project_path: Optional[str]
-    manifest_path: Optional[str]
-    manifest_exists: bool
-    catalog_path: Optional[str]
-    catalog_exists: bool
-    data_model_path: Optional[str]
-    data_model_exists: bool
-    canvas_layout_path: Optional[str]
-    canvas_layout_exists: bool
-    frontend_build_dir: Optional[str]
-    model_paths_configured: List[str]
-    model_paths_resolved: List[str]
-    guidance: Dict[str, Any]
-    entity_creation_guidance: Dict[str, Any]
-    lineage_enabled: bool
-    lineage_layers: List[str]
-    exposures_enabled: bool
-    exposures_default_layout: str
-    bus_matrix_enabled: bool
-    modeling_style: str
-    label_prefixes: List[str]
-    dimension_prefix: List[str]
-    fact_prefix: List[str]
-    entity_prefix: List[str]
-    start_page: str = StartPageEnum.CANVAS.value
-    canvas_default_filters: Dict[str, List[str]] = Field(
-        default_factory=lambda: {"domains": [], "tags": []}
-    )
-
-
 class ManifestResponse(BaseModel):
     """Response for manifest endpoint."""
     models: List[Dict[str, Any]]
