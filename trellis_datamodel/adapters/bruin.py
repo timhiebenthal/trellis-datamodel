@@ -47,7 +47,10 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
-from trellis_datamodel.adapters.lineage import walk_upstream
+from trellis_datamodel.adapters.lineage import (
+    source_systems_from_lineage,
+    walk_upstream,
+)
 from trellis_datamodel.utils.structured_data import (
     load_data_model_file,
     load_yaml_or_json,
@@ -1013,22 +1016,8 @@ class BruinAdapter:
 
     def get_source_systems_for_model(self, model_unique_id: str) -> list[str]:
         """Return the source connections feeding an asset."""
-        try:
-            graph = self.get_lineage(model_unique_id)
-        except Exception as e:
-            logger.warning(
-                "Failed to extract source systems for asset %s: %s",
-                model_unique_id,
-                e,
-            )
-            return []
-
-        return sorted(
-            {
-                node["source_name"]
-                for node in graph["nodes"]
-                if node["is_source"] and node["source_name"]
-            }
+        return source_systems_from_lineage(
+            self.get_lineage, model_unique_id, "asset"
         )
 
     def get_source_systems_for_models(

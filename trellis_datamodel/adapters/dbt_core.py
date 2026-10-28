@@ -29,7 +29,10 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.utils.path_validation import validate_path_is_safe
-from trellis_datamodel.adapters.lineage import walk_upstream
+from trellis_datamodel.adapters.lineage import (
+    source_systems_from_lineage,
+    walk_upstream,
+)
 from trellis_datamodel.utils.structured_data import load_data_model_file
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
@@ -1655,22 +1658,8 @@ class DbtCoreAdapter:
         Never raises: this backs optional display, so an unreadable manifest or
         an unknown model yields no source systems rather than an error.
         """
-        try:
-            graph = self.get_lineage(model_unique_id)
-        except Exception as e:
-            logger.warning(
-                "Failed to extract source systems for model %s: %s",
-                model_unique_id,
-                e,
-            )
-            return []
-
-        return sorted(
-            {
-                node["source_name"]
-                for node in graph["nodes"]
-                if node["is_source"] and node["source_name"]
-            }
+        return source_systems_from_lineage(
+            self.get_lineage, model_unique_id, "model"
         )
 
     def get_source_systems_for_models(
