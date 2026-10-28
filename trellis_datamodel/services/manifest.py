@@ -8,7 +8,11 @@ adapter details from route handlers.
 from typing import Any
 
 from trellis_datamodel.adapters import get_adapter
-from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
+from trellis_datamodel.exceptions import (
+    ConfigurationError,
+    DomainError,
+    FileOperationError,
+)
 
 
 def get_models() -> list[dict[str, Any]]:
@@ -56,6 +60,8 @@ def get_models() -> list[dict[str, Any]]:
 
     try:
         return adapter.get_models()
+    except DomainError:
+        raise
     except FileNotFoundError as e:
         raise FileOperationError(f"Model metadata not found: {str(e)}") from e
     except Exception as e:

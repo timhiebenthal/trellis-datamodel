@@ -136,7 +136,7 @@ class DbtCoreAdapter:
     def _get_artifact_snapshot(self) -> ArtifactSnapshot:
         """Return the shared snapshot used by read-only adapter operations."""
         if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
         catalog_path = (
             self.catalog_path
@@ -668,7 +668,7 @@ class DbtCoreAdapter:
     ) -> ModelSchema:
         """Get the current schema definition for a specific model from its YAML file."""
         if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
         snapshot = self._get_artifact_snapshot()
         candidate_nodes = [
@@ -747,7 +747,7 @@ class DbtCoreAdapter:
         the live tag list.
         """
         if not os.path.exists(self.manifest_path):
-            raise FileNotFoundError(f"Manifest not found at {self.manifest_path}")
+            raise FileOperationError(f"Manifest not found at {self.manifest_path}")
 
         manifest = self._load_manifest()
 
@@ -951,7 +951,7 @@ class DbtCoreAdapter:
                 for filename in files
             )
             if not yml_found:
-                raise FileNotFoundError(
+                raise ConfigurationError(
                     f"No schema yml files found under configured dbt model paths: {model_dirs}"
                 )
             return indexed_relationships
@@ -1115,7 +1115,7 @@ class DbtCoreAdapter:
                         continue
 
         if not yml_found:
-            raise FileNotFoundError(
+            raise ConfigurationError(
                 f"No schema yml files found under configured dbt model paths: {model_dirs}"
             )
 

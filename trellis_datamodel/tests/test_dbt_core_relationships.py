@@ -14,6 +14,7 @@ import yaml
 
 import trellis_datamodel.config as cfg
 from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
+from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
 
 
 def _model_node(name, columns=None, version=None):
@@ -281,14 +282,14 @@ class TestManifestIndexedRelationships:
     def test_missing_schema_files_raise_when_relationships_exist(self, tmp_path):
         adapter = _build(tmp_path, _customer_orders_nodes(), BOUND_ENTITIES, {})
 
-        with pytest.raises(FileNotFoundError, match="No schema yml files"):
+        with pytest.raises(ConfigurationError, match="No schema yml files"):
             adapter.infer_relationships()
 
-    def test_missing_manifest_raises_file_not_found(self, tmp_path):
+    def test_missing_manifest_raises_file_operation_error(self, tmp_path):
         adapter = _build(tmp_path, _customer_orders_nodes(), BOUND_ENTITIES, EMPTY_SCHEMA)
         Path(adapter.manifest_path).unlink()
 
-        with pytest.raises(FileNotFoundError, match="Manifest not found"):
+        with pytest.raises(FileOperationError, match="Manifest not found"):
             adapter.infer_relationships()
 
 
@@ -395,10 +396,10 @@ class TestYamlScannedRelationships:
 
         assert len(adapter.infer_relationships()) == 1
 
-    def test_no_schema_files_raise_file_not_found(self, tmp_path):
+    def test_no_schema_files_raise_configuration_error(self, tmp_path):
         adapter = _build(tmp_path, PLAIN_NODES, BOUND_ENTITIES, {})
 
-        with pytest.raises(FileNotFoundError, match="No schema yml files"):
+        with pytest.raises(ConfigurationError, match="No schema yml files"):
             adapter.infer_relationships()
 
     def test_versioned_model_in_yaml_reports_its_version_on_the_target_side(self, tmp_path):
