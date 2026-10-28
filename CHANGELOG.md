@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Saving the Config page no longer deletes keys and comments (#159):**
+  `PUT /api/config` rebuilt `trellis.yml` from a fixed allowlist and dumped it
+  with a plain YAML writer, so one save dropped every key the allowlist did not
+  know (`canvas_layout_file`, `canvas_layout_version_control`, `bus_matrix`),
+  along with all comments and key order - and `config.py` reads those keys, so
+  runtime behaviour changed too. The save now merges the normalised values into
+  the existing document with a round-trip writer and leaves everything else
+  alone. The same endpoint also wrote the file *before* reporting a conflict, so
+  the 409 arrived after the stale payload had already replaced the config; a
+  stale `expected_hash` / `expected_mtime` now returns 409 and leaves the file
+  byte-identical. "Force Overwrite" still works by sending no expected values.
 - **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`
   was honoured when the server booted, then dropped. The Config page, its save
   and `POST /api/config/reload` each re-discovered the file with

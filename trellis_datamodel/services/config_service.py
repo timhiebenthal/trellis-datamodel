@@ -15,6 +15,8 @@ import json
 
 import yaml
 from pydantic import ValidationError
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
 
 from trellis_datamodel.config import find_config_file
 from trellis_datamodel.exceptions import (
@@ -273,6 +275,32 @@ _BETA_FIELDS = [
 ]
 
 
+# Top-level keys _normalize_nested_config owns; anything else in trellis.yml is
+# left alone on save.
+_MANAGED_KEYS = (
+    "framework",
+    "modeling_style",
+    "start_page",
+    "dbt_project_path",
+    "dbt_manifest_path",
+    "dbt_catalog_path",
+    "data_model_file",
+    "dbt_model_paths",
+    "dbt_company_dummy_path",
+    "bruin_pipeline_path",
+    "bruin_asset_paths",
+    "bruin_default_asset_type",
+    "canvas",
+    "lineage",
+    "entity_creation_guidance",
+    "exposures",
+    "business_events",
+    "ossie",
+    "dimensional_modeling",
+    "entity_modeling",
+)
+
+
 def _get_file_hash(file_path: str) -> str:
     """Calculate SHA256 hash of a file."""
     sha256_hash = hashlib.sha256()
@@ -528,12 +556,53 @@ def _validate_paths(config: Dict[str, Any], config_path: str) -> list[str]:
 
 
 
-def _atomic_write(config_path: str, config: Dict[str, Any]) -> None:
+def _round_trip_yaml() -> YAML:
+    """Round-trip YAML with the indentation trellis.yml is written in."""
+    ryaml = YAML()
+    ryaml.preserve_quotes = True
+    ryaml.default_flow_style = False
+    ryaml.width = 4096
+    ryaml.indent(mapping=2, sequence=4, offset=2)
+    return ryaml
+
+
+def _merge_into_document(raw: Any, normalized: Dict[str, Any]) -> Any:
     """
-    Atomically write config to file.
+    Merge the normalized config into the document read from disk.
+
+    Keys the normalizer owns are set, or removed when it left them out. Keys it
+    does not know are kept untouched, along with comments and key order.
+    """
+    if not isinstance(raw, CommentedMap):
+        raw = CommentedMap()
+
+    for key in _MANAGED_KEYS:
+        if key not in normalized:
+            raw.pop(key, None)
+    for key, value in normalized.items():
+        current = raw.get(key)
+        if isinstance(value, dict) and isinstance(current, CommentedMap):
+            _merge_into_document(current, value)
+        else:
+            raw[key] = value
+    return raw
+
+
+def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
+    """
+    Atomically write config to file, merged into the existing document so
+    unknown keys, comments and key order survive.
 
     Uses temp file + move to ensure atomic operation.
     """
+    ryaml = _round_trip_yaml()
+    try:
+        with open(config_path, "r") as f:
+            raw = ryaml.load(f)
+    except Exception as e:
+        raise ConfigurationError(f"Failed to read config file: {e}")
+    document = _merge_into_document(raw, normalized)
+
     # Write to temp file
     fd, temp_path = tempfile.mkstemp(
         prefix=os.path.basename(config_path), dir=os.path.dirname(config_path)
@@ -541,7 +610,7 @@ def _atomic_write(config_path: str, config: Dict[str, Any]) -> None:
 
     try:
         with os.fdopen(fd, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            ryaml.dump(document, f)
 
         # Atomic move
         os.replace(temp_path, config_path)
@@ -675,7 +744,12 @@ def save_config(
     if not is_valid:
         raise CustomValidationError(f"Config validation failed: {error_msg}")
 
+    # A conflict leaves the file as it is; omitting the expected mtime/hash is
+    # how the caller forces the overwrite.
+    if conflict_message:
+        return normalized, conflict_message
+
     # Atomically write config
     _atomic_write(config_path, normalized)
 
-    return normalized, conflict_message
+    return normalized, None
