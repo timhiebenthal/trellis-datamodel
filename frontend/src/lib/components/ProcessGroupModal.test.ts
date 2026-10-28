@@ -155,7 +155,7 @@ describe('ProcessGroupModal', () => {
         });
     });
 
-    it('disables create button when less than 2 events', () => {
+    it('disables create button when less than 2 events', async () => {
         const onSave = vi.fn();
         const onCancel = vi.fn();
 
@@ -168,9 +168,9 @@ describe('ProcessGroupModal', () => {
         });
 
         const nameInput = screen.getByLabelText(/process name/i);
-        fireEvent.input(nameInput, { target: { value: 'Test Process' } });
+        await fireEvent.input(nameInput, { target: { value: 'Test Process' } });
         const domainInput = screen.getByLabelText(/process domain/i);
-        fireEvent.input(domainInput, { target: { value: 'Sales' } });
+        await fireEvent.input(domainInput, { target: { value: 'Sales' } });
 
         const createButton = screen.getByRole('button', { name: /create process/i });
         expect(createButton).toBeDisabled();
@@ -213,7 +213,7 @@ describe('ProcessGroupModal', () => {
         const onSave = vi.fn();
         const onCancel = vi.fn();
 
-        const { container } = render(ProcessGroupModal, {
+        render(ProcessGroupModal, {
             open: true,
             eventIds: ['evt_001', 'evt_002'],
             domains: DOMAIN_SUGGESTIONS,
@@ -221,11 +221,12 @@ describe('ProcessGroupModal', () => {
             onCancel
         });
 
-        const backdrop = container.querySelector('.fixed.inset-0');
-        if (backdrop) {
-            await fireEvent.click(backdrop);
-            expect(onCancel).toHaveBeenCalledTimes(1);
-        }
+        // The backdrop is the modal's dialog element; clicking inside the content must not close it.
+        await fireEvent.click(screen.getByLabelText(/process name/i));
+        expect(onCancel).not.toHaveBeenCalled();
+
+        await fireEvent.click(screen.getByRole('dialog'));
+        expect(onCancel).toHaveBeenCalledTimes(1);
     });
 
     it('calls onSave with correct data when form is submitted', async () => {

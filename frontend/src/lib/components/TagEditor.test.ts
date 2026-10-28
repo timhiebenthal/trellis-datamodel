@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/svelte';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
 import TagEditor from './TagEditor.svelte';
 
 describe('TagEditor Component', () => {
@@ -9,474 +9,205 @@ describe('TagEditor Component', () => {
         mockOnUpdate.mockClear();
     });
 
+    afterEach(() => cleanup());
+
+    function renderEditor(props: {
+        tags?: string[];
+        readOnlyTags?: string[];
+        canEdit?: boolean;
+        isBatchMode?: boolean;
+    } = {}) {
+        return render(TagEditor, {
+            props: {
+                tags: [],
+                canEdit: true,
+                isBatchMode: false,
+                onUpdate: mockOnUpdate,
+                ...props,
+            },
+        });
+    }
+
+    const addButton = () => screen.getByRole('button', { name: 'Add new tag' });
+    const removeButtons = () => screen.queryAllByRole('button', { name: /^Remove .* tag/ });
+
+    async function openInput() {
+        await fireEvent.click(addButton());
+        return (await screen.findByRole('textbox', { name: 'Add new tag' })) as HTMLInputElement;
+    }
+
     describe('Initial Rendering', () => {
-        it('renders empty state when no tags provided', () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('renders only the add button when no tags are provided', () => {
+            renderEditor({ tags: [] });
 
-            expect(container.querySelector('.tag-editor')).not.toBeNull();
-            // Should only show add button
-            expect(container.querySelectorAll('.tag')).toHaveLength(0);
+            expect(removeButtons()).toHaveLength(0);
+            expect(addButton()).toBeInTheDocument();
         });
 
-        it('renders provided tags correctly', () => {
-            const tags = ['core', 'pii', 'staging'];
-            const { container } = render(TagEditor, {
-                props: {
-                    tags,
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('renders every provided tag', () => {
+            renderEditor({ tags: ['core', 'pii', 'staging'] });
 
-            const tagElements = container.querySelectorAll('.tag');
-            expect(tagElements).toHaveLength(3);
-
-            tags.forEach((tag, index) => {
-                expect(tagElements[index].textContent).toContain(tag);
-            });
+            expect(screen.getByText('core')).toBeInTheDocument();
+            expect(screen.getByText('pii')).toBeInTheDocument();
+            expect(screen.getByText('staging')).toBeInTheDocument();
+            expect(removeButtons()).toHaveLength(3);
         });
 
-        it('normalizes tags (trims, removes duplicates, removes empty)', () => {
-            const tags = ['  core  ', '  ', 'core', 'staging', '', 'PII'];
-            const { container } = render(TagEditor, {
-                props: {
-                    tags,
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('normalizes tags (trims, removes duplicates, removes empty, keeps case)', () => {
+            renderEditor({ tags: ['  core  ', '  ', 'core', 'staging', '', 'PII'] });
 
-            const tagElements = container.querySelectorAll('.tag');
-            expect(tagElements).toHaveLength(3); // core, staging, PII
-            expect(tagElements[0].textContent).toContain('core');
-            expect(tagElements[1].textContent).toContain('staging');
-            expect(tagElements[2].textContent).toContain('PII'); // Tags preserve case
+            // getByText throws on duplicates, so this also proves 'core' is rendered once
+            expect(screen.getByText('core')).toBeInTheDocument();
+            expect(screen.getByText('staging')).toBeInTheDocument();
+            expect(screen.getByText('PII')).toBeInTheDocument();
+            expect(removeButtons()).toHaveLength(3);
         });
 
         it('hides add button and remove buttons when canEdit is false', () => {
-            const tags = ['core'];
-            const { container } = render(TagEditor, {
-                props: {
-                    tags,
-                    canEdit: false,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+            renderEditor({ tags: ['core'], canEdit: false });
 
-            // Should show tag but no remove buttons
-            expect(container.querySelector('.tag')).not.toBeNull();
-            expect(container.querySelectorAll('.tag button')).toHaveLength(0);
-
-            // Should not show add button
-            const addButton = container.querySelector('button[title="Add tag"]');
-            expect(addButton).toBeNull();
+            expect(screen.getByText('core')).toBeInTheDocument();
+            expect(removeButtons()).toHaveLength(0);
+            expect(screen.queryByRole('button', { name: 'Add new tag' })).not.toBeInTheDocument();
         });
 
-        it('shows add button when canEdit is true', () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('shows the add button when canEdit is true', () => {
+            renderEditor();
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            expect(addButton).not.toBeNull();
+            expect(addButton()).toBeInTheDocument();
+        });
+
+        it('gives read-only tags no remove button while other tags stay removable', () => {
+            renderEditor({ tags: ['nightly', 'pii'], readOnlyTags: ['nightly'] });
+
+            expect(screen.getByText('nightly')).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Remove nightly tag' })).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Remove pii tag' })).toBeInTheDocument();
         });
     });
 
     describe('Add Tag Functionality', () => {
         it('adds tag when pressing Enter', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+            renderEditor();
+            const input = await openInput();
 
-            // Click add button to show input
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
+            await fireEvent.input(input, { target: { value: 'core' } });
+            await fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-                // Wait for input to appear
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                // Type tag and press Enter
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: 'core' } });
-                    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
-
-                    // Check if onUpdate was called with new tag
-                    await waitFor(() => {
-                        expect(mockOnUpdate).toHaveBeenCalledWith(['core']);
-                    });
-                }
-            }
+            expect(mockOnUpdate).toHaveBeenCalledTimes(1);
+            expect(mockOnUpdate).toHaveBeenCalledWith(['core']);
         });
 
-        it('adds multiple tags separated by commas', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: ['existing'],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('appends to existing tags when a comma is typed', async () => {
+            renderEditor({ tags: ['existing'] });
+            const input = await openInput();
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
+            await fireEvent.input(input, { target: { value: 'core' } });
+            await fireEvent.keyDown(input, { key: ',', code: 'Comma' });
 
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: 'core,staging, pii' } });
-                    fireEvent.keyDown(input, { key: ',', code: 'Comma' });
-
-                    // Should add 'core' immediately on comma
-                    await waitFor(() => {
-                        expect(mockOnUpdate).toHaveBeenCalledWith(['existing', 'core']);
-                    });
-                }
-            }
+            expect(mockOnUpdate).toHaveBeenCalledTimes(1);
+            expect(mockOnUpdate).toHaveBeenCalledWith(['existing', 'core']);
         });
 
         it('trims whitespace when adding tags', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+            renderEditor();
+            const input = await openInput();
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
+            await fireEvent.input(input, { target: { value: '  core  ' } });
+            await fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: '  core  ' } });
-                    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
-
-                    await waitFor(() => {
-                        expect(mockOnUpdate).toHaveBeenCalledWith(['core']);
-                    });
-                }
-            }
+            expect(mockOnUpdate).toHaveBeenCalledWith(['core']);
         });
 
         it('does not add empty tags', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+            renderEditor();
+            const input = await openInput();
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
+            await fireEvent.input(input, { target: { value: '   ' } });
+            await fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: '   ' } });
-                    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
-
-                    // Should not call onUpdate with empty tag
-                    expect(mockOnUpdate).not.toHaveBeenCalled();
-                }
-            }
+            expect(mockOnUpdate).not.toHaveBeenCalled();
         });
 
         it('does not add duplicate tags', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: ['core'],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+            renderEditor({ tags: ['core'] });
+            const input = await openInput();
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
+            await fireEvent.input(input, { target: { value: 'core' } });
+            await fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: 'core' } });
-                    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
-
-                    // Should not call onUpdate - tag already exists
-                    expect(mockOnUpdate).not.toHaveBeenCalled();
-                }
-            }
+            expect(mockOnUpdate).not.toHaveBeenCalled();
         });
 
         it('clears input after adding tag', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+            renderEditor();
+            const input = await openInput();
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
+            await fireEvent.input(input, { target: { value: 'core' } });
+            await fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
+            await waitFor(() => expect(input).toHaveValue(''));
+        });
 
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: 'core' } });
-                    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+        it('adds the pending text as a tag when the input loses focus', async () => {
+            renderEditor();
+            const input = await openInput();
 
-                    await waitFor(() => {
-                        expect(input.value).toBe('');
-                    });
-                }
-            }
+            await fireEvent.input(input, { target: { value: 'pii' } });
+            await fireEvent.blur(input);
+
+            expect(mockOnUpdate).toHaveBeenCalledWith(['pii']);
+            expect(screen.queryByRole('textbox', { name: 'Add new tag' })).not.toBeInTheDocument();
         });
     });
 
     describe('Remove Tag Functionality', () => {
-        it('removes tag when remove button is clicked', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: ['core', 'staging'],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('removes only the clicked tag', async () => {
+            renderEditor({ tags: ['core', 'staging'] });
 
-            const removeButton = container.querySelector('.tag button');
-            if (removeButton) {
-                await fireEvent.click(removeButton);
+            await fireEvent.click(screen.getByRole('button', { name: 'Remove core tag' }));
 
-                await waitFor(() => {
-                    expect(mockOnUpdate).toHaveBeenCalledWith(['staging']);
-                });
-            }
-        });
-
-        it('shows remove button on hover', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: ['core'],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
-
-            const tag = container.querySelector('.tag');
-            const removeButton = container.querySelector('.tag button');
-
-            expect(tag).not.toBeNull();
-            // Remove button should exist but be hidden (opacity-0)
-            expect(removeButton).not.toBeNull();
-            expect(removeButton?.className).toContain('opacity-0');
+            expect(mockOnUpdate).toHaveBeenCalledTimes(1);
+            expect(mockOnUpdate).toHaveBeenCalledWith(['staging']);
         });
     });
 
     describe('Keyboard Shortcuts', () => {
-        it('hides input when Escape is pressed', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
+        it('closes the input and discards its text when Escape is pressed', async () => {
+            renderEditor();
+            const input = await openInput();
+
+            await fireEvent.input(input, { target: { value: 'draft' } });
+            await fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' });
+
+            await waitFor(() => {
+                expect(screen.queryByRole('textbox', { name: 'Add new tag' })).not.toBeInTheDocument();
             });
-
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
-
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' });
-
-                    await waitFor(() => {
-                        expect(input.value).toBe('');
-                    });
-                }
-            }
-        });
-
-        it('handles comma key for tag separation', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
-
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
-
-                await waitFor(() => {
-                    const input = container.querySelector('.tag-input');
-                    expect(input).not.toBeNull();
-                });
-
-                const input = container.querySelector('.tag-input') as HTMLInputElement;
-                if (input) {
-                    fireEvent.input(input, { target: { value: 'tag1,tag2,tag3' } });
-                    fireEvent.keyDown(input, { key: ',', code: 'Comma' });
-
-                    // First tag should be added
-                    await waitFor(() => {
-                        expect(mockOnUpdate).toHaveBeenCalledWith(['tag1']);
-                    });
-                }
-            }
+            expect(addButton()).toBeInTheDocument();
+            expect(mockOnUpdate).not.toHaveBeenCalled();
         });
     });
 
     describe('Batch Mode', () => {
-        it('shows batch-specific placeholder in batch mode', () => {
-            const tags: string[] = [];
-            const { container } = render(TagEditor, {
-                props: {
-                    tags,
-                    canEdit: true,
-                    isBatchMode: true,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('shows batch-specific placeholder and remove labels in batch mode', async () => {
+            renderEditor({ tags: ['core'], isBatchMode: true });
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                // Click to show input
-                fireEvent.click(addButton);
+            expect(
+                screen.getByRole('button', { name: 'Remove core tag from all selected' }),
+            ).toBeInTheDocument();
 
-                const input = container.querySelector('.tag-input');
-                if (input) {
-                    expect(input.getAttribute('placeholder')).toContain('all selected');
-                }
-            }
+            await openInput();
+            expect(screen.getByPlaceholderText(/all selected/)).toBeInTheDocument();
         });
 
-        it('shows regular placeholder when not in batch mode', () => {
-            const tags: string[] = [];
-            const { container } = render(TagEditor, {
-                props: {
-                    tags,
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
+        it('shows regular placeholder when not in batch mode', async () => {
+            renderEditor({ tags: ['core'] });
 
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                // Click to show input
-                fireEvent.click(addButton);
+            expect(screen.getByRole('button', { name: 'Remove core tag' })).toBeInTheDocument();
 
-                const input = container.querySelector('.tag-input');
-                if (input) {
-                    expect(input.getAttribute('placeholder')).not.toContain('all selected');
-                    expect(input.getAttribute('placeholder')).toContain('Enter tag');
-                }
-            }
-        });
-    });
-
-    describe('Accessibility', () => {
-        it('has proper ARIA labels on buttons', () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: ['core'],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
-
-            const removeButton = container.querySelector('.tag button');
-            expect(removeButton?.getAttribute('aria-label')).toBeTruthy();
-
-            const addButton = container.querySelector('button[title="Add tag"]');
-            expect(addButton?.getAttribute('aria-label')).toBeTruthy();
-        });
-
-        it('has aria-label on input field', async () => {
-            const { container } = render(TagEditor, {
-                props: {
-                    tags: [],
-                    canEdit: true,
-                    isBatchMode: false,
-                    onUpdate: mockOnUpdate,
-                },
-            });
-
-            const addButton = container.querySelector('button[title="Add tag"]');
-            if (addButton) {
-                await fireEvent.click(addButton);
-
-                const input = container.querySelector('.tag-input');
-                expect(input?.getAttribute('aria-label')).toBe('Add new tag');
-            }
+            await openInput();
+            const placeholder = screen.getByPlaceholderText(/Enter tag/);
+            expect(placeholder.getAttribute('placeholder')).not.toContain('all selected');
         });
     });
 });

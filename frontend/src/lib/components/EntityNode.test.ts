@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, waitFor } from '@testing-library/svelte';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 import { frameworkModels, viewMode } from '$lib/stores';
 import EntityNode from './EntityNode.svelte';
 import { computeUiTagsAfterEdit } from '$lib/utils/entity-tags';
@@ -62,6 +62,10 @@ const svelteFlowContext = new Map<string, unknown>([
   ['svelteFlow', { updateNodeData: vi.fn(), getNode: vi.fn() }],
 ]);
 
+// Vitest globals are off, so testing-library does not auto-clean; without this the DOM
+// accumulates across tests and element counts are only checkable with >=.
+afterEach(() => cleanup());
+
 describe('EntityNode — merged field rendering', () => {
   beforeEach(() => {
     frameworkModels.set([mockDbtModel] as any);
@@ -75,7 +79,9 @@ describe('EntityNode — merged field rendering', () => {
       context: svelteFlowContext,
     });
     const indicators = document.querySelectorAll('[data-origin="dbt"], [data-origin="draft"]');
-    expect(indicators.length).toBeGreaterThanOrEqual(3);
+    expect(indicators.length).toBe(3);
+    expect(document.querySelectorAll('[data-origin="dbt"]').length).toBe(2);
+    expect(document.querySelectorAll('[data-origin="draft"]').length).toBe(1);
   });
 
   it('dbt rows have "Materialized in dbt model" aria-label on indicator', () => {
@@ -83,8 +89,10 @@ describe('EntityNode — merged field rendering', () => {
       props: mockProps,
       context: svelteFlowContext,
     });
-    const materializedIndicators = document.querySelectorAll('[aria-label*="Materialized in dbt model"]');
-    expect(materializedIndicators.length).toBeGreaterThanOrEqual(2);
+    const materializedIndicators = document.querySelectorAll('[data-origin="dbt"][aria-label*="Materialized in dbt model"]');
+    expect(materializedIndicators.length).toBe(2);
+    // the label must be exclusive to dbt rows
+    expect(document.querySelectorAll('[data-origin="draft"][aria-label*="Materialized in dbt model"]').length).toBe(0);
   });
 
   it('draft row has "Drafted in Trellis" aria-label on indicator', () => {
@@ -92,8 +100,9 @@ describe('EntityNode — merged field rendering', () => {
       props: mockProps,
       context: svelteFlowContext,
     });
-    const draftIndicators = document.querySelectorAll('[aria-label*="Drafted in Trellis"]');
-    expect(draftIndicators.length).toBeGreaterThanOrEqual(1);
+    const draftIndicators = document.querySelectorAll('[data-origin="draft"][aria-label*="Drafted in Trellis"]');
+    expect(draftIndicators.length).toBe(1);
+    expect(document.querySelectorAll('[data-origin="dbt"][aria-label*="Drafted in Trellis"]').length).toBe(0);
   });
 
   it('Add Field button is visible on bound entities', () => {
@@ -102,7 +111,7 @@ describe('EntityNode — merged field rendering', () => {
       context: svelteFlowContext,
     });
     const addBtn = Array.from(document.querySelectorAll('button')).find(
-      b => b.textContent?.toLowerCase().includes('add field') || b.textContent?.toLowerCase().includes('add')
+      b => b.textContent?.toLowerCase().includes('add field')
     );
     expect(addBtn).toBeTruthy();
   });
