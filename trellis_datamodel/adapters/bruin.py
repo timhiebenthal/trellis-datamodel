@@ -47,7 +47,10 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
-from trellis_datamodel.utils.structured_data import load_yaml_or_json
+from trellis_datamodel.utils.structured_data import (
+    load_data_model_file,
+    load_yaml_or_json,
+)
 from . import entity_type_inference
 from .artifact_snapshot import clear_snapshots
 from .base import (
@@ -313,16 +316,7 @@ class BruinAdapter:
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
-        if not self.data_model_path or not os.path.exists(self.data_model_path):
-            return {}
-        try:
-            import yaml
-
-            with open(self.data_model_path, "r") as f:
-                return yaml.safe_load(f) or {}
-        except Exception as e:
-            logger.warning("Could not load data model: %s", e)
-            return {}
+        return load_data_model_file(self.data_model_path)
 
     def _get_model_to_entity_map(self) -> dict[str, str]:
         """Map asset names to the entity bound to them.

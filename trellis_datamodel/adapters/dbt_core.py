@@ -30,6 +30,7 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.utils.path_validation import validate_path_is_safe
+from trellis_datamodel.utils.structured_data import load_data_model_file
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
 from .base import (
@@ -150,14 +151,7 @@ class DbtCoreAdapter:
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
-        if not self.data_model_path or not os.path.exists(self.data_model_path):
-            return {}
-        try:
-            with open(self.data_model_path, "r") as f:
-                return yaml.safe_load(f) or {}
-        except Exception as e:
-            print(f"Warning: Could not load data model: {e}")
-            return {}
+        return load_data_model_file(self.data_model_path)
 
     def get_model_dirs(self) -> list[str]:
         """
