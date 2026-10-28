@@ -174,11 +174,6 @@ class TestCreateEvent:
         assert response.status_code == 400
         assert "text" in response.json()["detail"].lower()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) raised inside try is swallowed by "
-        "`except Exception` and re-raised as 500",
-    )
     def test_invalid_type_is_rejected_with_400(self, client):
         response = client.post(
             "/api/business-events", json={"text": "x", "type": "bogus"}
@@ -544,11 +539,6 @@ class TestCreateProcess:
 
         assert response.status_code == 422
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for blank domain raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_blank_domain_returns_400(self, client):
         event = _create_event(client)
 
@@ -587,11 +577,6 @@ class TestCreateProcess:
 
         assert response.status_code == 400
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for invalid process type raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_invalid_type_returns_400(self, client):
         event = _create_event(client)
 
@@ -607,11 +592,6 @@ class TestCreateProcess:
 
         assert response.status_code == 400
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(404) for unknown event_ids raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_unknown_event_id_returns_404(self, client):
         response = client.post(
             "/api/processes",
@@ -625,11 +605,6 @@ class TestCreateProcess:
 
         assert response.status_code == 404
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for event already in a process raised inside "
-        "try is converted to 500 by `except Exception`",
-    )
     def test_event_already_in_another_process_returns_400(self, client):
         event = _create_event(client)
         _create_process(client, [event["id"]])
@@ -695,11 +670,6 @@ class TestUpdateProcess:
 
         assert response.status_code == 404
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for empty update raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_empty_body_returns_400(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
@@ -708,11 +678,6 @@ class TestUpdateProcess:
 
         assert response.status_code == 400
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for blank domain raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_blank_domain_returns_400(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
@@ -721,11 +686,6 @@ class TestUpdateProcess:
 
         assert response.status_code == 400
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for invalid type raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_invalid_type_returns_400(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
@@ -734,11 +694,6 @@ class TestUpdateProcess:
 
         assert response.status_code == 400
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for empty event_ids raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_empty_event_ids_returns_400(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
@@ -845,11 +800,6 @@ class TestAttachEvents:
         assert response.status_code == 400
         assert "resolved" in response.json()["detail"]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(404) for unknown event ids raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_unknown_event_returns_404(self, client):
         member = _create_event(client)
         process = _create_process(client, [member["id"]])
@@ -861,11 +811,6 @@ class TestAttachEvents:
 
         assert response.status_code == 404
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for empty event_ids raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_empty_event_ids_returns_400(self, client):
         member = _create_event(client)
         process = _create_process(client, [member["id"]])
@@ -909,11 +854,6 @@ class TestDetachEvents:
 
         assert response.status_code == 404
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(400) for empty event_ids raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_empty_event_ids_returns_400(self, client):
         member = _create_event(client)
         process = _create_process(client, [member["id"]])
@@ -931,21 +871,11 @@ class TestDetachEvents:
 
 
 class TestGenerateEntitiesErrors:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(404) for unknown event raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_unknown_event_returns_404(self, client):
         response = client.post("/api/business-events/evt_missing/generate-entities")
 
         assert response.status_code == 404
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="HTTPException(404) for unknown process raised inside try "
-        "is converted to 500 by `except Exception`",
-    )
     def test_unknown_process_returns_404(self, client):
         response = client.post("/api/processes/proc_missing/generate-entities")
 
