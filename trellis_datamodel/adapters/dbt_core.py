@@ -29,6 +29,7 @@ from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
+from trellis_datamodel.utils.path_validation import validate_path_is_safe
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
 from .base import (
@@ -1200,7 +1201,7 @@ class DbtCoreAdapter:
             if get_model_ref(entity):
                 yml_path = self._get_model_yml_path(model_name)
             if not yml_path:
-                yml_path = os.path.join(models_dir, f"{model_name}.yml")
+                yml_path = self._default_schema_yml_path(models_dir, model_name)
 
             data = self.yaml_handler.load_file(yml_path)
             if not data:
@@ -1302,6 +1303,18 @@ class DbtCoreAdapter:
             updated_files.append(Path(yml_path))
 
         return updated_files
+
+    @staticmethod
+    def _default_schema_yml_path(models_dir: str, model_name: str) -> str:
+        """`<models_dir>/<model_name>.yml`, refusing a name that escapes the dir.
+
+        The routes validate request names, but entity ids from data_model.yml
+        reach here too, so the write site checks containment itself.
+        """
+        yml_path = os.path.join(models_dir, f"{model_name}.yml")
+        # Raises ValidationError when the resolved path leaves models_dir.
+        validate_path_is_safe(os.path.abspath(yml_path), models_dir)
+        return yml_path
 
     def save_schema_file(
         self,
@@ -1414,7 +1427,7 @@ class DbtCoreAdapter:
         if not yml_path:
             models_dir = self.get_model_dirs()[0]
             os.makedirs(models_dir, exist_ok=True)
-            yml_path = os.path.join(models_dir, f"{model_name}.yml")
+            yml_path = self._default_schema_yml_path(models_dir, model_name)
 
         data = self.yaml_handler.load_file(yml_path)
         if not data:

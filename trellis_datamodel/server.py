@@ -5,8 +5,12 @@ This is the FastAPI application that serves the API and frontend.
 """
 
 from importlib.resources import files
+import ipaddress
 import os
+import re
+import socket
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from time import perf_counter
 from uuid import uuid4
 
@@ -105,6 +109,178 @@ class _RequestTimingMiddleware:
 # this machine (the bundled UI, or the Vite dev server on any port) may call it
 # cross-origin. There are no cookies, so credentials stay off.
 _LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
+_LOCAL_ORIGIN_PATTERN = re.compile(_LOCAL_ORIGIN_REGEX)
+
+_LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "[::1]"})
+_LOOPBACK_BIND_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+# Starlette's TestClient always reports this peer and sends `Host: testserver`.
+# A real socket peer is an IP address, so matching the exact tuple lets the test
+# client through without accepting `testserver` from the network.
+_STARLETTE_TEST_CLIENT = ("testclient", 50000)
+
+
+def _is_local_origin(origin: str) -> bool:
+    """Whether *origin* is a page served from this machine (same rule as CORS)."""
+    return _LOCAL_ORIGIN_PATTERN.fullmatch(origin) is not None
+
+
+def _host_without_port(host: str) -> str:
+    """`localhost:8089` -> `localhost`, `[::1]:8089` -> `[::1]`."""
+    host = host.strip().lower()
+    if host.startswith("["):
+        end = host.find("]")
+        return host[: end + 1] if end != -1 else host
+    return host.rsplit(":", 1)[0] if ":" in host else host
+
+
+def _is_ip_literal(hostname: str) -> bool:
+    try:
+        ipaddress.ip_address(hostname.strip("[]"))
+    except ValueError:
+        return False
+    return True
+
+
+@lru_cache(maxsize=8)
+def _allowed_hostnames(bind_host: str, extra_hosts: str) -> tuple[frozenset, bool]:
+    """Host header names the server answers to, and whether any IP literal is OK.
+
+    `trellis run` binds loopback by default, so only loopback names are valid
+    and a DNS-rebound name (`evil.example` resolving to 127.0.0.1) is refused.
+    An explicit non-loopback `--host` is an opt-in to being reached over the
+    network, so the bind address, this machine's names and any IP literal are
+    accepted too: rebinding needs an attacker-controlled *name*, never an IP.
+    `TRELLIS_ALLOWED_HOSTS` (comma-separated) adds names such as a proxy's.
+    """
+    names = set(_LOOPBACK_HOSTNAMES)
+    names.update(
+        h.strip().lower() for h in extra_hosts.split(",") if h.strip()
+    )
+    if not bind_host or bind_host in _LOOPBACK_BIND_HOSTS:
+        return frozenset(names), False
+
+    if ":" in bind_host and not bind_host.startswith("["):
+        names.add(f"[{bind_host.lower()}]")
+    else:
+        names.add(bind_host.lower())
+    try:
+        hostname = socket.gethostname()
+        names.update({hostname.lower(), f"{hostname.lower()}.local"})
+        names.add(socket.getfqdn().lower())
+    except OSError:
+        pass
+    return frozenset(names), True
+
+
+def _is_allowed_host(host: str) -> bool:
+    names, any_ip = _allowed_hostnames(
+        os.environ.get("TRELLIS_BIND_HOST", ""),
+        os.environ.get("TRELLIS_ALLOWED_HOSTS", ""),
+    )
+    hostname = _host_without_port(host)
+    return hostname in names or (any_ip and _is_ip_literal(hostname))
+
+
+def _header(scope, name: bytes) -> str | None:
+    for key, value in scope.get("headers", []):
+        if key.lower() == name:
+            return value.decode("latin-1")
+    return None
+
+
+class _TrustedHostMiddleware:
+    """Refuse requests whose Host header is not a name this server answers to.
+
+    Without this, a page on `evil.example` can rebind its DNS to 127.0.0.1 and
+    then read and write the API as a same-origin caller, sidestepping CORS.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        host = _header(scope, b"host") or ""
+        is_test_client = tuple(scope.get("client") or ()) == _STARLETTE_TEST_CLIENT
+        if not (_is_allowed_host(host) or (is_test_client and host == "testserver")):
+            response = PlainTextResponse("Invalid host header", status_code=400)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
+
+class _CrossSiteWriteGuardMiddleware:
+    """Refuse state-changing requests a foreign web page could have sent.
+
+    CORS only hides responses; a "simple" cross-site POST (no-cors fetch, form
+    post) still reaches the handler. FastAPI parses a body without a JSON
+    Content-Type as JSON anyway, so a page could rewrite project files without
+    ever triggering a preflight. Every write the UI makes is JSON from a local
+    origin, so anything else is refused before routing. Callers that send no
+    Origin (curl, scripts, tests) are not browsers acting for a page and pass.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["method"] not in _MUTATING_METHODS:
+            await self.app(scope, receive, send)
+            return
+
+        rejection = self._rejection(scope)
+        if rejection is not None:
+            await rejection(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    def _rejection(scope) -> JSONResponse | None:
+        origin = _header(scope, b"origin")
+        host = _header(scope, b"host") or ""
+        # The bundled UI reached over an opted-in network bind sends its own
+        # address as Origin; the Host check has already vetted that address.
+        trusted_origin = origin is not None and (
+            _is_local_origin(origin)
+            or origin.split("://", 1)[-1].lower() == host.strip().lower()
+        )
+        if origin is not None and not trusted_origin:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Cross-origin write refused", "error": "forbidden"},
+            )
+
+        # Browsers that strip Origin still label the request. A local page on
+        # another loopback name (localhost vs 127.0.0.1) is "cross-site" too, so
+        # a trusted Origin takes precedence.
+        fetch_site = (_header(scope, b"sec-fetch-site") or "").lower()
+        if fetch_site == "cross-site" and not trusted_origin:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Cross-site write refused", "error": "forbidden"},
+            )
+
+        content_length = _header(scope, b"content-length")
+        has_body = _header(scope, b"transfer-encoding") is not None or (
+            content_length is not None and content_length.strip() not in ("", "0")
+        )
+        content_type = (_header(scope, b"content-type") or "").split(";", 1)[0]
+        if has_body and content_type.strip().lower() != "application/json":
+            return JSONResponse(
+                status_code=415,
+                content={
+                    "detail": "Request body must be application/json",
+                    "error": "unsupported_media_type",
+                },
+            )
+        return None
 
 
 def _configure_cors(app: FastAPI) -> None:
@@ -251,6 +427,10 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(title="Trellis Data", version="0.1.0", lifespan=lifespan)
 
+    # The last middleware added runs first: the Host check precedes the write
+    # guard, and CORS wraps both so a local page can still read their rejections.
+    app.add_middleware(_CrossSiteWriteGuardMiddleware)
+    app.add_middleware(_TrustedHostMiddleware)
     _configure_cors(app)
     app.add_middleware(_RequestTimingMiddleware)
     _register_exception_handlers(app)

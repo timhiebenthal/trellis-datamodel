@@ -126,6 +126,9 @@ def run(
 
     # Start server
     url = f"http://localhost:{port}"
+    # The server's Host-header check reads this: a loopback bind answers only to
+    # loopback names, a wider bind also to this machine's addresses and names.
+    os.environ["TRELLIS_BIND_HOST"] = host
     if host not in _LOOPBACK_HOSTS:
         typer.echo(
             typer.style(
@@ -133,6 +136,10 @@ def run(
                 "anyone who can reach this address can read and rewrite your project files.",
                 fg=typer.colors.YELLOW,
             )
+        )
+        typer.echo(
+            "   Reach it by IP address or this machine's hostname; add other names "
+            "(e.g. a proxy's) via TRELLIS_ALLOWED_HOSTS=name1,name2."
         )
     typer.echo(typer.style(f"   Server running at {url}", fg=typer.colors.CYAN))
     typer.echo("   Press Ctrl+C to stop")

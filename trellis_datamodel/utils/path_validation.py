@@ -5,6 +5,7 @@ Centralizes validation logic to avoid duplication across routes and services.
 """
 
 import os
+import re
 from pathlib import Path
 
 from trellis_datamodel import config as cfg
@@ -115,3 +116,25 @@ def validate_path_is_safe(path: str, base_dir: str) -> Path:
         )
 
     return resolved
+
+
+# Model names become file names (`<models_dir>/<name>.yml`, a Bruin asset's
+# `<name>.sql`), so they may not carry a path separator or `..`. Dots stay
+# allowed for Bruin's `schema.asset` names, hyphens for dbt file-named models.
+_MODEL_NAME_PATTERN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.\-]*")
+
+
+def validate_model_name(model_name: str) -> str:
+    """
+    Validate that a model name is safe to turn into a file name.
+
+    Raises:
+        ValidationError: If the name is empty, contains a path separator or
+            any character outside letters, digits, `_`, `.` and `-`, or `..`
+    """
+    if not _MODEL_NAME_PATTERN.fullmatch(model_name or "") or ".." in model_name:
+        raise ValidationError(
+            f"Invalid model name '{model_name}': use letters, digits, '_', '.' "
+            "or '-', with no path separators or '..'"
+        )
+    return model_name
