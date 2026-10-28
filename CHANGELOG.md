@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   semantic-model metrics still to add - with teal marking a bound metric and
   amber a draft. A draft's `dataset_ref` names one of the datasets a push
   writes (for example `entity_booking`), and the detail panel offers
-  exactly those in a dropdown.
+  exactly those in a dropdown. "Add metric" opens a draft in the detail panel with Create and Cancel; it joins
+  the tree, and the file, only on Create, so a cancelled metric leaves nothing behind.
 
 ### Fixed
 - **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`

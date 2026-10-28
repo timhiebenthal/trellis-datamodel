@@ -44,6 +44,15 @@
     let selectedMetricId = $state<string | null>(null);
     let detailFocus = $state<'label' | null>(null);
 
+    // "Add metric" opens a draft that is not on the tree. Nothing reaches the
+    // document (or the file) until Create, so cancelling leaves no half-defined
+    // metric behind. `link` is the metric it will be wired to once created.
+    type PendingDraft = {
+        draft: MetricEntry;
+        link: { anchorMetricId: string; relation: MetricRelationKind } | null;
+    };
+    let pending = $state<PendingDraft | null>(null);
+
     let saveState = $state<MetricTreeSaveState>({ isSaving: false, warnings: [], error: null });
     let hasUnsavedChanges = $state(false);
     let baselineReady = false;
@@ -65,6 +74,13 @@
         tree?.metrics.find((metric) => metric.id === selectedMetricId) ?? null,
     );
     const incompleteIds = $derived(incompleteDraftIds(tree?.metrics ?? []));
+
+    /** Select a metric (or nothing). Anything else on the page discards an unfinished draft. */
+    function select(metricId: string | null, focus: 'label' | null = null) {
+        pending = null;
+        selectedMetricId = metricId;
+        detailFocus = focus;
+    }
 
     // Check the feature flag, then load the document. Redirect to the canvas
     // when the feature is off, matching the bus-matrix route.
@@ -139,14 +155,56 @@
         noticeTimer = setTimeout(() => (notice = null), 5000);
     }
 
-    function handleAddMetric() {
+    function startDraft(link: PendingDraft['link'] = null) {
         if (!tree) return;
 
-        const { state: next, metric } = addDraftMetric(tree);
-        applyGraph(next);
+        select(null, 'label');
+        pending = { draft: { id: 'new-metric', label: '', description: '', expression: '' }, link };
+    }
 
-        selectedMetricId = metric.id;
-        detailFocus = 'label';
+    function handleAddMetric() {
+        startDraft();
+    }
+
+    function handleCancelDraft() {
+        select(null);
+    }
+
+    /** Put the finished draft on the tree, wired to its anchor when it came from one. */
+    function handleCreateMetric() {
+        if (!tree || !pending) return;
+
+        const { draft, link } = pending;
+        const { state: withDraft, metric } = addDraftMetric(tree, draft.label);
+        const filled = updateMetric(withDraft, metric.id, {
+            description: draft.description,
+            expression: draft.expression,
+            dataset_ref: draft.dataset_ref,
+        });
+
+        if (link) {
+            const pos = relatedMetricPosition(
+                link.anchorMetricId,
+                link.relation,
+                tree.metrics,
+                tree.influences,
+                layout,
+            );
+            const driver = link.relation === 'driver' ? metric.id : link.anchorMetricId;
+            const effect = link.relation === 'driver' ? link.anchorMetricId : metric.id;
+            const connected = connectInfluence(filled, driver, effect);
+
+            layout = alignMetricLayout(
+                connected.state.metrics,
+                connected.state.influences,
+                withMetricPosition(layout, metric.id, pos),
+            );
+            applyGraph(connected.state);
+        } else {
+            applyGraph(filled);
+        }
+
+        select(metric.id);
     }
 
     function handleAddCatalogMetric(entry: MetricCatalogEntry) {
@@ -164,34 +222,11 @@
             return;
         }
 
-        selectedMetricId = outcome.metric.id;
-        detailFocus = null;
+        select(outcome.metric.id);
     }
 
     function handleAddRelatedDraft(anchorMetricId: string, relation: MetricRelationKind) {
-        if (!tree) return;
-
-        const pos = relatedMetricPosition(
-            anchorMetricId,
-            relation,
-            tree.metrics,
-            tree.influences,
-            layout,
-        );
-        const { state: withDraft, metric } = addDraftMetric(tree);
-        const driver = relation === 'driver' ? metric.id : anchorMetricId;
-        const effect = relation === 'driver' ? anchorMetricId : metric.id;
-        const connected = connectInfluence(withDraft, driver, effect);
-
-        layout = alignMetricLayout(
-            connected.state.metrics,
-            connected.state.influences,
-            withMetricPosition(layout, metric.id, pos),
-        );
-        applyGraph(connected.state);
-
-        selectedMetricId = metric.id;
-        detailFocus = 'label';
+        startDraft({ anchorMetricId, relation });
     }
 
     function handleAddRelatedCatalogMetric(
@@ -241,8 +276,7 @@
         );
         applyGraph(connected.state);
 
-        selectedMetricId = added.metric.id;
-        detailFocus = null;
+        select(added.metric.id);
     }
 
     function handleConnect(driver: string, effect: string) {
@@ -280,16 +314,13 @@
         layout = alignMetricLayout(next.metrics, next.influences, layout);
         applyGraph(next);
 
-        if (selectedMetricId === metricId) {
-            selectedMetricId = null;
-            detailFocus = null;
-        }
+        if (selectedMetricId === metricId) select(null);
+        else pending = null;
     }
 
     function handleSelectMetric(metricId: string | null) {
-        selectedMetricId = metricId;
         // A deliberate selection is not a "start typing" moment.
-        detailFocus = null;
+        select(metricId);
     }
 
     /**
@@ -307,6 +338,10 @@
     }
 
     function handleMetricChange(patch: Partial<MetricEntry>) {
+        if (pending) {
+            pending = { ...pending, draft: { ...pending.draft, ...patch } };
+            return;
+        }
         if (!tree || !selectedMetricId) return;
         applyGraph(updateMetric(tree, selectedMetricId, patch));
     }
@@ -404,10 +439,13 @@
                      metric never moves the graph under the cursor. It starts below the
                      canvas's own "Add metric" button and only exists while something is
                      selected, so an idle canvas stays unobstructed. -->
-                {#if selectedMetric}
+                {#if pending || selectedMetric}
                     <div class="absolute bottom-4 right-4 top-16 z-20 flex">
                         <MetricDetailPanel
-                            metric={selectedMetric}
+                            metric={pending ? pending.draft : selectedMetric}
+                            isNew={pending !== null}
+                            oncreate={handleCreateMetric}
+                            oncancel={handleCancelDraft}
                             datasets={tree.datasets}
                             focus={detailFocus}
                             warnings={saveState.warnings}

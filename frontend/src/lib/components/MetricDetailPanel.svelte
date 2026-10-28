@@ -7,6 +7,9 @@
      * reference it holds plus the definition's expression, read-only, because the
      * definition stays in `semantic_model.yml` - copying it into this file is
      * exactly what the metric tree is designed not to do.
+     *
+     * With `isNew` the metric is a draft that is not on the tree yet: edits stay
+     * with the caller, and nothing is added until `oncreate`.
      */
     let {
         metric = null,
@@ -17,8 +20,11 @@
         isSaving = false,
         hasUnsavedChanges = false,
         incompleteIds = [],
+        isNew = false,
         onchange,
         onunlink,
+        oncreate,
+        oncancel,
         onclose,
     }: {
         metric?: MetricEntry | null;
@@ -29,8 +35,11 @@
         isSaving?: boolean;
         hasUnsavedChanges?: boolean;
         incompleteIds?: string[];
+        isNew?: boolean;
         onchange?: (patch: Partial<MetricEntry>) => void;
         onunlink?: (metricId: string) => void;
+        oncreate?: () => void;
+        oncancel?: () => void;
         onclose?: () => void;
     } = $props();
 
@@ -47,6 +56,10 @@
         return ref && !datasets.includes(ref) ? ref : null;
     });
     const noDatasets = $derived(datasets.length === 0 && !staleDataset);
+    // A new metric needs what the backend would otherwise refuse on save.
+    const canCreate = $derived(
+        !!metric && !!metric.label.trim() && !!(metric.expression ?? "").trim(),
+    );
 
     // `focus === 'label'` is how "Add metric" lands the caret in the name field.
     $effect(() => {
@@ -85,10 +98,12 @@
             />
             <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-semibold text-slate-800" title={metric.label}>
-                    {metric.label}
+                    {isNew ? "New metric" : metric.label}
                 </p>
                 <p class="mt-0.5 truncate text-[11px] text-slate-500">
-                    {#if binding}
+                    {#if isNew}
+                        not on the tree yet
+                    {:else if binding}
                         bound reference
                     {:else}
                         draft
@@ -232,7 +247,7 @@
                 </div>
             {/if}
 
-            {#if warnings.length > 0}
+            {#if !isNew && warnings.length > 0}
                 <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
                     <p class="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
                         <Icon icon="lucide:triangle-alert" class="h-3 w-3" />
@@ -251,7 +266,7 @@
                 </div>
             {/if}
 
-            {#if error}
+            {#if !isNew && error}
                 <div
                     class="rounded-md border border-red-200 bg-red-50 px-3 py-2"
                     role="alert"
@@ -265,7 +280,7 @@
                 </div>
             {/if}
 
-            {#if incompleteIds.length > 0}
+            {#if !isNew && incompleteIds.length > 0}
                 <p
                     class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500"
                     data-testid="metric-save-paused"
@@ -277,20 +292,42 @@
             {/if}
         </div>
 
-        <footer class="flex items-center gap-2 border-t border-slate-200 px-4 py-2 text-[11px] text-slate-500">
-            {#if isSaving}
-                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500"></span>
-                Saving&hellip;
-            {:else if error}
-                <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
-                Unsaved changes
-            {:else if hasUnsavedChanges}
-                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
-                Unsaved changes
-            {:else}
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                All changes saved
-            {/if}
-        </footer>
+        {#if isNew}
+            <footer class="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-2.5">
+                <button
+                    type="button"
+                    class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    onclick={oncancel}
+                    data-testid="metric-cancel"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                    disabled={!canCreate}
+                    onclick={oncreate}
+                    data-testid="metric-create"
+                >
+                    Create metric
+                </button>
+            </footer>
+        {:else}
+            <footer class="flex items-center gap-2 border-t border-slate-200 px-4 py-2 text-[11px] text-slate-500">
+                {#if isSaving}
+                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500"></span>
+                    Saving&hellip;
+                {:else if error}
+                    <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                    Unsaved changes
+                {:else if hasUnsavedChanges}
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                    Unsaved changes
+                {:else}
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                    All changes saved
+                {/if}
+            </footer>
+        {/if}
     {/if}
 </aside>

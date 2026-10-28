@@ -98,6 +98,47 @@ describe('MetricDetailPanel', () => {
         expect(container.textContent).toContain('No dataset is exported yet');
     });
 
+    it('creates a new metric only once it has a label and an expression', async () => {
+        const oncreate = vi.fn();
+        const oncancel = vi.fn();
+        const blank: MetricEntry = { id: 'new-metric', label: '', description: '', expression: '' };
+
+        const { container, rerender } = render(MetricDetailPanel, {
+            props: { metric: blank, isNew: true, oncreate, oncancel },
+        });
+        const create = () =>
+            container.querySelector('[data-testid="metric-create"]') as HTMLButtonElement;
+
+        expect(container.textContent).toContain('New metric');
+        expect(container.querySelector('[data-testid="metric-save-paused"]')).toBeNull();
+        expect(container.textContent).not.toContain('All changes saved');
+        expect(create().disabled).toBe(true);
+
+        await rerender({ metric: { ...blank, label: 'Revenue' }, isNew: true, oncreate, oncancel });
+        expect(create().disabled).toBe(true);
+
+        await rerender({
+            metric: { ...blank, label: 'Revenue', expression: 'sum(amount)' },
+            isNew: true,
+            oncreate,
+            oncancel,
+        });
+        expect(create().disabled).toBe(false);
+
+        await fireEvent.click(create());
+        expect(oncreate).toHaveBeenCalledOnce();
+
+        await fireEvent.click(container.querySelector('[data-testid="metric-cancel"]')!);
+        expect(oncancel).toHaveBeenCalledOnce();
+    });
+
+    it('shows no create or cancel buttons for a metric already on the tree', () => {
+        const { container } = render(MetricDetailPanel, { props: { metric: draft } });
+
+        expect(container.querySelector('[data-testid="metric-create"]')).toBeNull();
+        expect(container.querySelector('[data-testid="metric-cancel"]')).toBeNull();
+    });
+
     it('marks a draft with no expression as required', () => {
         const { container } = render(MetricDetailPanel, {
             props: { metric: { id: 'new_metric', label: 'New metric', description: '', expression: '' } },

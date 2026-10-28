@@ -135,7 +135,7 @@ describe('metrics-tree page', () => {
         expect(nodePositions()).toEqual(before);
     });
 
-    it('holds the save back while a new draft has no expression', async () => {
+    it('adds nothing to the tree or the file until a new metric is created', async () => {
         const { container } = render(MetricsTreePage);
         await waitFor(() => expect(flow.props).not.toBeNull());
 
@@ -143,11 +143,51 @@ describe('metrics-tree page', () => {
             container.querySelector('[data-testid="metric-sidebar-add"]') as HTMLElement,
         );
 
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        const create = document.querySelector('[data-testid="metric-create"]') as HTMLButtonElement;
+        expect(create.disabled).toBe(true);
 
+        await fireEvent.input(
+            document.querySelector('[data-testid="metric-field-label"]') as HTMLInputElement,
+            { target: { value: 'Net revenue' } },
+        );
+        await fireEvent.input(
+            document.querySelector('[data-testid="metric-field-expression"]') as HTMLTextAreaElement,
+            { target: { value: 'sum(net)' } },
+        );
+        expect(create.disabled).toBe(false);
+
+        await new Promise((resolve) => setTimeout(resolve, 600));
         expect(api.saveMetricTree).not.toHaveBeenCalled();
-        expect(container.textContent).toContain('Auto-save paused');
+        expect(nodePositions()).toHaveLength(2);
+
+        await fireEvent.click(create);
+
+        await waitFor(() => expect(api.saveMetricTree).toHaveBeenCalledTimes(1), { timeout: 2000 });
+        const created = api.saveMetricTree.mock.calls[0][0].metrics.find(
+            (metric: { id: string }) => metric.id === 'net_revenue',
+        );
+        expect(created).toMatchObject({ label: 'Net revenue', expression: 'sum(net)' });
         expect(nodePositions()).toHaveLength(3);
+        expect(document.querySelector('[data-testid="metric-create"]')).toBeNull();
+    });
+
+    it('discards a new metric on cancel without touching the tree or the file', async () => {
+        const { container } = render(MetricsTreePage);
+        await waitFor(() => expect(flow.props).not.toBeNull());
+
+        await fireEvent.click(
+            container.querySelector('[data-testid="metric-sidebar-add"]') as HTMLElement,
+        );
+        await fireEvent.input(
+            document.querySelector('[data-testid="metric-field-label"]') as HTMLInputElement,
+            { target: { value: 'Half done' } },
+        );
+        await fireEvent.click(document.querySelector('[data-testid="metric-cancel"]') as HTMLElement);
+
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        expect(document.querySelector('[data-testid="metric-detail-panel"]')).toBeNull();
+        expect(nodePositions()).toHaveLength(2);
+        expect(api.saveMetricTree).not.toHaveBeenCalled();
     });
 
     it('writes a catalog metric as a binding with no expression', async () => {
