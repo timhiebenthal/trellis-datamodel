@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-28
+
 ### Added
 - **Metric tree canvas (beta, opt-in):** a new `metrics` block in `trellis.yml` -
   `enabled`, `file`, and `expression_dialect` - adds a
