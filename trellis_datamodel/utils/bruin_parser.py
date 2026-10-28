@@ -38,6 +38,20 @@ def is_yaml_asset(file_path: str) -> bool:
     return str(file_path).lower().endswith(YAML_ASSET_SUFFIXES)
 
 
+def is_python_asset(file_path: str) -> bool:
+    """Whether *file_path* is a Python asset (block delimited by triple quotes)."""
+    return os.path.splitext(str(file_path))[1].lower() == ".py"
+
+
+def block_pattern(file_path: str) -> re.Pattern:
+    """The @bruin block pattern for *file_path*: Python's, otherwise SQL's.
+
+    Unlike :func:`_detect_pattern` this never returns None, for callers that
+    already know the file is an asset (the rewriter).
+    """
+    return PYTHON_BRUIN_PATTERN if is_python_asset(file_path) else SQL_BRUIN_PATTERN
+
+
 def _is_asset_file(file_path: str) -> bool:
     """Whether the scanner should parse *file_path* as an asset."""
     return _detect_pattern(file_path) is not None or is_yaml_asset(file_path)
