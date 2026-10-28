@@ -16,6 +16,7 @@
     import type { ModelInfo, TreeNode, EntityData } from "$lib/types";
     import { getModelFolder, normalizeTags, classifyModelTypeFromPrefixes } from "$lib/utils";
     import { readModelRef } from "$lib/utils/entity-compat";
+    import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
     import { getFrameworkDisplay, missingArtifactHints } from "$lib/utils/framework-display";
     import SidebarGroup from "./SidebarGroup.svelte";
     import Icon from "@iconify/svelte";
@@ -460,7 +461,7 @@
                                 : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
                             title={$entityTypeFilter === 'dimension' ? 'Clear dimension filter' : 'Filter by dimension'}
                         >
-                            <Icon icon="lucide:list" class="w-3 h-3" />
+                            <Icon icon={getEntityTypeStyle('dimension').icon} class="w-3 h-3" />
                             <span>Dimension</span>
                         </button>
 
@@ -471,7 +472,7 @@
                                 : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
                             title={$entityTypeFilter === 'fact' ? 'Clear fact filter' : 'Filter by fact'}
                         >
-                            <Icon icon="lucide:bar-chart-3" class="w-3 h-3" />
+                            <Icon icon={getEntityTypeStyle('fact').icon} class="w-3 h-3" />
                             <span>Fact</span>
                         </button>
 
@@ -482,7 +483,7 @@
                                 : 'inline-flex items-center gap-1 px-2 py-1 bg-white text-gray-600 border border-gray-200 rounded text-[10px] font-medium hover:border-primary-600 hover:bg-primary-50'}
                             title={$entityTypeFilter === 'unclassified' ? 'Clear unclassified filter' : 'Filter by unclassified'}
                         >
-                            <Icon icon="lucide:circle-dashed" class="w-3 h-3" />
+                            <Icon icon={getEntityTypeStyle('unclassified').icon} class="w-3 h-3" />
                             <span>Unclassified</span>
                         </button>
                     </div>

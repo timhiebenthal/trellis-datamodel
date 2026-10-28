@@ -6,6 +6,7 @@
     import { extractRelativePath, toggleFolderFilter } from "$lib/utils/folder-utils";
     import { classifyModelTypeFromPrefixes } from "$lib/utils";
     import { readModelRef } from "$lib/utils/entity-compat";
+    import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
 
     let { node, onDragStart, mainFolderPrefix = "" } = $props<{
         node: TreeNode;
@@ -51,14 +52,7 @@
             $factPrefixes
         );
 
-        switch (type) {
-            case 'dimension':
-                return 'lucide:list';
-            case 'fact':
-                return 'lucide:bar-chart-3';
-            default:
-                return 'lucide:circle-dashed';
-        }
+        return getEntityTypeStyle(type).icon;
     });
 
     // Determine icon color based on modeling style and model type
@@ -73,14 +67,7 @@
             $factPrefixes
         );
 
-        switch (type) {
-            case 'dimension':
-                return 'text-green-600 group-hover:text-primary-600';
-            case 'fact':
-                return 'text-blue-600 group-hover:text-primary-600';
-            default:
-                return 'text-gray-500 group-hover:text-primary-600';
-        }
+        return `${getEntityTypeStyle(type).iconClass} group-hover:text-primary-600`;
     });
 
     function toggle(event: MouseEvent) {

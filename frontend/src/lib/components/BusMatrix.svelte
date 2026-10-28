@@ -4,6 +4,7 @@
     import Icon from '@iconify/svelte';
     import * as XLSX from 'xlsx';
     import { readModelRef } from '$lib/utils/entity-compat';
+    import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
     import { activeFramework } from '$lib/stores';
     import { getFrameworkCopy, formatModelHint } from '$lib/utils/framework-display';
     import Tooltip from '$lib/components/Tooltip.svelte';
@@ -475,14 +476,14 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 border-r border-gray-200 w-[200px] min-w-[200px]">
                                     <div class="flex items-center gap-2">
-                                        <Icon icon="lucide:list" class="w-4 h-4 text-green-600" />
+                                        <Icon icon={getEntityTypeStyle('dimension').icon} class="w-4 h-4 {getEntityTypeStyle('dimension').iconClass}" />
                                         <span>Dimensions</span>
                                     </div>
                                 </th>
                                 {#each sortedFacts as fact}
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wider bg-gray-50 min-w-[150px]">
                                         <div class="flex items-center gap-2">
-                                            <Icon icon="lucide:bar-chart-3" class="w-4 h-4 text-blue-600" />
+                                            <Icon icon={getEntityTypeStyle('fact').icon} class="w-4 h-4 {getEntityTypeStyle('fact').iconClass}" />
                                             <span
                                                 class="flex-shrink-0 inline-block w-2 h-2 rounded-full {readModelRef(fact) ? 'bg-primary-600' : 'border border-gray-300'}"
                                                 title={readModelRef(fact) ? formatModelHint(frameworkCopy.builtHint, readModelRef(fact)!.split('.').pop() ?? '') : frameworkCopy.unbuiltHint}
@@ -492,7 +493,7 @@
                                                 <Tooltip text={`${factVisibleDimensionCounts.get(fact.id)} related dimensions`}>
                                                     <span
                                                         aria-label="{factVisibleDimensionCounts.get(fact.id)} related dimensions"
-                                                        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700"
+                                                        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full {getEntityTypeStyle('fact').badge}"
                                                     >
                                                         {factVisibleDimensionCounts.get(fact.id)}
                                                     </span>
@@ -521,7 +522,7 @@
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="px-4 py-3 text-sm font-medium text-gray-900 bg-white sticky left-0 z-10 border-r border-gray-200 w-[200px] min-w-[200px]">
                                             <div class="flex items-center gap-2" title={dimension.label}>
-                                                <Icon icon="lucide:list" class="w-4 h-4 text-green-600 flex-shrink-0" />
+                                                <Icon icon={getEntityTypeStyle('dimension').icon} class="w-4 h-4 flex-shrink-0 {getEntityTypeStyle('dimension').iconClass}" />
                                                 <span
                                                     class="flex-shrink-0 inline-block w-2 h-2 rounded-full {readModelRef(dimension) ? 'bg-primary-600' : 'border border-gray-300'}"
                                                     title={readModelRef(dimension) ? formatModelHint(frameworkCopy.builtHint, readModelRef(dimension)!.split('.').pop() ?? '') : frameworkCopy.unbuiltHint}
@@ -530,7 +531,7 @@
                                                 <Tooltip text={`${dimensionVisibleFactCounts.get(dimension.id) ?? 0} related facts`}>
                                                     <span
                                                         aria-label="{dimensionVisibleFactCounts.get(dimension.id) ?? 0} related facts"
-                                                        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 flex-shrink-0"
+                                                        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full flex-shrink-0 {getEntityTypeStyle('dimension').badge}"
                                                     >
                                                         {dimensionVisibleFactCounts.get(dimension.id) ?? 0}
                                                     </span>
