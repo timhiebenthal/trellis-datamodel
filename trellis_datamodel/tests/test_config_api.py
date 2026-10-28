@@ -743,3 +743,60 @@ async def test_put_config_persists_the_nested_ossie_source(
     assert saved["ossie"]["enabled"] is True
     assert saved["ossie"]["source"]["database"] == "ANALYTICS"
     assert saved["ossie"]["source"]["schema"] == "marts"
+
+
+@pytest.mark.asyncio
+async def test_put_config_preserves_unknown_keys_and_comments(
+    client: AsyncClient, temp_config_dir
+):
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    config_path.write_text(
+        "# team config - keep me\n"
+        + config_path.read_text()
+        + "canvas_layout_version_control: false\n"
+        + "canvas_layout_file: layout.yml\n"
+        + "bus_matrix:\n  enabled: false\n"
+    )
+
+    await _load_then_save(client)
+
+    text = config_path.read_text()
+    saved = yaml.safe_load(text)
+    assert text.startswith("# team config - keep me\n")
+    assert saved["canvas_layout_version_control"] is False
+    assert saved["canvas_layout_file"] == "layout.yml"
+    assert saved["bus_matrix"] == {"enabled": False}
+    assert saved["framework"] == "dbt-core"
+
+
+@pytest.mark.asyncio
+async def test_put_config_drops_a_section_the_modeling_style_excludes(
+    client: AsyncClient, temp_config_dir
+):
+    config_path = Path(temp_config_dir) / "trellis.yml"
+
+    await _load_then_save(client)
+
+    saved = yaml.safe_load(config_path.read_text())
+    assert saved["modeling_style"] == "entity_model"
+    assert "dimensional_modeling" not in saved
+
+
+@pytest.mark.asyncio
+async def test_put_config_conflict_leaves_the_file_untouched(
+    client: AsyncClient, temp_config_dir
+):
+    config_path = Path(temp_config_dir) / "trellis.yml"
+    before = config_path.read_bytes()
+    config = (await client.get("/api/config")).json()["config"]
+
+    response = await client.put(
+        "/api/config",
+        json={
+            "config": {**config, "start_page": "entity-list"},
+            "expected_hash": "deadbeef",
+        },
+    )
+
+    assert response.status_code == 409
+    assert config_path.read_bytes() == before
