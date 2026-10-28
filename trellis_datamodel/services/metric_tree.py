@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.adapters.base import semantic_dataset_name
+from trellis_datamodel.models.semantic_names import semantic_dataset_name
 from trellis_datamodel.exceptions import ValidationError
 from trellis_datamodel.models.entity_keys import get_model_ref
 from trellis_datamodel.models.metric import (

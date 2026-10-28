@@ -23,6 +23,7 @@ from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.adapters.base import ModelInfo, ModelSchema, TransformationAdapter
 from trellis_datamodel.exceptions import (
     ConfigurationError,
+    DomainError,
     FileOperationError,
     NotFoundError,
     ValidationError,
@@ -280,7 +281,7 @@ def get_model_schema(model_name: str, version: int | None = None) -> dict[str, A
         }
     except FileNotFoundError as e:
         raise NotFoundError(f"Model schema not found: {str(e)}") from e
-    except ValidationError:
+    except DomainError:
         raise
     except ValueError as e:
         raise NotFoundError(f"Model not found: {str(e)}") from e
@@ -327,7 +328,7 @@ def update_model_schema(
         return output_path
     except FileNotFoundError as e:
         raise NotFoundError(f"Model schema not found: {str(e)}") from e
-    except ValidationError:
+    except DomainError:
         raise
     except ValueError as e:
         raise NotFoundError(f"Model not found: {str(e)}") from e
@@ -355,12 +356,9 @@ def infer_relationships(include_unbound: bool = False) -> list[dict[str, Any]]:
         adapter = get_adapter()
         relationships = adapter.infer_relationships(include_unbound=include_unbound)
         return relationships
+    except DomainError:
+        raise
     except FileNotFoundError as e:
-        # When no yml files found, raise ConfigurationError (maps to 400)
-        # to match existing API behavior
-        error_msg = str(e).lower()
-        if "no schema yml files found" in error_msg:
-            raise ConfigurationError(str(e)) from e
         raise FileOperationError(f"Schema files not found: {str(e)}") from e
     except Exception as e:
         raise FileOperationError(f"Error inferring relationships: {str(e)}") from e

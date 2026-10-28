@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 def load_yaml_or_json(path: str | Path) -> Any:
@@ -18,3 +22,14 @@ def load_yaml_or_json(path: str | Path) -> Any:
         except json.JSONDecodeError:
             pass
     return yaml.safe_load(text)
+
+
+def load_data_model_file(path: str | Path | None) -> dict[str, Any]:
+    """Load the data model file, returning ``{}`` if it is unset, missing or unreadable."""
+    if not path or not os.path.exists(path):
+        return {}
+    try:
+        return load_yaml_or_json(path) or {}
+    except Exception as e:
+        logger.warning("Could not load data model: %s", e)
+        return {}

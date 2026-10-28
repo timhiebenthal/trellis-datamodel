@@ -86,7 +86,7 @@ def _legacy_artifact_keys(status: dict) -> dict:
     if "catalog" in artifacts:
         legacy["catalog_path"] = artifacts["catalog"]["path"]
         legacy["catalog_exists"] = artifacts["catalog"]["exists"]
-    if status["framework"] == "dbt-core":
+    if "manifest" in artifacts:
         legacy["dbt_project_path"] = status["project_path"]
 
     return legacy
