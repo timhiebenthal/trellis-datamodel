@@ -47,6 +47,7 @@ from trellis_datamodel.utils.bruin_rewriter import (
     write_bruin_asset,
 )
 from trellis_datamodel.utils.origin import parse_origin, stringify_origin
+from trellis_datamodel.models.schemas import FrameworkEnum
 from trellis_datamodel.adapters.lineage import (
     source_systems_from_lineage,
     walk_upstream,
@@ -72,7 +73,7 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
-FRAMEWORK_NAME = "bruin"
+FRAMEWORK_NAME = FrameworkEnum.BRUIN.value
 
 # Asset types that ingest from outside the warehouse rather than transform
 # within it. These terminate a lineage walk the way a dbt source does.
@@ -99,6 +100,15 @@ def _split_asset_name(name: str) -> tuple[str, str]:
 def _short_name(name: str) -> str:
     """The asset name without its schema prefix."""
     return _split_asset_name(name)[1]
+
+
+def _assets_by_name(assets: list[BruinAsset]) -> dict[str, BruinAsset]:
+    """Index assets by full name, and by short name where no full name claims it."""
+    by_name: dict[str, BruinAsset] = {}
+    for asset in assets:
+        by_name[asset.name] = asset
+        by_name.setdefault(_short_name(asset.name), asset)
+    return by_name
 
 
 def _ambiguous_short_names(assets: list[BruinAsset]) -> set[str]:
@@ -933,10 +943,7 @@ class BruinAdapter:
     def get_lineage(self, model_unique_id: str) -> LineageGraph:
         """Build the upstream lineage graph for an asset from `depends:`."""
         assets = self._scan_all_assets()
-        by_name: dict[str, BruinAsset] = {}
-        for asset in assets:
-            by_name[asset.name] = asset
-            by_name.setdefault(_short_name(asset.name), asset)
+        by_name = _assets_by_name(assets)
 
         root = by_name.get(model_unique_id)
         if root is None:
@@ -1030,10 +1037,7 @@ class BruinAdapter:
 
         try:
             assets = self._scan_all_assets()
-            by_name: dict[str, BruinAsset] = {}
-            for asset in assets:
-                by_name[asset.name] = asset
-                by_name.setdefault(_short_name(asset.name), asset)
+            by_name = _assets_by_name(assets)
 
             memo: dict[str, tuple[str, ...]] = {}
 

@@ -29,6 +29,7 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 from trellis_datamodel.utils.column_metadata import resolve_column_metadata
 from trellis_datamodel.utils.origin import parse_origin
 from trellis_datamodel.utils.path_validation import validate_path_is_safe
+from trellis_datamodel.models.schemas import FrameworkEnum
 from trellis_datamodel.adapters.lineage import (
     source_systems_from_lineage,
     walk_upstream,
@@ -51,7 +52,7 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
-FRAMEWORK_NAME = "dbt-core"
+FRAMEWORK_NAME = FrameworkEnum.DBT_CORE.value
 
 
 def _extract_folder_from_path(original_file_path: str) -> Optional[str]:
