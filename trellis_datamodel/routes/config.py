@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException
 
 from trellis_datamodel import __version__ as trellis_version
 from trellis_datamodel.adapters import get_adapter
-from trellis_datamodel.config import find_config_file, reload_config
+from trellis_datamodel.config import reload_config
 from trellis_datamodel.exceptions import ConfigurationError, ValidationError
 from trellis_datamodel.models.schemas import (
     ConfigGetResponse,
@@ -21,7 +21,8 @@ from trellis_datamodel.models.schemas import (
 )
 from trellis_datamodel.services.config_service import (
     get_schema_metadata,
-    load_config,
+    read_config,
+    require_config_path,
     save_config,
     validate_config,
 )
@@ -41,7 +42,7 @@ async def get_config() -> ConfigGetResponse:
     """
     try:
         # Load config and file info
-        config, file_info = load_config()
+        config, file_info = read_config()
 
         # Get schema metadata
         schema = get_schema_metadata()
@@ -104,13 +105,7 @@ async def update_config(request: ConfigUpdateRequest) -> Dict[str, Any]:
     If validation fails, returns 422 with validation errors.
     """
     try:
-        # Get config path (use override if not provided)
-        config_path = find_config_file()
-
-        if not config_path:
-            raise ConfigurationError(
-                "No config file found. Please create trellis.yml in the current directory."
-            )
+        config_path = require_config_path()
 
         # Save config with conflict detection
         saved_config, conflict_message = save_config(

@@ -13,7 +13,19 @@ from typing import Any, Optional
 
 import yaml
 
+from trellis_datamodel.models import schemas as _schemas
+
 logger = logging.getLogger(__name__)
+
+# The pydantic schema owns the shape and defaults of trellis.yml. The runtime
+# dataclasses and loaders below read their defaults from here (#178).
+_DEFAULTS = _schemas.ConfigSchema()
+_DIMENSIONAL_DEFAULTS = _schemas.DimensionalInferencePatterns()
+_ENTITY_DEFAULTS = _schemas.EntityInferencePatterns()
+_DEFAULT_START_PAGE: str = _DEFAULTS.start_page.value
+_DEFAULT_MODELING_STYLE: str = _DEFAULTS.modeling_style.value
+_DEFAULT_EXPOSURES_LAYOUT: str = _DEFAULTS.exposures.default_layout.value
+_DEFAULT_BRUIN_ASSET_TYPE: str = _DEFAULTS.bruin_default_asset_type
 
 # Check for test mode - allows overriding config via environment
 _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
@@ -23,10 +35,12 @@ _TEST_DIR = os.environ.get("DATAMODEL_TEST_DIR", "")
 class GuidanceConfig:
     """Configuration for entity creation guidance features."""
 
-    entity_wizard_enabled: bool = True
-    push_warning_enabled: bool = True
-    min_description_length: int = 10
-    disabled_guidance: list[str] = field(default_factory=list)
+    entity_wizard_enabled: bool = _DEFAULTS.entity_creation_guidance.enabled
+    push_warning_enabled: bool = _DEFAULTS.entity_creation_guidance.push_warning_enabled
+    min_description_length: int = _DEFAULTS.entity_creation_guidance.min_description_length
+    disabled_guidance: list[str] = field(
+        default_factory=lambda: list(_DEFAULTS.entity_creation_guidance.disabled_guidance)
+    )
 
 
 @dataclass
@@ -34,8 +48,12 @@ class DimensionalModelingConfig:
     """Configuration for dimensional modeling features."""
 
     enabled: bool = False
-    dimension_prefix: list[str] = field(default_factory=lambda: ["dim_", "d_"])
-    fact_prefix: list[str] = field(default_factory=lambda: ["fct_", "fact_"])
+    dimension_prefix: list[str] = field(
+        default_factory=lambda: list(_DIMENSIONAL_DEFAULTS.dimension_prefix)
+    )
+    fact_prefix: list[str] = field(
+        default_factory=lambda: list(_DIMENSIONAL_DEFAULTS.fact_prefix)
+    )
 
 
 @dataclass
@@ -43,7 +61,9 @@ class EntityModelingConfig:
     """Configuration for entity modeling features."""
 
     enabled: bool = False
-    entity_prefix: list[str] = field(default_factory=list)
+    entity_prefix: list[str] = field(
+        default_factory=lambda: list(_ENTITY_DEFAULTS.prefix)
+    )
 
 
 @dataclass
@@ -58,19 +78,21 @@ class SourceChipsConfig:
 class OssieConfig:
     """Configuration for Apache Ossie semantic model export."""
 
-    enabled: bool = False
-    file: str = ""  # resolved absolute path to the generated document
-    database: str = ""  # overrides the adapter's database segment; empty omits it
-    schema: str = ""  # overrides the adapter's schema segment; empty uses it
+    enabled: bool = _DEFAULTS.ossie.enabled
+    file: str = _DEFAULTS.ossie.file  # resolved absolute path to the generated document
+    # overrides the adapter's database segment; empty omits it
+    database: str = _DEFAULTS.ossie.source.database
+    # overrides the adapter's schema segment; empty uses it
+    schema: str = _DEFAULTS.ossie.source.schema_name
 
 
 @dataclass
 class MetricsConfig:
     """Configuration for the metric tree canvas."""
 
-    enabled: bool = False
-    file: str = ""  # resolved absolute path to metric_tree.yml
-    expression_dialect: str = "ANSI_SQL"
+    enabled: bool = _DEFAULTS.metrics.enabled
+    file: str = _DEFAULTS.metrics.file  # resolved absolute path to metric_tree.yml
+    expression_dialect: str = _DEFAULTS.metrics.expression_dialect
 
 
 # Global configuration objects (set by load_config)
@@ -110,16 +132,16 @@ if _TEST_DIR:
     DBT_MODEL_PATHS: list[str] = ["3_core"]
     BRUIN_PIPELINE_PATH: str = ""
     BRUIN_ASSET_PATHS: list[str] = []
-    BRUIN_DEFAULT_ASSET_TYPE: str = "duckdb.sql"
-    START_PAGE: str = "canvas"
+    BRUIN_DEFAULT_ASSET_TYPE: str = _DEFAULT_BRUIN_ASSET_TYPE
+    START_PAGE: str = _DEFAULT_START_PAGE
     CANVAS_DEFAULT_FILTERS: dict[str, list[str]] = {"domains": [], "tags": []}
     FRONTEND_BUILD_DIR: str = os.path.join(_TEST_DIR, "frontend/build")
     DBT_COMPANY_DUMMY_PATH: str = os.path.join(_TEST_DIR, "dbt_company_dummy")
     LINEAGE_LAYERS: list[str] = []
     LINEAGE_ENABLED: bool = False
     EXPOSURES_ENABLED: bool = False
-    EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
-    MODELING_STYLE: str = "entity_model"
+    EXPOSURES_DEFAULT_LAYOUT: str = _DEFAULT_EXPOSURES_LAYOUT
+    MODELING_STYLE: str = _DEFAULT_MODELING_STYLE
     Bus_MATRIX_ENABLED: bool = False
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
@@ -145,16 +167,16 @@ else:
     DBT_MODEL_PATHS: list[str] = []
     BRUIN_PIPELINE_PATH: str = ""
     BRUIN_ASSET_PATHS: list[str] = []
-    BRUIN_DEFAULT_ASSET_TYPE: str = "duckdb.sql"
-    START_PAGE: str = "canvas"
+    BRUIN_DEFAULT_ASSET_TYPE: str = _DEFAULT_BRUIN_ASSET_TYPE
+    START_PAGE: str = _DEFAULT_START_PAGE
     CANVAS_DEFAULT_FILTERS: dict[str, list[str]] = {"domains": [], "tags": []}
     FRONTEND_BUILD_DIR: str = ""
     DBT_COMPANY_DUMMY_PATH: str = ""
     LINEAGE_LAYERS: list[str] = []
     LINEAGE_ENABLED: bool = False
     EXPOSURES_ENABLED: bool = False
-    EXPOSURES_DEFAULT_LAYOUT: str = "dashboards-as-rows"
-    MODELING_STYLE: str = "entity_model"
+    EXPOSURES_DEFAULT_LAYOUT: str = _DEFAULT_EXPOSURES_LAYOUT
+    MODELING_STYLE: str = _DEFAULT_MODELING_STYLE
     Bus_MATRIX_ENABLED: bool = False
     BUSINESS_EVENTS_ENABLED: bool = False
     BUSINESS_EVENTS_PATH: str = ""
@@ -174,7 +196,7 @@ def _load_yaml_config(path: str) -> dict[str, Any]:
         return {}
 
 
-def _resolve_config_path(config_path: Optional[str]) -> Optional[str]:
+def resolve_config_path(config_path: Optional[str]) -> Optional[str]:
     """Pick explicit path or search for a config file."""
     if config_path:
         # Normalise once: a relative --config would otherwise break every later
@@ -344,7 +366,9 @@ def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
     if isinstance(guidance_section, dict):
         entity_wizard_enabled = guidance_section.get("enabled")
         if entity_wizard_enabled is None:
-            entity_wizard_enabled = guidance_section.get("entity_wizard_enabled", True)
+            entity_wizard_enabled = guidance_section.get(
+                "entity_wizard_enabled", _DEFAULTS.entity_creation_guidance.enabled
+            )
         wizard_section = guidance_section.get("wizard") or guidance_section.get(
             "entity_wizard"
         )
@@ -352,8 +376,14 @@ def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
             entity_wizard_enabled = wizard_section.get("enabled", entity_wizard_enabled)
         return GuidanceConfig(
             entity_wizard_enabled=bool(entity_wizard_enabled),
-            push_warning_enabled=guidance_section.get("push_warning_enabled", True),
-            min_description_length=guidance_section.get("min_description_length", 10),
+            push_warning_enabled=guidance_section.get(
+                "push_warning_enabled",
+                _DEFAULTS.entity_creation_guidance.push_warning_enabled,
+            ),
+            min_description_length=guidance_section.get(
+                "min_description_length",
+                _DEFAULTS.entity_creation_guidance.min_description_length,
+            ),
             disabled_guidance=(
                 guidance_section.get("disabled_guidance", [])
                 if isinstance(guidance_section.get("disabled_guidance"), list)
@@ -367,7 +397,7 @@ def _load_guidance_config(config: dict[str, Any]) -> GuidanceConfig:
 def _load_exposures_config(config: dict[str, Any]) -> tuple[bool, str]:
     """Load exposures configuration with validation."""
     enabled = False
-    default_layout = "dashboards-as-rows"
+    default_layout = _DEFAULT_EXPOSURES_LAYOUT
 
     exposures_config = config.get("exposures")
     if isinstance(exposures_config, dict):
@@ -450,11 +480,14 @@ def _load_metrics_config(config: dict[str, Any]) -> tuple[bool, str]:
     if not isinstance(metrics_config, dict):
         if metrics_config is not None:
             logger.warning("'metrics' must be a mapping. Ignoring provided value.")
-        return False, "ANSI_SQL"
+        return _DEFAULTS.metrics.enabled, _DEFAULTS.metrics.expression_dialect
 
-    dialect = metrics_config.get("expression_dialect") or "ANSI_SQL"
+    dialect = (
+        metrics_config.get("expression_dialect")
+        or _DEFAULTS.metrics.expression_dialect
+    )
     if not isinstance(dialect, str):
-        dialect = "ANSI_SQL"
+        dialect = _DEFAULTS.metrics.expression_dialect
 
     return bool(metrics_config.get("enabled", False)), dialect
 
@@ -463,12 +496,12 @@ def _load_canvas_navigation_config(
     config: dict[str, Any],
 ) -> tuple[str, dict[str, list[str]]]:
     """Load and normalize the root page and Canvas project defaults."""
-    start_page = config.get("start_page", "canvas")
+    start_page = config.get("start_page", _DEFAULT_START_PAGE)
     if start_page not in {"canvas", "entity-list"}:
         logger.warning(
             "'start_page' must be 'canvas' or 'entity-list'. Using default 'canvas'."
         )
-        start_page = "canvas"
+        start_page = _DEFAULT_START_PAGE
 
     default_filters: dict[str, list[str]] = {"domains": [], "tags": []}
     canvas_config = config.get("canvas")
@@ -564,13 +597,13 @@ def _resolve_metrics_file_path(
 
 def _load_modeling_style(config: dict[str, Any]) -> str:
     """Load modeling style with validation."""
-    modeling_style = config.get("modeling_style", "entity_model")
+    modeling_style = config.get("modeling_style", _DEFAULT_MODELING_STYLE)
     if modeling_style not in ["dimensional_model", "entity_model"]:
         logger.warning(
             "'modeling_style' must be 'dimensional_model' or 'entity_model'. "
             "Using default 'entity_model'."
         )
-        return "entity_model"
+        return _DEFAULT_MODELING_STYLE
     return modeling_style
 
 
@@ -689,7 +722,7 @@ def load_config(config_path: Optional[str] = None) -> None:
     ):
         return
 
-    CONFIG_PATH = _resolve_config_path(config_path) or ""
+    CONFIG_PATH = resolve_config_path(config_path) or ""
     if not CONFIG_PATH:
         return
 

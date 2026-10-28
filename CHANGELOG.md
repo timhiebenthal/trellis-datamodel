@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`trellis init` writes the config through the same round-trip writer as the
+  config page:** values are unchanged, but the generated `trellis.yml` now
+  carries the template's per-key comments and commented documentation blocks,
+  `modeling_style`, `entity_creation_guidance` and `dimensional_modeling` come
+  last in the file, and a few wizard-only comments are gone. Saving a config
+  value unchanged no longer rewrites its quoting.
+- **Config defaults come from one place:** the pydantic `ConfigSchema` now owns
+  the defaults that `config.py`, the config page metadata and the config
+  normaliser used to repeat (#178).
+
 ### Fixed
+- **Config page showed the entity creation wizard as off by default:** with
+  `entity_creation_guidance.enabled` unset the wizard was on at runtime but the
+  config API and page reported it as `false`. They now report `true` (#178).
 - **Web pages can no longer drive the local API around CORS:** CORS hid
   responses from foreign pages but did not stop their requests. A page could
   rebind its DNS name to 127.0.0.1 and call the API as a same-origin caller, or

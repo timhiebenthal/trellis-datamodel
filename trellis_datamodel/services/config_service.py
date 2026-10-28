@@ -10,22 +10,28 @@ import os
 import re
 import tempfile
 from datetime import datetime
+from io import StringIO
 from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, Optional, Tuple
 import json
+from enum import Enum
 
 import yaml
 from pydantic import ValidationError
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from trellis_datamodel.config import find_config_file
+from trellis_datamodel.config import resolve_config_path
 from trellis_datamodel.exceptions import (
     ConfigurationError,
     ValidationError as CustomValidationError,
 )
 from trellis_datamodel.models.schemas import (
     ConfigSchema,
+    ExposuresLayoutEnum,
+    FrameworkEnum,
+    ModelingStyleEnum,
+    StartPageEnum,
     ConfigSchemaResponse,
     ConfigFieldMetadata,
 )
@@ -33,77 +39,89 @@ from trellis_datamodel.models.schemas import (
 logger = logging.getLogger(__name__)
 
 
+def _schema_default(path: str) -> Any:
+    """Default for a dotted trellis.yml key, read from the pydantic schema."""
+    node: Any = ConfigSchema()
+    for part in path.split("."):
+        # `ossie.source.schema` is exposed as `schema_name` (see OssieSourceConfig).
+        node = getattr(node, "schema_name" if part == "schema" else part)
+    if isinstance(node, Enum):
+        return node.value
+    return list(node) if isinstance(node, list) else node
+
+
+
 # Define field metadata for UI
 _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
     "framework": ConfigFieldMetadata(
         type="enum",
-        enum_values=["dbt-core", "bruin"],
-        default="dbt-core",
+        enum_values=[e.value for e in FrameworkEnum],
+        default=_schema_default("framework"),
         required=True,
         description="Transformation framework",
         beta=False,
     ),
     "start_page": ConfigFieldMetadata(
         type="enum",
-        enum_values=["canvas", "entity-list"],
-        default="canvas",
+        enum_values=[e.value for e in StartPageEnum],
+        default=_schema_default("start_page"),
         required=False,
         description="Project default for the root route only; explicit routes remain authoritative",
         beta=False,
     ),
     "canvas.default_filters.domains": ConfigFieldMetadata(
         type="list",
-        default=[],
+        default=_schema_default("canvas.default_filters.domains"),
         required=False,
         description="Project-wide default Canvas domain filters, not per-user preferences",
         beta=False,
     ),
     "canvas.default_filters.tags": ConfigFieldMetadata(
         type="list",
-        default=[],
+        default=_schema_default("canvas.default_filters.tags"),
         required=False,
         description="Project-wide default Canvas tag filters, not per-user preferences",
         beta=False,
     ),
     "modeling_style": ConfigFieldMetadata(
         type="enum",
-        enum_values=["dimensional_model", "entity_model"],
-        default="entity_model",
+        enum_values=[e.value for e in ModelingStyleEnum],
+        default=_schema_default("modeling_style"),
         required=True,
         description="Modeling style approach",
         beta=False,
     ),
     "dbt_project_path": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("dbt_project_path"),
         required=False,
         description="Path to dbt project directory (relative or absolute)",
         beta=False,
     ),
     "dbt_manifest_path": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("dbt_manifest_path"),
         required=False,
         description="Path to manifest.json (relative to project or absolute)",
         beta=False,
     ),
     "dbt_catalog_path": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("dbt_catalog_path"),
         required=False,
         description="Path to catalog.json (relative to project or absolute)",
         beta=False,
     ),
     "data_model_file": ConfigFieldMetadata(
         type="string",
-        default="data_model.yml",
+        default=_schema_default("data_model_file"),
         required=False,
         description="Path where data model YAML will be saved",
         beta=False,
     ),
     "dbt_model_paths": ConfigFieldMetadata(
         type="list",
-        default=[],
+        default=_schema_default("dbt_model_paths"),
         required=False,
         description="Path patterns to include (filters dbt models by original_file_path)",
         beta=False,
@@ -117,78 +135,78 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
     ),
     "bruin_pipeline_path": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("bruin_pipeline_path"),
         required=False,
         description="Path to Bruin pipeline directory holding pipeline.yml and assets/ (relative or absolute)",
         beta=False,
     ),
     "bruin_asset_paths": ConfigFieldMetadata(
         type="list",
-        default=[],
+        default=_schema_default("bruin_asset_paths"),
         required=False,
         description="Subdirectories under assets/ to include (filters Bruin assets)",
         beta=False,
     ),
     "bruin_default_asset_type": ConfigFieldMetadata(
         type="string",
-        default="duckdb.sql",
+        default=_schema_default("bruin_default_asset_type"),
         required=False,
         description="Asset type used when Trellis scaffolds a new Bruin asset (e.g. bq.sql, sf.sql)",
         beta=False,
     ),
     "lineage.enabled": ConfigFieldMetadata(
         type="boolean",
-        default=False,
+        default=_schema_default("lineage.enabled"),
         required=False,
         description="Enable lineage visualization",
         beta=True,
     ),
     "lineage.layers": ConfigFieldMetadata(
         type="list",
-        default=[],
+        default=_schema_default("lineage.layers"),
         required=False,
         description="Ordered list of folder names to organize lineage into layers",
         beta=True,
     ),
     "entity_creation_guidance.enabled": ConfigFieldMetadata(
         type="boolean",
-        default=False,
+        default=_schema_default("entity_creation_guidance.enabled"),
         required=False,
         description="Enable entity creation wizard",
         beta=False,
     ),
     "entity_creation_guidance.push_warning_enabled": ConfigFieldMetadata(
         type="boolean",
-        default=True,
+        default=_schema_default("entity_creation_guidance.push_warning_enabled"),
         required=False,
         description="Show push-to-dbt warnings",
         beta=False,
     ),
     "entity_creation_guidance.min_description_length": ConfigFieldMetadata(
         type="integer",
-        default=10,
+        default=_schema_default("entity_creation_guidance.min_description_length"),
         required=False,
         description="Minimum description length for entity creation",
         beta=False,
     ),
     "entity_creation_guidance.disabled_guidance": ConfigFieldMetadata(
         type="list",
-        default=[],
+        default=_schema_default("entity_creation_guidance.disabled_guidance"),
         required=False,
         description="List of guidance features to disable",
         beta=False,
     ),
     "exposures.enabled": ConfigFieldMetadata(
         type="boolean",
-        default=False,
+        default=_schema_default("exposures.enabled"),
         required=False,
         description="Enable exposures tracking and visualization",
         beta=True,
     ),
     "exposures.default_layout": ConfigFieldMetadata(
         type="enum",
-        enum_values=["dashboards-as-rows", "entities-as-rows"],
-        default="dashboards-as-rows",
+        enum_values=[e.value for e in ExposuresLayoutEnum],
+        default=_schema_default("exposures.default_layout"),
         required=False,
         description="Default layout for exposures visualization",
         beta=True,
@@ -216,35 +234,35 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
     ),
     "business_events.enabled": ConfigFieldMetadata(
         type="boolean",
-        default=False,
+        default=_schema_default("business_events.enabled"),
         required=False,
         description="Enable business events modeling with BEAM* methodology",
         beta=True,
     ),
     "business_events.file": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("business_events.file"),
         required=False,
         description="Path to business events YAML file (defaults to business_events.yml in data model directory)",
         beta=True,
     ),
     "ossie.enabled": ConfigFieldMetadata(
         type="boolean",
-        default=False,
+        default=_schema_default("ossie.enabled"),
         required=False,
         description="Enable Apache Ossie semantic model export alongside framework pushes",
         beta=True,
     ),
     "ossie.file": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("ossie.file"),
         required=False,
         description="Path to the Ossie semantic model file (defaults to semantic_model.yml beside the data model)",
         beta=True,
     ),
     "ossie.source.database": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("ossie.source.database"),
         required=False,
         description=(
             "Database segment for Ossie dataset names; empty omits the database segment. "
@@ -254,21 +272,21 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
     ),
     "ossie.source.schema": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("ossie.source.schema"),
         required=False,
         description="Schema segment override for Ossie dataset names; empty uses the adapter-derived schema",
         beta=True,
     ),
     "metrics.enabled": ConfigFieldMetadata(
         type="boolean",
-        default=False,
+        default=_schema_default("metrics.enabled"),
         required=False,
         description="Enable the metric tree canvas and metric emission on push",
         beta=True,
     ),
     "metrics.file": ConfigFieldMetadata(
         type="string",
-        default="",
+        default=_schema_default("metrics.file"),
         required=False,
         description="Path to the metric tree file (defaults to metric_tree.yml beside the data model)",
         beta=True,
@@ -276,7 +294,7 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
     "metrics.expression_dialect": ConfigFieldMetadata(
         type="enum",
         enum_values=["ANSI_SQL", "OSSIE_SQL_2026"],
-        default="ANSI_SQL",
+        default=_schema_default("metrics.expression_dialect"),
         required=False,
         description="Dialect label emitted with each metric expression; it is not validated against the SQL",
         beta=True,
@@ -451,7 +469,7 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         lineage = config["lineage"]
         if isinstance(lineage, dict):
             normalized["lineage"] = {
-                "enabled": bool(lineage.get("enabled", False)),
+                "enabled": bool(lineage.get("enabled", _schema_default("lineage.enabled"))),
                 "layers": (
                     list(lineage.get("layers", []))
                     if isinstance(lineage.get("layers"), list)
@@ -464,12 +482,22 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         guidance = config["entity_creation_guidance"]
         if isinstance(guidance, dict):
             normalized["entity_creation_guidance"] = {
-                "enabled": bool(guidance.get("enabled", False)),
+                "enabled": bool(
+                    guidance.get(
+                        "enabled", _schema_default("entity_creation_guidance.enabled")
+                    )
+                ),
                 "push_warning_enabled": bool(
-                    guidance.get("push_warning_enabled", True)
+                    guidance.get(
+                        "push_warning_enabled",
+                        _schema_default("entity_creation_guidance.push_warning_enabled"),
+                    )
                 ),
                 "min_description_length": int(
-                    guidance.get("min_description_length", 10)
+                    guidance.get(
+                        "min_description_length",
+                        _schema_default("entity_creation_guidance.min_description_length"),
+                    )
                 ),
                 "disabled_guidance": (
                     list(guidance.get("disabled_guidance", []))
@@ -482,11 +510,12 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
     if "exposures" in config:
         exposures = config["exposures"]
         if isinstance(exposures, dict):
-            layout = exposures.get("default_layout", "dashboards-as-rows")
-            if layout not in ["dashboards-as-rows", "entities-as-rows"]:
-                layout = "dashboards-as-rows"
+            layout_default = _schema_default("exposures.default_layout")
+            layout = exposures.get("default_layout", layout_default)
+            if layout not in [e.value for e in ExposuresLayoutEnum]:
+                layout = layout_default
             normalized["exposures"] = {
-                "enabled": bool(exposures.get("enabled", False)),
+                "enabled": bool(exposures.get("enabled", _schema_default("exposures.enabled"))),
                 "default_layout": layout,
             }
 
@@ -495,8 +524,10 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         business_events = config["business_events"]
         if isinstance(business_events, dict):
             normalized["business_events"] = {
-                "enabled": bool(business_events.get("enabled", False)),
-                "file": business_events.get("file", ""),
+                "enabled": bool(
+                    business_events.get("enabled", _schema_default("business_events.enabled"))
+                ),
+                "file": business_events.get("file", _schema_default("business_events.file")),
             }
 
     # Ossie export. Only emitted when the file already declares the block, the
@@ -515,7 +546,7 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
             return value if isinstance(value, str) else ""
 
         normalized["ossie"] = {
-            "enabled": bool(ossie.get("enabled", False)),
+            "enabled": bool(ossie.get("enabled", _schema_default("ossie.enabled"))),
             "file": as_str(ossie.get("file")),
             "source": {
                 "database": as_str(ossie_source.get("database")),
@@ -532,15 +563,16 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(metrics, dict):
             metrics = {}
 
-        dialect = metrics.get("expression_dialect", "ANSI_SQL")
+        dialect_default = _schema_default("metrics.expression_dialect")
+        dialect = metrics.get("expression_dialect", dialect_default)
         if dialect not in _METRICS_DIALECTS:
-            dialect = "ANSI_SQL"
+            dialect = dialect_default
 
         def metrics_str(value: Any) -> str:
             return value if isinstance(value, str) else ""
 
         normalized["metrics"] = {
-            "enabled": bool(metrics.get("enabled", False)),
+            "enabled": bool(metrics.get("enabled", _schema_default("metrics.enabled"))),
             "file": metrics_str(metrics.get("file")),
             "expression_dialect": dialect,
         }
@@ -680,9 +712,18 @@ def _merge_into_document(raw: Any, normalized: Dict[str, Any]) -> Any:
         current = raw.get(key)
         if isinstance(value, dict) and isinstance(current, CommentedMap):
             _merge_into_document(current, value)
-        else:
+        elif current != value:
             raw[key] = value
     return raw
+
+
+def render_config(text: str, normalized: Dict[str, Any]) -> str:
+    """Merge the normalized config into trellis.yml text and return the new text."""
+    ryaml = _round_trip_yaml()
+    document = _merge_into_document(ryaml.load(text), normalized)
+    out = StringIO()
+    ryaml.dump(document, out)
+    return out.getvalue()
 
 
 def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
@@ -692,13 +733,11 @@ def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
 
     Uses temp file + move to ensure atomic operation.
     """
-    ryaml = _round_trip_yaml()
     try:
         with open(config_path, "r") as f:
-            raw = ryaml.load(f)
+            rendered = render_config(f.read(), normalized)
     except Exception as e:
         raise ConfigurationError(f"Failed to read config file: {e}")
-    document = _merge_into_document(raw, normalized)
 
     # Write to temp file
     fd, temp_path = tempfile.mkstemp(
@@ -707,7 +746,7 @@ def _atomic_write(config_path: str, normalized: Dict[str, Any]) -> None:
 
     try:
         with os.fdopen(fd, "w") as f:
-            ryaml.dump(document, f)
+            f.write(rendered)
 
         # Atomic move
         os.replace(temp_path, config_path)
@@ -730,7 +769,22 @@ def get_schema_metadata() -> ConfigSchemaResponse:
     return ConfigSchemaResponse(fields=_FIELD_DEFINITIONS, beta_flags=_BETA_FIELDS)
 
 
-def load_config(
+def require_config_path(config_path: Optional[str] = None) -> str:
+    """Resolve the trellis.yml to operate on, raising if there isn't one."""
+    resolved = resolve_config_path(config_path)
+
+    if not resolved:
+        raise ConfigurationError(
+            "No config file found. Please create trellis.yml in the current directory."
+        )
+
+    if not os.path.exists(resolved):
+        raise ConfigurationError(f"Config file not found: {resolved}")
+
+    return resolved
+
+
+def read_config(
     config_path: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     """
@@ -743,16 +797,7 @@ def load_config(
     Raises:
         ConfigurationError: If config file is not found or unreadable
     """
-    if not config_path:
-        config_path = find_config_file()
-
-    if not config_path:
-        raise ConfigurationError(
-            "No config file found. Please create trellis.yml in the current directory."
-        )
-
-    if not os.path.exists(config_path):
-        raise ConfigurationError(f"Config file not found: {config_path}")
+    config_path = require_config_path(config_path)
 
     try:
         with open(config_path, "r") as f:
@@ -812,16 +857,7 @@ def save_config(
         ConfigurationError: If config file is not found or validation fails
         ValidationError: If config validation fails
     """
-    if not config_path:
-        config_path = find_config_file()
-
-    if not config_path:
-        raise ConfigurationError(
-            "No config file found. Please create trellis.yml in the current directory."
-        )
-
-    if not os.path.exists(config_path):
-        raise ConfigurationError(f"Config file not found: {config_path}")
+    config_path = require_config_path(config_path)
 
     # Check for conflicts
     current_mtime = _get_file_mtime(config_path)
