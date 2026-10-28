@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inferRelationships, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt, getModelSchema } from './api';
+import { apiJson, ApiError, updateConfig, inferRelationships, getDimensions, createBusinessEvent, updateBusinessEvent, getBusinessEventProcesses, createBusinessEventProcess, updateBusinessEventProcess, resolveBusinessEventProcess, attachEventsToProcess, detachEventsFromProcess, generateEntitiesFromProcess, syncDbtTests, reconcileDbt, getModelSchema } from './api';
 import type { BusinessEventType, BusinessEventSevenWs, CreateProcessRequest, UpdateProcessRequest, AttachEventsRequest, DetachEventsRequest } from '$lib/types';
 import { recordBootRequest } from './boot-diagnostics';
 
@@ -92,6 +92,178 @@ describe('boot request diagnostics', () => {
         expect(recordBootRequest).toHaveBeenCalledWith(expect.objectContaining({
             url: 'http://localhost:8089/api/models/orders/schema',
         }));
+    });
+});
+
+describe('apiJson', () => {
+    afterEach(() => {
+        vi.clearAllMocks();
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    function stubResponse(response: Record<string, unknown>) {
+        const fetchMock = vi.fn().mockResolvedValue({ headers: new Headers(), ...response });
+        vi.stubGlobal('fetch', fetchMock);
+        return fetchMock;
+    }
+
+    async function caught(promise: Promise<unknown>): Promise<ApiError> {
+        const error = await promise.then(
+            () => undefined,
+            (e: unknown) => e,
+        );
+        expect(error).toBeInstanceOf(ApiError);
+        return error as ApiError;
+    }
+
+    it('returns the parsed body and sends JSON bodies', async () => {
+        const fetchMock = stubResponse({
+            ok: true,
+            status: 200,
+            text: vi.fn().mockResolvedValue('{"id":"x"}'),
+        });
+
+        await expect(apiJson('/things', { method: 'POST', body: { a: 1 } })).resolves.toEqual({ id: 'x' });
+        expect(fetchMock).toHaveBeenCalledWith('http://localhost:8089/api/things', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{"a":1}',
+        });
+    });
+
+    it('calls fetch with the URL only for a plain GET', async () => {
+        const fetchMock = stubResponse({ ok: true, status: 200, json: vi.fn().mockResolvedValue([]) });
+
+        await apiJson('/things');
+
+        expect(fetchMock).toHaveBeenCalledWith('http://localhost:8089/api/things');
+    });
+
+    it('resolves undefined for an empty success body', async () => {
+        stubResponse({ ok: true, status: 204, text: vi.fn().mockResolvedValue('') });
+
+        await expect(apiJson('/things', { method: 'DELETE' })).resolves.toBeUndefined();
+    });
+
+    it('throws ApiError with the server detail string as message', async () => {
+        stubResponse({
+            ok: false,
+            status: 422,
+            text: vi.fn().mockResolvedValue('{"detail":"Process not found"}'),
+        });
+
+        const error = await caught(apiJson('/things'));
+        expect(error.message).toBe('Process not found');
+        expect(error.status).toBe(422);
+        expect(error.detail).toBe('Process not found');
+    });
+
+    it('prefixes the message with errorMessage and status', async () => {
+        stubResponse({
+            ok: false,
+            status: 500,
+            text: vi.fn().mockResolvedValue('{"detail":"boom"}'),
+        });
+
+        const error = await caught(apiJson('/things', { errorMessage: 'Failed to fetch things' }));
+        expect(error.message).toBe('Failed to fetch things: 500 - boom');
+    });
+
+    it('reads detail.message objects and validation error lists', async () => {
+        stubResponse({
+            ok: false,
+            status: 400,
+            json: vi.fn().mockResolvedValue({ detail: { message: 'Invalid config', field: 'x' } }),
+        });
+        const objectError = await caught(apiJson('/things'));
+        expect(objectError.message).toBe('Invalid config');
+        expect(objectError.detail).toEqual({ message: 'Invalid config', field: 'x' });
+
+        stubResponse({
+            ok: false,
+            status: 422,
+            json: vi.fn().mockResolvedValue({ detail: [{ msg: 'field required' }, { msg: 'bad type' }] }),
+        });
+        const listError = await caught(apiJson('/things'));
+        expect(listError.message).toBe('field required; bad type');
+    });
+
+    it('keeps a non-JSON error body as text instead of throwing a parse error', async () => {
+        stubResponse({
+            ok: false,
+            status: 502,
+            text: vi.fn().mockResolvedValue('<html>Bad Gateway</html>'),
+        });
+
+        const error = await caught(apiJson('/things', { errorMessage: 'Failed to fetch things' }));
+        expect(error.message).toBe('Failed to fetch things: 502 - <html>Bad Gateway</html>');
+        expect(error.detail).toBe('<html>Bad Gateway</html>');
+    });
+
+    it('falls back to the status when the error body is unreadable', async () => {
+        stubResponse({ ok: false, status: 500 });
+
+        const error = await caught(apiJson('/things'));
+        expect(error.message).toBe('Request failed: 500');
+        expect(error.detail).toBeUndefined();
+    });
+
+    it('returns notFound on 404 without reading the body, and throws 404 otherwise', async () => {
+        const text = vi.fn().mockResolvedValue('{"detail":"Not here"}');
+        stubResponse({ ok: false, status: 404, text });
+
+        await expect(apiJson<string[]>('/things', { notFound: [] })).resolves.toEqual([]);
+        expect(text).not.toHaveBeenCalled();
+
+        const error = await caught(apiJson('/things'));
+        expect(error.status).toBe(404);
+        expect(error.message).toBe('Not here');
+    });
+
+    it('propagates network failures unchanged and records them', async () => {
+        const failure = new TypeError('Failed to fetch');
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(failure));
+
+        await expect(apiJson('/things', { method: 'post' })).rejects.toBe(failure);
+        expect(recordBootRequest).toHaveBeenCalledWith(expect.objectContaining({
+            url: 'http://localhost:8089/api/things',
+            method: 'POST',
+            bytes: undefined,
+        }));
+    });
+
+    it('records every request with its status', async () => {
+        stubResponse({ ok: true, status: 200, json: vi.fn().mockResolvedValue({ a: 1 }) });
+        await apiJson('/ok');
+        stubResponse({ ok: false, status: 500, json: vi.fn().mockResolvedValue({ detail: 'x' }) });
+        await expect(apiJson('/fail')).rejects.toBeInstanceOf(ApiError);
+
+        const calls = vi.mocked(recordBootRequest).mock.calls.map(([r]) => r);
+        expect(calls).toEqual([
+            expect.objectContaining({ url: 'http://localhost:8089/api/ok', method: 'GET', status: 200 }),
+            expect.objectContaining({ url: 'http://localhost:8089/api/fail', method: 'GET', status: 500 }),
+        ]);
+    });
+});
+
+describe('updateConfig conflict contract', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it('throws CONFLICT: <detail JSON> on 409', async () => {
+        const detail = { error: 'conflict', message: 'Changed on disk', conflict: { mtime: 1 } };
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({ ok: false, status: 409, json: vi.fn().mockResolvedValue({ detail }) }),
+        );
+
+        const error = await updateConfig({}).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(ApiError);
+        expect((error as ApiError).status).toBe(409);
+        expect((error as ApiError).message).toBe(`CONFLICT: ${JSON.stringify(detail)}`);
     });
 });
 

@@ -84,16 +84,35 @@ export function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
-type BootResponse = {
-    ok: boolean;
-    status: number;
-    statusText?: string;
-    headers?: Headers;
-    json: () => Promise<unknown>;
-    text: () => Promise<string>;
-    readJson: <T>() => Promise<T>;
-    readText: () => Promise<string>;
-    record: (body?: unknown) => void;
+
+/**
+ * Error thrown by {@link apiJson} when the server answers with a non-2xx status.
+ */
+export class ApiError extends Error {
+    readonly status: number;
+    /** FastAPI `detail` (string, object or validation array), the raw body when it is not JSON, or undefined. */
+    readonly detail: unknown;
+
+    constructor(message: string, status: number, detail?: unknown) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.detail = detail;
+    }
+}
+
+export type ApiJsonOptions<T> = {
+    method?: string;
+    /** Serialized as JSON and sent with `Content-Type: application/json`. */
+    body?: unknown;
+    signal?: AbortSignal;
+    /** Returned instead of throwing when the server answers 404. */
+    notFound?: T;
+    /**
+     * Error message prefix: `${errorMessage}: ${status}[ - ${detail}]`.
+     * Omit it to use the server's `detail` as the message.
+     */
+    errorMessage?: string;
 };
 
 function responseHeader(response: Response, name: string): string | null {
@@ -104,63 +123,71 @@ function serializedByteLength(value: unknown): number {
     return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
-async function request(url: string, options?: RequestInit): Promise<BootResponse> {
-    const startedAt = performance.now();
-    const method = String(options?.method ?? 'GET').toUpperCase();
-    try {
-        const response = await fetch(url, options);
-        let recorded = false;
-        const contentLength = responseHeader(response, 'content-length');
-        const serverTiming = responseHeader(response, 'server-timing');
-        const record = (body?: unknown): void => {
-            if (recorded) return;
-            recorded = true;
-            const parsedContentLength = contentLength === null ? undefined : Number(contentLength);
-            recordBootRequest({
-                url,
-                method,
-                status: response.status,
-                bytes: Number.isFinite(parsedContentLength)
-                    ? parsedContentLength
-                    : body === undefined
-                      ? undefined
-                      : serializedByteLength(body),
-                duration: performance.now() - startedAt,
-                serverTiming: parseServerTiming(serverTiming),
-            });
-        };
-        const readJson = async <T>(): Promise<T> => {
-            const body = await response.json();
-            record(body);
-            return body as T;
-        };
-        const readText = async (): Promise<string> => {
-            const body = await response.text();
-            record(body);
-            return body;
-        };
+/** Human-readable text for a FastAPI `detail`: a string, `{ message }`, or a validation error list. */
+function detailText(detail: unknown): string | undefined {
+    if (typeof detail === 'string') return detail || undefined;
+    if (Array.isArray(detail)) {
+        const messages = detail
+            .map((item) => (typeof item === 'string' ? item : (item as { msg?: unknown } | null)?.msg))
+            .filter((msg): msg is string => typeof msg === 'string');
+        return messages.length > 0 ? messages.join('; ') : undefined;
+    }
+    if (detail && typeof detail === 'object') {
+        const message = (detail as { message?: unknown }).message;
+        if (typeof message === 'string') return message;
+    }
+    return undefined;
+}
 
-        return {
-            ok: response.ok,
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            json:
-                typeof response.json === 'function'
-                    ? response.json.bind(response)
-                    : async () => {
-                          throw new Error('Response does not support JSON parsing');
-                      },
-            text:
-                typeof response.text === 'function'
-                    ? response.text.bind(response)
-                    : async () => {
-                          throw new Error('Response does not support text parsing');
-                      },
-            readJson,
-            readText,
-            record,
-        };
+async function readJsonBody(response: Response): Promise<unknown> {
+    if (typeof response.text === 'function') {
+        const text = await response.text();
+        return text ? JSON.parse(text) : undefined;
+    }
+    if (typeof response.json === 'function') return await response.json();
+    throw new Error('Response does not support JSON parsing');
+}
+
+/** Read an error body without ever throwing: parsed JSON, raw text, or undefined. */
+async function readErrorBody(response: Response): Promise<unknown> {
+    try {
+        if (typeof response.text === 'function') {
+            const text = await response.text();
+            if (!text) return undefined;
+            try {
+                return JSON.parse(text);
+            } catch {
+                return text;
+            }
+        }
+        if (typeof response.json === 'function') return await response.json();
+    } catch {
+        // Unreadable body: the message falls back to the status code.
+    }
+    return undefined;
+}
+
+/**
+ * Call a JSON endpoint under the API base. Resolves with the parsed body
+ * (undefined for an empty body) or throws {@link ApiError} for non-2xx
+ * responses; network failures propagate unchanged. Every call is recorded
+ * for boot diagnostics.
+ */
+export async function apiJson<T>(path: string, opts: ApiJsonOptions<T> = {}): Promise<T> {
+    const url = `${API_BASE}${path}`;
+    const method = (opts.method ?? 'GET').toUpperCase();
+    const init: RequestInit = {};
+    if (opts.method) init.method = opts.method;
+    if (opts.body !== undefined) {
+        init.headers = { 'Content-Type': 'application/json' };
+        init.body = JSON.stringify(opts.body);
+    }
+    if (opts.signal) init.signal = opts.signal;
+
+    const startedAt = performance.now();
+    let response: Response;
+    try {
+        response = Object.keys(init).length > 0 ? await fetch(url, init) : await fetch(url);
     } catch (error) {
         recordBootRequest({
             url,
@@ -171,27 +198,74 @@ async function request(url: string, options?: RequestInit): Promise<BootResponse
         });
         throw error;
     }
+
+    const record = (body?: unknown): void => {
+        const contentLength = responseHeader(response, 'content-length');
+        const parsedContentLength = contentLength === null ? undefined : Number(contentLength);
+        recordBootRequest({
+            url,
+            method,
+            status: response.status,
+            bytes: Number.isFinite(parsedContentLength)
+                ? parsedContentLength
+                : body === undefined
+                  ? undefined
+                  : serializedByteLength(body),
+            duration: performance.now() - startedAt,
+            serverTiming: parseServerTiming(responseHeader(response, 'server-timing')),
+        });
+    };
+
+    if (response.status === 404 && opts.notFound !== undefined) {
+        record();
+        return opts.notFound;
+    }
+
+    let body: unknown;
+    try {
+        body = response.ok ? await readJsonBody(response) : await readErrorBody(response);
+    } finally {
+        record(body);
+    }
+    if (response.ok) return body as T;
+
+    const detail =
+        body !== null && typeof body === 'object' && !Array.isArray(body) && 'detail' in body
+            ? (body as { detail: unknown }).detail
+            : body;
+    const text = detailText(detail);
+    const message = opts.errorMessage
+        ? `${opts.errorMessage}: ${response.status}${text ? ` - ${text}` : ''}`
+        : (text ?? `Request failed: ${response.status}`);
+    throw new ApiError(message, response.status, detail);
+}
+
+/** Accept both a bare list and a `{ [key]: [...] }` wrapper. */
+function listFrom<T>(payload: unknown, key: string): T[] {
+    if (Array.isArray(payload)) return payload as T[];
+    const wrapped = (payload as Record<string, unknown> | null | undefined)?.[key];
+    return Array.isArray(wrapped) ? (wrapped as T[]) : [];
+}
+
+function isSmokeMode(): boolean {
+    return (
+        import.meta.env?.MODE === 'test' ||
+        import.meta.env?.VITE_SMOKE_TEST === 'true' ||
+        import.meta.env?.PUBLIC_SMOKE_TEST === 'true' ||
+        (typeof window !== 'undefined' && Boolean((window as any).__SMOKE_TEST__))
+    );
 }
 
 export async function getManifest(): Promise<ModelInfo[]> {
     try {
         // Short-circuit in test/smoke environments to avoid console 500s when backend is absent
-        const isSmokeMode =
-            import.meta.env?.MODE === 'test' ||
-            import.meta.env?.VITE_SMOKE_TEST === 'true' ||
-            import.meta.env?.PUBLIC_SMOKE_TEST === 'true' ||
-            (typeof window !== 'undefined' && Boolean((window as any).__SMOKE_TEST__));
-        if (isSmokeMode) {
+        if (isSmokeMode()) {
             return [];
         }
-
-        const res = await request(`${API_BASE}/manifest`);
-        if (!res.ok) {
-            res.record();
-            if (res.status === 404) return [];
-            throw new Error(`Failed to fetch manifest: ${res.status}`);
-        }
-        const data = await res.readJson<{ models?: ModelInfo[] }>();
+        const data = await apiJson<{ models?: ModelInfo[] }>('/manifest', {
+            notFound: {},
+            errorMessage: 'Failed to fetch manifest',
+        });
         return data.models || [];
     } catch (e) {
         console.error("Error fetching manifest:", e);
@@ -199,151 +273,71 @@ export async function getManifest(): Promise<ModelInfo[]> {
     }
 }
 
-async function fetchDataModelOnce(): Promise<DataModel> {
-    const res = await request(`${API_BASE}/data-model`);
-    if (!res.ok) {
-        res.record();
-        throw new Error(`Failed to fetch data model: ${res.status}`);
-    }
-    return await res.readJson<DataModel>();
+function fetchDataModelOnce(): Promise<DataModel> {
+    return apiJson<DataModel>('/data-model', { errorMessage: 'Failed to fetch data model' });
 }
 
 export async function getDataModel(): Promise<DataModel> {
+    if (isSmokeMode()) {
+        return { version: 0.1, entities: [], relationships: [] };
+    }
     try {
-        const isSmokeMode =
-            import.meta.env?.MODE === 'test' ||
-            import.meta.env?.VITE_SMOKE_TEST === 'true' ||
-            import.meta.env?.PUBLIC_SMOKE_TEST === 'true' ||
-            (typeof window !== 'undefined' && Boolean((window as any).__SMOKE_TEST__));
-        if (isSmokeMode) {
-            return { version: 0.1, entities: [], relationships: [] };
-        }
-
-        try {
-            return await fetchDataModelOnce();
-        } catch (e) {
-            if (e instanceof TypeError && e.message.includes('Failed to fetch')) {
-                return await fetchDataModelOnce();
-            }
-            throw e;
-        }
+        return await fetchDataModelOnce();
     } catch (e) {
-        console.error("Error fetching data model:", e);
+        if (e instanceof TypeError && e.message.includes('Failed to fetch')) {
+            return await fetchDataModelOnce();
+        }
         throw e;
     }
 }
 
 export async function saveDataModel(model: DataModel): Promise<void> {
-    try {
-        const res = await fetch(`${API_BASE}/data-model`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(model),
-        });
-
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`Failed to save data model: ${res.status} - ${errorText}`);
-        }
-    } catch (e) {
-        console.error("Error saving data model:", e);
-        throw e;
-    }
+    await apiJson('/data-model', {
+        method: 'POST',
+        body: model,
+        errorMessage: 'Failed to save data model',
+    });
 }
 
-export async function getConfigStatus(): Promise<ConfigStatus> {
-    try {
-        const res = await fetch(`${API_BASE}/config-status`);
-        if (!res.ok) {
-            throw new Error(`Failed to fetch config status: ${res.status}`);
-        }
-        return await res.json();
-    } catch (e) {
-        console.error("Error fetching config status:", e);
-        throw e;
-    }
+export function getConfigStatus(): Promise<ConfigStatus> {
+    return apiJson<ConfigStatus>('/config-status', { errorMessage: 'Failed to fetch config status' });
 }
 
-export async function getConfigInfo(): Promise<ConfigInfo> {
-    try {
-        const res = await fetch(`${API_BASE}/config-info`);
-        if (!res.ok) {
-            throw new Error(`Failed to fetch config info: ${res.status}`);
-        }
-        return await res.json();
-    } catch (e) {
-        console.error("Error fetching config info:", e);
-        throw e;
-    }
+export function getConfigInfo(): Promise<ConfigInfo> {
+    return apiJson<ConfigInfo>('/config-info', { errorMessage: 'Failed to fetch config info' });
 }
 
 export async function inferRelationships(): Promise<Relationship[]> {
     try {
-        const res = await request(`${API_BASE}/infer-relationships`);
-        if (!res.ok) {
-            if (res.status === 400) {
-                // Treat config/schema absence as a non-fatal case for the UI/tests
-                res.record();
-                return [];
-            }
-            const errorText = await res.readText();
-            const details = errorText ? ` - ${errorText}` : '';
-            throw new Error(
-                `Failed to infer relationships: ${res.status} ${res.statusText}${details}`,
-            );
-        }
-        const payload = await res.readJson<Relationship[] | { relationships?: Relationship[] }>();
-        const relationships = Array.isArray(payload)
-            ? payload
-            : Array.isArray((payload as any)?.relationships)
-              ? (payload as any).relationships
-              : [];
-        return relationships;
-    } catch (e) {
-        console.error("Error inferring relationships:", e);
-        throw e;
-    }
-}
-
-export async function syncDbtTests(): Promise<{ message: string; warnings?: string[] }> {
-    try {
-        const res = await fetch(`${API_BASE}/sync-tests`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
+        const payload = await apiJson<unknown>('/infer-relationships', {
+            errorMessage: 'Failed to infer relationships',
         });
-
-        if (!res.ok) {
-            throw new Error(`Failed to sync relationship tests: ${res.status}`);
-        }
-        return await res.json();
+        return listFrom<Relationship>(payload, 'relationships');
     } catch (e) {
-        console.error("Error syncing relationship tests:", e);
+        // Treat config/schema absence as a non-fatal case for the UI/tests
+        if (e instanceof ApiError && e.status === 400) return [];
         throw e;
     }
 }
 
-export async function getExposures(): Promise<ExposuresResponse> {
-    try {
-        const res = await fetch(`${API_BASE}/exposures`);
-        if (!res.ok) {
-            throw new Error(`Failed to fetch exposures: ${res.status}`);
-        }
-        return await res.json();
-    } catch (e) {
-        console.error("Error fetching exposures:", e);
-        throw e;
-    }
+export function syncDbtTests(): Promise<{ message: string; warnings?: string[] }> {
+    return apiJson('/sync-tests', {
+        method: 'POST',
+        body: {},
+        errorMessage: 'Failed to sync relationship tests',
+    });
+}
+
+export function getExposures(): Promise<ExposuresResponse> {
+    return apiJson<ExposuresResponse>('/exposures', { errorMessage: 'Failed to fetch exposures' });
 }
 
 export async function getLineage(modelId: string): Promise<LineageResponse | null> {
     try {
-        const res = await fetch(`${API_BASE}/lineage/${encodeURIComponent(modelId)}`);
-        if (!res.ok) {
-            if (res.status === 404) return null;
-            throw new Error(`Failed to fetch lineage: ${res.status}`);
-        }
-        return await res.json();
+        return await apiJson<LineageResponse | null>(`/lineage/${encodeURIComponent(modelId)}`, {
+            notFound: null,
+            errorMessage: 'Failed to fetch lineage',
+        });
     } catch (e) {
         console.error("Error fetching lineage:", e);
         // Return null on error to allow modal to handle error display
@@ -351,61 +345,43 @@ export async function getLineage(modelId: string): Promise<LineageResponse | nul
     }
 }
 
+function schemaPath(modelName: string, version?: number): string {
+    const encodedModel = encodeURIComponent(modelName);
+    return version
+        ? `/models/${encodedModel}/schema?version=${version}`
+        : `/models/${encodedModel}/schema`;
+}
+
 export async function getModelSchema(
     modelName: string,
     version?: number
 ): Promise<ModelSchema | null> {
     try {
-        const encodedModel = encodeURIComponent(modelName);
-        const url = version
-            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
-            : `${API_BASE}/models/${encodedModel}/schema`;
-        const res = await request(url);
-        if (!res.ok) {
-            res.record();
-            if (res.status === 404) return null;
-            throw new Error(`Failed to fetch schema: ${res.status}`);
-        }
-        return await res.readJson<ModelSchema>();
+        return await apiJson<ModelSchema | null>(schemaPath(modelName, version), {
+            notFound: null,
+            errorMessage: 'Failed to fetch schema',
+        });
     } catch (e) {
         console.error("Error fetching schema:", e);
         return null;
     }
 }
 
-export async function updateModelSchema(
+export function updateModelSchema(
     modelName: string,
     version: number | undefined,
     columns: ModelSchemaColumn[]
 ): Promise<ModelSchema> {
-    try {
-        const encodedModel = encodeURIComponent(modelName);
-        const url = version
-            ? `${API_BASE}/models/${encodedModel}/schema?version=${version}`
-            : `${API_BASE}/models/${encodedModel}/schema`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ columns }),
-        });
-        if (!res.ok) {
-            throw new Error(`Failed to update schema: ${res.status}`);
-        }
-        return await res.json();
-    } catch (e) {
-        console.error("Error updating schema:", e);
-        throw e;
-    }
+    return apiJson<ModelSchema>(schemaPath(modelName, version), {
+        method: 'POST',
+        body: { columns },
+        errorMessage: 'Failed to update schema',
+    });
 }
 
 export async function getSourceSystemSuggestions(): Promise<string[]> {
     try {
-        const res = await fetch(`${API_BASE}/source-systems/suggestions`);
-        if (!res.ok) {
-            // Return empty array on error
-            return [];
-        }
-        const data = await res.json();
+        const data = await apiJson<{ suggestions?: string[] }>('/source-systems/suggestions');
         return data.suggestions || [];
     } catch (e) {
         console.error("Error fetching source system suggestions:", e);
@@ -416,9 +392,7 @@ export async function getSourceSystemSuggestions(): Promise<string[]> {
 // Config API
 export async function getConfig(): Promise<ConfigGetResponse> {
     try {
-        const res = await fetch(`${API_BASE}/config`);
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
-        return await res.json();
+        return await apiJson<ConfigGetResponse>('/config');
     } catch (e) {
         console.error("Error fetching config:", e);
         return {
@@ -431,57 +405,42 @@ export async function getConfig(): Promise<ConfigGetResponse> {
 
 export async function getConfigSchema(): Promise<ConfigSchema> {
     try {
-        const res = await fetch(`${API_BASE}/config/schema`);
-        if (!res.ok) throw new Error(`Status: ${res.status}`);
-        return await res.json();
+        return await apiJson<ConfigSchema>('/config/schema');
     } catch (e) {
         console.error("Error fetching config schema:", e);
         return { fields: {}, beta_flags: [] };
     }
 }
 
+/**
+ * Save the config. A 409 (file changed on disk) is thrown as an ApiError whose
+ * message is `CONFLICT: <JSON of detail>`; the config page parses that format.
+ */
 export async function updateConfig(
     config: Record<string, any>,
     expected_mtime?: number,
     expected_hash?: string
 ): Promise<ConfigUpdateResponse> {
-    const body: any = { config };
+    const body: Record<string, unknown> = { config };
     if (expected_mtime !== undefined) body.expected_mtime = expected_mtime;
     if (expected_hash !== undefined) body.expected_hash = expected_hash;
 
-    const res = await fetch(`${API_BASE}/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
-
-    if (res.status === 409) {
-        const error = await res.json();
-        throw new Error(`CONFLICT: ${JSON.stringify(error.detail)}`);
+    try {
+        return await apiJson<ConfigUpdateResponse>('/config', { method: 'PUT', body });
+    } catch (e) {
+        if (e instanceof ApiError && e.status === 409) {
+            throw new ApiError(`CONFLICT: ${JSON.stringify(e.detail)}`, e.status, e.detail);
+        }
+        throw e;
     }
-
-    if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail?.message || `Status: ${res.status}`);
-    }
-
-    return await res.json();
 }
 
 export async function validateConfig(config: Record<string, any>): Promise<{ valid: boolean; error?: string }> {
     try {
-        const res = await fetch(`${API_BASE}/config/validate`, {
+        return await apiJson<{ valid: boolean; error?: string }>('/config/validate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
+            body: config,
         });
-
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail?.message || `Status: ${res.status}`);
-        }
-
-        return await res.json();
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         // If it's not a CONFLICT, rethrow
@@ -493,34 +452,19 @@ export async function validateConfig(config: Record<string, any>): Promise<{ val
     }
 }
 
-export async function reloadConfig(): Promise<{ status: string; message: string }> {
-    try {
-        const res = await fetch(`${API_BASE}/config/reload`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail?.message || `Status: ${res.status}`);
-        }
-
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(message);
-    }
+export function reloadConfig(): Promise<{ status: string; message: string }> {
+    return apiJson('/config/reload', { method: 'POST' });
 }
 
 /**
  * Fetch Bus Matrix data showing dimension-fact connections.
- * 
+ *
  * @param dimensionId - Optional filter by specific dimension entity ID
  * @param factId - Optional filter by specific fact entity ID
  * @param tag - Optional filter by tag (entities must have this tag)
  * @returns Promise containing dimensions, facts, and their connections
  */
-export async function getBusMatrix(
+export function getBusMatrix(
     dimensionId?: string,
     factId?: string,
     tag?: string
@@ -535,13 +479,9 @@ export async function getBusMatrix(
     if (tag) params.append('tag', tag);
 
     const queryString = params.toString();
-    const url = `${API_BASE}/bus-matrix${queryString ? `?${queryString}` : ''}`;
-
-    const res = await fetch(url);
-    if (!res.ok) {
-        throw new Error(`Failed to fetch bus matrix: ${res.statusText}`);
-    }
-    return await res.json();
+    return apiJson(`/bus-matrix${queryString ? `?${queryString}` : ''}`, {
+        errorMessage: 'Failed to fetch bus matrix',
+    });
 }
 
 /**
@@ -550,68 +490,25 @@ export async function getBusMatrix(
 
 /**
  * Fetch all business events.
+ * Errors are ApiError instances, so callers can branch on `status`.
  * @returns Promise containing array of BusinessEvent objects
  */
 export async function getBusinessEvents(): Promise<BusinessEvent[]> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events`);
-        if (!res.ok) {
-            // Try to get error detail from response
-            let errorDetail = res.statusText;
-            try {
-                const errorData = await res.json();
-                errorDetail = errorData.detail || errorData.message || errorDetail;
-            } catch {
-                // If JSON parsing fails, use statusText
-            }
-            const error = new Error(`Failed to fetch business events: ${errorDetail}`);
-            (error as any).status = res.status;
-            (error as any).statusText = res.statusText;
-            throw error;
-        }
-        const data = await res.json();
-        // Handle both { events: [...] } and direct array response
-        return Array.isArray(data) ? data : (data.events || []);
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error fetching business events: ${message}`);
-    }
+    const data = await apiJson<unknown>('/business-events', {
+        errorMessage: 'Failed to fetch business events',
+    });
+    // Handle both { events: [...] } and direct array response
+    return listFrom<BusinessEvent>(data, 'events');
 }
 
 /**
  * Get unique domain values from all business events for autocomplete.
  * @returns Promise containing array of unique domain strings
  */
-export async function getBusinessEventDomains(): Promise<string[]> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/domains`);
-        if (!res.ok) {
-            // Try to get error detail from response
-            let errorDetail = res.statusText;
-            try {
-                const errorData = await res.json();
-                errorDetail = errorData.detail || errorData.message || errorDetail;
-            } catch {
-                // If JSON parsing fails, use statusText
-            }
-            const error = new Error(`Failed to fetch business event domains: ${errorDetail}`);
-            (error as any).status = res.status;
-            (error as any).statusText = res.statusText;
-            throw error;
-        }
-        return await res.json();
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error fetching business event domains: ${message}`);
-    }
+export function getBusinessEventDomains(): Promise<string[]> {
+    return apiJson<string[]>('/business-events/domains', {
+        errorMessage: 'Failed to fetch business event domains',
+    });
 }
 
 /**
@@ -622,36 +519,21 @@ export async function getBusinessEventDomains(): Promise<string[]> {
  * @param sevenWs - Optional 7 Ws structure for the event
  * @returns Promise containing the created BusinessEvent
  */
-export async function createBusinessEvent(
+export function createBusinessEvent(
     text: string,
     type?: BusinessEventType,
     domain?: string,
     annotations?: BusinessEventAnnotations,
     description?: string
 ): Promise<BusinessEvent> {
-    try {
-        const body: any = { text, ...(type !== undefined ? { type } : {}), domain: domain || null };
-        if (description) {
-            body.description = description;
-        }
-        if (annotations) {
-            body.annotations = annotations;
-        }
-
-        const res = await fetch(`${API_BASE}/business-events`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to create business event: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error creating business event: ${message}`);
+    const body: Record<string, unknown> = { text, ...(type !== undefined ? { type } : {}), domain: domain || null };
+    if (description) {
+        body.description = description;
     }
+    if (annotations) {
+        body.annotations = annotations;
+    }
+    return apiJson<BusinessEvent>('/business-events', { method: 'POST', body });
 }
 
 /**
@@ -660,25 +542,11 @@ export async function createBusinessEvent(
  * @param updates - Dictionary with fields to update (text, type, domain, annotations, derived_entities)
  * @returns Promise containing the updated BusinessEvent
  */
-export async function updateBusinessEvent(
+export function updateBusinessEvent(
     id: string,
     updates: Partial<BusinessEvent>
 ): Promise<BusinessEvent> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to update business event: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error updating business event: ${message}`);
-    }
+    return apiJson<BusinessEvent>(`/business-events/${id}`, { method: 'PUT', body: updates });
 }
 
 /**
@@ -687,25 +555,14 @@ export async function updateBusinessEvent(
  * @param annotations - Complete annotations structure to replace existing
  * @returns Promise containing the updated BusinessEvent
  */
-export async function updateBusinessEventAnnotations(
+export function updateBusinessEventAnnotations(
     id: string,
     annotations: BusinessEventAnnotations
 ): Promise<BusinessEvent> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ annotations: annotations }),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to update annotations: ${res.statusText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error updating annotations: ${message}`);
-    }
+    return apiJson<BusinessEvent>(`/business-events/${id}`, {
+        method: 'PUT',
+        body: { annotations: annotations },
+    });
 }
 
 /**
@@ -714,39 +571,31 @@ export async function updateBusinessEventAnnotations(
  * @returns Promise containing array of Dimension objects
  */
 export async function getDimensions(filterByType?: AnnotationType, includeAllEntities = false): Promise<Dimension[]> {
-    try {
-        let url = `${API_BASE}/data-model`;
-        const params = new URLSearchParams();
-        if (filterByType) {
-            params.append('annotation_type', filterByType);
-        }
-        const queryString = params.toString();
-        if (queryString) {
-            url += `?${queryString}`;
-        }
-
-        const res = await fetch(url);
-        if (!res.ok) {
-            // Treat missing data model as empty result
-            if (res.status === 404) return [];
-            throw new Error(`Failed to fetch dimensions: ${res.status}`);
-        }
-
-        const data = await res.json();
-        const entities = data.entities || [];
-        return entities
-            .filter((e: Dimension) => includeAllEntities || e.entity_type === 'dimension')
-            .filter((e: Dimension) => {
-                // annotation_type filter only applies for dimensional mode
-                if (!includeAllEntities && filterByType) {
-                    return e.annotation_type === filterByType;
-                }
-                return true;
-            });
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error fetching dimensions: ${message}`);
+    let path = '/data-model';
+    const params = new URLSearchParams();
+    if (filterByType) {
+        params.append('annotation_type', filterByType);
     }
+    const queryString = params.toString();
+    if (queryString) {
+        path += `?${queryString}`;
+    }
+
+    // Treat missing data model as empty result
+    const data = await apiJson<{ entities?: Dimension[] }>(path, {
+        notFound: { entities: [] },
+        errorMessage: 'Failed to fetch dimensions',
+    });
+    const entities = data.entities || [];
+    return entities
+        .filter((e: Dimension) => includeAllEntities || e.entity_type === 'dimension')
+        .filter((e: Dimension) => {
+            // annotation_type filter only applies for dimensional mode
+            if (!includeAllEntities && filterByType) {
+                return e.annotation_type === filterByType;
+            }
+            return true;
+        });
 }
 
 /**
@@ -754,18 +603,7 @@ export async function getDimensions(filterByType?: AnnotationType, includeAllEnt
  * @param id - Event ID to delete
  */
 export async function deleteBusinessEvent(id: string): Promise<void> {
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${id}`, {
-            method: 'DELETE',
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to delete business event: ${res.statusText}`);
-        }
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error deleting business event: ${message}`);
-    }
+    await apiJson(`/business-events/${id}`, { method: 'DELETE' });
 }
 
 /** Abort fetch if the server never responds (avoids an endless “Generating preview…” spinner). */
@@ -791,38 +629,43 @@ function combinePreviewSignals(user: AbortSignal | undefined, timeoutMs: number)
 }
 
 /**
+ * POST a generate-entities endpoint. Server errors surface as ApiError with the
+ * server's detail; timeouts and network failures get a contextual message.
+ */
+async function generateEntities(path: string, context: string, userSignal?: AbortSignal): Promise<GeneratedEntitiesResult> {
+    const signal = combinePreviewSignals(userSignal, 120_000);
+    try {
+        const data = await apiJson<GeneratedEntitiesResult | null>(path, { method: 'POST', signal });
+        // Handle both direct response and wrapped response formats
+        return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
+    } catch (e) {
+        if (e instanceof ApiError) throw e;
+        const name = e instanceof Error ? e.name : '';
+        if (name === 'AbortError' || name === 'TimeoutError') {
+            throw new Error(
+                `${context}: request timed out or was cancelled (check that the API is running).`
+            );
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(`${context}: ${message}`);
+    }
+}
+
+/**
  * Generate entities from a business event.
  * Supports both annotation-based and 7 Ws-based entity generation.
  * @param eventId - Event ID to generate entities from
  * @returns Promise containing GeneratedEntitiesResult
  */
-export async function generateEntitiesFromEvent(
+export function generateEntitiesFromEvent(
     eventId: string,
     options?: { signal?: AbortSignal }
 ): Promise<GeneratedEntitiesResult> {
-    const signal = combinePreviewSignals(options?.signal, 120_000);
-    try {
-        const res = await fetch(`${API_BASE}/business-events/${eventId}/generate-entities`, {
-            method: 'POST',
-            signal,
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
-        }
-        const data = await res.json();
-        // Handle both direct response and wrapped response formats
-        return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
-    } catch (e) {
-        const name = e instanceof Error ? e.name : '';
-        if (name === 'AbortError' || name === 'TimeoutError') {
-            throw new Error(
-                'Error generating entities: request timed out or was cancelled (check that the API is running).'
-            );
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error generating entities: ${message}`);
-    }
+    return generateEntities(
+        `/business-events/${eventId}/generate-entities`,
+        'Error generating entities',
+        options?.signal,
+    );
 }
 
 /**
@@ -831,33 +674,15 @@ export async function generateEntitiesFromEvent(
  * @param processId - Process ID to generate entities from
  * @returns Promise containing GeneratedEntitiesResult
  */
-export async function generateEntitiesFromProcess(
+export function generateEntitiesFromProcess(
     processId: string,
     options?: { signal?: AbortSignal }
 ): Promise<GeneratedEntitiesResult> {
-    const signal = combinePreviewSignals(options?.signal, 120_000);
-    try {
-        const res = await fetch(`${API_BASE}/processes/${processId}/generate-entities`, {
-            method: 'POST',
-            signal,
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to generate entities: ${res.statusText}`);
-        }
-        const data = await res.json();
-        // Handle both direct response and wrapped response formats
-        return Array.isArray(data?.entities) ? data : { entities: [], relationships: [], errors: [] };
-    } catch (e) {
-        const name = e instanceof Error ? e.name : '';
-        if (name === 'AbortError' || name === 'TimeoutError') {
-            throw new Error(
-                'Error generating entities from process: request timed out or was cancelled (check that the API is running).'
-            );
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error generating entities from process: ${message}`);
-    }
+    return generateEntities(
+        `/processes/${processId}/generate-entities`,
+        'Error generating entities from process',
+        options?.signal,
+    );
 }
 
 /**
@@ -869,33 +694,11 @@ export async function generateEntitiesFromProcess(
  * @returns Promise containing array of BusinessEventProcess objects
  */
 export async function getBusinessEventProcesses(): Promise<BusinessEventProcess[]> {
-    try {
-        const res = await fetch(`${API_BASE}/processes`);
-        if (!res.ok) {
-            // Try to get error detail from response
-            let errorDetail = res.statusText;
-            try {
-                const errorData = await res.json();
-                errorDetail = errorData.detail || errorData.message || errorDetail;
-            } catch {
-                // If JSON parsing fails, use statusText
-            }
-            const error = new Error(`Failed to fetch business event processes: ${errorDetail}`);
-            (error as any).status = res.status;
-            (error as any).statusText = res.statusText;
-            throw error;
-        }
-        const data = await res.json();
-        // Handle both { processes: [...] } and direct array response
-        return Array.isArray(data) ? data : (data.processes || []);
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error fetching business event processes: ${message}`);
-    }
+    const data = await apiJson<unknown>('/processes', {
+        errorMessage: 'Failed to fetch business event processes',
+    });
+    // Handle both { processes: [...] } and direct array response
+    return listFrom<BusinessEventProcess>(data, 'processes');
 }
 
 /**
@@ -903,32 +706,10 @@ export async function getBusinessEventProcesses(): Promise<BusinessEventProcess[
  * @param request - CreateProcessRequest with name, type, and optional event_ids
  * @returns Promise containing the created BusinessEventProcess
  */
-export async function createBusinessEventProcess(
+export function createBusinessEventProcess(
     request: CreateProcessRequest
 ): Promise<BusinessEventProcess> {
-    try {
-        const res = await fetch(`${API_BASE}/processes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            const errorMessage = error.detail || `Failed to create business event process: ${res.statusText}`;
-            const apiError = new Error(errorMessage);
-            (apiError as any).status = res.status;
-            (apiError as any).statusText = res.statusText;
-            throw apiError;
-        }
-        return await res.json();
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error creating business event process: ${message}`);
-    }
+    return apiJson<BusinessEventProcess>('/processes', { method: 'POST', body: request });
 }
 
 /**
@@ -937,33 +718,11 @@ export async function createBusinessEventProcess(
  * @param request - UpdateProcessRequest with fields to update (name, type)
  * @returns Promise containing the updated BusinessEventProcess
  */
-export async function updateBusinessEventProcess(
+export function updateBusinessEventProcess(
     processId: string,
     request: UpdateProcessRequest
 ): Promise<BusinessEventProcess> {
-    try {
-        const res = await fetch(`${API_BASE}/processes/${processId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            const errorMessage = error.detail || `Failed to update business event process: ${res.statusText}`;
-            const apiError = new Error(errorMessage);
-            (apiError as any).status = res.status;
-            (apiError as any).statusText = res.statusText;
-            throw apiError;
-        }
-        return await res.json();
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error updating business event process: ${message}`);
-    }
+    return apiJson<BusinessEventProcess>(`/processes/${processId}`, { method: 'PUT', body: request });
 }
 
 /**
@@ -972,30 +731,10 @@ export async function updateBusinessEventProcess(
  * @param processId - Process ID to resolve
  * @returns Promise containing the resolved BusinessEventProcess
  */
-export async function resolveBusinessEventProcess(
+export function resolveBusinessEventProcess(
     processId: string
 ): Promise<BusinessEventProcess> {
-    try {
-        const res = await fetch(`${API_BASE}/processes/${processId}/resolve`, {
-            method: 'POST',
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            const errorMessage = error.detail || `Failed to resolve business event process: ${res.statusText}`;
-            const apiError = new Error(errorMessage);
-            (apiError as any).status = res.status;
-            (apiError as any).statusText = res.statusText;
-            throw apiError;
-        }
-        return await res.json();
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error resolving business event process: ${message}`);
-    }
+    return apiJson<BusinessEventProcess>(`/processes/${processId}/resolve`, { method: 'POST' });
 }
 
 /**
@@ -1004,33 +743,11 @@ export async function resolveBusinessEventProcess(
  * @param request - AttachEventsRequest with event_ids list
  * @returns Promise containing the updated BusinessEventProcess
  */
-export async function attachEventsToProcess(
+export function attachEventsToProcess(
     processId: string,
     request: AttachEventsRequest
 ): Promise<BusinessEventProcess> {
-    try {
-        const res = await fetch(`${API_BASE}/processes/${processId}/attach`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            const errorMessage = error.detail || `Failed to attach events to process: ${res.statusText}`;
-            const apiError = new Error(errorMessage);
-            (apiError as any).status = res.status;
-            (apiError as any).statusText = res.statusText;
-            throw apiError;
-        }
-        return await res.json();
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error attaching events to process: ${message}`);
-    }
+    return apiJson<BusinessEventProcess>(`/processes/${processId}/attach`, { method: 'POST', body: request });
 }
 
 /**
@@ -1039,50 +756,28 @@ export async function attachEventsToProcess(
  * @param request - DetachEventsRequest with event_ids list
  * @returns Promise containing the updated BusinessEventProcess
  */
-export async function detachEventsFromProcess(
+export function detachEventsFromProcess(
     processId: string,
     request: DetachEventsRequest
 ): Promise<BusinessEventProcess> {
-    try {
-        const res = await fetch(`${API_BASE}/processes/${processId}/detach`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request),
-        });
-        if (!res.ok) {
-            const error = await res.json();
-            const errorMessage = error.detail || `Failed to detach events from process: ${res.statusText}`;
-            const apiError = new Error(errorMessage);
-            (apiError as any).status = res.status;
-            (apiError as any).statusText = res.statusText;
-            throw apiError;
-        }
-        return await res.json();
-    } catch (e) {
-        // Re-throw with status code preserved
-        if (e instanceof Error && (e as any).status) {
-            throw e;
-        }
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(`Error detaching events from process: ${message}`);
-    }
+    return apiJson<BusinessEventProcess>(`/processes/${processId}/detach`, { method: 'POST', body: request });
 }
 
 export async function reconcileDbt(): Promise<ReconciliationResult> {
+    const fallback: ReconciliationResult = { status: 'success', changed: false };
     try {
-        const res = await fetch(`${API_BASE}/reconcile`, { method: 'POST' });
-        if (!res.ok) {
-            if (res.status === 404) return { status: 'success', changed: false };
-            throw new Error(`Failed to reconcile models: ${res.status}`);
-        }
-        const result = await res.json();
+        const result = await apiJson<ReconciliationResult>('/reconcile', {
+            method: 'POST',
+            notFound: fallback,
+            errorMessage: 'Failed to reconcile models',
+        });
         return {
             status: result.status,
             changed: result.changed,
         };
     } catch (e) {
         console.error('Error reconciling models:', e);
-        return { status: 'success', changed: false };
+        return fallback;
     }
 }
 
@@ -1094,18 +789,8 @@ export async function reconcileDbt(): Promise<ReconciliationResult> {
  * Fetch the metric tree document.
  * @returns Promise containing the tree plus the semantic-model catalog
  */
-export async function getMetricTree(): Promise<MetricTreeResponse> {
-    try {
-        const res = await fetch(`${API_BASE}/metric-tree`);
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`Failed to fetch metric tree: ${res.status} - ${errorText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        console.error('Error fetching metric tree:', e);
-        throw e;
-    }
+export function getMetricTree(): Promise<MetricTreeResponse> {
+    return apiJson<MetricTreeResponse>('/metric-tree', { errorMessage: 'Failed to fetch metric tree' });
 }
 
 /**
@@ -1113,22 +798,12 @@ export async function getMetricTree(): Promise<MetricTreeResponse> {
  * @param payload - version, metrics and influences to persist
  * @returns Promise containing the status and any validation warnings
  */
-export async function saveMetricTree(
+export function saveMetricTree(
     payload: MetricTreeFile
 ): Promise<{ status: string; warnings: string[] }> {
-    try {
-        const res = await fetch(`${API_BASE}/metric-tree`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`Failed to save metric tree: ${res.status} - ${errorText}`);
-        }
-        return await res.json();
-    } catch (e) {
-        console.error('Error saving metric tree:', e);
-        throw e;
-    }
+    return apiJson('/metric-tree', {
+        method: 'POST',
+        body: payload,
+        errorMessage: 'Failed to save metric tree',
+    });
 }

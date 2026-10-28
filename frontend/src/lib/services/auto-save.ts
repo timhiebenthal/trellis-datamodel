@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/svelte';
 import type { DataModel, EntityRole } from '$lib/types';
-import { getApiBase, saveDataModel as apiSaveDataModel } from '$lib/api';
+import { saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
 import { readModelRef } from '$lib/utils/entity-compat';
 import { get } from 'svelte/store';
@@ -152,21 +152,10 @@ export class AutoSaveService {
         this.queuedState = state;
         this.inFlightState = state;
         this.setSaving(true);
-        const payload = JSON.stringify(
-            this.buildDataModelFromState(currentNodes, currentEdges),
-        );
-        const url = `${getApiBase()}/data-model`;
+        const dataModel = this.buildDataModelFromState(currentNodes, currentEdges);
 
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: payload,
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            await apiSaveDataModel(dataModel);
 
             this.lastSavedState = state;
             this.inFlightState = null;
