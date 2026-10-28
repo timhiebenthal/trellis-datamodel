@@ -323,7 +323,7 @@
 		entitySourceSystems = [...(data.source_system || [])];
 		entityType = data.entity_type || 'unclassified';
 		annotationType = data.annotation_type;
-		entityRoles = [...((data as any).roles || [])];
+		entityRoles = [...(data.roles || [])];
 		tagInput = '';
 		domainInput = '';
 		sourceInput = '';
@@ -451,7 +451,7 @@
 			sourceInput.trim().length > 0 ||
 			entityType !== (data.entity_type || 'unclassified') ||
 			annotationType !== data.annotation_type ||
-			JSON.stringify(entityRoles.sort()) !== JSON.stringify([...((data as any).roles || [])].sort()) ||
+			JSON.stringify(entityRoles.sort()) !== JSON.stringify([...(data.roles || [])].sort()) ||
 			materializedDescriptionEdits.size > 0 ||
 			JSON.stringify(editableDraftedFields) !==
 				JSON.stringify(data?.drafted_fields || []);
@@ -683,13 +683,15 @@
 		nodes.update((n) => {
 			return n.map((node) => {
 				if (node.id === currentEntity.id) {
-					const isBound = Boolean(readModelRef((node.data ?? {}) as any));
+					// The modal's node is an entity node; the store is untyped `Node[]`.
+					const entityData = (node.data ?? {}) as EntityData;
+					const isBound = Boolean(readModelRef(entityData));
 					// Bound entities: `tags` is a computed display union and reconcile-owned
 					// `dbt_tags` is read-only — an edit here only ever changes `ui_tags`.
 					// Unbound entities: `tags` remains the single freely-editable field.
 					const tagFields = isBound
 						? { ui_tags: (() => {
-								const uiTags = computeUiTagsAfterEdit(readFrameworkTags((node.data ?? {}) as any), entityTags);
+								const uiTags = computeUiTagsAfterEdit(readFrameworkTags(entityData), entityTags);
 								return uiTags.length > 0 ? uiTags : undefined;
 							})() }
 						: { tags: entityTags.length > 0 ? entityTags : undefined };
@@ -729,7 +731,7 @@
 					// Priority: user's staged edit > live schema.yml value > manifest value
 					description: materializedDescriptionEdits.get(c.name)
 						?? liveSchemaDescriptions.get(c.name)
-						?? (c as any).description
+						?? c.description
 						?? '',
 				}));
 				await updateModelSchema(boundModel.name, boundModel.version ?? undefined, allCols);
@@ -766,7 +768,7 @@
 				...(boundModel.columns ?? []).map((c) => ({
 					name: c.name,
 					data_type: c.type,
-					description: (c as any).description ?? '',
+					description: c.description ?? '',
 				})),
 				{
 					name: draft.name,
@@ -1564,7 +1566,7 @@
 												{:else}
 													<select
 														value={field.datatype}
-														onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as any })}
+														onchange={(e) => updateDraftedField(field.draftIndex, { datatype: (e.target as HTMLSelectElement).value as DraftedField['datatype'] })}
 														class="w-full px-1.5 py-1.5 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-xs font-mono uppercase text-gray-700 font-medium cursor-pointer"
 													>
 														<option value="text">text</option>

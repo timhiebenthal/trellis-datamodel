@@ -62,7 +62,8 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
     import { getEntityIdFromPath } from "$lib/utils/entity-list-route";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { ConfigInfo, GuidanceConfig } from "$lib/types";
+    import type { ConfigInfo, Entity, EntityFlowNode, EntityNodeData, GroupFlowNode, GuidanceConfig } from "$lib/types";
+    import { isEntityNode } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
     import { entityDetailModal, lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
     import { AutoSaveService } from "$lib/services/auto-save";
@@ -385,7 +386,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                     addedNodes += 1;
                 }
 
-                inferred.forEach((r: any) => {
+                inferred.forEach((r) => {
                     maybeAddEntity(r.source);
                     maybeAddEntity(r.target);
 
@@ -429,7 +430,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     async function handleAutoLayout() {
         if (loading) return;
 
-        const entityNodes = $nodes.filter((n) => n.type === "entity");
+        const entityNodes = $nodes.filter(isEntityNode);
         if (entityNodes.length === 0) return;
 
         // If dimensional modeling is enabled, use smart positioning
@@ -443,7 +444,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
         // fitView prop on Canvas will automatically adjust the view
     }
 
-    async function applySmartPositioning(entityNodes: Node[]) {
+    async function applySmartPositioning(entityNodes: EntityFlowNode[]) {
         // Calculate canvas center (average of all entity positions, or default)
         const allEntityNodes = $nodes.filter((n) => n.type === "entity");
         let centerX = 500;
@@ -458,13 +459,13 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
 
         // Separate facts and dimensions
         const facts = entityNodes.filter(
-            (n) => (n.data as any)?.entity_type === "fact"
+            (n) => n.data?.entity_type === "fact"
         );
         const dimensions = entityNodes.filter(
-            (n) => (n.data as any)?.entity_type === "dimension"
+            (n) => n.data?.entity_type === "dimension"
         );
         const unclassified = entityNodes.filter(
-            (n) => (n.data as any)?.entity_type !== "fact" && (n.data as any)?.entity_type !== "dimension"
+            (n) => n.data?.entity_type !== "fact" && n.data?.entity_type !== "dimension"
         );
 
         // Position facts in center area
@@ -680,7 +681,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
 
                 // Helper to get folder and tags from dbt model
                 const modelsById = new Map(models.map((model) => [model.unique_id, model]));
-                function getEntityMetadata(entity: any) {
+                function getEntityMetadata(entity: Entity) {
                     const modelRef = readModelRef(entity);
                     if (!modelRef) return { folder: null, model: null };
 
@@ -691,7 +692,8 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                 }
 
                 // Map data model to Svelte Flow format with metadata
-                const entityNodes = (dataModel.entities || []).map((e: any) => {
+                // `panelHeight` is a legacy camelCase key still accepted on load.
+                const entityNodes = (dataModel.entities || []).map((e: Entity & { panelHeight?: number }): EntityFlowNode => {
                     const metadata = getEntityMetadata(e);
                     const { tags, framework_tags, ui_tags } = mapEntityTagsToNodeData(e);
                     const modelName = metadata.model ? metadata.model.name : e.id;
@@ -725,11 +727,11 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                 });
 
                 // Create group nodes if grouping is enabled
-                const groupNodes: Node[] = [];
+                const groupNodes: GroupFlowNode[] = [];
                 if ($groupByFolder) {
-                    const folderMap = new Map<string, any[]>();
+                    const folderMap = new Map<string, EntityFlowNode[]>();
 
-                    entityNodes.forEach((node: any) => {
+                    entityNodes.forEach((node) => {
                         if (node.data.folder) {
                             if (!folderMap.has(node.data.folder)) {
                                 folderMap.set(node.data.folder, []);
@@ -747,7 +749,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                         y: number;
                         width: number;
                         height: number;
-                        node: any;
+                        node: GroupFlowNode;
                     }> = [];
 
                     folderMap.forEach((children, folderPath) => {
@@ -777,7 +779,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                             }
                         }
 
-                        const groupNode = {
+                        const groupNode: GroupFlowNode = {
                             id: groupId,
                             type: "group",
                             position: { x: groupX, y: groupY },
@@ -795,7 +797,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                         tempGroups.push({ x: groupX, y: groupY, width: groupWidth, height: groupHeight, node: groupNode });
                         groupNodes.push(groupNode);
 
-                        children.forEach((child: any) => {
+                        children.forEach((child) => {
                             child.parentId = groupId;
                             child.position = { x: child.position.x - groupX, y: child.position.y - groupY };
                             child.extent = "parent";
@@ -803,7 +805,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                     });
                 }
 
-                $nodes = [...groupNodes, ...entityNodes] as Node[];
+                $nodes = [...groupNodes, ...entityNodes];
                 $edges = aggregateRelationshipsIntoEdges(relationships);
                 bootGraphIndex = buildBootGraphIndex({
                     models,
@@ -1000,7 +1002,8 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
 
             if (!explicitEntityIds?.has(node.id)) {
                 visible = visible && matchesCanvasFilters(
-                    node.data as any,
+                    // bootGraphIndex.nodes is untyped Node[]; only entity nodes reach here.
+                    node.data as EntityNodeData,
                     {
                         selectedDomains: activeDomains,
                         selectedTags: activeTags,

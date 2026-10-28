@@ -1,5 +1,5 @@
 import type { Node, Edge } from '@xyflow/svelte';
-import type { DataModel, EntityRole } from '$lib/types';
+import { isEntityNode, type DataModel, type Entity, type RelationshipEdgeModel } from '$lib/types';
 import { saveDataModel as apiSaveDataModel } from '$lib/api';
 import { normalizeTags } from '$lib/utils';
 import { readModelRef } from '$lib/utils/entity-compat';
@@ -246,29 +246,29 @@ export class AutoSaveService {
             version: 0.1,
             source_colors: Object.keys(sourceColors).length > 0 ? sourceColors : undefined,
             entities: currentNodes
-                .filter((n) => n.type === 'entity')
+                .filter(isEntityNode)
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const isBound = Boolean(readModelRef(n.data as any));
-                    const uiTags = normalizeTags((n.data as any)?.ui_tags);
+                    const isBound = Boolean(readModelRef(n.data));
+                    const uiTags = normalizeTags(n.data?.ui_tags);
 
-                    const source_system = ((n.data as any)?.source_system) as string[] | undefined;
-                    const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
-                    const roles = ((n.data as any)?.roles) as EntityRole[] | undefined;
-                    const domain = ((n.data as any)?.domain) as string | undefined;
-                    const domains = ((n.data as any)?.domains) as string[] | undefined;
+                    const source_system = n.data?.source_system;
+                    const annotation_type = n.data?.annotation_type;
+                    const roles = n.data?.roles;
+                    const domain = n.data?.domain;
+                    const domains = n.data?.domains;
                     const isDimensional = get(modelingStyleStore) === 'dimensional_model';
-                    const entity: any = {
+                    const entity: Entity = {
                         id: n.id,
-                        label: ((n.data.label as string) || '').trim() || 'Entity',
-                        description: n.data.description as string | undefined,
-                        model_ref: readModelRef(n.data as any),
-                        additional_models: n.data?.additional_models as string[] | undefined,
-                        drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                        label: (n.data.label || '').trim() || 'Entity',
+                        description: n.data.description,
+                        model_ref: readModelRef(n.data),
+                        additional_models: n.data?.additional_models,
+                        drafted_fields: n.data?.drafted_fields,
                         position: n.position,
-                        width: n.data?.width as number | undefined,
-                        panel_height: n.data?.panelHeight as number | undefined,
-                        collapsed: (n.data?.collapsed as boolean) ?? false,
+                        width: n.data?.width,
+                        panel_height: n.data?.panelHeight,
+                        collapsed: n.data?.collapsed ?? false,
                         // Bound entities: `framework_tags`/`tags` mirror schema.yml and are
                         // reconcile-owned; autosave must never write them, only
                         // `ui_tags` (user-added). Unbound entities: `tags` remains
@@ -279,7 +279,7 @@ export class AutoSaveService {
                     };
                     // Only include entity_type for dimensional modeling
                     if (isDimensional) {
-                        entity.entity_type = ((n.data as any)?.entity_type) || 'unclassified';
+                        entity.entity_type = n.data?.entity_type || 'unclassified';
                     }
 
                     // Include domain if present
@@ -311,7 +311,7 @@ export class AutoSaveService {
                 }),
             relationships: currentEdges.flatMap((e) => {
                 // If edge has multiple model relationships, expand them
-                const models = (e.data?.models as any[]) || [];
+                const models = (e.data?.models as RelationshipEdgeModel[] | undefined) || [];
                 if (models.length > 0) {
                     // Create one relationship per model
                     return models.map((m) => ({
@@ -324,12 +324,12 @@ export class AutoSaveService {
                                 | 'many_to_one'
                                 | 'one_to_one'
                                 | 'many_to_many') || 'one_to_many',
-                        source_field: m.source_field as string | undefined,
-                        target_field: m.target_field as string | undefined,
-                        source_model_name: m.source_model_name as string | undefined,
-                        source_model_version: m.source_model_version as number | null | undefined,
-                        target_model_name: m.target_model_name as string | undefined,
-                        target_model_version: m.target_model_version as number | null | undefined,
+                        source_field: m.source_field,
+                        target_field: m.target_field,
+                        source_model_name: m.source_model_name,
+                        source_model_version: m.source_model_version,
+                        target_model_name: m.target_model_name,
+                        target_model_version: m.target_model_version,
                         label_dx: e.data?.label_dx as number | undefined,
                         label_dy: e.data?.label_dy as number | undefined,
                     }));
@@ -370,7 +370,7 @@ export class AutoSaveService {
         try {
             const dataModel = this.buildDataModelFromState(nodesSnapshot, edgesSnapshot);
             const draftedCounts = (dataModel.entities ?? [])
-                .map((e) => (Array.isArray((e as any).drafted_fields) ? (e as any).drafted_fields.length : 0));
+                .map((e) => (Array.isArray(e.drafted_fields) ? e.drafted_fields.length : 0));
             await apiSaveDataModel(dataModel);
             this.lastSavedState = stateString;
             this.inFlightState = null;

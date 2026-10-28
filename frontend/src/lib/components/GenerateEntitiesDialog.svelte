@@ -4,8 +4,13 @@
         BusinessEvent,
         BusinessEventAnnotations,
         BusinessEventProcess,
+        DraftedField,
+        Entity,
+        EntityFlowNode,
         GeneratedEntitiesResult,
+        RelationshipEdgeModel,
     } from '$lib/types';
+    import { isEntityNode } from '$lib/types';
     import { nodes, edges, modelingStyle, sourceColors, dimensionPrefixes, factPrefixes } from '$lib/stores';
     import { formatModelNameForLabel, generateEntityId, generateSlug, mergeRelationshipIntoEdges, normalizeTags, shouldAutoSyncGeneratedEntityLabel } from '$lib/utils';
     import { DimensionalModelPositioner } from '$lib/services/position-calculator';
@@ -36,7 +41,7 @@
     let previewData = $state<GeneratedEntitiesResult | null>(null);
     let editedEntities = $state<Array<{ id: string; label: string; entity_type: string; tags?: string[] }>>([]);
     type EditedRelationship = { source: string; target: string; label: string; type: string };
-    type EditedDraftedField = { name: string; datatype: string; targetEntityId: string };
+    type EditedDraftedField = { name: string; datatype: DraftedField['datatype']; targetEntityId: string };
 
     let editedRelationships = $state<EditedRelationship[]>([]);
     let editedDraftedFields = $state<EditedDraftedField[]>([]);
@@ -106,14 +111,11 @@
     const fullExistingCanvasEntityOptions = $derived(
         $modelingStyle === 'entity_model' && previewData
             ? $nodes
-                  .filter(
-                      (n) =>
-                          n.type === 'entity' &&
-                          !previewEntityIdSet.has(n.id)
-                  )
+                  .filter(isEntityNode)
+                  .filter((n) => !previewEntityIdSet.has(n.id))
                   .map((n) => ({
                       id: n.id,
-                      label: String((n.data as any)?.label || n.id),
+                      label: String(n.data?.label || n.id),
                       isNew: false as const,
                   }))
             : []
@@ -246,16 +248,16 @@
             // when annotations_superset changes between generation runs.
             const existingDerivedIdSet = new Set(existingDerivedIds);
             // Pre-build the list of derived nodes for fallback matching by entity_type.
-            const derivedNodes = $nodes.filter(
-                (node) => node.type === 'entity' && existingDerivedIdSet.has(node.id)
-            );
+            const derivedNodes = $nodes
+                .filter(isEntityNode)
+                .filter((node) => existingDerivedIdSet.has(node.id));
             // Track which derived nodes have already been matched to avoid double-assignment.
             const matchedDerivedNodeIds = new Set<string>();
             editedEntities = previewData.entities.map((e) => {
                 // Try exact ID match first (entity was not renamed).
                 let existingNode =
                     existingDerivedIdSet.has(e.id)
-                        ? $nodes.find((node) => node.type === 'entity' && node.id === e.id)
+                        ? $nodes.find((node): node is EntityFlowNode => isEntityNode(node) && node.id === e.id)
                         : undefined;
 
                 // Fallback: entity was renamed — find a derived node with matching entity_type.
@@ -263,7 +265,7 @@
                 if (!existingNode) {
                     existingNode = derivedNodes.find(
                         (node) =>
-                            (node.data as any)?.entity_type === e.entity_type &&
+                            node.data?.entity_type === e.entity_type &&
                             !matchedDerivedNodeIds.has(node.id)
                     );
                 }
@@ -274,7 +276,7 @@
 
                 return {
                     id: existingNode?.id || e.id,
-                    label: String((existingNode?.data as any)?.label || e.label),
+                    label: String(existingNode?.data?.label || e.label),
                     entity_type: String(e.entity_type),
                     tags: e.tags || [],
                 };
@@ -301,7 +303,7 @@
                 }));
 
                 editedDraftedFields = previewData.entities.flatMap((e) =>
-                    ((e as any).drafted_fields || []).map((f: any) => ({
+                    (e.drafted_fields || []).map((f) => ({
                         name: f.name,
                         datatype: f.datatype || 'unknown',
                         targetEntityId: e.id,
@@ -462,7 +464,7 @@
             let edgesToUse = $edges;
             // Map of entityId → drafted_fields for entities that are about to be removed (process mode).
             // Used below to re-apply manually drafted fields onto freshly created nodes.
-            const previousDraftedFieldsMap = new Map<string, any[]>();
+            const previousDraftedFieldsMap = new Map<string, DraftedField[]>();
             if (mode === 'process' && process) {
                 const processDerivedEntityIds = new Set(
                     (process.derived_entities ?? [])
@@ -481,9 +483,9 @@
                 // Capture drafted_fields from entities about to be removed so they can be
                 // re-merged onto the freshly created nodes (see creation loop below).
                 for (const node of $nodes) {
-                    if (node.type !== 'entity') continue;
-                    if (removableEntityIds.has(node.id) && Array.isArray((node.data as any)?.drafted_fields)) {
-                        previousDraftedFieldsMap.set(node.id, (node.data as any).drafted_fields);
+                    if (!isEntityNode(node)) continue;
+                    if (removableEntityIds.has(node.id) && Array.isArray(node.data?.drafted_fields)) {
+                        previousDraftedFieldsMap.set(node.id, node.data.drafted_fields);
                     }
                 }
 
@@ -501,7 +503,7 @@
                 10
             );
 
-            let fieldsByEntity = new Map<string, any[]>();
+            let fieldsByEntity = new Map<string, DraftedField[]>();
             if ($modelingStyle === 'entity_model') {
                 const preliminaryIdMap = new Map(
                     previewData.entities.map((e, i) => [
@@ -618,11 +620,11 @@
                     }
 
                     nodesToUse = nodesToUse.map((n) => {
-                        if (n.id !== entityId || n.type !== 'entity') return n;
-                        const existing: any[] = Array.isArray((n.data as any)?.drafted_fields)
-                            ? (n.data as any).drafted_fields
+                        if (n.id !== entityId || !isEntityNode(n)) return n;
+                        const existing: DraftedField[] = Array.isArray(n.data?.drafted_fields)
+                            ? n.data.drafted_fields
                             : [];
-                        const existingNames = new Set(existing.map((f: any) => f.name));
+                        const existingNames = new Set(existing.map((f) => f.name));
                         const merged = [
                             ...existing,
                             ...fields.filter((f) => !existingNames.has(f.name)),
@@ -665,7 +667,7 @@
                     if (!l) return true;
                     if (l === targetId.trim().toLowerCase()) return true;
                     const targetNode = nodesToUse.find((n) => n.id === targetId);
-                    const targetNodeLabel = String((targetNode?.data as any)?.label || '');
+                    const targetNodeLabel = String(targetNode?.data?.label || '');
                     if (targetNodeLabel && l === targetNodeLabel.trim().toLowerCase()) {
                         return true;
                     }
@@ -701,7 +703,7 @@
                                 (e.source === targetId && e.target === sourceId);
                             if (!samePair) return e;
                             const endpointForLabel = e.target;
-                            const existing = String((e.data as any)?.label ?? '');
+                            const existing = String(e.data?.label ?? '');
                             if (!isEdgeFillerLabel(existing, endpointForLabel)) return e;
                             return {
                                 ...e,
@@ -779,29 +781,29 @@
             version: 0.1,
             source_colors: Object.keys(sourceColorsValue).length > 0 ? sourceColorsValue : undefined,
             entities: currentNodes
-                .filter((n) => n.type === 'entity')
+                .filter(isEntityNode)
                 .map((n) => {
                     const displayTags = normalizeTags(n.data?.tags);
-                    const uiTags = normalizeTags((n.data as any)?.ui_tags);
-                    const isBound = Boolean(readModelRef((n.data ?? {}) as any));
+                    const uiTags = normalizeTags(n.data?.ui_tags);
+                    const isBound = Boolean(readModelRef(n.data ?? {}));
 
-                    const source_system = ((n.data as any)?.source_system) as string[] | undefined;
-                    const domain = ((n.data as any)?.domain) as string | undefined;
-                    const domains = ((n.data as any)?.domains) as string[] | undefined;
-                    const annotation_type = ((n.data as any)?.annotation_type) as string | undefined;
-                    const roles = ((n.data as any)?.roles) as string[] | undefined;
+                    const source_system = n.data?.source_system;
+                    const domain = n.data?.domain;
+                    const domains = n.data?.domains;
+                    const annotation_type = n.data?.annotation_type;
+                    const roles = n.data?.roles;
                     const isDimensional = $modelingStyle === 'dimensional_model';
-                    const entity: any = {
+                    const entity: Entity = {
                         id: n.id,
-                        label: ((n.data.label as string) || '').trim() || 'Entity',
-                        description: n.data.description as string | undefined,
-                        model_ref: readModelRef((n.data ?? {}) as any),
-                        additional_models: n.data?.additional_models as string[] | undefined,
-                        drafted_fields: n.data?.drafted_fields as any[] | undefined,
+                        label: (n.data.label || '').trim() || 'Entity',
+                        description: n.data.description,
+                        model_ref: readModelRef(n.data ?? {}),
+                        additional_models: n.data?.additional_models,
+                        drafted_fields: n.data?.drafted_fields,
                         position: n.position,
-                        width: n.data?.width as number | undefined,
-                        panel_height: n.data?.panelHeight as number | undefined,
-                        collapsed: (n.data?.collapsed as boolean) ?? false,
+                        width: n.data?.width,
+                        panel_height: n.data?.panelHeight,
+                        collapsed: n.data?.collapsed ?? false,
                         // Bound entities: `framework_tags`/`tags` mirror schema.yml and are
                         // reconcile-owned; never hand-written here, only `ui_tags`.
                         // Unbound entities: `tags` remains the single freely-editable field.
@@ -811,7 +813,7 @@
                     };
                     // Only include entity_type for dimensional modeling
                     if (isDimensional) {
-                        entity.entity_type = ((n.data as any)?.entity_type) || 'unclassified';
+                        entity.entity_type = n.data?.entity_type || 'unclassified';
                     }
 
                     if (domain && domain.trim()) {
@@ -838,7 +840,7 @@
                     return entity;
                 }),
             relationships: currentEdges.flatMap((e) => {
-                const models = (e.data?.models as any[]) || [];
+                const models = (e.data?.models as RelationshipEdgeModel[] | undefined) || [];
                 if (models.length > 0) {
                     return models.map((m) => ({
                         source: e.source,
@@ -850,12 +852,12 @@
                                 | 'many_to_one'
                                 | 'one_to_one'
                                 | 'many_to_many') || 'one_to_many',
-                        source_field: m.source_field as string | undefined,
-                        target_field: m.target_field as string | undefined,
-                        source_model_name: m.source_model_name as string | undefined,
-                        source_model_version: m.source_model_version as number | null | undefined,
-                        target_model_name: m.target_model_name as string | undefined,
-                        target_model_version: m.target_model_version as number | null | undefined,
+                        source_field: m.source_field,
+                        target_field: m.target_field,
+                        source_model_name: m.source_model_name,
+                        source_model_version: m.source_model_version,
+                        target_model_name: m.target_model_name,
+                        target_model_version: m.target_model_version,
                         label_dx: e.data?.label_dx as number | undefined,
                         label_dy: e.data?.label_dy as number | undefined,
                     }));
