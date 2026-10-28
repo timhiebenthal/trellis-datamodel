@@ -188,6 +188,23 @@ def read_yaml(path):
         return yaml.safe_load(f)
 
 
+def install_metrics(monkeypatch, tmp_path, *, enabled, metrics):
+    """Point the metric tree at tmp_path so the push can read the drafts."""
+    tree_path = tmp_path / "metric_tree.yml"
+    tree_path.write_text(
+        yaml.safe_dump({"version": 0.1, "metrics": list(metrics), "influences": []})
+    )
+    monkeypatch.setattr(
+        cfg,
+        "METRICS_CONFIG",
+        cfg.MetricsConfig(
+            enabled=enabled,
+            file=str(tree_path),
+        ),
+    )
+    return tree_path
+
+
 class TestOssiePushEndToEnd:
     def test_one_push_writes_only_the_bound_entities(
         self, test_client, validator, monkeypatch, tmp_path
@@ -277,3 +294,42 @@ class TestOssiePushEndToEnd:
         assert ossie_path.read_bytes() == before_bytes
         assert ossie_path.stat().st_mtime_ns == before_mtime
         assert str(ossie_path) not in response.json()["files"]
+
+    def test_push_emits_the_drafted_metrics(
+        self, test_client, validator, monkeypatch, tmp_path
+    ):
+        _, ossie_path = install(monkeypatch, tmp_path, enabled=True)
+        install_metrics(
+            monkeypatch,
+            tmp_path,
+            enabled=True,
+            metrics=[
+                {
+                    "id": "revenue",
+                    "label": "Revenue",
+                    "description": "Booked revenue.",
+                    "expression": "sum(amount)",
+                    "dataset_ref": "fct_sale",
+                },
+                {
+                    "id": "avg_order_value",
+                    "label": "Average order value",
+                    "expression": "sum(amount) / count(*)",
+                },
+            ],
+        )
+
+        response = test_client.post("/api/sync-tests")
+
+        assert response.status_code == 200
+        document = read_yaml(ossie_path)
+        validate(validator, document)
+
+        datasets = {dataset["name"]: dataset for dataset in document["datasets"]}
+        assert [m["name"] for m in datasets["fct_sale"]["metrics"]] == ["revenue"]
+        assert datasets["fct_sale"]["metrics"][0]["expression"] == {
+            "dialects": [{"dialect": "ANSI_SQL", "expression": "sum(amount)"}]
+        }
+        assert [m["name"] for m in document["metrics"]] == ["avg_order_value"]
+        assert "metrics" not in datasets["dim_customer"]
+        assert str(ossie_path) in response.json()["files"]

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-28
+
+### Added
+- **Metric tree canvas (beta, opt-in):** a new `metrics` block in `trellis.yml` -
+  `enabled`, `file`, and `expression_dialect` - adds a
+  `/metrics-tree` route that lays metrics out as a directed influence graph:
+  "revenue is influenced by average price and order count". Definitions and
+  influences are written to `metric_tree.yml` beside `data_model.yml` by
+  default, and node positions are computed deterministically from the tree
+  hierarchy, so a tree survives a reload and is readable without Trellis. A
+  metric is either a draft authored in Trellis or a bound reference to a metric
+  in `semantic_model.yml`; a bound entry stores `{dataset, name}` and never a
+  copy of the definition. Influences carry no arithmetic - an edge states
+  direction, not a formula. A push with `ossie.enabled: true` emits the drafts
+  into the Ossie document, dataset-scoped drafts under `datasets[].metrics` and
+  the rest at the document root, and preserves every metric Trellis did not
+  author at both levels, including `custom_extensions` and `ai_context`. The
+  block is normalised only when `trellis.yml` declares it, and it is off by
+  default. With `metrics.enabled`, the header gains a Metric Tree entry after
+  Entity List. The metric sidebar groups everything by semantic-model dataset
+  in collapsible sections - drafts, metrics already on the tree, and
+  semantic-model metrics still to add - with teal marking a bound metric and
+  amber a draft. A draft's `dataset_ref` names one of the datasets a push
+  writes (for example `entity_booking`), and the detail panel offers
+  exactly those in a dropdown. "Add metric" opens a draft in the detail panel with Create and Cancel; it joins
+  the tree, and the file, only on Create, so a cancelled metric leaves nothing behind.
+
+### Fixed
+- **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`
+  was honoured when the server booted, then dropped. The Config page, its save
+  and `POST /api/config/reload` each re-discovered the file with
+  `find_config_file()`, which searches the *server process's* working directory,
+  so a server started from the checkout with `-c` pointed elsewhere reported the
+  checkout's own `trellis.yml`. Saving from that page wrote the checkout's file,
+  and reloading silently switched the whole app to it - the hot-reload loop
+  documented in `CONTRIBUTING.md` was unusable. The resolved path is now pinned
+  in `TRELLIS_CONFIG_PATH` for the process lifetime, and a relative `-c` is
+  normalised to an absolute path.
+
 ### Fixed
 - **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`
   was honoured when the server booted, then dropped. The Config page, its save
@@ -21,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.25.0] - 2026-10-27
 
-Promotes 0.25.0b2 to a final release. No code changes since the beta: the Ossie export, the push fixes and the column-order fix are already in it.
+Promotes 0.25.0b2 to a final release. No code changes since the beta: the Ossie
+export, the push fixes and the column-order fix are already in it.
 
 ## [0.25.0b2] - 2026-10-27
 

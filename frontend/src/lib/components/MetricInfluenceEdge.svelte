@@ -1,0 +1,35 @@
+<script lang="ts">
+    import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/svelte";
+    import { METRIC_ACCENT } from "$lib/utils/metric-graph";
+
+    let {
+        selected = false,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+    }: EdgeProps = $props();
+
+    // Hierarchical tree line connecting the bottom of the upper (effect) metric
+    // to the top of the lower (driver) metric.
+    const [path] = $derived(
+        getBezierPath({
+            sourceX,
+            sourceY,
+            sourcePosition,
+            targetX,
+            targetY,
+            targetPosition,
+        }),
+    );
+
+    const strokeStyle = $derived(
+        selected
+            ? `stroke: ${METRIC_ACCENT}; stroke-width: 2.5;`
+            : `stroke: #94a3b8; stroke-width: 1.75;`,
+    );
+</script>
+
+<BaseEdge path={path} style={strokeStyle} class="metric-influence-edge" />

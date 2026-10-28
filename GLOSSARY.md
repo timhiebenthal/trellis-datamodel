@@ -32,3 +32,23 @@ _Avoid_: Primary key, uniqueness rule
 The field or fields that uniquely identify a row of a dataset, taken from framework metadata or framework tests.
 _Avoid_: Grain, unique key
 
+**Metric**:
+A named quantity the business measures, carrying a description and a SQL expression, and joined to other metrics by influence.
+_Avoid_: KPI, measure, field
+
+**Draft Metric**:
+A metric authored on the metric canvas that has no definition in the project's semantic model.
+_Avoid_: Unbound metric, custom metric
+
+**Bound Metric**:
+A metric whose definition lives in the project's Ossie semantic model and is referenced from the metric canvas rather than restated there.
+_Avoid_: Linked metric, imported metric
+
+**Influence**:
+A directed claim that one metric drives another, stored from cause to effect and carrying no arithmetic.
+_Avoid_: Dependency, derivation, formula
+
+**Metric Tree**:
+A named grouping of metrics and the influences between them. Trees may overlap, so one metric can appear in more than one.
+_Avoid_: Metric hierarchy, metric tree diagram, lineage graph
+

@@ -38,6 +38,7 @@ from trellis_datamodel.routes import (
     exposures_router,
     lineage_router,
     manifest_router,
+    metric_tree_router,
     reconcile_router,
     schema_router,
 )
@@ -227,6 +228,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(lineage_router)
     app.include_router(bus_matrix_router)
     app.include_router(business_events_router)
+    app.include_router(metric_tree_router)
 
 
 @asynccontextmanager

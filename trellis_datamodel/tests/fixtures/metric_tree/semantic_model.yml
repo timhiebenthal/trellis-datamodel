@@ -1,0 +1,44 @@
+# Catalog fixture: one dataset that maps to a bound entity, one that does not,
+# and one document-level metric. A binding to `fct__order.archived_revenue` is
+# the "definition was deleted" case: the dataset exists, the metric name does not.
+version: 0.2.0.dev0
+name: metric_tree_fixture
+datasets:
+  - name: fct__order
+    source:
+      table: fct__order
+    fields:
+      - name: order_id
+      - name: amount
+    metrics:
+      - name: revenue
+        description: Booked revenue for the period.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: sum(amount)
+      - name: order_count
+        description: Number of orders placed.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: count(*)
+  - name: fct__web_session
+    source:
+      table: fct__web_session
+    fields:
+      - name: session_id
+    metrics:
+      - name: sessions
+        description: Web sessions started in the period.
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: count(*)
+metrics:
+  - name: gross_margin
+    description: Gross margin; spans revenue and cost.
+    expression:
+      dialects:
+        - dialect: ANSI_SQL
+          expression: gross_profit / net_revenue

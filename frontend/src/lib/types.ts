@@ -240,6 +240,7 @@ export interface ConfigInfo {
     exposures_default_layout?: 'dashboards-as-rows' | 'entities-as-rows';
     bus_matrix_enabled?: boolean;
     business_events_enabled?: boolean;
+    metrics_enabled?: boolean;
     modeling_style?: 'dimensional_model' | 'entity_model';
     entity_prefix?: string[];
     label_prefixes?: string[];
@@ -531,4 +532,92 @@ export interface EntityDetailModalState {
 export interface BulkEditModalState {
     open: boolean;
     selectedEntityIds: string[];
+}
+
+// Metric Tree types
+
+/**
+ * A metric on the metric canvas: authored in Trellis (draft) or bound to the
+ * semantic model (bound). Drafts carry `expression`; bound entries carry
+ * `binding` only.
+ */
+export interface MetricEntry {
+    id: string;
+    label: string;
+    description?: string;
+    expression?: string;
+    dataset_ref?: string; // semantic-model dataset the draft is written under; drafts only
+    binding?: { dataset: string; name: string }; // semantic_model.yml reference; bound only
+    position?: { x: number; y: number }; // optional runtime canvas position override
+    unresolved?: boolean; // set by GET when dataset_ref or binding no longer resolves
+    // Set by GET for a bound metric whose definition resolves: the expression read
+    // from semantic_model.yml. Display only; never sent back on save.
+    resolved_expression?: string;
+}
+
+/**
+ * A directed claim: `effect` moves when its `drivers` move.
+ */
+export interface MetricInfluence {
+    effect: string;
+    drivers: string[];
+}
+
+/**
+ * The metric tree as persisted in metric_tree.yml, and the POST payload shape.
+ */
+export interface MetricTreeFile {
+    version: number;
+    metrics: MetricEntry[];
+    influences: MetricInfluence[];
+}
+
+/**
+ * One metric found in semantic_model.yml, resolved against the data model.
+ * `bindable` is false for cross-dataset metrics and for datasets with no bound entity.
+ */
+export interface MetricCatalogEntry {
+    name: string;
+    dataset?: string | null;
+    entity_id?: string | null;
+    bindable: boolean;
+    reason?: string; // present when not bindable
+}
+
+/**
+ * GET /api/metric-tree: the tree plus what the sidebar and the dataset picker use.
+ * `datasets` are the ones a push writes to semantic_model.yml, so they are what a
+ * draft's `dataset_ref` can name.
+ */
+export interface MetricTreeResponse extends MetricTreeFile {
+    catalog: MetricCatalogEntry[];
+    datasets: string[];
+}
+
+/**
+ * Data carried by a metric node. The canvas and the node component both read it.
+ */
+export interface MetricNodeData {
+    metric: MetricEntry;
+    unresolved: boolean;
+}
+
+/**
+ * Canvas node for a metric.
+ */
+export interface MetricTreeNode {
+    id: string;
+    type: 'metric';
+    position: { x: number; y: number };
+    data: MetricNodeData;
+}
+
+/**
+ * Canvas edge for an influence, drawn from the driver to the effect.
+ */
+export interface MetricTreeEdge {
+    id: string;
+    type: 'influence';
+    source: string;
+    target: string;
 }

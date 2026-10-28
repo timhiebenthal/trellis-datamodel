@@ -693,6 +693,28 @@ async def test_put_config_round_trips_the_ossie_block(
     assert reloaded["ossie"]["file"] == ""
 
 
+METRICS_FIELD_PATHS = [
+    "metrics.enabled",
+    "metrics.file",
+    "metrics.expression_dialect",
+]
+
+
+@pytest.mark.asyncio
+async def test_metrics_fields_are_listed_as_beta(client: AsyncClient):
+    """All four metrics paths carry field metadata and beta flags."""
+    schema = (await client.get("/api/config/schema")).json()
+
+    fields = schema["fields"]
+    for path in METRICS_FIELD_PATHS:
+        assert path in schema["beta_flags"], path
+        assert fields[path]["beta"] is True, path
+        assert fields[path]["description"], path
+
+    assert "ANSI_SQL" in fields["metrics.expression_dialect"]["enum_values"]
+    assert fields["metrics.expression_dialect"]["type"] == "enum"
+
+
 @pytest.mark.asyncio
 async def test_put_config_persists_the_nested_ossie_source(
     client: AsyncClient, temp_config_dir

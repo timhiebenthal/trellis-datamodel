@@ -256,6 +256,28 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         description="Schema segment override for Ossie dataset names; empty uses the adapter-derived schema",
         beta=True,
     ),
+    "metrics.enabled": ConfigFieldMetadata(
+        type="boolean",
+        default=False,
+        required=False,
+        description="Enable the metric tree canvas and metric emission on push",
+        beta=True,
+    ),
+    "metrics.file": ConfigFieldMetadata(
+        type="string",
+        default="",
+        required=False,
+        description="Path to the metric tree file (defaults to metric_tree.yml beside the data model)",
+        beta=True,
+    ),
+    "metrics.expression_dialect": ConfigFieldMetadata(
+        type="enum",
+        enum_values=["ANSI_SQL", "OSSIE_SQL_2026"],
+        default="ANSI_SQL",
+        required=False,
+        description="Dialect label emitted with each metric expression; it is not validated against the SQL",
+        beta=True,
+    ),
 }
 
 # List of fields that are beta features
@@ -270,7 +292,14 @@ _BETA_FIELDS = [
     "ossie.file",
     "ossie.source.database",
     "ossie.source.schema",
+    "metrics.enabled",
+    "metrics.file",
+    "metrics.expression_dialect",
 ]
+
+# Dialects the metric tree may emit. A label, not a parser: nothing validates
+# the SQL against it.
+_METRICS_DIALECTS = ["ANSI_SQL", "OSSIE_SQL_2026"]
 
 
 def _get_file_hash(file_path: str) -> str:
@@ -418,6 +447,28 @@ def _normalize_nested_config(config: Dict[str, Any]) -> Dict[str, Any]:
                 "database": as_str(ossie_source.get("database")),
                 "schema": as_str(ossie_source.get("schema")),
             },
+        }
+
+    # Metric tree. Same guard as Ossie: only emitted when the file already
+    # declares the block, so an unrelated save cannot inject an opt-in feature
+    # into a version-controlled trellis.yml. A malformed value falls back to
+    # the defaults instead of raising.
+    if "metrics" in config:
+        metrics = config.get("metrics")
+        if not isinstance(metrics, dict):
+            metrics = {}
+
+        dialect = metrics.get("expression_dialect", "ANSI_SQL")
+        if dialect not in _METRICS_DIALECTS:
+            dialect = "ANSI_SQL"
+
+        def metrics_str(value: Any) -> str:
+            return value if isinstance(value, str) else ""
+
+        normalized["metrics"] = {
+            "enabled": bool(metrics.get("enabled", False)),
+            "file": metrics_str(metrics.get("file")),
+            "expression_dialect": dialect,
         }
 
     # Dimensional modeling

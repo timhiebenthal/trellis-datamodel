@@ -1392,6 +1392,90 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Metric Tree Container -->
+                            {#if true}
+                            <div class="bg-white border border-amber-200 rounded-lg p-4">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <h3 class="text-base font-semibold text-amber-900">Metric Tree</h3>
+                                    <Tooltip text="Design a metric tree on its own canvas and emit the drafted metrics into the Apache Ossie document on push.">
+                                        <Icon icon="lucide:help-circle" class="w-4 h-4 text-amber-600 hover:text-amber-700 cursor-help" />
+                                    </Tooltip>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <label for="metrics-enabled-toggle" class="block text-sm font-medium text-gray-700">
+                                                    Metric Tree Enabled
+                                                </label>
+                                                {#if isBetaField('metrics.enabled')}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
+                                                {/if}
+                                            </div>
+                                            {#if getFieldMetadata('metrics.enabled')?.description}
+                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('metrics.enabled')?.description}</p>
+                                            {:else}
+                                                <p class="text-xs text-gray-500 mt-1">Enable the metric tree canvas and metric emission on push</p>
+                                            {/if}
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                id="metrics-enabled-toggle"
+                                                type="checkbox"
+                                                checked={getFieldValue('metrics.enabled')}
+                                                onchange={(e) => handleNestedFieldChange('metrics.enabled', e.currentTarget.checked)}
+                                                disabled={!isDangerZoneEnabled}
+                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
+                                            />
+                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label for="metrics-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Metric Tree File
+                                        </label>
+                                        <input
+                                            id="metrics-file-input"
+                                            type="text"
+                                            value={getFieldValue('metrics.file') || ''}
+                                            oninput={(e) => handleNestedFieldChange('metrics.file', e.currentTarget.value)}
+                                            placeholder="metric_tree.yml (defaults to same directory as data_model.yml)"
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        />
+                                        {#if getFieldMetadata('metrics.file')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('metrics.file')?.description}</p>
+                                        {:else}
+                                            <p class="mt-1.5 text-xs text-gray-500">Path to the metric tree file (optional, defaults to metric_tree.yml in data model directory)</p>
+                                        {/if}
+                                    </div>
+
+                                    <div>
+                                        <label for="metrics-expression-dialect-select" class="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Expression Dialect
+                                        </label>
+                                        <select
+                                            id="metrics-expression-dialect-select"
+                                            value={getFieldValue('metrics.expression_dialect') || 'ANSI_SQL'}
+                                            onchange={(e) => handleNestedFieldChange('metrics.expression_dialect', e.currentTarget.value)}
+                                            disabled={!isDangerZoneEnabled}
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
+                                        >
+                                            {#each getEnumOptions('metrics.expression_dialect', ['ANSI_SQL', 'OSSIE_SQL_2026']) as value}
+                                                <option value={value}>{value}</option>
+                                            {/each}
+                                        </select>
+                                        {#if getFieldMetadata('metrics.expression_dialect')?.description}
+                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('metrics.expression_dialect')?.description}</p>
+                                        {:else}
+                                            <p class="mt-1.5 text-xs text-gray-500">Dialect label emitted with each metric expression; it is not validated against the SQL</p>
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
+                            {/if}
                         </div>
                     </div>
 
