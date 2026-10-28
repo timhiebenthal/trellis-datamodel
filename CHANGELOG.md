@@ -46,6 +46,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `TRELLIS_CONFIG_PATH` for the process lifetime, and a relative `-c` is
   normalised to an absolute path.
 
+### Fixed
+- **`--config` survives startup:** `trellis run -c /path/to/project/trellis.yml`
+  was honoured when the server booted, then dropped. The Config page, its save
+  and `POST /api/config/reload` each re-discovered the file with
+  `find_config_file()`, which searches the *server process's* working directory,
+  so a server started from the checkout with `-c` pointed elsewhere reported the
+  checkout's own `trellis.yml`. Saving from that page wrote the checkout's file,
+  and reloading silently switched the whole app to it - the hot-reload loop
+  documented in `CONTRIBUTING.md` was unusable. The resolved path is now pinned
+  in `TRELLIS_CONFIG_PATH` for the process lifetime, and a relative `-c` is
+  normalised to an absolute path.
+
 ## [0.25.0] - 2026-10-27
 
 Promotes 0.25.0b2 to a final release. No code changes since the beta: the Ossie
