@@ -27,6 +27,9 @@ export default defineConfig({
         include: ['src/**/*.{test,spec}.{js,ts}'],
         environment: 'jsdom',
         setupFiles: ['./tests/vitest-setup.ts'],
+        // Heavy jsdom component tests (EntityDetailModal, SevenWsForm) exceed the 5s
+        // default when the full suite runs in parallel.
+        testTimeout: 20000,
         coverage: {
             provider: 'v8',
             reporter: ['text-summary', 'lcov'],
