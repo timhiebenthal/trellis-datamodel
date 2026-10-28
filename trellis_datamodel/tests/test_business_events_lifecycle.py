@@ -798,7 +798,7 @@ class TestUpdateProcess:
     def test_empty_event_ids_are_rejected(self):
         process = _process([_event().id])
 
-        with pytest.raises(ValidationError, match="at least one event"):
+        with pytest.raises(ValidationError, match="event_ids list cannot be empty"):
             svc.update_process(process.id, {"event_ids": []})
 
     def test_unknown_event_id_is_rejected(self):

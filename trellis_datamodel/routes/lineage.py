@@ -1,15 +1,23 @@
 """Routes for lineage operations."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import FeatureDisabledError
+from trellis_datamodel.routes.dependencies import require_feature
 from trellis_datamodel.services.lineage import extract_upstream_lineage
 
 
 router = APIRouter(
     prefix="/api",
     tags=["lineage"],
+    dependencies=[
+        Depends(
+            require_feature(
+                lambda: cfg.LINEAGE_ENABLED,
+                "Lineage is disabled. Set lineage.enabled: true in trellis.yml to enable.",
+            )
+        )
+    ],
 )
 
 
@@ -29,11 +37,5 @@ async def get_lineage(model_id: str):
         404: If model not found
         500: If lineage extraction fails
     """
-    # Check if lineage is enabled
-    if not cfg.LINEAGE_ENABLED:
-        raise FeatureDisabledError(
-            "Lineage is disabled. Set lineage.enabled: true in trellis.yml to enable."
-        )
-
     # Missing-metadata and unknown-model errors surface from the adapter.
     return extract_upstream_lineage(model_unique_id=model_id)

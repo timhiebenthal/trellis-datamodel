@@ -101,7 +101,11 @@ class _RequestTimingMiddleware:
         except Exception:
             record_total_request()
             if not response_started:
-                error_response = PlainTextResponse("Internal Server Error", status_code=500)
+                # Same body shape as the domain handlers, without exception text.
+                error_response = JSONResponse(
+                    status_code=500,
+                    content={"detail": "Internal Server Error", "error": "internal_error"},
+                )
                 await error_response(scope, receive, send_with_headers)
             raise
         finally:
@@ -370,9 +374,9 @@ def _register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(FeatureDisabledError)
     async def feature_disabled_handler(request: Request, exc: FeatureDisabledError):
-        """Handle FeatureDisabledError -> 403."""
+        """Handle FeatureDisabledError -> 403 (or the status the error carries)."""
         return JSONResponse(
-            status_code=403,
+            status_code=exc.status_code,
             content={"detail": exc.message, "error": "feature_disabled"},
         )
 

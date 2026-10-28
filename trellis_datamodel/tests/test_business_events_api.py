@@ -168,18 +168,18 @@ class TestCreateEvent:
 
         assert response.status_code == 422
 
-    def test_blank_text_is_rejected_with_400(self, client):
+    def test_blank_text_is_rejected_with_422(self, client):
         response = client.post("/api/business-events", json={"text": "   "})
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "text" in response.json()["detail"].lower()
 
-    def test_invalid_type_is_rejected_with_400(self, client):
+    def test_invalid_type_is_rejected_with_422(self, client):
         response = client.post(
             "/api/business-events", json={"text": "x", "type": "bogus"}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "Invalid event type" in response.json()["detail"]
 
     def test_invalid_type_is_not_persisted(self, client):
@@ -227,23 +227,23 @@ class TestUpdateEvent:
         assert response.status_code == 404
         assert "evt_missing" in response.json()["detail"]
 
-    def test_blank_text_returns_400(self, client):
+    def test_blank_text_returns_422(self, client):
         created = _create_event(client)
 
         response = client.put(
             f"/api/business-events/{created['id']}", json={"text": "  "}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_invalid_type_returns_400(self, client):
+    def test_invalid_type_returns_422(self, client):
         created = _create_event(client)
 
         response = client.put(
             f"/api/business-events/{created['id']}", json={"type": "bogus"}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "Invalid event type" in response.json()["detail"]
 
 
@@ -351,20 +351,20 @@ class TestAddAnnotation:
         ids = [e["id"] for e in body["annotations"]["who"]]
         assert len(set(ids)) == 2
 
-    def test_invalid_annotation_type_returns_400(self, client):
+    def test_invalid_annotation_type_returns_422(self, client):
         event = _create_event(client)
 
         response = _add_annotation(client, event["id"], "bogus")
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "Invalid annotation_type" in response.json()["detail"]
 
-    def test_blank_text_returns_400(self, client):
+    def test_blank_text_returns_422(self, client):
         event = _create_event(client)
 
         response = _add_annotation(client, event["id"], "who", "  ")
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_unknown_event_returns_404(self, client):
         response = _add_annotation(client, "evt_missing")
@@ -404,7 +404,7 @@ class TestUpdateAnnotation:
         assert entry["description"] == "the buyer"
         assert entry["text"] == "Customer"
 
-    def test_blank_text_returns_400(self, client):
+    def test_blank_text_returns_422(self, client):
         event = _create_event(client)
         entry_id = _add_annotation(client, event["id"]).json()["annotations"]["who"][
             0
@@ -415,7 +415,7 @@ class TestUpdateAnnotation:
             json={"text": " "},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_unknown_entry_returns_404(self, client):
         event = _create_event(client)
@@ -539,7 +539,7 @@ class TestCreateProcess:
 
         assert response.status_code == 422
 
-    def test_blank_domain_returns_400(self, client):
+    def test_blank_domain_returns_422(self, client):
         event = _create_event(client)
 
         response = client.post(
@@ -552,9 +552,9 @@ class TestCreateProcess:
             },
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_blank_name_returns_400(self, client):
+    def test_blank_name_returns_422(self, client):
         event = _create_event(client)
 
         response = client.post(
@@ -567,17 +567,17 @@ class TestCreateProcess:
             },
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_no_event_ids_returns_400(self, client):
+    def test_no_event_ids_returns_422(self, client):
         response = client.post(
             "/api/processes",
             json={"name": "p", "type": "discrete", "domain": "Sales"},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_invalid_type_returns_400(self, client):
+    def test_invalid_type_returns_422(self, client):
         event = _create_event(client)
 
         response = client.post(
@@ -590,7 +590,7 @@ class TestCreateProcess:
             },
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_unknown_event_id_returns_404(self, client):
         response = client.post(
@@ -605,7 +605,7 @@ class TestCreateProcess:
 
         assert response.status_code == 404
 
-    def test_event_already_in_another_process_returns_400(self, client):
+    def test_event_already_in_another_process_returns_422(self, client):
         event = _create_event(client)
         _create_process(client, [event["id"]])
 
@@ -619,7 +619,7 @@ class TestCreateProcess:
             },
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 class TestListProcesses:
@@ -670,37 +670,37 @@ class TestUpdateProcess:
 
         assert response.status_code == 404
 
-    def test_empty_body_returns_400(self, client):
+    def test_empty_body_returns_422(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
 
         response = client.put(f"/api/processes/{process['id']}", json={})
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_blank_domain_returns_400(self, client):
+    def test_blank_domain_returns_422(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
 
         response = client.put(f"/api/processes/{process['id']}", json={"domain": " "})
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_invalid_type_returns_400(self, client):
+    def test_invalid_type_returns_422(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
 
         response = client.put(f"/api/processes/{process['id']}", json={"type": "x"})
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
-    def test_empty_event_ids_returns_400(self, client):
+    def test_empty_event_ids_returns_422(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
 
         response = client.put(f"/api/processes/{process['id']}", json={"event_ids": []})
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_resolved_process_cannot_be_updated(self, client):
         event = _create_event(client)
@@ -709,7 +709,7 @@ class TestUpdateProcess:
 
         response = client.put(f"/api/processes/{process['id']}", json={"name": "x"})
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "resolved" in response.json()["detail"].lower()
 
 
@@ -732,14 +732,14 @@ class TestResolveProcess:
 
         assert _event_from_list(client, event["id"])["process_id"] is None
 
-    def test_resolving_twice_returns_400(self, client):
+    def test_resolving_twice_returns_422(self, client):
         event = _create_event(client)
         process = _create_process(client, [event["id"]])
         client.post(f"/api/processes/{process['id']}/resolve")
 
         response = client.post(f"/api/processes/{process['id']}/resolve")
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "already resolved" in response.json()["detail"]
 
     def test_unknown_process_returns_404(self, client):
@@ -765,7 +765,7 @@ class TestAttachEvents:
         ]
         assert _event_from_list(client, extra["id"])["process_id"] == process["id"]
 
-    def test_attaching_event_owned_by_other_process_returns_400(self, client):
+    def test_attaching_event_owned_by_other_process_returns_422(self, client):
         first = _create_event(client, "first")
         second = _create_event(client, "second")
         _create_process(client, [first["id"]], name="one")
@@ -775,7 +775,7 @@ class TestAttachEvents:
             f"/api/processes/{other['id']}/attach", json={"event_ids": [first["id"]]}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "already attached" in response.json()["detail"]
 
     def test_unknown_process_returns_404(self, client):
@@ -787,7 +787,7 @@ class TestAttachEvents:
 
         assert response.status_code == 404
 
-    def test_attaching_to_resolved_process_returns_400(self, client):
+    def test_attaching_to_resolved_process_returns_422(self, client):
         member = _create_event(client, "member")
         extra = _create_event(client, "extra")
         process = _create_process(client, [member["id"]])
@@ -797,7 +797,7 @@ class TestAttachEvents:
             f"/api/processes/{process['id']}/attach", json={"event_ids": [extra["id"]]}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "resolved" in response.json()["detail"]
 
     def test_unknown_event_returns_404(self, client):
@@ -811,7 +811,7 @@ class TestAttachEvents:
 
         assert response.status_code == 404
 
-    def test_empty_event_ids_returns_400(self, client):
+    def test_empty_event_ids_returns_422(self, client):
         member = _create_event(client)
         process = _create_process(client, [member["id"]])
 
@@ -819,7 +819,7 @@ class TestAttachEvents:
             f"/api/processes/{process['id']}/attach", json={"event_ids": []}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 class TestDetachEvents:
@@ -854,7 +854,7 @@ class TestDetachEvents:
 
         assert response.status_code == 404
 
-    def test_empty_event_ids_returns_400(self, client):
+    def test_empty_event_ids_returns_422(self, client):
         member = _create_event(client)
         process = _create_process(client, [member["id"]])
 
@@ -862,7 +862,7 @@ class TestDetachEvents:
             f"/api/processes/{process['id']}/detach", json={"event_ids": []}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -885,3 +885,66 @@ class TestGenerateEntitiesErrors:
         response = disabled_client.post("/api/business-events/evt_1/generate-entities")
 
         assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Error mapping (global handlers in server.py)
+# ---------------------------------------------------------------------------
+
+
+class TestErrorMapping:
+    def test_validation_error_is_422_with_message_and_error_code(self, client):
+        response = client.post(
+            "/api/processes",
+            json={"name": "p", "type": "bogus", "domain": "Sales", "event_ids": []},
+        )
+
+        assert response.status_code == 422
+        assert response.json() == {
+            "detail": "Invalid process type: bogus. Must be one of: discrete, evolving, recurring",
+            "error": "validation_error",
+        }
+
+    def test_request_checks_run_before_the_process_lookup(self, client):
+        response = client.put("/api/processes/proc_missing", json={})
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "No fields provided to update"
+
+    def test_unknown_event_ids_are_listed_together(self, client):
+        response = client.post(
+            "/api/processes",
+            json={
+                "name": "p",
+                "type": "discrete",
+                "domain": "Sales",
+                "event_ids": ["evt_a", "evt_b"],
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json() == {
+            "detail": "Events not found: evt_a, evt_b",
+            "error": "not_found",
+        }
+
+    def test_unexpected_error_is_500_without_leaking_the_exception(
+        self, client, monkeypatch
+    ):
+        from trellis_datamodel.routes import business_events as routes
+        from trellis_datamodel.server import app
+
+        def boom():
+            raise RuntimeError("private failure detail")
+
+        monkeypatch.setattr(routes, "load_business_events", boom)
+
+        with TestClient(app, raise_server_exceptions=False) as raw_client:
+            response = raw_client.get("/api/business-events")
+
+        assert response.status_code == 500
+        assert response.json() == {
+            "detail": "Internal Server Error",
+            "error": "internal_error",
+        }
+        assert "private failure detail" not in response.text

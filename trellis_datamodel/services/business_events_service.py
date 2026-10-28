@@ -166,24 +166,91 @@ def get_unique_domains() -> List[str]:
     return sorted(list(domains))
 
 
+def parse_business_event_type(value: BusinessEventType | str, kind: str) -> BusinessEventType:
+    """
+    Parse an event or process type, naming the allowed values on failure.
+
+    Args:
+        value: Raw type value from the request
+        kind: "event" or "process", used in the error message
+
+    Raises:
+        ValidationError: If the value is not a known BusinessEventType
+    """
+    try:
+        return BusinessEventType(value)
+    except ValueError:
+        raise ValidationError(
+            f"Invalid {kind} type: {value}. Must be one of: discrete, evolving, recurring"
+        ) from None
+
+
+def get_event(event_id: str) -> BusinessEvent:
+    """
+    Return one business event by ID.
+
+    Raises:
+        NotFoundError: If event not found
+        FileOperationError: If file cannot be read
+    """
+    for event in load_business_events():
+        if event.id == event_id:
+            return event
+    raise NotFoundError(f"Business event '{event_id}' not found")
+
+
+def get_process(process_id: str) -> BusinessEventProcess:
+    """
+    Return one business event process by ID.
+
+    Raises:
+        NotFoundError: If process not found
+        FileOperationError: If file cannot be read
+    """
+    for process in load_processes():
+        if process.id == process_id:
+            return process
+    raise NotFoundError(f"Business event process '{process_id}' not found")
+
+
+def _require_events_exist(event_ids: List[str], events: List[BusinessEvent]) -> None:
+    """Raise NotFoundError naming every requested event ID that does not exist."""
+    existing_event_ids = {e.id for e in events}
+    invalid_ids = [eid for eid in event_ids if eid not in existing_event_ids]
+    if invalid_ids:
+        raise NotFoundError(f"Events not found: {', '.join(invalid_ids)}")
+
+
+def _require_event_ids(event_ids: List[str]) -> None:
+    """Reject an empty event ID list in attach/detach/update requests."""
+    if not event_ids:
+        raise ValidationError("event_ids list cannot be empty")
+
+
 def create_event(
-    text: str, type: BusinessEventType, domain: Optional[str] = None, description: Optional[str] = None
+    text: str,
+    type: BusinessEventType | str | None = None,
+    domain: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> BusinessEvent:
     """
     Create a new business event with auto-generated ID.
 
     Args:
         text: Event description text
-        type: Event type (discrete, evolving, recurring)
+        type: Event type (discrete, evolving, recurring); None means discrete
         domain: Optional business domain
 
     Returns:
         New BusinessEvent object with empty 7 Ws structure
 
     Raises:
-        ValidationError: If text is invalid
+        ValidationError: If type or text is invalid
         FileOperationError: If file operations fail
     """
+    type = parse_business_event_type(
+        type if type is not None else BusinessEventType.DISCRETE, "event"
+    )
     if not text or not text.strip():
         raise ValidationError("Event text is required")
 
@@ -447,7 +514,7 @@ def add_annotation_entry(
         ValidationError: If annotation_type is invalid or entry_id is not unique
         FileOperationError: If file operations fail
     """
-    valid_types = ["who", "what", "when", "where", "how", "how_many", "why"]
+    valid_types = ["who", "what", "when", "where", "how", "why", "how_many"]
     if annotation_type not in valid_types:
         raise ValidationError(
             f"Invalid annotation_type: '{annotation_type}'. Must be one of: {', '.join(valid_types)}"
@@ -729,9 +796,13 @@ def attach_events_to_process(process_id: str, event_ids: List[str]) -> BusinessE
 
     Raises:
         NotFoundError: If process or any event not found
-        ValidationError: If events are already in another process or process is resolved
+        ValidationError: If event_ids is empty, events are already in another
+            process, or process is resolved
         FileOperationError: If file operations fail
     """
+    _require_event_ids(event_ids)
+    _require_events_exist(event_ids, load_business_events())
+
     processes = load_processes()
     process_index = None
     for i, process in enumerate(processes):
@@ -748,14 +819,9 @@ def attach_events_to_process(process_id: str, event_ids: List[str]) -> BusinessE
     if process.resolved_at is not None:
         raise ValidationError(f"Cannot attach events to resolved process '{process_id}'")
 
-    # Validate events exist and aren't already in another process
+    # Validate events aren't already in another process
     events = load_business_events()
-    existing_event_ids = {e.id for e in events}
     for event_id in event_ids:
-        if event_id not in existing_event_ids:
-            raise NotFoundError(f"Event '{event_id}' not found")
-
-        # Check if event is already in another process
         for e in events:
             if e.id == event_id and e.process_id is not None and e.process_id != process_id:
                 raise ValidationError(
@@ -796,8 +862,11 @@ def detach_events_from_process(process_id: str, event_ids: List[str]) -> Busines
 
     Raises:
         NotFoundError: If process not found
+        ValidationError: If event_ids is empty
         FileOperationError: If file operations fail
     """
+    _require_event_ids(event_ids)
+
     processes = load_processes()
     process_index = None
     for i, process in enumerate(processes):
@@ -1012,9 +1081,9 @@ def _require_process_domain(domain: Optional[str]) -> str:
 
 def create_process(
     name: str,
-    type: BusinessEventType,
+    type: BusinessEventType | str,
     domain: str,
-    event_ids: List[str],
+    event_ids: Optional[List[str]],
     description: Optional[str] = None,
 ) -> BusinessEventProcess:
     """
@@ -1030,24 +1099,29 @@ def create_process(
         New BusinessEventProcess object with computed annotations superset
 
     Raises:
-        ValidationError: If name is invalid, domain is missing, or event_ids is empty
+        ValidationError: If type or name is invalid, domain is missing,
+            event_ids is empty, or an event already belongs to a process
         NotFoundError: If any event_id doesn't exist
         FileOperationError: If file operations fail
     """
+    type = parse_business_event_type(type, "process")
+
+    events = load_business_events()
+    if event_ids:
+        _require_events_exist(event_ids, events)
+        for event in events:
+            if event.id in event_ids and event.process_id is not None:
+                raise ValidationError(
+                    f"Event '{event.id}' is already attached to process '{event.process_id}'"
+                )
+
+    domain_value = _require_process_domain(domain)
+
     if not name or not name.strip():
         raise ValidationError("Process name is required")
 
     if not event_ids:
         raise ValidationError("At least one event ID is required")
-
-    domain_value = _require_process_domain(domain)
-
-    # Validate all events exist
-    events = load_business_events()
-    existing_event_ids = {event.id for event in events}
-    for event_id in event_ids:
-        if event_id not in existing_event_ids:
-            raise NotFoundError(f"Business event '{event_id}' not found")
 
     # Generate ID: proc_YYYYMMDD_NNN
     today = datetime.now().strftime("%Y%m%d")
@@ -1097,6 +1171,20 @@ def create_process(
     return new_process
 
 
+def _validate_process_updates(updates: dict) -> None:
+    """Reject an update request before the process is looked up."""
+    if "type" in updates:
+        parse_business_event_type(updates["type"], "process")
+    if "domain" in updates:
+        domain = updates["domain"]
+        if not isinstance(domain, str) or not domain.strip():
+            raise ValidationError("Process domain cannot be empty")
+    if "event_ids" in updates:
+        _require_event_ids(updates["event_ids"])
+    if not updates:
+        raise ValidationError("No fields provided to update")
+
+
 def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
     """
     Update an existing business event process.
@@ -1110,9 +1198,11 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
 
     Raises:
         NotFoundError: If process not found
-        ValidationError: If updates are invalid
+        ValidationError: If updates are empty or invalid
         FileOperationError: If file operations fail
     """
+    _validate_process_updates(updates)
+
     processes = load_processes()
     process_index = None
     for i, proc in enumerate(processes):
@@ -1141,10 +1231,7 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
         process.description = description_value.strip() if description_value and isinstance(description_value, str) else None
 
     if "type" in updates:
-        try:
-            process.type = BusinessEventType(updates["type"])
-        except ValueError:
-            raise ValidationError(f"Invalid process type: {updates['type']}")
+        process.type = BusinessEventType(updates["type"])
 
     if "domain" in updates:
         process.domain = _require_process_domain(updates["domain"])
@@ -1172,9 +1259,7 @@ def update_process(process_id: str, updates: dict) -> BusinessEventProcess:
     old_event_ids = set(process.event_ids)
     if "event_ids" in updates:
         new_event_ids = updates["event_ids"]
-        if not new_event_ids:
-            raise ValidationError("Process must have at least one event")
-        
+
         # Validate all events exist
         events = load_business_events()
         existing_event_ids = {event.id for event in events}

@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Config defaults come from one place:** the pydantic `ConfigSchema` now owns
   the defaults that `config.py`, the config page metadata and the config
   normaliser used to repeat (#178).
+- **Business events and processes API answers invalid input with 422, not 400:**
+  every validation failure (invalid event or process type, blank text, name or
+  domain, empty `event_ids`, an event already in another process, an empty
+  update, a resolved process) now returns `422` like the rest of the API; the
+  `detail` messages are unchanged and the body also carries
+  `"error": "validation_error"`. Unexpected server errors answer `500` with
+  `{"detail": "Internal Server Error", "error": "internal_error"}` instead of
+  echoing the exception text. Status conventions are documented in
+  `CONTRIBUTING.md` (#179).
 
 ### Fixed
 - **Config page showed the entity creation wizard as off by default:** with

@@ -194,6 +194,38 @@ uv sync --extra dev
 uv run pytest
 ```
 
+## Backend conventions
+
+### Errors
+Services raise the domain exceptions in `trellis_datamodel/exceptions.py`; route handlers do not catch them and do not raise `HTTPException` for domain conditions (unknown id, invalid input, ...). The global handlers in `server.py` map each exception to a status and a JSON body `{"detail": <message>, "error": <code>}`:
+
+| Exception | Status | `error` |
+| --- | --- | --- |
+| `NotFoundError` | 404 | `not_found` |
+| `ValidationError` | 422 | `validation_error` |
+| `FeatureDisabledError` | 403 (or the `status_code` it carries) | `feature_disabled` |
+| `ConfigurationError` | 400 | `configuration_error` |
+| `FileOperationError` | 500 | `file_operation_error` |
+| any other `DomainError` | 500 | `domain_error` |
+| unhandled exception | 500 | `internal_error` (detail is always `Internal Server Error`) |
+
+Invalid input is 422 everywhere, the same status FastAPI uses for request bodies that fail pydantic validation. Do not map `ValidationError` to 400 in a route.
+
+### Feature flags
+Gate a feature with the shared guard in `trellis_datamodel/routes/dependencies.py`, usually on the router:
+
+```python
+router = APIRouter(
+    prefix="/api",
+    dependencies=[Depends(require_feature(lambda: cfg.LINEAGE_ENABLED, "Lineage is disabled. ..."))],
+)
+```
+
+It raises `FeatureDisabledError` (403). Pass `status_code=404` only where a spec requires a disabled feature to look absent (the metric tree does).
+
+### Request and response models
+Pydantic request/response models live in `trellis_datamodel/models/`, not in route modules.
+
 ## Reporting issues
 - Use GitHub issues with clear reproduction steps, expected vs. actual behavior, and environment details.
 
