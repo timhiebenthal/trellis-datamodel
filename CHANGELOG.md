@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Web pages can no longer drive the local API around CORS:** CORS hid
+  responses from foreign pages but did not stop their requests. A page could
+  rebind its DNS name to 127.0.0.1 and call the API as a same-origin caller, or
+  send a "simple" `no-cors` POST whose body FastAPI still parsed as JSON. The
+  server now answers only to loopback Host names (an explicit non-loopback
+  `--host` also accepts this machine's IP addresses and hostname, plus any
+  names in `TRELLIS_ALLOWED_HOSTS`). POST, PUT, PATCH and DELETE are refused
+  with a 403 when `Origin` is not a local page or `Sec-Fetch-Site` is
+  `cross-site`, and with a 415 when a body is not `application/json`. Requests
+  without an `Origin` (curl, scripts) work as before.
+- **Schema writes can no longer leave the models directory:** `POST /api/schema`
+  and `POST /api/models/{model_name}/schema` reject a model name with a path
+  separator, `..` or characters other than letters, digits, `_`, `.` and `-`
+  with a 422. The dbt adapter also refuses a default `<model>.yml` path that
+  resolves outside the models directory, which covers entity ids read from
+  `data_model.yml` during `POST /api/sync-tests`.
+
 ## [0.26.0] - 2026-10-28
 
 ### Added

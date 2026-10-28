@@ -152,6 +152,8 @@ def sync_framework_tests() -> SyncOutcome:
         pushed_before = {e.get("id"): e.get(PUSHED_TAGS_KEY) for e in entities}
         updated_files = adapter.sync_relationships(entities, relationships)
         _persist_pushed_tags(data_model_path, entities, pushed_before)
+    except ValidationError:
+        raise
     except Exception as e:
         raise FileOperationError(f"Error syncing tests: {str(e)}") from e
 

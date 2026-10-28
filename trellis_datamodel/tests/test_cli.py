@@ -357,6 +357,8 @@ class TestRunHost:
         from trellis_datamodel.cli import app
 
         monkeypatch.delenv("TRELLIS_CONFIG_PATH", raising=False)
+        # run() exports the bind host for the server; restore it afterwards.
+        monkeypatch.setenv("TRELLIS_BIND_HOST", "")
         project_config = tmp_path / "trellis.yml"
         project_config.write_text(
             "framework: dbt-core\ndbt_project_path: .\ndata_model_file: dm.yml\n"
@@ -376,6 +378,7 @@ class TestRunHost:
 
         assert captured["host"] == "127.0.0.1"
         assert "Warning: bound to" not in result.output
+        assert os.environ["TRELLIS_BIND_HOST"] == "127.0.0.1"
 
     def test_host_option_opts_in_to_wider_binds_with_a_warning(
         self, monkeypatch, tmp_path
@@ -384,6 +387,9 @@ class TestRunHost:
 
         assert captured["host"] == "0.0.0.0"
         assert "Warning: bound to 0.0.0.0" in result.output
+        assert "TRELLIS_ALLOWED_HOSTS" in result.output
+        # The server's Host check widens only because the bind was opted in.
+        assert os.environ["TRELLIS_BIND_HOST"] == "0.0.0.0"
 
 
 class TestCLIHelp:

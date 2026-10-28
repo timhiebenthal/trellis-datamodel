@@ -18,6 +18,7 @@ from trellis_datamodel.services.schema import (
     sync_framework_tests,
     update_model_schema,
 )
+from trellis_datamodel.utils.path_validation import validate_model_name
 
 router = APIRouter(prefix="/api", tags=["schema"])
 
@@ -25,6 +26,9 @@ router = APIRouter(prefix="/api", tags=["schema"])
 @router.post("/schema", response_model=FileOperationResponse)
 async def save_model_schema_endpoint(request: ModelSchemaRequest):
     """Generate and save a schema YAML file for the drafted fields."""
+    # The name becomes a file name when the model has no schema file yet.
+    if request.model_name is not None:
+        validate_model_name(request.model_name)
     output_path = save_model_schema_from_request(
         entity_id=request.entity_id,
         model_name=request.model_name,
@@ -80,6 +84,7 @@ async def update_model_schema_endpoint(
     model_name: str, request: ModelSchemaRequest
 ):
     """Update the schema for a specific model in its YAML file."""
+    validate_model_name(model_name)
     output_path = update_model_schema(
         model_name=model_name,
         columns=request.columns,

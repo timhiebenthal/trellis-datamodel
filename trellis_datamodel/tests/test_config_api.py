@@ -85,8 +85,9 @@ async def client(temp_config_dir, monkeypatch):
     from trellis_datamodel.server import app
     from httpx import ASGITransport
 
+    # A loopback Host: the server refuses names it does not answer to.
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://localhost"
     ) as client:
         yield client
 
