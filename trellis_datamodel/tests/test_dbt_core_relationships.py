@@ -489,3 +489,104 @@ class TestYamlScannedRelationships:
         rels = adapter.infer_relationships()
 
         assert [(r["source"], r["target"]) for r in rels] == [("customer", "orders")]
+
+
+class TestYamlScanEdgeCases:
+    def test_missing_configured_model_dir_is_skipped(self, tmp_path):
+        adapter = _build(tmp_path, PLAIN_NODES, BOUND_ENTITIES, _fk_yaml())
+        adapter.model_paths = ["3_core", "does_not_exist"]
+
+        assert [(r["source"], r["target"]) for r in adapter.infer_relationships()] == [
+            ("customer", "orders")
+        ]
+
+    def test_model_entry_without_name_is_skipped(self, tmp_path):
+        yml = _fk_yaml()
+        yml["fct_orders.yml"] = yml["fct_orders.yml"].replace(
+            "models:\n", "models:\n  - columns:\n      - name: orphan\n", 1
+        )
+        adapter = _build(tmp_path, PLAIN_NODES, BOUND_ENTITIES, yml)
+
+        assert len(adapter.infer_relationships()) == 1
+
+    def test_non_numeric_model_version_is_reported_as_none(self, tmp_path):
+        yml = {
+            "fct_orders.yml": (
+                "models:\n"
+                "  - name: fct_orders\n"
+                "    versions:\n"
+                "      - v: beta\n"
+                "        columns:\n"
+                "          - name: customer_id\n"
+                "            data_tests:\n"
+                "              - relationships:\n"
+                "                  to: ref('dim_customer')\n"
+                "                  field: id\n"
+            )
+        }
+        adapter = _build(tmp_path, PLAIN_NODES, [], yml)
+
+        rels = adapter.infer_relationships(include_unbound=True)
+
+        assert [(r["target"], r["target_model_version"]) for r in rels] == [
+            ("fct_orders", None)
+        ]
+
+    def test_model_bound_to_entity_without_id_falls_back_to_model_name(self, tmp_path):
+        entities = [
+            {"model_ref": "model.proj.dim_customer"},
+            {"model_ref": "model.proj.fct_orders"},
+        ]
+        adapter = _build(tmp_path, PLAIN_NODES, entities, _fk_yaml())
+
+        rels = adapter.infer_relationships(include_unbound=True)
+
+        assert [(r["source"], r["target"]) for r in rels] == [("dim_customer", "fct_orders")]
+
+    def test_relationships_read_before_a_malformed_model_entry_are_kept(self, tmp_path):
+        yml = _fk_yaml()
+        yml["fct_orders.yml"] += "  - not_a_mapping\n"
+        adapter = _build(tmp_path, PLAIN_NODES, BOUND_ENTITIES, yml)
+
+        assert [(r["source"], r["target"]) for r in adapter.infer_relationships()] == [
+            ("customer", "orders")
+        ]
+
+
+class TestModelToEntityMapEdgeCases:
+    def test_versioned_additional_model_resolves_to_its_entity(self, tmp_path):
+        nodes = [
+            _model_node("dim_customer", {"id": {"name": "id"}}),
+            _model_node(
+                "fct_orders",
+                {"customer_id": {"name": "customer_id", **_fk_column("ref('dim_customer')")}},
+                version=2,
+            ),
+        ]
+        entities = [
+            {"id": "customer", "model_ref": "model.proj.dim_customer"},
+            {"id": "orders", "additional_models": ["model.proj.fct_orders.v2"]},
+        ]
+        adapter = _build(tmp_path, nodes, entities, EMPTY_SCHEMA)
+
+        rels = adapter.infer_relationships()
+
+        assert [(r["source"], r["target"], r["target_model_version"]) for r in rels] == [
+            ("customer", "orders", 2)
+        ]
+
+    def test_unparseable_yaml_of_a_bound_model_does_not_break_resolution(self, tmp_path):
+        yml = {**EMPTY_SCHEMA, "dim_customer.yml": "models: [unclosed\n"}
+        adapter = _build(tmp_path, _customer_orders_nodes(), BOUND_ENTITIES, yml)
+
+        assert [(r["source"], r["target"]) for r in adapter.infer_relationships()] == [
+            ("customer", "orders")
+        ]
+
+    def test_single_model_yaml_without_name_is_ignored(self, tmp_path):
+        yml = {**EMPTY_SCHEMA, "nameless.yml": "models:\n  - columns: []\n"}
+        adapter = _build(tmp_path, _customer_orders_nodes(), BOUND_ENTITIES, yml)
+
+        assert [(r["source"], r["target"]) for r in adapter.infer_relationships()] == [
+            ("customer", "orders")
+        ]
