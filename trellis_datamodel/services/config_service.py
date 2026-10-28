@@ -7,9 +7,10 @@ Handles loading, validation, conflict detection, and atomic writes.
 import hashlib
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, Optional, Tuple
 import json
 
@@ -328,6 +329,51 @@ _MANAGED_KEYS = (
     "dimensional_modeling",
     "entity_modeling",
 )
+
+
+# Fields whose value becomes a file the server writes. A hand-edited trellis.yml
+# may point them anywhere; a value arriving over HTTP may not escape the project.
+_WRITE_PATH_FIELDS = (
+    ("data_model_file",),
+    ("business_events", "file"),
+    ("ossie", "file"),
+)
+
+
+def _nested_get(config: Any, path: Tuple[str, ...]) -> Any:
+    for key in path:
+        if not isinstance(config, dict):
+            return None
+        config = config.get(key)
+    return config
+
+
+def _escapes_project(value: str) -> bool:
+    """True for an absolute path or one with a `..` segment, on any OS."""
+    if os.path.isabs(value) or PureWindowsPath(value).is_absolute():
+        return True
+    return ".." in re.split(r"[\\/]+", value)
+
+
+def _unsafe_write_paths(
+    normalized: Dict[str, Any], current: Dict[str, Any]
+) -> list[str]:
+    """
+    Name the write-path fields that were changed to an absolute or `..` path.
+
+    A value already in the file is left alone, so an existing config that
+    reaches outside its directory stays saveable from the UI.
+    """
+    problems = []
+    for path in _WRITE_PATH_FIELDS:
+        value = _nested_get(normalized, path)
+        if (
+            isinstance(value, str)
+            and _escapes_project(value)
+            and value != _nested_get(current, path)
+        ):
+            problems.append(".".join(path))
+    return problems
 
 
 def _get_file_hash(file_path: str) -> str:
@@ -794,6 +840,18 @@ def save_config(
     is_valid, error_msg = validate_config(normalized)
     if not is_valid:
         raise CustomValidationError(f"Config validation failed: {error_msg}")
+
+    try:
+        with open(config_path, "r") as f:
+            current = yaml.safe_load(f) or {}
+    except Exception as e:
+        raise ConfigurationError(f"Failed to read config file: {e}")
+    unsafe = _unsafe_write_paths(normalized, current)
+    if unsafe:
+        raise CustomValidationError(
+            f"{', '.join(unsafe)}: must be a path inside the project "
+            "(no absolute paths or '..'); edit trellis.yml directly to point outside it"
+        )
 
     # A conflict leaves the file as it is; omitting the expected mtime/hash is
     # how the caller forces the overwrite.
