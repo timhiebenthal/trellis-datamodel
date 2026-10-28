@@ -684,13 +684,20 @@ def _sync_roles_to_dimensions(annotations: BusinessEventAnnotations) -> None:
                 current_roles = entity.get("roles", [])
                 if current_roles is None:
                     current_roles = []
-                current_roles_set = set(current_roles)
+                # Roles are flat strings or structured {label, role, source} objects
+                current_roles_set = {
+                    (r.get("role") or r.get("label")) if isinstance(r, dict) else r
+                    for r in current_roles
+                }
+                structured = any(isinstance(r, dict) for r in current_roles)
                 
-                # Add new roles
+                # Add new roles, matching the shape already stored on the entity
                 new_roles = dimension_roles[entity_id]
                 for role in new_roles:
                     if role not in current_roles_set:
-                        current_roles.append(role)
+                        current_roles.append(
+                            {"label": role, "role": role} if structured else role
+                        )
                         modified = True
                 
                 # Update entity
