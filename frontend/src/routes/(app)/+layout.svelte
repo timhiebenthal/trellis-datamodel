@@ -749,7 +749,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             {#if businessEventsEnabled}
                 <a
                     href="/business-events"
-                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                     class:bg-white={$page.url.pathname === '/business-events'}
                     class:text-primary-600={$page.url.pathname === '/business-events'}
                     class:shadow-sm={$page.url.pathname === '/business-events'}
@@ -762,7 +762,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             {/if}
             <a
                 href="/canvas"
-                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                 class:bg-white={$page.url.pathname === '/canvas'}
                 class:text-primary-600={$page.url.pathname === '/canvas'}
                 class:shadow-sm={$page.url.pathname === '/canvas'}
@@ -774,7 +774,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             </a>
             <a
                 href="/entity-list"
-                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                 class:bg-white={$page.url.pathname === '/entity-list'}
                 class:text-primary-600={$page.url.pathname === '/entity-list'}
                 class:shadow-sm={$page.url.pathname === '/entity-list'}
@@ -787,7 +787,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             {#if metricsEnabled}
                 <a
                     href="/metrics-tree"
-                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                     class:bg-white={$page.url.pathname === '/metrics-tree'}
                     class:text-primary-600={$page.url.pathname === '/metrics-tree'}
                     class:shadow-sm={$page.url.pathname === '/metrics-tree'}
@@ -801,7 +801,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             {#if exposuresEnabled && hasExposuresData}
                 <a
                     href="/exposures"
-                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                     class:bg-white={$page.url.pathname === '/exposures'}
                     class:text-primary-600={$page.url.pathname === '/exposures'}
                     class:shadow-sm={$page.url.pathname === '/exposures'}
@@ -815,7 +815,7 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             {#if busMatrixEnabled}
                 <a
                     href="/bus-matrix"
-                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2"
+                    class="flex-1 min-w-32 px-4 py-1.5 text-sm rounded-md transition-all duration-200 font-medium flex items-center justify-center gap-2 whitespace-nowrap"
                     class:bg-white={$page.url.pathname === '/bus-matrix'}
                     class:text-primary-600={$page.url.pathname === '/bus-matrix'}
                     class:shadow-sm={$page.url.pathname === '/bus-matrix'}

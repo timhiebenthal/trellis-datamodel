@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-29
+
 ### Changed
+- **Nav tab labels stay on one line:** "Metric Tree" no longer wraps onto two lines in the top navigation.
 - **Giant frontend components split up:** `EntityNode`, `EntityDetailModal`, the
   app layout, the config page, `LineageModal`, `SevenWsForm`, `BusinessEvents`
   and `GenerateEntitiesDialog` now delegate to smaller components, services and
