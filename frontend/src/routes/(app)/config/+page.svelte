@@ -4,6 +4,9 @@
     import type { ConfigGetResponse, ConfigFieldMetadata, ConfigSchema } from '$lib/api';
     import Icon from '$lib/components/Icon.svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
+    import ConfigToggle from '$lib/components/ConfigToggle.svelte';
+    import ConfigTextField from '$lib/components/ConfigTextField.svelte';
+    import { setConfigFormContext } from '$lib/utils/config-form-context';
     import { frameworkModels, nodes } from '$lib/stores';
     import { normalizeTags } from '$lib/utils/entity-tags';
     import { readModelRef } from '$lib/utils/entity-compat';
@@ -343,6 +346,8 @@
     function isBetaField(path: string): boolean {
         return schema.beta_flags.includes(path);
     }
+
+    setConfigFormContext({ getFieldValue, handleNestedFieldChange, getFieldMetadata, isBetaField });
 
     function getEnumOptions(path: string, fallback: string[]): string[] {
         const options = getFieldMetadata(path)?.enum_values;
@@ -1251,54 +1256,9 @@
                                     </Tooltip>
                                 </div>
                                 <div class="space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2">
-                                                <label for="business-events-enabled-toggle" class="block text-sm font-medium text-gray-700">
-                                                    Business Events Enabled
-                                                </label>
-                                                {#if isBetaField('business_events.enabled')}
-                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
-                                                {/if}
-                                            </div>
-                                            {#if getFieldMetadata('business_events.enabled')?.description}
-                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('business_events.enabled')?.description}</p>
-                                            {:else}
-                                                <p class="text-xs text-gray-500 mt-1">Enable business events modeling to annotate natural language sentences and generate entities</p>
-                                            {/if}
-                                        </div>
-                                        <label class="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                id="business-events-enabled-toggle"
-                                                type="checkbox"
-                                                checked={getFieldValue('business_events.enabled')}
-                                                onchange={(e) => handleNestedFieldChange('business_events.enabled', e.currentTarget.checked)}
-                                                disabled={!isDangerZoneEnabled}
-                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
-                                            />
-                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
-                                        </label>
-                                    </div>
+                                    <ConfigToggle path="business_events.enabled" label="Business Events Enabled" disabled={!isDangerZoneEnabled} />
 
-                                    <div>
-                                        <label for="business-events-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Business Events File
-                                        </label>
-                                        <input
-                                            id="business-events-file-input"
-                                            type="text"
-                                            value={getFieldValue('business_events.file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('business_events.file', e.currentTarget.value)}
-                                            placeholder="business_events.yml (defaults to same directory as data_model.yml)"
-                                            disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
-                                        {#if getFieldMetadata('business_events.file')?.description}
-                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('business_events.file')?.description}</p>
-                                        {:else}
-                                            <p class="mt-1.5 text-xs text-gray-500">Path to business events YAML file (optional, defaults to business_events.yml in data model directory)</p>
-                                        {/if}
-                                    </div>
+                                    <ConfigTextField path="business_events.file" label="Business Events File" placeholder="business_events.yml (defaults to same directory as data_model.yml)" disabled={!isDangerZoneEnabled} />
                                 </div>
                             </div>
                             {/if}
@@ -1312,92 +1272,13 @@
                                     </Tooltip>
                                 </div>
                                 <div class="space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2">
-                                                <label for="ossie-enabled-toggle" class="block text-sm font-medium text-gray-700">
-                                                    Ossie Export Enabled
-                                                </label>
-                                                {#if isBetaField('ossie.enabled')}
-                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
-                                                {/if}
-                                            </div>
-                                            {#if getFieldMetadata('ossie.enabled')?.description}
-                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('ossie.enabled')?.description}</p>
-                                            {:else}
-                                                <p class="text-xs text-gray-500 mt-1">Enable Apache Ossie semantic model export alongside framework pushes</p>
-                                            {/if}
-                                        </div>
-                                        <label class="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                id="ossie-enabled-toggle"
-                                                type="checkbox"
-                                                checked={getFieldValue('ossie.enabled')}
-                                                onchange={(e) => handleNestedFieldChange('ossie.enabled', e.currentTarget.checked)}
-                                                disabled={!isDangerZoneEnabled}
-                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
-                                            />
-                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
-                                        </label>
-                                    </div>
+                                    <ConfigToggle path="ossie.enabled" label="Ossie Export Enabled" disabled={!isDangerZoneEnabled} />
 
-                                    <div>
-                                        <label for="ossie-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Semantic Model File
-                                        </label>
-                                        <input
-                                            id="ossie-file-input"
-                                            type="text"
-                                            value={getFieldValue('ossie.file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('ossie.file', e.currentTarget.value)}
-                                            placeholder="semantic_model.yml (defaults to same directory as data_model.yml)"
-                                            disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
-                                        {#if getFieldMetadata('ossie.file')?.description}
-                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('ossie.file')?.description}</p>
-                                        {:else}
-                                            <p class="mt-1.5 text-xs text-gray-500">Path to the Ossie semantic model file (optional, defaults to semantic_model.yml in data model directory)</p>
-                                        {/if}
-                                    </div>
+                                    <ConfigTextField path="ossie.file" label="Semantic Model File" placeholder="semantic_model.yml (defaults to same directory as data_model.yml)" disabled={!isDangerZoneEnabled} />
 
-                                    <div>
-                                        <label for="ossie-source-database" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Database Override
-                                        </label>
-                                        <input
-                                            id="ossie-source-database"
-                                            type="text"
-                                            value={getFieldValue('ossie.source.database') || ''}
-                                            oninput={(e) => handleNestedFieldChange('ossie.source.database', e.currentTarget.value)}
-                                            disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
-                                        {#if getFieldMetadata('ossie.source.database')?.description}
-                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('ossie.source.database')?.description}</p>
-                                        {:else}
-                                            <p class="mt-1.5 text-xs text-gray-500">Leave empty to omit the database segment. Values from the manifest reflect the target that last ran dbt.</p>
-                                        {/if}
-                                    </div>
+                                    <ConfigTextField path="ossie.source.database" label="Database Override" disabled={!isDangerZoneEnabled} />
 
-                                    <div>
-                                        <label for="ossie-source-schema" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Schema Override
-                                        </label>
-                                        <input
-                                            id="ossie-source-schema"
-                                            type="text"
-                                            value={getFieldValue('ossie.source.schema') || ''}
-                                            oninput={(e) => handleNestedFieldChange('ossie.source.schema', e.currentTarget.value)}
-                                            disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
-                                        {#if getFieldMetadata('ossie.source.schema')?.description}
-                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('ossie.source.schema')?.description}</p>
-                                        {:else}
-                                            <p class="mt-1.5 text-xs text-gray-500">Leave empty to use the schema the adapter reports.</p>
-                                        {/if}
-                                    </div>
+                                    <ConfigTextField path="ossie.source.schema" label="Schema Override" disabled={!isDangerZoneEnabled} />
                                 </div>
                             </div>
 
@@ -1411,54 +1292,9 @@
                                     </Tooltip>
                                 </div>
                                 <div class="space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2">
-                                                <label for="metrics-enabled-toggle" class="block text-sm font-medium text-gray-700">
-                                                    Metric Tree Enabled
-                                                </label>
-                                                {#if isBetaField('metrics.enabled')}
-                                                    <span class="px-2 py-0.5 text-xs font-medium bg-amber-200 text-amber-800 rounded">Beta</span>
-                                                {/if}
-                                            </div>
-                                            {#if getFieldMetadata('metrics.enabled')?.description}
-                                                <p class="text-xs text-gray-500 mt-1">{getFieldMetadata('metrics.enabled')?.description}</p>
-                                            {:else}
-                                                <p class="text-xs text-gray-500 mt-1">Enable the metric tree canvas and metric emission on push</p>
-                                            {/if}
-                                        </div>
-                                        <label class="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                id="metrics-enabled-toggle"
-                                                type="checkbox"
-                                                checked={getFieldValue('metrics.enabled')}
-                                                onchange={(e) => handleNestedFieldChange('metrics.enabled', e.currentTarget.checked)}
-                                                disabled={!isDangerZoneEnabled}
-                                                class="sr-only peer focus:ring-0 focus:ring-offset-0"
-                                            />
-                                            <div class="w-11 h-6 bg-gray-200 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full {isDangerZoneEnabled ? '' : 'opacity-50'}"></div>
-                                        </label>
-                                    </div>
+                                    <ConfigToggle path="metrics.enabled" label="Metric Tree Enabled" disabled={!isDangerZoneEnabled} />
 
-                                    <div>
-                                        <label for="metrics-file-input" class="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Metric Tree File
-                                        </label>
-                                        <input
-                                            id="metrics-file-input"
-                                            type="text"
-                                            value={getFieldValue('metrics.file') || ''}
-                                            oninput={(e) => handleNestedFieldChange('metrics.file', e.currentTarget.value)}
-                                            placeholder="metric_tree.yml (defaults to same directory as data_model.yml)"
-                                            disabled={!isDangerZoneEnabled}
-                                            class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-all duration-200 shadow-sm {isDangerZoneEnabled ? '' : 'opacity-50'}"
-                                        />
-                                        {#if getFieldMetadata('metrics.file')?.description}
-                                            <p class="mt-1.5 text-xs text-gray-500">{getFieldMetadata('metrics.file')?.description}</p>
-                                        {:else}
-                                            <p class="mt-1.5 text-xs text-gray-500">Path to the metric tree file (optional, defaults to metric_tree.yml in data model directory)</p>
-                                        {/if}
-                                    </div>
+                                    <ConfigTextField path="metrics.file" label="Metric Tree File" placeholder="metric_tree.yml (defaults to same directory as data_model.yml)" disabled={!isDangerZoneEnabled} />
 
                                     <div>
                                         <label for="metrics-expression-dialect-select" class="block text-sm font-medium text-gray-700 mb-1.5">

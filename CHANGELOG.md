@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Config page toggles and text fields are shared components:** the Business
+  Events, Apache Ossie and Metric Tree sections now use `ConfigToggle` and
+  `ConfigTextField`, which read the page's config helpers from context and
+  always store a cleared text field as `''`, never `null`. Fallback copy that
+  restated the backend field descriptions is gone; the descriptions come from
+  the config schema. Adds a component test and a Playwright round-trip test for
+  the Ossie section (#164).
 - **Ossie export reads its own inputs:** the push-time adapter reads moved from
   `services/schema.py` into `services/ossie.py` (`export_ossie_for_push`), and
   the metric tree and exporter share one Ossie path function. Output is
