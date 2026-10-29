@@ -30,51 +30,12 @@ from trellis_datamodel.models.semantic_names import semantic_dataset_name
 from trellis_datamodel.models.metric import MetricEntry, MetricTreeFile
 from trellis_datamodel.services.fk_placement import place_foreign_key
 from trellis_datamodel.services.metric_tree import load_metric_tree
+from trellis_datamodel.utils.sql_types import classify_sql_type, ossie_type_for_bucket
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 
 OSSIE_VERSION = "0.2.0.dev0"
 FIELD_DIALECT = "ANSI_SQL"
 DEFAULT_FILENAME = "semantic_model.yml"
-
-# Portable logical types. Anything absent here is omitted rather than guessed;
-# `Opaque` is reserved for known types outside this vocabulary.
-_SQL_TYPE_MAP: dict[str, str] = {
-    "varchar": "String",
-    "char": "String",
-    "text": "String",
-    "string": "String",
-    "integer": "Integer",
-    "int": "Integer",
-    "bigint": "Integer",
-    "smallint": "Integer",
-    "decimal": "Decimal",
-    "numeric": "Decimal",
-    "number": "Decimal",
-    "float": "Float",
-    "double": "Float",
-    "real": "Float",
-    "boolean": "Boolean",
-    "bool": "Boolean",
-    "date": "Date",
-    "time": "Time",
-    "timestamp": "DateTime",
-    "datetime": "DateTime",
-    "timestamp_ntz": "DateTime",
-    "timestamp_tz": "DateTimeTz",
-    "timestamptz": "DateTimeTz",
-    "timestamp_ltz": "DateTimeTz",
-}
-
-# Trellis's logical buckets, used for drafted fields without a usable
-# physical type. `unknown` is intentionally absent so the key is omitted.
-_BUCKET_TYPE_MAP: dict[str, str] = {
-    "text": "String",
-    "int": "Integer",
-    "float": "Float",
-    "bool": "Boolean",
-    "date": "Date",
-    "timestamp": "DateTime",
-}
 
 _TIME_DATATYPES = frozenset({"Date", "Time", "DateTime", "DateTimeTz"})
 
@@ -87,16 +48,9 @@ class OssieExport:
     warnings: list[str] = field(default_factory=list)
 
 
-def _normalise_type(raw: str | None) -> str:
-    """Lowercase a warehouse type and drop precision/scale, e.g. numeric(38,0)."""
-    value = (raw or "").strip().lower()
-    if "(" in value:
-        value = value.split("(", 1)[0].strip()
-    return value
-
-
 def _ossie_datatype(sql_type: str | None) -> str | None:
-    return _SQL_TYPE_MAP.get(_normalise_type(sql_type))
+    resolved = classify_sql_type(sql_type)
+    return resolved.ossie if resolved else None
 
 
 def _drafted_datatype(drafted: dict[str, Any]) -> str | None:
@@ -105,8 +59,7 @@ def _drafted_datatype(drafted: dict[str, Any]) -> str | None:
     mapped = _ossie_datatype(physical) if physical else None
     if mapped:
         return mapped
-    bucket = _normalise_type(drafted.get("datatype"))
-    return _BUCKET_TYPE_MAP.get(bucket)
+    return ossie_type_for_bucket(drafted.get("datatype"))
 
 
 def _build_field(
@@ -133,7 +86,13 @@ def _build_field(
 def _build_fields(
     entity: dict[str, Any], model: ModelInfo
 ) -> list[dict[str, Any]]:
-    """Model columns in order, then drafted-only fields sorted by name."""
+    """Model columns in order, then drafted-only fields sorted by name.
+
+    Same precedence as `reconcile_entity_fields` (the model's columns win,
+    drafted-only fields are appended), but the order is deliberately the
+    exporter's own: the output is a standalone file, so it is deterministic
+    rather than following the canvas arrangement that reconciliation preserves.
+    """
     fields: list[dict[str, Any]] = []
     seen: set[str] = set()
 
