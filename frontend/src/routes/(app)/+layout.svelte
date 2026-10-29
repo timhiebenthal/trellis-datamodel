@@ -34,16 +34,15 @@
         getConfigStatus,
         getConfigInfo,
         inferRelationships,
-        syncDbtTests,
         getExposures,
         reconcileDbt,
     } from "$lib/api";
 import { getModelFolder } from "$lib/utils/folder-utils";
-import { aggregateRelationshipsIntoEdges, mergeRelationshipIntoEdges } from "$lib/utils/relationship-edges";
-import { formatModelNameForLabel, getLabelPrefixesFromConfig } from "$lib/utils/model-naming";
+import { aggregateRelationshipsIntoEdges } from "$lib/utils/relationship-edges";
+import { getLabelPrefixesFromConfig } from "$lib/utils/model-naming";
 import { nextExpandCollapseState } from "$lib/utils/expand-collapse";
-import { normalizeTags, mapEntityTagsToNodeData } from "$lib/utils/entity-tags";
 import { readModelRef } from "$lib/utils/entity-compat";
+import { buildEntityNodes, groupEntityNodesByFolder, smartPositionNodes } from "$lib/utils/canvas-nodes";
 import { matchesCanvasFilters } from "$lib/utils/canvas-filtering";
 import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-display";
     import { applyDagreLayout } from "$lib/layout";
@@ -55,9 +54,10 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     import SourceEditorModal from "$lib/components/SourceEditorModal.svelte";
     import DeleteConfirmModal from "$lib/components/DeleteConfirmModal.svelte";
     import EntityDetailModal from "$lib/components/EntityDetailModal.svelte";
+    import Toolbar from "$lib/components/Toolbar.svelte";
     import { getEntityIdFromPath } from "$lib/utils/entity-list-route";
     import { type Node, type Edge } from "@xyflow/svelte";
-    import type { ConfigInfo, Entity, EntityFlowNode, EntityNodeData, GroupFlowNode, GuidanceConfig } from "$lib/types";
+    import type { ConfigInfo, EntityNodeData, GroupFlowNode, GuidanceConfig } from "$lib/types";
     import { isEntityNode } from "$lib/types";
     import Icon from "$lib/components/Icon.svelte";
     import { entityDetailModal, lineageModal, closeLineageModal, sourceEditorModal, closeSourceEditorModal, deleteConfirmModal, closeDeleteConfirmModal } from "$lib/stores";
@@ -74,11 +74,8 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
         transformBootGraph,
         type BootGraphIndex,
     } from "$lib/utils/boot-graph";
-    import { 
-        getIncompleteEntities, 
-        getEntitiesWithUndescribedAttributes,
-        shouldShowValidationModal,
-    } from "$lib/services/entity-validation";
+    import { pushToFramework, pullFromFramework, type SyncStatus, type UndescribedEntity } from "$lib/services/canvas-sync";
+    import { createConfirmGate } from "$lib/services/confirm-gate";
 
     let { children } = $props();
 
@@ -142,10 +139,10 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
 
     let warningModalOpen = $state(false);
     let incompleteEntitiesForWarning = $state<Node[]>([]);
-    let warningModalResolve: ((value: boolean) => void) | null = null;
+    const incompleteEntitiesGate = createConfirmGate();
     let undescribedAttributesModalOpen = $state(false);
-    let entitiesWithUndescribedAttributes = $state<Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>>([]);
-    let undescribedAttributesResolve: ((value: boolean) => void) | null = null;
+    let entitiesWithUndescribedAttributes = $state<UndescribedEntity[]>([]);
+    const undescribedAttributesGate = createConfirmGate();
 
     // Drive viewMode from current route on load
     $effect(() => {
@@ -211,98 +208,54 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
 
     // Show warning modal for incomplete entities and wait for user decision
     function showIncompleteEntitiesWarning(incompleteEntities: Node[]): Promise<boolean> {
-        return new Promise((resolve) => {
-            incompleteEntitiesForWarning = incompleteEntities;
-            warningModalResolve = resolve;
-            warningModalOpen = true;
-        });
+        incompleteEntitiesForWarning = incompleteEntities;
+        const decision = incompleteEntitiesGate.request();
+        warningModalOpen = true;
+        return decision;
     }
 
-    function handleWarningConfirm() {
+    function closeIncompleteEntitiesWarning(proceed: boolean) {
         warningModalOpen = false;
-        if (warningModalResolve) {
-            warningModalResolve(true);
-            warningModalResolve = null;
-        }
-    }
-
-    function handleWarningCancel() {
-        warningModalOpen = false;
-        if (warningModalResolve) {
-            warningModalResolve(false);
-            warningModalResolve = null;
-        }
+        incompleteEntitiesGate.settle(proceed);
     }
 
     // Show warning modal for undescribed attributes and wait for user decision
-    function showUndescribedAttributesWarning(entities: Array<{ entityLabel: string; entityId: string; attributeNames: string[] }>): Promise<boolean> {
-        return new Promise((resolve) => {
-            entitiesWithUndescribedAttributes = entities;
-            undescribedAttributesResolve = resolve;
-            undescribedAttributesModalOpen = true;
-        });
+    function showUndescribedAttributesWarning(entities: UndescribedEntity[]): Promise<boolean> {
+        entitiesWithUndescribedAttributes = entities;
+        const decision = undescribedAttributesGate.request();
+        undescribedAttributesModalOpen = true;
+        return decision;
     }
 
-    function handleUndescribedAttributesConfirm() {
+    function closeUndescribedAttributesWarning(proceed: boolean) {
         undescribedAttributesModalOpen = false;
-        if (undescribedAttributesResolve) {
-            undescribedAttributesResolve(true);
-            undescribedAttributesResolve = null;
-        }
+        undescribedAttributesGate.settle(proceed);
     }
 
-    function handleUndescribedAttributesCancel() {
-        undescribedAttributesModalOpen = false;
-        if (undescribedAttributesResolve) {
-            undescribedAttributesResolve(false);
-            undescribedAttributesResolve = null;
-        }
+    // Show a toolbar status line and clear it after its timeout.
+    function flashSyncMessage(status: SyncStatus) {
+        syncMessage = status.message;
+        setTimeout(() => {
+            syncMessage = null;
+        }, status.clearAfterMs);
     }
 
     async function handleSyncDbt() {
         syncing = true;
         syncMessage = null;
         try {
-            // Check for validation issues using EntityValidation service
-            const incompleteEntities = getIncompleteEntities($nodes);
-            const entitiesWithUndescribed = getEntitiesWithUndescribedAttributes($nodes);
-
-            // Check if validation modal should be shown
-            if (guidanceConfig.push_warning_enabled && shouldShowValidationModal($nodes, true, true)) {
-                if (incompleteEntities.length > 0) {
-                    const proceed = await showIncompleteEntitiesWarning(incompleteEntities);
-                    if (!proceed) {
-                        syncing = false;
-                        return;
-                    }
-                }
-                if (entitiesWithUndescribed.length > 0) {
-                    const proceed = await showUndescribedAttributesWarning(entitiesWithUndescribed);
-                    if (!proceed) {
-                        syncing = false;
-                        return;
-                    }
-                }
-            }
-
-            // Proceed with sync
-            const result = await syncDbtTests();
-            syncMessage = `✓ ${result.message}`;
-            for (const warning of result.warnings ?? []) {
-                console.warn("[trellis] sync warning:", warning);
-            }
+            const outcome = await pushToFramework({
+                nodes: $nodes,
+                pushWarningEnabled: guidanceConfig.push_warning_enabled,
+                confirmIncomplete: showIncompleteEntitiesWarning,
+                confirmUndescribed: showUndescribedAttributesWarning,
+            });
+            if (!outcome) return;
             // Mark current state as synced
-            if (autoSaveService) {
+            if (outcome.ok && autoSaveService) {
                 lastSyncedState = autoSaveService.getLastSavedState();
             }
-            setTimeout(() => {
-                syncMessage = null;
-            }, 3000);
-        } catch (e) {
-            syncMessage = `✗ ${e instanceof Error ? e.message : "Sync failed"}`;
-            setTimeout(() => {
-                syncMessage = null;
-            }, 5000);
+            flashSyncMessage(outcome);
         } finally {
             syncing = false;
         }
@@ -338,85 +291,18 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
         syncing = true;
         syncMessage = "Inferring...";
         try {
-            const inferred = await inferRelationships();
-            if (inferred.length > 0) {
-                let addedCount = 0;
-                let addedNodes = 0;
-                let newEdges = [...$edges];
-                const existingEntityIds = new Set(
-                    $nodes.filter((n) => n.type === "entity").map((n) => n.id),
-                );
-
-                function maybeAddEntity(id: string | undefined | null) {
-                    if (!id) return;
-                    if (existingEntityIds.has(id)) return;
-
-                    const model =
-                        $frameworkModels.find(
-                            (m) => m.unique_id === id || m.name === id,
-                        ) ?? null;
-                    const folder = model ? getModelFolder(model) : null;
-
-                    const newNode: Node = {
-                        id,
-                        type: "entity",
-                        position: { x: 200 + addedNodes * 60, y: 200 },
-                        zIndex: 10,
-                        data: {
-                            label: formatModelNameForLabel((model?.name ?? id).trim(), $labelPrefixes),
-                            description: model?.description ?? "",
-                            model_ref: model?.unique_id ?? null,
-                            additional_models: [],
-                            drafted_fields: [],
-                            width: 280,
-                            panelHeight: 200,
-                            collapsed: false,
-                            folder,
-                            tags: normalizeTags(model?.tags),
-                        },
-                    };
-
-                    $nodes = [...$nodes, newNode];
-                    existingEntityIds.add(id);
-                    addedNodes += 1;
-                }
-
-                inferred.forEach((r) => {
-                    maybeAddEntity(r.source);
-                    maybeAddEntity(r.target);
-
-                    // Merge relationship into edges (will aggregate by entity pair)
-                    const beforeCount = newEdges.length;
-                    newEdges = mergeRelationshipIntoEdges(newEdges, r);
-                    if (newEdges.length > beforeCount) {
-                        addedCount++;
-                    }
-                });
-
-                if (addedCount > 0 || addedNodes > 0) {
-                    $edges = newEdges;
-                    syncMessage = `✓ Added ${addedCount} relationship${addedCount !== 1 ? 's' : ''}${addedNodes ? `, ${addedNodes} node${addedNodes !== 1 ? 's' : ''}` : ""}`;
-                    setTimeout(() => {
-                        syncMessage = null;
-                    }, 3000);
-                } else {
-                    syncMessage = "✓ No new relationships found";
-                    setTimeout(() => {
-                        syncMessage = null;
-                    }, 3000);
-                }
-            } else {
-                syncMessage = frameworkCopy.noRelationshipsMessage;
-                setTimeout(() => {
-                    syncMessage = null;
-                }, 3000);
-            }
-        } catch (e) {
-            console.error(e);
-            syncMessage = "✗ Failed to infer";
-            setTimeout(() => {
-                syncMessage = null;
-            }, 5000);
+            const outcome = await pullFromFramework({
+                getGraph: () => ({
+                    nodes: $nodes,
+                    edges: $edges,
+                    models: $frameworkModels,
+                    labelPrefixes: $labelPrefixes,
+                }),
+                noRelationshipsMessage: frameworkCopy.noRelationshipsMessage,
+            });
+            if (outcome.nodes) $nodes = outcome.nodes;
+            if (outcome.edges) $edges = outcome.edges;
+            flashSyncMessage(outcome);
         } finally {
             syncing = false;
         }
@@ -430,92 +316,13 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
 
         // If dimensional modeling is enabled, use smart positioning
         if ($modelingStyle === "dimensional_model") {
-            await applySmartPositioning(entityNodes);
+            $nodes = smartPositionNodes($nodes, entityNodes);
         } else {
             // Use dagre layout for entity modeling
             const layoutedNodes = await applyDagreLayout($nodes, $edges);
             $nodes = layoutedNodes;
         }
         // fitView prop on Canvas will automatically adjust the view
-    }
-
-    async function applySmartPositioning(entityNodes: EntityFlowNode[]) {
-        // Calculate canvas center (average of all entity positions, or default)
-        const allEntityNodes = $nodes.filter((n) => n.type === "entity");
-        let centerX = 500;
-        let centerY = 400;
-
-        if (allEntityNodes.length > 0) {
-            const xPositions = allEntityNodes.map((n) => n.position.x);
-            const yPositions = allEntityNodes.map((n) => n.position.y);
-            centerX = (Math.min(...xPositions) + Math.max(...xPositions)) / 2;
-            centerY = (Math.min(...yPositions) + Math.max(...yPositions)) / 2;
-        }
-
-        // Separate facts and dimensions
-        const facts = entityNodes.filter(
-            (n) => n.data?.entity_type === "fact"
-        );
-        const dimensions = entityNodes.filter(
-            (n) => n.data?.entity_type === "dimension"
-        );
-        const unclassified = entityNodes.filter(
-            (n) => n.data?.entity_type !== "fact" && n.data?.entity_type !== "dimension"
-        );
-
-        // Position facts in center area
-        const updatedFacts = facts.map((fact, i) => {
-            const gridSize = Math.ceil(Math.sqrt(facts.length));
-            const row = Math.floor(i / gridSize);
-            const col = i % gridSize;
-            const offset = 200;
-            return {
-                ...fact,
-                position: {
-                    x: centerX + (col - gridSize / 2) * offset,
-                    y: centerY + (row - gridSize / 2) * offset,
-                },
-            };
-        });
-
-        // Position dimensions in outer ring
-        const updatedDimensions = dimensions.map((dim, i) => {
-            const radius = 500;
-            const angle = (2 * Math.PI * i) / dimensions.length;
-            return {
-                ...dim,
-                position: {
-                    x: centerX + Math.cos(angle) * radius,
-                    y: centerY + Math.sin(angle) * radius,
-                },
-            };
-        });
-
-        // Position unclassified entities randomly around center
-        const updatedUnclassified = unclassified.map((entity) => ({
-            ...entity,
-            position: {
-                x: centerX + (Math.random() - 0.5) * 600,
-                y: centerY + (Math.random() - 0.5) * 600,
-            },
-        }));
-
-        // Update nodes with new positions
-        const nodeIdMap = new Map($nodes.map((n) => [n.id, n]));
-        const updatedNodes = $nodes.map((n) => {
-            const factNode = updatedFacts.find((fn) => fn.id === n.id);
-            if (factNode) return factNode;
-
-            const dimensionNode = updatedDimensions.find((dn) => dn.id === n.id);
-            if (dimensionNode) return dimensionNode;
-
-            const unclassifiedNode = updatedUnclassified.find((un) => un.id === n.id);
-            if (unclassifiedNode) return unclassifiedNode;
-
-            return n;
-        });
-
-        $nodes = updatedNodes;
     }
 
     // Expand/Collapse all entities toggle
@@ -674,131 +481,11 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
                 // If no relationships in data model, try to infer from dbt yml files
                 let relationships = dataModel.relationships || [];
 
-                // Helper to get folder and tags from dbt model
-                const modelsById = new Map(models.map((model) => [model.unique_id, model]));
-                function getEntityMetadata(entity: Entity) {
-                    const modelRef = readModelRef(entity);
-                    if (!modelRef) return { folder: null, model: null };
-
-                    const model = modelsById.get(modelRef);
-                    if (!model) return { folder: null, model: null };
-
-                    return { folder: getModelFolder(model), model };
-                }
-
                 // Map data model to Svelte Flow format with metadata
-                // `panelHeight` is a legacy camelCase key still accepted on load.
-                const entityNodes = (dataModel.entities || []).map((e: Entity & { panelHeight?: number }): EntityFlowNode => {
-                    const metadata = getEntityMetadata(e);
-                    const { tags, framework_tags, ui_tags } = mapEntityTagsToNodeData(e);
-                    const modelName = metadata.model ? metadata.model.name : e.id;
-                    return {
-                        id: e.id,
-                        type: "entity",
-                        position: e.position || { x: 0, y: 0 },
-                        zIndex: 10,
-                        data: {
-                            label: e.label?.trim() || formatModelNameForLabel(modelName.trim(), $labelPrefixes),
-                            description: e.description,
-                            model_ref: readModelRef(e),
-                            additional_models: e.additional_models,
-                            drafted_fields: e.drafted_fields,
-                            width: e.width ?? 280,
-                            panelHeight: e.panel_height ?? e.panelHeight ?? 200,
-                            collapsed: e.collapsed ?? false,
-                            folder: metadata.folder,
-                            tags,
-                            framework_tags,
-                            ui_tags,
-                            entity_type: e.entity_type,
-                            source_system: e.source_system,
-                            annotation_type: e.annotation_type,
-                            roles: e.roles,
-                            domain: e.domain,
-                            domains: e.domains,
-                        },
-                        parentId: undefined,
-                    };
-                });
+                const entityNodes = buildEntityNodes(dataModel.entities || [], models, $labelPrefixes);
 
                 // Create group nodes if grouping is enabled
-                const groupNodes: GroupFlowNode[] = [];
-                if ($groupByFolder) {
-                    const folderMap = new Map<string, EntityFlowNode[]>();
-
-                    entityNodes.forEach((node) => {
-                        if (node.data.folder) {
-                            if (!folderMap.has(node.data.folder)) {
-                                folderMap.set(node.data.folder, []);
-                            }
-                            folderMap.get(node.data.folder)!.push(node);
-                        }
-                    });
-
-                    const PADDING = 40;
-                    const HEADER_HEIGHT = 60;
-                    const GROUP_SPACING = 50;
-
-                    const tempGroups: Array<{
-                        x: number;
-                        y: number;
-                        width: number;
-                        height: number;
-                        node: GroupFlowNode;
-                    }> = [];
-
-                    folderMap.forEach((children, folderPath) => {
-                        if (children.length === 0) return;
-
-                        const groupId = `group-${folderPath.replace(/\//g, "-")}`;
-
-                        const minX = Math.min(...children.map((n) => n.position.x));
-                        const minY = Math.min(...children.map((n) => n.position.y));
-                        const maxX = Math.max(...children.map((n) => n.position.x + (n.data.width || 280)));
-                        const maxY = Math.max(...children.map((n) => n.position.y + (n.data.panelHeight || 200)));
-
-                        let groupX = minX - PADDING;
-                        let groupY = minY - PADDING - HEADER_HEIGHT;
-                        const groupWidth = maxX - minX + PADDING * 2;
-                        const groupHeight = maxY - minY + PADDING * 2 + HEADER_HEIGHT;
-
-                        for (const existing of tempGroups) {
-                            const overlapX = groupX < existing.x + existing.width + GROUP_SPACING && groupX + groupWidth + GROUP_SPACING > existing.x;
-                            const overlapY = groupY < existing.y + existing.height + GROUP_SPACING && groupY + groupHeight + GROUP_SPACING > existing.y;
-
-                            if (overlapX && overlapY) {
-                                groupX = existing.x + existing.width + GROUP_SPACING;
-                                if (groupY < existing.y + existing.height + GROUP_SPACING) {
-                                    groupY = existing.y + existing.height + GROUP_SPACING;
-                                }
-                            }
-                        }
-
-                        const groupNode: GroupFlowNode = {
-                            id: groupId,
-                            type: "group",
-                            position: { x: groupX, y: groupY },
-                            style: `width: ${groupWidth}px; height: ${groupHeight}px;`,
-                            zIndex: 1,
-                            data: {
-                                label: folderPath.split("/").pop() || folderPath,
-                                description: `Folder: ${folderPath}`,
-                                width: groupWidth,
-                                height: groupHeight,
-                                collapsed: false,
-                            },
-                        };
-
-                        tempGroups.push({ x: groupX, y: groupY, width: groupWidth, height: groupHeight, node: groupNode });
-                        groupNodes.push(groupNode);
-
-                        children.forEach((child) => {
-                            child.parentId = groupId;
-                            child.position = { x: child.position.x - groupX, y: child.position.y - groupY };
-                            child.extent = "parent";
-                        });
-                    });
-                }
+                const groupNodes: GroupFlowNode[] = $groupByFolder ? groupEntityNodesByFolder(entityNodes) : [];
 
                 $nodes = [...groupNodes, ...entityNodes];
                 $edges = aggregateRelationshipsIntoEdges(relationships);
@@ -1141,103 +828,19 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
             {/if}
         </div>
 
-        <!-- Actions -->
-        <div class="flex items-center gap-3">
-            {#if syncMessage}
-                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
-                    {#if syncMessage.startsWith("✓")}
-                        <div class="w-2 h-2 rounded-full bg-success-500"></div>
-                        <span class="text-xs font-medium text-success-700">{syncMessage.substring(2)}</span>
-                    {:else if syncMessage.startsWith("✗")}
-                        <div class="w-2 h-2 rounded-full bg-danger-500"></div>
-                        <span class="text-xs font-medium text-danger-700">{syncMessage.substring(2)}</span>
-                    {:else}
-                        <span class="text-xs text-gray-600">{syncMessage}</span>
-                    {/if}
-                </div>
-            {/if}
-
-            <div class="h-6 w-px bg-gray-200 mx-1"></div>
-
-            <button
-                onclick={() => {
-                    // Directly navigate to config page
-                    window.location.href = '/config';
-                }}
-                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-sm"
-                title="Go to configuration page"
-            >
-                <Icon icon="lucide:settings" class="w-3.5 h-3.5" />
-                Config info
-            </button>
-
-            <button
-                onclick={toggleAllEntities}
-                disabled={loading}
-                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
-                title={allExpanded ? "Collapse all entities" : "Expand all entities"}
-                aria-label={allExpanded ? "Collapse all entities" : "Expand all entities"}
-            >
-                {#if allExpanded}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
-                        <path d="m7.4 21.308l-.708-.708L12 15.292l5.308 5.308l-.708.708l-4.6-4.6zm4.6-12.6L6.692 3.4l.708-.708l4.6 4.6l4.6-4.6l.708.708z"/>
-                    </svg>
-                {:else}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
-                        <path d="M12 21.308L6.692 16l.714-.713L12 19.842l4.594-4.555l.714.713zm-4.588-12.6L6.692 8L12 2.692L17.308 8l-.72.708L12 4.158z"/>
-                    </svg>
-                {/if}
-            </button>
-
-            {#if $modelingStyle === "dimensional_model"}
-                <button
-                    onclick={handleAutoLayout}
-                    disabled={loading}
-                    class="px-2.5 py-1.5 text-xs rounded-md font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
-                    title="Arrange entities by fact/dimension positioning"
-                >
-                    <Icon icon="lucide:wand-2" class="w-3.5 h-3.5" />
-                    Auto Layout
-                </button>
-            {/if}
-
-            <button
-                onclick={handleInferFromDbt}
-                disabled={syncing || loading}
-                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white bg-primary-600 border border-transparent hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
-                title={frameworkCopy.pullTooltip}
-            >
-                <Icon icon="lucide:download" class="w-3.5 h-3.5" />
-                {frameworkCopy.pullLabel}
-            </button>
-
-            <button
-                onclick={handleSyncDbt}
-                disabled={syncing || loading}
-                class="px-2.5 py-1.5 text-xs rounded-md font-medium text-white border border-transparent transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm relative"
-                class:bg-primary-600={!needsSync}
-                class:hover:bg-primary-700={!needsSync}
-                class:bg-amber-600={needsSync}
-                class:hover:bg-amber-700={needsSync}
-                class:animate-pulse={needsSync}
-                title={needsSync
-                    ? frameworkCopy.pushDirtyTooltip
-                    : frameworkCopy.pushCleanTooltip}
-            >
-                {#if syncing}
-                    <Icon icon="lucide:loader-2" class="w-3.5 h-3.5 animate-spin" />
-                {:else}
-                    <Icon icon="lucide:upload" class="w-3.5 h-3.5" />
-                {/if}
-                {frameworkCopy.pushLabel}
-                {#if needsSync && !syncing}
-                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                    </span>
-                {/if}
-            </button>
-        </div>
+        <Toolbar
+            {syncMessage}
+            {loading}
+            {syncing}
+            {needsSync}
+            {allExpanded}
+            showAutoLayout={$modelingStyle === "dimensional_model"}
+            {frameworkCopy}
+            onToggleAll={toggleAllEntities}
+            onAutoLayout={handleAutoLayout}
+            onPull={handleInferFromDbt}
+            onPush={handleSyncDbt}
+        />
     </header>
 
     <main class="flex-1 flex overflow-hidden relative">
@@ -1267,15 +870,15 @@ import { isFeatureAvailable, getFrameworkCopy } from "$lib/utils/framework-displ
     <IncompleteEntitiesWarningModal
         open={warningModalOpen}
         incompleteEntities={incompleteEntitiesForWarning}
-        onConfirm={handleWarningConfirm}
-        onCancel={handleWarningCancel}
+        onConfirm={() => closeIncompleteEntitiesWarning(true)}
+        onCancel={() => closeIncompleteEntitiesWarning(false)}
     />
 
     <UndescribedAttributesWarningModal
         open={undescribedAttributesModalOpen}
         entitiesWithAttributes={entitiesWithUndescribedAttributes}
-        onConfirm={handleUndescribedAttributesConfirm}
-        onCancel={handleUndescribedAttributesCancel}
+        onConfirm={() => closeUndescribedAttributesWarning(true)}
+        onCancel={() => closeUndescribedAttributesWarning(false)}
     />
 
     <DeleteConfirmModal
