@@ -18,7 +18,8 @@ from trellis_datamodel.exceptions import (
     ValidationError,
 )
 from trellis_datamodel.models.business_event import BusinessEventType
-from trellis_datamodel.services import business_events_service as svc
+from trellis_datamodel.services import business_events as svc
+from trellis_datamodel.services.business_events import storage as _storage
 
 DISCRETE = BusinessEventType.DISCRETE
 ALL_WS = ["who", "what", "when", "where", "how", "how_many", "why"]
@@ -27,7 +28,7 @@ ALL_WS = ["who", "what", "when", "where", "how", "how_many", "why"]
 @pytest.fixture(autouse=True)
 def events_file(tmp_path, monkeypatch):
     path = str(tmp_path / "business_events.yml")
-    monkeypatch.setattr(svc, "_get_business_events_path", lambda: path)
+    monkeypatch.setattr(_storage, "_get_business_events_path", lambda: path)
     return path
 
 
@@ -798,7 +799,7 @@ class TestUpdateProcess:
     def test_empty_event_ids_are_rejected(self):
         process = _process([_event().id])
 
-        with pytest.raises(ValidationError, match="at least one event"):
+        with pytest.raises(ValidationError, match="event_ids list cannot be empty"):
             svc.update_process(process.id, {"event_ids": []})
 
     def test_unknown_event_id_is_rejected(self):

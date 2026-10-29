@@ -16,13 +16,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.adapters.base import ModelInfo, ModelSchema, TransformationAdapter
 from trellis_datamodel.exceptions import (
-    ConfigurationError,
     DomainError,
     FileOperationError,
     NotFoundError,
@@ -31,11 +29,8 @@ from trellis_datamodel.exceptions import (
 from trellis_datamodel.models.entity_keys import get_model_ref
 from trellis_datamodel.services.ossie import export_ossie
 from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
-from trellis_datamodel.utils.path_validation import (
-    ensure_data_model_path_exists,
-    validate_data_model_path,
-)
-from trellis_datamodel.utils.structured_data import load_yaml_or_json
+from trellis_datamodel.utils.path_validation import validate_data_model_path
+from trellis_datamodel.utils.structured_data import load_yaml_file, load_yaml_or_json
 from trellis_datamodel.utils.yaml_handler import YamlHandler
 
 
@@ -114,8 +109,7 @@ def sync_framework_tests() -> SyncOutcome:
         raise FileOperationError("Data model file not found")
 
     try:
-        with open(data_model_path, "r") as f:
-            data_model = yaml.safe_load(f) or {}
+        data_model = load_yaml_file(data_model_path, {})
 
         entities = data_model.get("entities", [])
         relationships = data_model.get("relationships", [])

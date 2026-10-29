@@ -5,7 +5,8 @@ import yaml
 import pytest
 from datetime import datetime
 
-from trellis_datamodel.services import business_events_service
+from trellis_datamodel.services import business_events as business_events_service
+from trellis_datamodel.services.business_events import storage as _storage, supersets as _supersets
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
@@ -22,7 +23,7 @@ TEST_PROCESS_DOMAIN = "Sales"
 def events_path(temp_dir, monkeypatch):
     """Redirect business events storage into the per-test temp dir."""
     path = os.path.join(temp_dir, "business_events.yml")
-    monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: path)
+    monkeypatch.setattr(_storage, "_get_business_events_path", lambda: path)
     return path
 
 
@@ -383,7 +384,7 @@ class TestAnnotationUnionLogic:
 
         events = business_events_service.load_business_events()
         process_events = [e for e in events if e.id in [event1.id, event2.id]]
-        union = business_events_service._compute_annotation_union(process_events)
+        union = _supersets._compute_annotation_union(process_events)
 
         assert len(union.who) == 2
         assert len(union.what) == 1
@@ -406,7 +407,7 @@ class TestAnnotationUnionLogic:
 
         events = business_events_service.load_business_events()
         process_events = [e for e in events if e.id in [event1.id, event2.id]]
-        union = business_events_service._compute_annotation_union(process_events)
+        union = _supersets._compute_annotation_union(process_events)
 
         # Should deduplicate by dimension_id, keeping first occurrence
         assert len(union.who) == 1
@@ -429,7 +430,7 @@ class TestAnnotationUnionLogic:
 
         events = business_events_service.load_business_events()
         process_events = [e for e in events if e.id in [event1.id, event2.id]]
-        union = business_events_service._compute_annotation_union(process_events)
+        union = _supersets._compute_annotation_union(process_events)
 
         assert len(union.who) == 1
         assert union.who[0].dimension_id == "dim_employee"
@@ -451,7 +452,7 @@ class TestAnnotationUnionLogic:
 
         events = business_events_service.load_business_events()
         process_events = [e for e in events if e.id in [event1.id, event2.id]]
-        union = business_events_service._compute_annotation_union(process_events)
+        union = _supersets._compute_annotation_union(process_events)
 
         # Should deduplicate by normalized text+description
         assert len(union.what) == 1
@@ -476,7 +477,7 @@ class TestAnnotationUnionLogic:
 
         events = business_events_service.load_business_events()
         process_events = [e for e in events if e.id in [event1.id, event2.id]]
-        union = business_events_service._compute_annotation_union(process_events)
+        union = _supersets._compute_annotation_union(process_events)
 
         assert len(union.who) == 3
 

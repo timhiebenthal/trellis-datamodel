@@ -2,12 +2,13 @@
 
 from fastapi import APIRouter
 
+from trellis_datamodel.models.schemas import ReconcileResponse
 from trellis_datamodel.services.reconciliation import reconcile_framework
 
 router = APIRouter(prefix="/api", tags=["reconciliation"])
 
 
-@router.post("/reconcile")
+@router.post("/reconcile", response_model=ReconcileResponse)
 def reconcile_framework_endpoint():
     """Reconcile dbt manifest columns into data_model.yml with provenance tags.
 
@@ -17,7 +18,4 @@ def reconcile_framework_endpoint():
     left untouched (handles partial dbt compiles).
     """
     _, changed = reconcile_framework()
-    return {
-        "status": "success",
-        "changed": changed,
-    }
+    return ReconcileResponse(changed=changed)

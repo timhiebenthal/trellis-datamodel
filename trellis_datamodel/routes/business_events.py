@@ -1,28 +1,36 @@
-"""Routes for business events operations."""
+"""Routes for business events operations.
 
-from fastapi import APIRouter, HTTPException, Body
-from pydantic import BaseModel
+Handlers stay thin: domain exceptions raised by the service are mapped to
+HTTP responses by the global handlers in server.py.
+"""
+
+from fastapi import APIRouter, Body, Depends
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.exceptions import (
-    ConfigurationError,
-    FileOperationError,
-    ValidationError,
-    NotFoundError,
-    FeatureDisabledError,
-)
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
-    BusinessEventType,
     GeneratedEntitiesResult,
     BusinessEventAnnotations,
     BusinessEventProcess,
 )
-from trellis_datamodel.services.business_events_service import (
+from trellis_datamodel.models.business_event_requests import (
+    AddAnnotationEntryRequest,
+    AttachEventsRequest,
+    CreateEventRequest,
+    CreateProcessRequest,
+    DetachEventsRequest,
+    UpdateAnnotationEntryRequest,
+    UpdateEventRequest,
+    UpdateProcessRequest,
+)
+from trellis_datamodel.routes.dependencies import require_feature
+from trellis_datamodel.services.business_events import (
     load_business_events,
     create_event,
     update_event,
     delete_event,
+    get_event,
+    get_process,
     get_unique_domains,
     add_annotation_entry,
     remove_annotation_entry,
@@ -39,93 +47,18 @@ from trellis_datamodel.services.entity_generator import (
     generate_entities_from_process,
 )
 
-router = APIRouter(prefix="/api", tags=["business-events"])
-
-
-class CreateEventRequest(BaseModel):
-    """Request model for creating a business event."""
-
-    text: str
-    type: str | None = None
-    description: str | None = None
-    domain: str | None = None
-    annotations: BusinessEventAnnotations | None = None
-
-
-class UpdateEventRequest(BaseModel):
-    """Request model for updating a business event."""
-
-    text: str | None = None
-    type: str | None = None
-    description: str | None = None
-    domain: str | None = None
-    derived_entities: list[dict] | None = None
-    annotations: BusinessEventAnnotations | dict | None = None
-
-
-class UpdateEventAnnotationsRequest(BaseModel):
-    """Request model for updating annotations of a business event."""
-
-    annotations: BusinessEventAnnotations | None = None
-
-
-class AddAnnotationEntryRequest(BaseModel):
-    """Request model for adding an annotation entry to a business event."""
-
-    annotation_type: str
-    text: str
-    dimension_id: str | None = None
-    description: str | None = None
-    attributes: dict | None = None
-
-
-class UpdateAnnotationEntryRequest(BaseModel):
-    """Request model for updating an annotation entry in a business event."""
-
-    text: str | None = None
-    dimension_id: str | None = None
-    description: str | None = None
-    attributes: dict | None = None
-
-
-class CreateProcessRequest(BaseModel):
-    """Request model for creating a business event process."""
-
-    name: str
-    type: str
-    description: str | None = None
-    domain: str
-    event_ids: list[str] | None = None
-
-
-class UpdateProcessRequest(BaseModel):
-    """Request model for updating a business event process."""
-
-    name: str | None = None
-    type: str | None = None
-    description: str | None = None
-    domain: str | None = None
-    annotations_superset: BusinessEventAnnotations | None = None
-    event_ids: list[str] | None = None
-    derived_entities: list[dict] | None = None
-
-
-class AttachEventsRequest(BaseModel):
-    """Request model for attaching events to a process."""
-
-    event_ids: list[str]
-
-
-class DetachEventsRequest(BaseModel):
-    """Request model for detaching events from a process."""
-
-    event_ids: list[str]
-
-
-def _check_feature_enabled():
-    """Check if business events feature is enabled."""
-    if not cfg.BUSINESS_EVENTS_ENABLED:
-        raise FeatureDisabledError("Business events feature is disabled")
+router = APIRouter(
+    prefix="/api",
+    tags=["business-events"],
+    dependencies=[
+        Depends(
+            require_feature(
+                lambda: cfg.BUSINESS_EVENTS_ENABLED,
+                "Business events feature is disabled",
+            )
+        )
+    ],
+)
 
 
 @router.get("/business-events/domains", response_model=list[str])
@@ -140,17 +73,7 @@ async def get_business_event_domains():
         FeatureDisabledError: If business events feature is disabled
         FileOperationError: If file cannot be read
     """
-    _check_feature_enabled()
-
-    try:
-        domains = get_unique_domains()
-        return domains
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error loading business event domains: {str(e)}"
-        )
+    return get_unique_domains()
 
 
 @router.get("/business-events", response_model=list[BusinessEvent])
@@ -166,19 +89,7 @@ async def get_business_events():
         ConfigurationError: If path is not configured
         FileOperationError: If file cannot be read
     """
-    _check_feature_enabled()
-
-    try:
-        events = load_business_events()
-        return events
-    except ConfigurationError:
-        raise
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error loading business events: {str(e)}"
-        )
+    return load_business_events()
 
 
 @router.post("/business-events", response_model=BusinessEvent, status_code=201)
@@ -197,38 +108,18 @@ async def create_business_event(request: CreateEventRequest = Body(...)):
         ValidationError: If input is invalid
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
+    event = create_event(
+        request.text,
+        request.type,
+        domain=request.domain,
+        description=request.description,
+    )
 
-    try:
-        # Validate event type
-        raw_type = request.type if request.type is not None else "discrete"
-        try:
-            event_type = BusinessEventType(raw_type)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid event type: {raw_type}. Must be one of: discrete, evolving, recurring",
-            )
+    # If annotations provided, update the event with it
+    if request.annotations is not None:
+        event = update_event(event.id, {"annotations": request.annotations.model_dump()})
 
-        event = create_event(request.text, event_type, domain=request.domain, description=request.description)
-
-        # If annotations provided, update the event with it
-        if request.annotations is not None:
-            event = update_event(
-                event.id, {"annotations": request.annotations.model_dump()}
-            )
-
-        return event
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error creating business event: {str(e)}"
-        )
+    return event
 
 
 @router.put("/business-events/{event_id}", response_model=BusinessEvent)
@@ -249,39 +140,25 @@ async def update_business_event(event_id: str, request: UpdateEventRequest = Bod
         ValidationError: If updates are invalid
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
+    updates = {}
+    if request.text is not None:
+        updates["text"] = request.text
+    if request.type is not None:
+        updates["type"] = request.type
+    if request.description is not None:
+        updates["description"] = request.description
+    if request.domain is not None:
+        updates["domain"] = request.domain
+    if request.derived_entities is not None:
+        updates["derived_entities"] = request.derived_entities
+    if request.annotations is not None:
+        # Convert to dict if it's a BusinessEventAnnotations object
+        if isinstance(request.annotations, BusinessEventAnnotations):
+            updates["annotations"] = request.annotations.model_dump()
+        else:
+            updates["annotations"] = request.annotations
 
-    try:
-        updates = {}
-        if request.text is not None:
-            updates["text"] = request.text
-        if request.type is not None:
-            updates["type"] = request.type
-        if request.description is not None:
-            updates["description"] = request.description
-        if request.domain is not None:
-            updates["domain"] = request.domain
-        if request.derived_entities is not None:
-            updates["derived_entities"] = request.derived_entities
-        if request.annotations is not None:
-            # Convert to dict if it's a BusinessEventAnnotations object
-            if isinstance(request.annotations, BusinessEventAnnotations):
-                updates["annotations"] = request.annotations.model_dump()
-            else:
-                updates["annotations"] = request.annotations
-
-        event = update_event(event_id, updates)
-        return event
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error updating business event: {str(e)}"
-        )
+    return update_event(event_id, updates)
 
 
 @router.delete("/business-events/{event_id}", status_code=204)
@@ -295,21 +172,9 @@ async def delete_business_event(event_id: str):
     Raises:
         FeatureDisabledError: If business events feature is disabled
         NotFoundError: If event not found
-        ValidationError: If event doesn't have required 7 Ws data
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        delete_event(event_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting business event: {str(e)}"
-        )
+    delete_event(event_id)
 
 
 @router.post(
@@ -335,36 +200,14 @@ async def add_event_annotation_entry(
         ValidationError: If annotation_type is invalid or text is empty
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    # Validate annotation_type
-    valid_types = ["who", "what", "when", "where", "how", "why", "how_many"]
-    if request.annotation_type not in valid_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid annotation_type: '{request.annotation_type}'. Must be one of: {', '.join(valid_types)}",
-        )
-
-    try:
-        event = add_annotation_entry(
-            event_id,
-            request.annotation_type,
-            request.text,
-            dimension_id=request.dimension_id,
-            description=request.description,
-            attributes=request.attributes,
-        )
-        return event
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error adding annotation entry: {str(e)}"
-        )
+    return add_annotation_entry(
+        event_id,
+        request.annotation_type,
+        request.text,
+        dimension_id=request.dimension_id,
+        description=request.description,
+        attributes=request.attributes,
+    )
 
 
 @router.delete(
@@ -387,19 +230,7 @@ async def remove_event_annotation_entry(event_id: str, entry_id: str):
         NotFoundError: If event or entry not found
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        event = remove_annotation_entry(event_id, entry_id)
-        return event
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error removing annotation entry: {str(e)}"
-        )
+    return remove_annotation_entry(event_id, entry_id)
 
 
 @router.put(
@@ -426,28 +257,14 @@ async def update_event_annotation_entry(
         ValidationError: If text is invalid
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        event = update_annotation_entry(
-            event_id,
-            entry_id,
-            text=request.text,
-            dimension_id=request.dimension_id,
-            description=request.description,
-            attributes=request.attributes,
-        )
-        return event
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error updating annotation entry: {str(e)}"
-        )
+    return update_annotation_entry(
+        event_id,
+        entry_id,
+        text=request.text,
+        dimension_id=request.dimension_id,
+        description=request.description,
+        attributes=request.attributes,
+    )
 
 
 @router.post(
@@ -470,35 +287,7 @@ async def generate_entities_from_business_event(event_id: str):
         ValidationError: If event doesn't have required annotations
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        events = load_business_events()
-        event = None
-        for e in events:
-            if e.id == event_id:
-                event = e
-                break
-
-        if event is None:
-            raise HTTPException(
-                status_code=404, detail=f"Business event '{event_id}' not found"
-            )
-
-        result = generate_entities_from_event(event)
-        return result
-    except NotFoundError:
-        raise
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error generating entities: {str(e)}"
-        )
+    return generate_entities_from_event(get_event(event_id))
 
 
 @router.get("/processes", response_model=list[BusinessEventProcess])
@@ -513,17 +302,7 @@ async def get_processes():
         FeatureDisabledError: If business events feature is disabled
         FileOperationError: If file cannot be read
     """
-    _check_feature_enabled()
-
-    try:
-        processes = load_processes()
-        return processes
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error loading processes: {str(e)}"
-        )
+    return load_processes()
 
 
 @router.post("/processes", response_model=BusinessEventProcess, status_code=201)
@@ -543,60 +322,13 @@ async def create_business_event_process(request: CreateProcessRequest = Body(...
         NotFoundError: If any event_id doesn't exist
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        # Validate process type
-        try:
-            process_type = BusinessEventType(request.type)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid process type: {request.type}. Must be one of: discrete, evolving, recurring",
-            )
-
-        # Validate event_ids if provided
-        if request.event_ids:
-            events = load_business_events()
-            existing_event_ids = {e.id for e in events}
-            invalid_ids = [
-                eid for eid in request.event_ids if eid not in existing_event_ids
-            ]
-            if invalid_ids:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Events not found: {', '.join(invalid_ids)}",
-                )
-
-            # Check if events are already in another process
-            for event in events:
-                if event.id in request.event_ids and event.process_id is not None:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Event '{event.id}' is already attached to process '{event.process_id}'",
-                    )
-
-        if not request.domain or not request.domain.strip():
-            raise HTTPException(status_code=400, detail="Process domain is required")
-
-        process = create_process(
-            request.name,
-            process_type,
-            request.domain.strip(),
-            event_ids=request.event_ids,
-            description=request.description,
-        )
-        return process
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating process: {str(e)}")
+    return create_process(
+        request.name,
+        request.type,
+        request.domain,
+        event_ids=request.event_ids,
+        description=request.description,
+    )
 
 
 @router.put("/processes/{process_id}", response_model=BusinessEventProcess)
@@ -616,63 +348,26 @@ async def update_business_event_process(
     Raises:
         FeatureDisabledError: If business events feature is disabled
         NotFoundError: If process not found
-        ValidationError: If updates are invalid or process is resolved
+        ValidationError: If updates are empty or invalid, or process is resolved
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
+    updates = {}
+    if request.name is not None:
+        updates["name"] = request.name
+    if request.description is not None:
+        updates["description"] = request.description
+    if request.type is not None:
+        updates["type"] = request.type
+    if request.domain is not None:
+        updates["domain"] = request.domain
+    if request.annotations_superset is not None:
+        updates["annotations_superset"] = request.annotations_superset.model_dump()
+    if request.event_ids is not None:
+        updates["event_ids"] = request.event_ids
+    if request.derived_entities is not None:
+        updates["derived_entities"] = request.derived_entities
 
-    try:
-        updates = {}
-        if request.name is not None:
-            updates["name"] = request.name
-        if request.description is not None:
-            updates["description"] = request.description
-        if request.type is not None:
-            # Validate process type
-            try:
-                BusinessEventType(request.type)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid process type: {request.type}. Must be one of: discrete, evolving, recurring",
-                )
-            updates["type"] = request.type
-
-        if request.domain is not None:
-            if not request.domain.strip():
-                raise HTTPException(
-                    status_code=400, detail="Process domain cannot be empty"
-                )
-            updates["domain"] = request.domain.strip()
-
-        if request.annotations_superset is not None:
-            updates["annotations_superset"] = request.annotations_superset.model_dump()
-
-        if request.event_ids is not None:
-            if len(request.event_ids) == 0:
-                raise HTTPException(
-                    status_code=400, detail="event_ids list cannot be empty"
-                )
-            updates["event_ids"] = request.event_ids
-
-        if request.derived_entities is not None:
-            updates["derived_entities"] = request.derived_entities
-
-        if not updates:
-            raise HTTPException(status_code=400, detail="No fields provided to update")
-
-        process = update_process(process_id, updates)
-        return process
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating process: {str(e)}")
+    return update_process(process_id, updates)
 
 
 @router.post("/processes/{process_id}/resolve", response_model=BusinessEventProcess)
@@ -692,21 +387,7 @@ async def resolve_business_event_process(process_id: str):
         ValidationError: If process is already resolved
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        process = resolve_process(process_id)
-        return process
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error resolving process: {str(e)}"
-        )
+    return resolve_process(process_id)
 
 
 @router.post("/processes/{process_id}/attach", response_model=BusinessEventProcess)
@@ -726,43 +407,11 @@ async def attach_events_to_business_event_process(
     Raises:
         FeatureDisabledError: If business events feature is disabled
         NotFoundError: If process or any event not found
-        ValidationError: If events are already in another process or process is resolved
+        ValidationError: If event_ids is empty, events are already in another
+            process, or process is resolved
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        if not request.event_ids:
-            raise HTTPException(
-                status_code=400, detail="event_ids list cannot be empty"
-            )
-
-        # Validate event_ids exist
-        events = load_business_events()
-        existing_event_ids = {e.id for e in events}
-        invalid_ids = [
-            eid for eid in request.event_ids if eid not in existing_event_ids
-        ]
-        if invalid_ids:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Events not found: {', '.join(invalid_ids)}",
-            )
-
-        process = attach_events_to_process(process_id, request.event_ids)
-        return process
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error attaching events to process: {str(e)}"
-        )
+    return attach_events_to_process(process_id, request.event_ids)
 
 
 @router.post("/processes/{process_id}/detach", response_model=BusinessEventProcess)
@@ -782,28 +431,10 @@ async def detach_events_from_business_event_process(
     Raises:
         FeatureDisabledError: If business events feature is disabled
         NotFoundError: If process not found
+        ValidationError: If event_ids is empty
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        if not request.event_ids:
-            raise HTTPException(
-                status_code=400, detail="event_ids list cannot be empty"
-            )
-
-        process = detach_events_from_process(process_id, request.event_ids)
-        return process
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error detaching events from process: {str(e)}"
-        )
+    return detach_events_from_process(process_id, request.event_ids)
 
 
 @router.post(
@@ -832,33 +463,4 @@ async def generate_entities_from_business_event_process(process_id: str):
         ValidationError: If process doesn't have required annotations or is resolved
         FileOperationError: If file operations fail
     """
-    _check_feature_enabled()
-
-    try:
-        processes = load_processes()
-        process = None
-        for p in processes:
-            if p.id == process_id:
-                process = p
-                break
-
-        if process is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Business event process '{process_id}' not found",
-            )
-
-        result = generate_entities_from_process(process)
-        return result
-    except NotFoundError:
-        raise
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileOperationError:
-        raise
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error generating entities from process: {str(e)}"
-        )
+    return generate_entities_from_process(get_process(process_id))

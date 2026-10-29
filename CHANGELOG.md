@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Business events service split into a package:** the 1.4k-line
+  `services/business_events_service.py` is now `services/business_events/`
+  (storage, events, annotations, processes, supersets, role sync) with the same
+  public functions; behaviour is unchanged (#179). `services/entity_generator.py`
+  is split the same way into `services/entity_generator/` (common,
+  dimensional, entity_model).
 - **`trellis init` writes the config through the same round-trip writer as the
   config page:** values are unchanged, but the generated `trellis.yml` now
   carries the template's per-key comments and commented documentation blocks,
@@ -17,6 +23,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Config defaults come from one place:** the pydantic `ConfigSchema` now owns
   the defaults that `config.py`, the config page metadata and the config
   normaliser used to repeat (#178).
+- **Business events and processes API answers invalid input with 422, not 400:**
+  every validation failure (invalid event or process type, blank text, name or
+  domain, empty `event_ids`, an event already in another process, an empty
+  update, a resolved process) now returns `422` like the rest of the API; the
+  `detail` messages are unchanged and the body also carries
+  `"error": "validation_error"`. Unexpected server errors answer `500` with
+  `{"detail": "Internal Server Error", "error": "internal_error"}` instead of
+  echoing the exception text. Status conventions are documented in
+  `CONTRIBUTING.md` (#179).
+- **Config API answers config errors with 4xx instead of 200 + `error`:**
+  `GET /api/config` with no `trellis.yml`, or one that cannot be read or is not
+  a mapping, now returns `400` with
+  `{"detail": <message>, "error": "configuration_error"}` instead of `200` with
+  an empty config and an `error` field (a non-mapping file used to answer
+  `500`). `PUT /api/config` and `POST /api/config/reload` errors use the same
+  flat body instead of `{"detail": {"error", "message"}}`; a config file that
+  cannot be written answers `500` with `"error": "file_operation_error"` (was
+  `400`, or `500` without a message). The `409` conflict body is unchanged. The
+  config page shows the same messages as before. `/api/config-status` still
+  reports a missing config with `200`, since onboarding reads it (#179).
+- **Data model read/write failures keep their message:** a malformed or
+  unwritable `data_model.yml` answers `500` with
+  `{"detail": "Error reading/saving data model: ...", "error": "file_operation_error"}`;
+  other unexpected errors on these routes answer the generic
+  `internal_error` body (#179).
+- **Every JSON endpoint declares its response model:** the OpenAPI schema now
+  documents the responses of the data model, config, config status/info,
+  manifest, lineage, metric tree, reconcile and health endpoints. Write
+  endpoints answer one success envelope, `{"status": "success"}`, plus only
+  the fields their callers read (`changed`, `warnings`, `message`) (#179).
+- **`business_events.yml` is written atomically:** like `data_model.yml`,
+  `trellis.yml` and Bruin assets, a failed save now leaves the previous file in
+  place instead of a partially written one (#179).
 - **One SQL type vocabulary for reconciliation and the Ossie export (#163):** both now read the same table in `utils/sql_types.py`, so supporting a new warehouse type is a single edit.
 
 ### Fixed

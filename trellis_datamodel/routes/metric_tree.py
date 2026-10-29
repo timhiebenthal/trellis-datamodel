@@ -2,10 +2,12 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, Depends
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.models.metric import MetricTreeUpdate
+from trellis_datamodel.models.schemas import MetricTreeResponse, MetricTreeSaveResponse
+from trellis_datamodel.routes.dependencies import require_feature
 from trellis_datamodel.services.metric_tree import (
     load_metric_tree,
     resolve_catalog,
@@ -13,19 +15,21 @@ from trellis_datamodel.services.metric_tree import (
     save_metric_tree,
 )
 
-router = APIRouter(prefix="/api", tags=["metric-tree"])
-
-
-# Deliberately an HTTPException rather than FeatureDisabledError: the global
-# handler maps that exception to 403 and other features depend on it, while
-# SPEC.md requires 404 here. Do not "unify" the two.
-def _ensure_metrics_enabled() -> None:
-    """Reject requests with 404 when the metric tree feature is disabled."""
-    if not cfg.METRICS_CONFIG.enabled:
-        raise HTTPException(
-            status_code=404,
-            detail="Metric tree is disabled. Set metrics.enabled: true in trellis.yml.",
+# The metric tree spec requires a disabled feature to look absent, so this
+# guard answers 404 instead of the default 403.
+router = APIRouter(
+    prefix="/api",
+    tags=["metric-tree"],
+    dependencies=[
+        Depends(
+            require_feature(
+                lambda: cfg.METRICS_CONFIG.enabled,
+                "Metric tree is disabled. Set metrics.enabled: true in trellis.yml.",
+                status_code=404,
+            )
         )
+    ],
+)
 
 
 def _build_catalog() -> list[dict[str, Any]]:
@@ -33,7 +37,7 @@ def _build_catalog() -> list[dict[str, Any]]:
     return resolve_catalog()
 
 
-@router.get("/metric-tree")
+@router.get("/metric-tree", response_model=MetricTreeResponse)
 async def get_metric_tree():
     """
     Return the metric tree document.
@@ -43,10 +47,8 @@ async def get_metric_tree():
         a draft can attach to
 
     Raises:
-        HTTPException: 404 if the metric tree feature is disabled
+        FeatureDisabledError: 404 if the metric tree feature is disabled
     """
-    _ensure_metrics_enabled()
-
     tree = load_metric_tree(cfg.METRICS_CONFIG.file)
 
     return {
@@ -60,7 +62,7 @@ async def get_metric_tree():
     }
 
 
-@router.post("/metric-tree")
+@router.post("/metric-tree", response_model=MetricTreeSaveResponse)
 async def post_metric_tree(payload: MetricTreeUpdate = Body(...)):
     """
     Save the metric tree document.
@@ -72,11 +74,9 @@ async def post_metric_tree(payload: MetricTreeUpdate = Body(...)):
         Dictionary with status and any warnings
 
     Raises:
-        HTTPException: 404 if the metric tree feature is disabled
+        FeatureDisabledError: 404 if the metric tree feature is disabled
         ValidationError: If graph integrity is violated, mapped to 422 globally
     """
-    _ensure_metrics_enabled()
-
     warnings = save_metric_tree(payload)
 
-    return {"status": "success", "warnings": warnings}
+    return MetricTreeSaveResponse(warnings=warnings)

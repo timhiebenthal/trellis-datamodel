@@ -3,28 +3,55 @@ YAML Handler for round-trip editing of DBT schema files.
 Preserves comments, formatting, and structure while allowing updates.
 """
 
+import logging
 import os
-from typing import Any, Callable, Dict, List, Optional
+from io import StringIO
+from typing import Any, Callable, Dict, List, Optional, Type
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.representer import RoundTripRepresenter
 
 from trellis_datamodel.services.tag_ownership import plan_tag_push
+from trellis_datamodel.utils.atomic_write import atomic_write
 from trellis_datamodel.utils.column_metadata import split_description_origin
+
+logger = logging.getLogger(__name__)
+
+
+def round_trip_yaml(
+    *,
+    representer: Optional[Type[RoundTripRepresenter]] = None,
+    allow_duplicate_keys: bool = False,
+) -> YAML:
+    """The one ruamel round-trip YAML setup for files Trellis edits in place.
+
+    Keeps the user's quoting, writes block style without line wrapping, and
+    indents sequence items under their parent key (mapping=2, sequence=4,
+    offset=2).
+
+    Args:
+        representer: Representer class replacing ruamel's round-trip default
+            (Bruin quotes plain strings that would otherwise change type).
+        allow_duplicate_keys: Accept duplicate mapping keys on load, last one
+            wins, the way PyYAML does.
+    """
+    ryaml = YAML()
+    ryaml.preserve_quotes = True
+    if representer is not None:
+        ryaml.Representer = representer
+    if allow_duplicate_keys:
+        ryaml.allow_duplicate_keys = True
+    ryaml.default_flow_style = False
+    ryaml.width = 4096  # Prevent unwanted line wrapping
+    ryaml.indent(mapping=2, sequence=4, offset=2)
+    return ryaml
 
 
 class YamlHandler:
     """Handler for reading and writing DBT schema YAML files with round-trip capabilities."""
 
     def __init__(self):
-        self.yaml = YAML()
-        self.yaml.preserve_quotes = True
-        self.yaml.default_flow_style = False
-        self.yaml.width = 4096  # Prevent unwanted line wrapping
-        # Indent sequences 2 spaces under their parent mapping keys (offset=2)
-        # sequence=4 is the total indentation for nested sequence items
-        self.yaml.indent(mapping=2, sequence=4, offset=2)
-        # Disallow indentless sequences so list items are indented under their parent keys
-        self.yaml.indentless_sequences = False
+        self.yaml = round_trip_yaml()
 
     def load_file(self, file_path: str) -> Optional[Dict]:
         """
@@ -43,30 +70,21 @@ class YamlHandler:
             with open(file_path, "r") as f:
                 return self.yaml.load(f)
         except Exception as e:
-            print(f"Error loading YAML file {file_path}: {e}")
+            logger.error("Error loading YAML file %s: %s", file_path, e)
             return None
 
     def save_file(self, file_path: str, data: Dict) -> None:
         """
-        Save YAML data to a file with round-trip preservation.
+        Save YAML data to a file with round-trip preservation, atomically,
+        creating missing parent directories.
 
         Args:
             file_path: Path to the YAML file
             data: YAML data to save
         """
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-        # Write atomically using a temp file
-        temp_path = f"{file_path}.tmp"
-        try:
-            with open(temp_path, "w") as f:
-                self.yaml.dump(data, f)
-            os.replace(temp_path, file_path)
-        except Exception as e:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise e
+        out = StringIO()
+        self.yaml.dump(data, out)
+        atomic_write(file_path, out.getvalue())
 
     def find_model(self, data: Dict, model_name: str) -> Optional[CommentedMap]:
         """

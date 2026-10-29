@@ -5,7 +5,8 @@ import yaml
 import pytest
 from datetime import datetime
 
-from trellis_datamodel.services import business_events_service
+from trellis_datamodel.services import business_events as business_events_service
+from trellis_datamodel.services.business_events import storage as _storage
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
@@ -70,7 +71,7 @@ class TestBusinessEventYamlRoundTrip:
     def test_annotation_with_role_serializes_correctly(self, temp_dir, monkeypatch):
         """Test that annotation entries with role field serialize to YAML correctly."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create event
         event = business_events_service.create_event(
@@ -102,7 +103,7 @@ class TestBusinessEventYamlRoundTrip:
     def test_annotation_without_role_deserializes_correctly(self, temp_dir, monkeypatch):
         """Test that old YAML files without role field load correctly (backward compatibility)."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create YAML without role field (old format)
         old_format_yaml = """
@@ -144,7 +145,7 @@ events:
     def test_yaml_round_trip_preserves_role(self, temp_dir, monkeypatch):
         """Test that role field is preserved through save/load cycle."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create YAML with role field
         yaml_with_role = """
@@ -193,7 +194,7 @@ class TestRolesFieldValidation:
 
     def test_roles_must_be_list_or_none(self):
         """Test that roles field must be a list of strings/dicts or None."""
-        from trellis_datamodel.routes.data_model import _validate_roles
+        from trellis_datamodel.services.data_model import _validate_roles
 
         # Valid cases — None, empty list, strings, dicts, mixed str+dict
         _validate_roles(None)
@@ -225,7 +226,7 @@ class TestBackwardCompatibility:
     def test_load_events_without_role_field(self, temp_dir, monkeypatch):
         """Test loading events from YAML files that don't have role field."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create old-format YAML
         old_yaml = """
@@ -261,9 +262,127 @@ events:
 
     def test_flat_string_roles_do_not_crash_validator(self):
         """Test that old flat-string roles list is accepted by _validate_roles (backward compat)."""
-        from trellis_datamodel.routes.data_model import _validate_roles
+        from trellis_datamodel.services.data_model import _validate_roles
 
         # Old format: list of plain strings — validator must not raise
         _validate_roles(["employee"])
         _validate_roles(["employee", "manager"])
         _validate_roles([])
+
+
+class TestMergeRolesLegacyStrings:
+    """The single roles-merge helper tolerates legacy flat-string roles at both
+    call sites: the data-model save and the entity generator."""
+
+    def test_merge_keeps_existing_strings_and_skips_incoming_strings(self):
+        from trellis_datamodel.services.data_model import merge_roles
+
+        existing = ["employee", {"label": "Sales Agent", "source": "evt_1"}]
+        incoming = [
+            "manager",
+            {"label": "Sales Agent", "source": "evt_1"},
+            {"label": "Support Agent", "source": "evt_1"},
+        ]
+
+        assert merge_roles(existing, incoming) == [
+            "employee",
+            {"label": "Sales Agent", "source": "evt_1"},
+            {"label": "Support Agent", "source": "evt_1"},
+        ]
+        assert merge_roles(["employee"], None) == ["employee"]
+        assert merge_roles(None, ["manager", {"label": "A"}]) == [{"label": "A"}]
+
+    def test_save_merges_into_legacy_string_roles_on_disk(
+        self, test_client, temp_data_model_path, temp_canvas_layout_path
+    ):
+        with open(temp_data_model_path, "w") as f:
+            yaml.safe_dump(
+                {
+                    "version": 0.1,
+                    "entities": [
+                        {"id": "employee", "label": "Employee", "roles": ["staff"]}
+                    ],
+                    "relationships": [],
+                },
+                f,
+            )
+
+        response = test_client.post(
+            "/api/data-model",
+            json={
+                "version": 0.1,
+                "entities": [
+                    {
+                        "id": "employee",
+                        "label": "Employee",
+                        "roles": [
+                            "manager",
+                            {"label": "Sales Agent", "source": "evt_1"},
+                        ],
+                    }
+                ],
+                "relationships": [],
+            },
+        )
+
+        assert response.status_code == 200
+        with open(temp_data_model_path) as f:
+            saved = yaml.safe_load(f)
+        assert saved["entities"][0]["roles"] == [
+            "staff",
+            {"label": "Sales Agent", "source": "evt_1"},
+        ]
+
+    def test_generator_merges_roles_for_dimension_with_legacy_string_roles(
+        self, tmp_path, monkeypatch
+    ):
+        from unittest.mock import Mock
+
+        from trellis_datamodel import config as cfg
+        from trellis_datamodel.services import entity_generator
+
+        path = tmp_path / "data_model.yml"
+        path.write_text(
+            yaml.safe_dump(
+                {
+                    "entities": [
+                        {"id": "dim__employee", "label": "Employee", "roles": ["staff"]}
+                    ]
+                }
+            )
+        )
+        monkeypatch.setattr(cfg, "DATA_MODEL_PATH", str(path))
+        config = Mock(dimension_prefix=["dim__"], fact_prefix=["fct_"])
+        now = datetime.now()
+        who = [
+            AnnotationEntry(
+                id=f"w{i}",
+                text=text,
+                dimension_id="dim__employee",
+                description=None,
+                attributes={},
+                role=text.lower(),
+            )
+            for i, text in enumerate(["Sales Agent", "Support Agent", "Sales Agent"])
+        ]
+        event = BusinessEvent(
+            domain=None,
+            id="evt_20260101_001",
+            text="employee does something",
+            type=BusinessEventType.DISCRETE,
+            created_at=now,
+            updated_at=now,
+            annotations=BusinessEventAnnotations(
+                who=who,
+                how_many=[
+                    AnnotationEntry(id="hm1", text="count", description=None, attributes={})
+                ],
+            ),
+            derived_entities=[],
+        )
+
+        result = entity_generator.generate_entities_from_event(event, config)
+
+        assert result.errors == []
+        (dim,) = [e for e in result.entities if e["entity_type"] == "dimension"]
+        assert [r["label"] for r in dim["roles"]] == ["Sales Agent", "Support Agent"]

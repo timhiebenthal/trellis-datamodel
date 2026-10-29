@@ -103,7 +103,7 @@ def _reset_shared_test_state():
     cfg.EXPOSURES_ENABLED = False
     cfg.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
     cfg.MODELING_STYLE = "entity_model"
-    cfg.Bus_MATRIX_ENABLED = True
+    cfg.BUS_MATRIX_ENABLED = True
     cfg.BUSINESS_EVENTS_ENABLED = False
     cfg.BUSINESS_EVENTS_PATH = ""
     cfg.GUIDANCE_CONFIG = cfg.GuidanceConfig()
@@ -427,7 +427,7 @@ def test_client(mock_manifest):
         cfg_module.LINEAGE_LAYERS = []
         cfg_module.EXPOSURES_ENABLED = False
         cfg_module.EXPOSURES_DEFAULT_LAYOUT = "dashboards-as-rows"
-        cfg_module.Bus_MATRIX_ENABLED = True
+        cfg_module.BUS_MATRIX_ENABLED = True
         # Ensure paths are set to the test directory (reset any contamination from test_config.py etc.)
         cfg_module.MANIFEST_PATH = os.path.join(_TEST_TEMP_DIR, "manifest.json")
         cfg_module.DATA_MODEL_PATH = os.path.join(_TEST_TEMP_DIR, "data_model.yml")

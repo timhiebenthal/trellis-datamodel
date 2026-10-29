@@ -4,7 +4,8 @@ import pytest
 from starlette.testclient import TestClient
 
 from trellis_datamodel import config as cfg
-from trellis_datamodel.services import business_events_service
+from trellis_datamodel.services import business_events as business_events_service
+from trellis_datamodel.services.business_events import storage as _storage
 
 
 @pytest.fixture
@@ -12,7 +13,7 @@ def client(tmp_path, monkeypatch):
     """TestClient in dimensional modeling style with storage redirected to tmp_path."""
     events_file = str(tmp_path / "business_events.yml")
     monkeypatch.setattr(
-        business_events_service, "_get_business_events_path", lambda: events_file
+        _storage, "_get_business_events_path", lambda: events_file
     )
     monkeypatch.setattr(cfg, "BUSINESS_EVENTS_ENABLED", True)
     monkeypatch.setattr(cfg, "MODELING_STYLE", "dimensional_model")

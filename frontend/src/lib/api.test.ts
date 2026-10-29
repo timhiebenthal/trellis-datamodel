@@ -21,6 +21,9 @@ import {
     syncDbtTests,
     reconcileDbt,
     getModelSchema,
+    getConfig,
+    reloadConfig,
+    updateConfig,
 } from './api';
 import { emitBootSummary } from './boot-diagnostics';
 import { useApiStub } from './test-helpers/stub-api';
@@ -893,5 +896,50 @@ describe('role-playing dimensions through the data model', () => {
             const saved = api.sent.find((r) => r.method === 'PUT')!;
             expect(saved.body.annotations.when.map((a: any) => a.role)).toEqual(['order_date', 'ship_date']);
         });
+    });
+});
+
+describe('config API error bodies', () => {
+    it('getConfig returns the 400 configuration error message instead of throwing', async () => {
+        api.route({
+            'GET /api/config': {
+                status: 400,
+                json: {
+                    detail: 'No config file found. Please create trellis.yml in the current directory.',
+                    error: 'configuration_error',
+                },
+            },
+        });
+
+        const response = await getConfig();
+
+        expect(response.config).toEqual({});
+        expect(response.error).toBe(
+            'No config file found. Please create trellis.yml in the current directory.',
+        );
+    });
+
+    it('reloadConfig throws the message of a string detail', async () => {
+        api.route({
+            'POST /api/config/reload': {
+                status: 400,
+                json: { detail: 'Invalid YAML in trellis.yml', error: 'configuration_error' },
+            },
+        });
+
+        await expect(reloadConfig()).rejects.toThrow('Invalid YAML in trellis.yml');
+    });
+
+    it('updateConfig throws the message of a 422 validation error', async () => {
+        api.route({
+            'PUT /api/config': {
+                status: 422,
+                json: { detail: 'Config validation failed: framework', error: 'validation_error' },
+            },
+        });
+
+        await expect(updateConfig({ framework: 'x' })).rejects.toThrow(
+            'Config validation failed: framework',
+        );
     });
 });

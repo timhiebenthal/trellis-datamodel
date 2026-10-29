@@ -71,7 +71,7 @@ def sample_data_model(temp_data_model_path):
 def enable_bus_matrix(monkeypatch):
     """Enable bus matrix for dimensional modeling."""
     monkeypatch.setattr(cfg, "MODELING_STYLE", "dimensional_model")
-    monkeypatch.setattr(cfg, "Bus_MATRIX_ENABLED", True)
+    monkeypatch.setattr(cfg, "BUS_MATRIX_ENABLED", True)
 
 
 class TestBusMatrixEndpoint:
@@ -345,7 +345,7 @@ class TestBusMatrixEndpoint:
     def test_disabled_bus_matrix_raises_error(self, sample_data_model, monkeypatch):
         """Test that disabled bus matrix raises ConfigurationError."""
         monkeypatch.setattr(cfg, "MODELING_STYLE", "entity_model")
-        monkeypatch.setattr(cfg, "Bus_MATRIX_ENABLED", False)
+        monkeypatch.setattr(cfg, "BUS_MATRIX_ENABLED", False)
 
         with pytest.raises(ConfigurationError) as exc_info:
             get_bus_matrix()

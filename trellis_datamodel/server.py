@@ -6,6 +6,7 @@ This is the FastAPI application that serves the API and frontend.
 
 from importlib.resources import files
 import ipaddress
+import logging
 import os
 import re
 import socket
@@ -34,6 +35,7 @@ from trellis_datamodel.observability import (
     serialize_server_timing,
     set_collector,
 )
+from trellis_datamodel.models.schemas import HealthResponse
 from trellis_datamodel.routes import (
     bus_matrix_router,
     business_events_router,
@@ -46,6 +48,8 @@ from trellis_datamodel.routes import (
     reconcile_router,
     schema_router,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _RequestTimingMiddleware:
@@ -98,7 +102,11 @@ class _RequestTimingMiddleware:
         except Exception:
             record_total_request()
             if not response_started:
-                error_response = PlainTextResponse("Internal Server Error", status_code=500)
+                # Same body shape as the domain handlers, without exception text.
+                error_response = JSONResponse(
+                    status_code=500,
+                    content={"detail": "Internal Server Error", "error": "internal_error"},
+                )
                 await error_response(scope, receive, send_with_headers)
             raise
         finally:
@@ -367,9 +375,9 @@ def _register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(FeatureDisabledError)
     async def feature_disabled_handler(request: Request, exc: FeatureDisabledError):
-        """Handle FeatureDisabledError -> 403."""
+        """Handle FeatureDisabledError -> 403 (or the status the error carries)."""
         return JSONResponse(
-            status_code=403,
+            status_code=exc.status_code,
             content={"detail": exc.message, "error": "feature_disabled"},
         )
 
@@ -436,7 +444,7 @@ def create_app() -> FastAPI:
     _register_exception_handlers(app)
 
     # Health check endpoint
-    @app.get("/health")
+    @app.get("/health", response_model=HealthResponse)
     def health_check():
         return {"status": "ok"}
 
@@ -455,7 +463,7 @@ def create_app() -> FastAPI:
 
     static_dir_path = _discover_static_dir()
 
-    print(f"Serving frontend from: {static_dir_path}")
+    logger.info("Serving frontend from: %s", static_dir_path)
 
     _register_routers(app)
 
@@ -465,10 +473,10 @@ def create_app() -> FastAPI:
     if static_dir_path:
         _mount_static_routes(app, static_dir_path)
     else:
-        print(
-            f"Warning: Frontend build not found. "
-            f"Bundled static files missing and {cfg.FRONTEND_BUILD_DIR} does not exist. "
-            f"Run 'npm run build' in frontend/ or install the package properly."
+        logger.warning(
+            "Frontend build not found. Bundled static files missing and %s does "
+            "not exist. Run 'npm run build' in frontend/ or install the package properly.",
+            cfg.FRONTEND_BUILD_DIR,
         )
 
     return app
