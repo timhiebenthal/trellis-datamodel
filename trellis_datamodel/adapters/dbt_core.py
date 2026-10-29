@@ -10,7 +10,7 @@ import logging
 import os
 import re
 import time
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, Optional
 
@@ -797,8 +797,40 @@ class DbtCoreAdapter:
         with timed_phase("schema_read"):
             return self._get_model_schema(model_name, version=version)
 
+    def get_model_schemas(
+        self, requests: list[tuple[str, Optional[int]]]
+    ) -> list[ModelSchema | Exception]:
+        """Read several model schemas, parsing each schema file once.
+
+        Models usually share a schema.yml, so the parsed file is memoised by
+        path for the duration of the call (never across calls: the files change
+        between pushes).
+        """
+        with timed_phase("schema_read"):
+            parsed: dict[str, Optional[dict]] = {}
+
+            def load_once(path: str) -> Optional[dict]:
+                if path not in parsed:
+                    parsed[path] = self.yaml_handler.load_file(path)
+                return parsed[path]
+
+            results: list[ModelSchema | Exception] = []
+            for model_name, version in requests:
+                try:
+                    results.append(
+                        self._get_model_schema(
+                            model_name, version=version, load_file=load_once
+                        )
+                    )
+                except Exception as e:
+                    results.append(e)
+            return results
+
     def _get_model_schema(
-        self, model_name: str, version: Optional[int] = None
+        self,
+        model_name: str,
+        version: Optional[int] = None,
+        load_file: Optional[Callable[[str], Optional[dict]]] = None,
     ) -> ModelSchema:
         """Get the current schema definition for a specific model from its YAML file."""
         if not os.path.exists(self.manifest_path):
@@ -821,7 +853,7 @@ class DbtCoreAdapter:
                 f"No patch_path or original_file_path found for model '{model_name}'"
             )
 
-        data = self.yaml_handler.load_file(yml_path)
+        data = (load_file or self.yaml_handler.load_file)(yml_path)
         if not data:
             return {
                 "model_name": model_name,

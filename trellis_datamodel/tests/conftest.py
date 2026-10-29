@@ -271,6 +271,15 @@ class FakeAdapter:
     def get_models(self):
         return self.models
 
+    def get_model_schemas(self, requests):
+        results = []
+        for model_name, version in requests:
+            try:
+                results.append(self.get_model_schema(model_name, version=version))
+            except Exception as e:
+                results.append(e)
+        return results
+
     def get_model_schema(self, model_name, version=None):
         for model in self.models:
             if model.get("name") == model_name and (

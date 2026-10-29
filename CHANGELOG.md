@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Push reads model schemas in one batch:** adapters gain
+  `get_model_schemas`, and the Ossie export uses it instead of one
+  `get_model_schema` per bound entity. A push now scans the Bruin pipeline once
+  and parses each dbt `schema.yml` once, instead of once per entity, and
+  `POST /sync-tests` no longer blocks the event loop while it runs (#162).
 - **Ossie export reads its own inputs:** the push-time adapter reads moved from
   `services/schema.py` into `services/ossie.py` (`export_ossie_for_push`), and
   the metric tree and exporter share one Ossie path function. Output is

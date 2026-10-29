@@ -44,8 +44,10 @@ async def save_model_schema_endpoint(request: ModelSchemaRequest):
 
 
 @router.post("/sync-tests", response_model=SyncTestsResponse)
-async def sync_framework_tests_endpoint():
+def sync_framework_tests_endpoint():
     """Sync relationship tests from data model to schema files."""
+    # Plain `def`: the push is blocking file work, so FastAPI runs it in the
+    # threadpool instead of stalling the event loop.
     outcome = sync_framework_tests()
 
     # `files` also carries the Ossie document, which the message already names

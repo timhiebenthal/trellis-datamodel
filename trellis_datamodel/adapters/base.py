@@ -185,6 +185,24 @@ class TransformationAdapter(Protocol):
         """
         ...
 
+    def get_model_schemas(
+        self, requests: list[tuple[str, Optional[int]]]
+    ) -> list[ModelSchema | Exception]:
+        """
+        Read several model schemas in one pass over the framework's files.
+
+        Callers that need N schemas (a push) must use this instead of N calls to
+        `get_model_schema`, which each pay a full scan.
+
+        Args:
+            requests: `(model_name, version)` pairs, as `get_model_schema` takes them.
+
+        Returns:
+            One entry per request, in order: the schema, or the exception that
+            reading it raised. One unreadable model must not hide the others.
+        """
+        ...
+
     def save_model_schema(
         self,
         model_name: str,

@@ -2227,3 +2227,36 @@ class TestMetricEmission:
         )
 
         assert path.read_text() == GOLDEN_NO_METRICS
+
+
+def test_collect_model_schemas_reads_bound_models_in_one_batch():
+    """A push with N bound entities makes one batch call, not N adapter reads."""
+    from trellis_datamodel.services.ossie import collect_model_schemas
+
+    models = [
+        {"unique_id": f"model.p.m{i}", "name": f"m{i}", "version": None}
+        for i in range(5)
+    ]
+    entities = [
+        {"id": f"e{i}", "model_ref": f"model.p.m{i}"} for i in range(4)
+    ]
+
+    class BatchAdapter:
+        batches: list[list] = []
+
+        def get_model_schema(self, *args, **kwargs):
+            raise AssertionError("per-model read during a push")
+
+        def get_model_schemas(self, requests):
+            self.batches.append(requests)
+            return [
+                RuntimeError("boom") if name == "m2" else {"model_name": name}
+                for name, _ in requests
+            ]
+
+    adapter = BatchAdapter()
+    schemas, warnings = collect_model_schemas(adapter, entities, models)
+
+    assert adapter.batches == [[(f"m{i}", None) for i in range(4)]]
+    assert set(schemas) == {"model.p.m0", "model.p.m1", "model.p.m3"}
+    assert len(warnings) == 1 and 'model "m2"' in warnings[0] and "boom" in warnings[0]
