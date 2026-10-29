@@ -20,6 +20,16 @@
     import { readModelRef } from '$lib/utils/entity-compat';
     import { getEntityTypeStyle } from '$lib/utils/entity-type-style';
     import { buildEntityNodes, findLegacyAliasNodeIds } from '$lib/utils/entity-generation';
+    import {
+        addEntityModelStubs,
+        buildDerivedEntities,
+        collectEventLevelEntityIds,
+        groupDraftedFieldsByEntity,
+        mergeGeneratedRelationships,
+        removeProcessDerivedEntities,
+        type EditedDraftedField,
+        type EditedRelationship,
+    } from '$lib/utils/entity-generation-canvas';
     import CustomEntitySelect from './CustomEntitySelect.svelte';
     import Modal from './Modal.svelte';
     import type { Node, Edge } from '@xyflow/svelte';
@@ -43,8 +53,6 @@
     let error = $state<string | null>(null);
     let previewData = $state<GeneratedEntitiesResult | null>(null);
     let editedEntities = $state<Array<{ id: string; label: string; entity_type: string; tags?: string[] }>>([]);
-    type EditedRelationship = { source: string; target: string; label: string; type: string };
-    type EditedDraftedField = { name: string; datatype: DraftedField['datatype']; targetEntityId: string };
 
     let editedRelationships = $state<EditedRelationship[]>([]);
     let editedDraftedFields = $state<EditedDraftedField[]>([]);
@@ -446,20 +454,12 @@
             creating = true;
             error = null;
             // For process mode: collect event-level entity IDs to skip
-            const eventLevelEntityIds = new Set<string>();
+            let eventLevelEntityIds = new Set<string>();
             if (mode === 'process' && process) {
                 const allEvents = await getBusinessEvents();
-                const processEvents = allEvents.filter(e => e.process_id === process.id);
-                for (const evt of processEvents) {
-                    if (evt.derived_entities) {
-                        for (const derived of evt.derived_entities) {
-                            const entityId = typeof derived === 'string' ? derived : derived.entity_id;
-                            if (entityId) {
-                                eventLevelEntityIds.add(entityId);
-                            }
-                        }
-                    }
-                }
+                eventLevelEntityIds = collectEventLevelEntityIds(
+                    allEvents.filter(e => e.process_id === process.id)
+                );
             }
 
             // Remove event-level entities from nodes/edges before creating new ones
@@ -467,38 +467,18 @@
             let edgesToUse = $edges;
             // Map of entityId → drafted_fields for entities that are about to be removed (process mode).
             // Used below to re-apply manually drafted fields onto freshly created nodes.
-            const previousDraftedFieldsMap = new Map<string, DraftedField[]>();
+            let previousDraftedFieldsMap = new Map<string, DraftedField[]>();
             if (mode === 'process' && process) {
-                const processDerivedEntityIds = new Set(
-                    (process.derived_entities ?? [])
-                        .map((derived) => derived.entity_id)
-                        .filter(Boolean)
-                );
-                const removableEntityIds = new Set<string>([
-                    ...eventLevelEntityIds,
-                    ...processDerivedEntityIds,
-                ]);
-
-                for (const aliasId of findLegacyAliasNodeIds(editedEntities, $nodes)) {
-                    removableEntityIds.add(aliasId);
-                }
-
-                // Capture drafted_fields from entities about to be removed so they can be
-                // re-merged onto the freshly created nodes (see creation loop below).
-                for (const node of $nodes) {
-                    if (!isEntityNode(node)) continue;
-                    if (removableEntityIds.has(node.id) && Array.isArray(node.data?.drafted_fields)) {
-                        previousDraftedFieldsMap.set(node.id, node.data.drafted_fields);
-                    }
-                }
-
-                nodesToUse = $nodes.filter(n => {
-                    if (n.type !== 'entity') return true;
-                    return !removableEntityIds.has(n.id);
+                const removed = removeProcessDerivedEntities({
+                    nodes: $nodes,
+                    edges: $edges,
+                    process,
+                    eventLevelEntityIds,
+                    editedEntities,
                 });
-                edgesToUse = $edges.filter(e => {
-                    return !removableEntityIds.has(e.source) && !removableEntityIds.has(e.target);
-                });
+                nodesToUse = removed.nodes;
+                edgesToUse = removed.edges;
+                previousDraftedFieldsMap = removed.previousDraftedFieldsMap;
             }
             // Create entities on canvas (skip ones that already exist)
             const maxZIndex = Math.max(
@@ -508,18 +488,11 @@
 
             let fieldsByEntity = new Map<string, DraftedField[]>();
             if ($modelingStyle === 'entity_model') {
-                const preliminaryIdMap = new Map(
-                    previewData.entities.map((e, i) => [
-                        e.id,
-                        generateEntityId(editedEntities[i].id.trim(), []),
-                    ])
+                fieldsByEntity = groupDraftedFieldsByEntity(
+                    previewData.entities,
+                    editedEntities,
+                    editedDraftedFields
                 );
-                fieldsByEntity = new Map();
-                for (const f of editedDraftedFields) {
-                    const actualId = preliminaryIdMap.get(f.targetEntityId) ?? f.targetEntityId;
-                    if (!fieldsByEntity.has(actualId)) fieldsByEntity.set(actualId, []);
-                    fieldsByEntity.get(actualId)!.push({ name: f.name, datatype: f.datatype });
-                }
             }
 
             const inheritedDomain =
@@ -543,104 +516,22 @@
 
             if ($modelingStyle === 'entity_model') {
                 // Create stub entities for relationship endpoints that are neither in the
-                // preview entities nor already on the canvas. These represent entities
-                // referenced by the event/process (e.g. Employee, Account) that must exist
-                // so their relationships can be drawn and they appear on the canvas.
-                const rels = editedRelationships.length > 0
-                    ? editedRelationships
-                    : (previewData.relationships || []);
-                const existingIdSet = new Set(nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id));
-                const previewIdSet = new Set(previewData.entities.map((e) => e.id));
-                const endpointIds = new Set<string>();
-                for (const rel of rels) {
-                    for (const id of [rel.source, rel.target]) {
-                        if (!id) continue;
-                        if (previewIdSet.has(id)) continue;
-                        if (existingIdSet.has(id)) continue;
-                        endpointIds.add(id);
-                    }
-                }
-                const inheritedDomain =
-                    mode === 'event' ? event?.domain?.trim() : process?.domain?.trim();
-                let stubIdx = 0;
-                // Prefer the original preview relationship label when naming stub nodes
-                // (it carries the nice display form e.g. "Employee"); the *edge* label itself
-                // is scrubbed of filler separately at preview-load time.
-                const previewRels = previewData.relationships || [];
-                for (const endpointId of endpointIds) {
-                    const incomingRel = previewRels.find((r) => r.target === endpointId);
-                    const outgoingRel = previewRels.find((r) => r.source === endpointId);
-                    const stubLabel =
-                        incomingRel?.label || outgoingRel?.label || endpointId;
-                    const newNode: Node = {
-                        id: endpointId,
-                        type: 'entity',
-                        position: {
-                            x: 200 + ((stubIdx % 5) * 260),
-                            y: 400 + (Math.floor(stubIdx / 5) * 220),
-                        },
-                        data: {
-                            label: stubLabel,
-                            entity_type: 'dimension',
-                            width: 280,
-                            panelHeight: 200,
-                            collapsed: false,
-                            domain: inheritedDomain || undefined,
-                            domains: inheritedDomain ? [inheritedDomain] : undefined,
-                        },
-                        zIndex: maxZIndex + 5 + stubIdx,
-                    };
-                    nodesToUse = [...nodesToUse, newNode];
-                    existingIdSet.add(endpointId);
-                    createdEntityIds.push(endpointId);
-                    stubIdx += 1;
-                }
-
-                for (const [entityId, fields] of fieldsByEntity) {
-                    if (entityIdByIndex.includes(entityId) || createdEntityIds.includes(entityId)) continue;
-
-                    const isOnCanvas = nodesToUse.some(n => n.id === entityId);
-                    if (!isOnCanvas) {
-                        const rel = previewData.relationships?.find(r => r.target === entityId || r.source === entityId);
-                        const stubLabel = rel?.label || entityId;
-
-                        const newNode: Node = {
-                            id: entityId,
-                            type: 'entity',
-                            position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 },
-                            data: {
-                                label: stubLabel,
-                                entity_type: 'dimension',
-                                width: 280,
-                                panelHeight: 200,
-                                collapsed: false,
-                                drafted_fields: fields,
-                            },
-                            zIndex: maxZIndex + 10,
-                        };
-                        nodesToUse = [...nodesToUse, newNode];
-                        continue;
-                    }
-
-                    nodesToUse = nodesToUse.map((n) => {
-                        if (n.id !== entityId || !isEntityNode(n)) return n;
-                        const existing: DraftedField[] = Array.isArray(n.data?.drafted_fields)
-                            ? n.data.drafted_fields
-                            : [];
-                        const existingNames = new Set(existing.map((f) => f.name));
-                        const merged = [
-                            ...existing,
-                            ...fields.filter((f) => !existingNames.has(f.name)),
-                        ];
-                        return {
-                            ...n,
-                            data: {
-                                ...n.data,
-                                drafted_fields: merged.length > 0 ? merged : undefined,
-                            },
-                        };
-                    });
-                }
+                // preview entities nor already on the canvas (see addEntityModelStubs).
+                const stubs = addEntityModelStubs({
+                    nodes: nodesToUse,
+                    previewEntities: previewData.entities,
+                    previewRelationships: previewData.relationships || [],
+                    relationships: editedRelationships.length > 0
+                        ? editedRelationships
+                        : (previewData.relationships || []),
+                    fieldsByEntity,
+                    entityIdByIndex,
+                    createdEntityIds,
+                    inheritedDomain,
+                    maxZIndex,
+                });
+                nodesToUse = stubs.nodes;
+                createdEntityIds.push(...stubs.stubEntityIds);
             }
 
             // Update nodes store with filtered + new nodes
@@ -652,96 +543,28 @@
                     ? editedRelationships
                     : (previewData.relationships || []);
             if (relsToCreate.length > 0) {
-                // Map original entity IDs to created entity IDs
-                const idMapping = new Map<string, string>();
-                for (let i = 0; i < previewData.entities.length; i++) {
-                    const originalId = previewData.entities[i].id;
-                    const mappedId = entityIdByIndex[i] || createdEntityIds[i];
-                    if (mappedId) {
-                        idMapping.set(originalId, mappedId);
-                    }
-                }
-                const allEntityIds = new Set(nodesToUse.filter((n) => n.type === 'entity').map((n) => n.id));
-
-                // Treat any label that just restates the target's id/label as filler
-                // (e.g. backend emits "Employee" as the rel label on booking→employee).
-                const isEdgeFillerLabel = (rawLabel: string, targetId: string): boolean => {
-                    const l = (rawLabel || '').trim().toLowerCase();
-                    if (!l) return true;
-                    if (l === targetId.trim().toLowerCase()) return true;
-                    const targetNode = nodesToUse.find((n) => n.id === targetId);
-                    const targetNodeLabel = String(targetNode?.data?.label || '');
-                    if (targetNodeLabel && l === targetNodeLabel.trim().toLowerCase()) {
-                        return true;
-                    }
-                    return false;
-                };
-
-                let updatedEdges = edgesToUse;
-                for (const rel of relsToCreate) {
-                    const sourceId = idMapping.get(rel.source) || rel.source;
-                    const targetId = idMapping.get(rel.target) || rel.target;
-
-                    // Only create relationship if both entities exist
-                    if (
-                        allEntityIds.has(sourceId) &&
-                        allEntityIds.has(targetId)
-                    ) {
-                        const cleanLabel = isEdgeFillerLabel(rel.label || '', targetId)
-                            ? ''
-                            : rel.label || '';
-                        const relationship = {
-                            source: sourceId,
-                            target: targetId,
-                            label: cleanLabel,
-                            type: (rel.type || 'one_to_many') as 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many',
-                        };
-                        updatedEdges = mergeRelationshipIntoEdges(updatedEdges, relationship);
-                        // mergeRelationshipIntoEdges skips updating the label on an existing
-                        // edge; explicitly overwrite pre-existing filler labels so old runs
-                        // (e.g. "Employee") get cleaned up on regeneration.
-                        updatedEdges = updatedEdges.map((e) => {
-                            const samePair =
-                                (e.source === sourceId && e.target === targetId) ||
-                                (e.source === targetId && e.target === sourceId);
-                            if (!samePair) return e;
-                            const endpointForLabel = e.target;
-                            const existing = String(e.data?.label ?? '');
-                            if (!isEdgeFillerLabel(existing, endpointForLabel)) return e;
-                            return {
-                                ...e,
-                                data: { ...(e.data || {}), label: cleanLabel },
-                            };
-                        });
-                    }
-                }
-                $edges = updatedEdges;
+                $edges = mergeGeneratedRelationships({
+                    relationships: relsToCreate,
+                    previewEntities: previewData.entities,
+                    entityIdByIndex,
+                    createdEntityIds,
+                    nodes: nodesToUse,
+                    edges: edgesToUse,
+                });
             } else {
                 $edges = edgesToUse;
             }
 
             // Update event's or process's derived_entities list
             if (mode === 'event' && event) {
-                const uniqueDerivedIds = Array.from(
-                    new Set([...entityIdByIndex, ...createdEntityIds].filter(Boolean))
-                );
-                const derivedEntities = uniqueDerivedIds.map((id) => ({
-                    entity_id: id,
-                    created_at: new Date().toISOString(),
-                }));
+                const derivedEntities = buildDerivedEntities(entityIdByIndex, createdEntityIds);
 
                 await updateBusinessEvent(event.id, {
                     derived_entities: derivedEntities,
                 });
             } else if (mode === 'process' && process) {
                 // Set derived_entities for the process
-                const uniqueDerivedIds = Array.from(
-                    new Set([...entityIdByIndex, ...createdEntityIds].filter(Boolean))
-                );
-                const derivedEntities = uniqueDerivedIds.map((id) => ({
-                    entity_id: id,
-                    created_at: new Date().toISOString(),
-                }));
+                const derivedEntities = buildDerivedEntities(entityIdByIndex, createdEntityIds);
                 await updateBusinessEventProcess(process.id, {
                     derived_entities: derivedEntities,
                 });
