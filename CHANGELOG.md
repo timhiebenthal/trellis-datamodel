@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Giant frontend components split up:** `EntityNode`, `EntityDetailModal`, the
+  app layout, the config page, `LineageModal`, `SevenWsForm`, `BusinessEvents`
+  and `GenerateEntitiesDialog` now delegate to smaller components, services and
+  unit-tested utils. No behaviour or markup changes (#184).
 - **Business events service split into a package:** the 1.4k-line
   `services/business_events_service.py` is now `services/business_events/`
   (storage, events, annotations, processes, supersets, role sync) with the same
