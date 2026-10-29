@@ -82,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One SQL type vocabulary for reconciliation and the Ossie export (#163):** both now read the same table in `utils/sql_types.py`, so supporting a new warehouse type is a single edit.
 
 ### Fixed
+- **Dragging a foreign-key field onto a primary-key field keeps both field names:** the
+  flipped relationship used to end up with the same field on both sides (#184).
 - **Config page showed the entity creation wizard as off by default:** with
   `entity_creation_guidance.enabled` unset the wizard was on at runtime but the
   config API and page reported it as `false`. They now report `true` (#178).

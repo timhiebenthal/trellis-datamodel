@@ -1,4 +1,6 @@
 <script lang="ts">
+    // Context-bound: reads and writes the value at `path` through the config page's form
+    // context. The markup lives in config/ConfigToggleRow.svelte (props-based).
     import ConfigToggleRow from './config/ConfigToggleRow.svelte';
     import { getConfigFormContext } from '$lib/utils/config-form-context';
 

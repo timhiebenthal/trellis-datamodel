@@ -1,4 +1,6 @@
 <script lang="ts">
+    // Presentational: value and handlers come in as props. For a field addressed by
+    // config path, use the context-bound ConfigTextField.
     import type { Snippet } from 'svelte';
 
     let {

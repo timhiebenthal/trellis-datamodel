@@ -152,8 +152,8 @@ export function createFieldDragDrop(getNodeId: () => string, getNodeLabel: () =>
 						finalSource = targetNodeId;
 						finalTarget = sourceNodeId;
 						finalSourceField = targetFieldName;
-						// Deliberately re-reads the store after the awaits (pre-existing behaviour).
-						finalTargetField = get(draggingField)!.fieldName;
+						// `dragging` was captured before the awaits: dragend may already have cleared the store.
+						finalTargetField = dragging.fieldName;
 						relationshipType = 'one_to_many';
 					} else {
 						// PK → FK is already parent → child; unknown/both-PK/both-FK fall back

@@ -22,4 +22,14 @@ describe('createConfirmGate', () => {
         gate.settle(true);
         await expect(decision).resolves.toBe(false);
     });
+
+    it('cancels a pending request when a new one is made, so it never hangs', async () => {
+        const gate = createConfirmGate();
+        const first = gate.request();
+        const second = gate.request();
+        await expect(first).resolves.toBe(false);
+
+        gate.settle(true);
+        await expect(second).resolves.toBe(true);
+    });
 });

@@ -1,4 +1,6 @@
 <script lang="ts">
+    // Presentational: label, beta badge and switch from props. For a field addressed by
+    // config path, use the context-bound ConfigToggle.
     import ConfigToggleSwitch from './ConfigToggleSwitch.svelte';
 
     let {

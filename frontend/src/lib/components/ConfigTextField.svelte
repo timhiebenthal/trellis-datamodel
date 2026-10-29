@@ -1,4 +1,6 @@
 <script lang="ts">
+    // Context-bound: reads and writes the value at `path` through the config page's form
+    // context. The markup lives in config/ConfigTextInput.svelte (props-based).
     import ConfigTextInput from './config/ConfigTextInput.svelte';
     import { getConfigFormContext } from '$lib/utils/config-form-context';
 
