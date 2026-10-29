@@ -290,14 +290,21 @@ class BruinAdapter:
         """
         return scan_pipeline_assets(self.pipeline_path, [])
 
-    def _find_asset(self, model_name: str) -> BruinAsset:
+    def _find_asset(
+        self, model_name: str, assets: Optional[list[BruinAsset]] = None
+    ) -> BruinAsset:
         """Find the asset matching *model_name*.
 
         *model_name* may be a short name (``dim__game``) or fully qualified
         (``core.dim__game``); Bruin users write both, and an entity binding may
         hold either.
+
+        *assets* is an already-scanned pipeline, for callers resolving several
+        names; without it each call walks the whole pipeline.
         """
-        asset = self._lookup_asset(self._scan_all_assets(), model_name)
+        asset = self._lookup_asset(
+            self._scan_all_assets() if assets is None else assets, model_name
+        )
         if asset is None:
             raise ValueError(f"Model '{model_name}' not found in pipeline assets")
         return asset
@@ -380,6 +387,22 @@ class BruinAdapter:
         """Get a model schema while timing the adapter-owned lookup."""
         with timed_phase("schema_read"):
             return self._get_model_schema(model_name, version=version)
+
+    def get_model_schemas(
+        self, requests: list[tuple[str, Optional[int]]]
+    ) -> list[ModelSchema | Exception]:
+        """Read several model schemas from a single scan of the pipeline."""
+        with timed_phase("schema_read"):
+            assets = self._scan_all_assets() if requests else []
+            results: list[ModelSchema | Exception] = []
+            for model_name, _version in requests:
+                try:
+                    results.append(
+                        _asset_to_model_schema(self._find_asset(model_name, assets))
+                    )
+                except Exception as e:
+                    results.append(e)
+            return results
 
     def _get_model_schema(
         self,

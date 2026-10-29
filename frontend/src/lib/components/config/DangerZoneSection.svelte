@@ -4,7 +4,8 @@
     import DangerFeatureCard from './DangerFeatureCard.svelte';
     import DangerToggleRow from './DangerToggleRow.svelte';
     import ConfigSelectField from './ConfigSelectField.svelte';
-    import ConfigTextField from './ConfigTextField.svelte';
+    import ConfigToggle from '$lib/components/ConfigToggle.svelte';
+    import ConfigTextField from '$lib/components/ConfigTextField.svelte';
     import {
         getEnumOptions,
         getFieldDescription,
@@ -146,88 +147,26 @@
             title="Business Events"
             tooltip="Model business events by annotating natural language sentences with the 7 W's to generate entities and relationships. Works for both dimensional and entity modeling styles."
         >
-            <DangerToggleRow
-                id="business-events-enabled-toggle"
-                label="Business Events Enabled"
-                beta={isBetaField(schema, 'business_events.enabled')}
-                description={getFieldDescription(schema, 'business_events.enabled') || 'Enable business events modeling to annotate natural language sentences and generate entities'}
-                checked={getFieldValue(config, 'business_events.enabled')}
-                onchange={(checked) => onNestedChange('business_events.enabled', checked)}
-                disabled={!isDangerZoneEnabled}
-            />
-            <ConfigTextField
-                id="business-events-file-input"
-                label="Business Events File"
-                value={getFieldValue(config, 'business_events.file') || ''}
-                oninput={(value) => onNestedChange('business_events.file', value)}
-                placeholder="business_events.yml (defaults to same directory as data_model.yml)"
-                description={getFieldDescription(schema, 'business_events.file') || 'Path to business events YAML file (optional, defaults to business_events.yml in data model directory)'}
-                disabled={!isDangerZoneEnabled}
-            />
+            <ConfigToggle path="business_events.enabled" label="Business Events Enabled" disabled={!isDangerZoneEnabled} />
+            <ConfigTextField path="business_events.file" label="Business Events File" placeholder="business_events.yml (defaults to same directory as data_model.yml)" disabled={!isDangerZoneEnabled} />
         </DangerFeatureCard>
 
         <DangerFeatureCard
             title="Apache Ossie"
             tooltip="Export an Apache Ossie semantic model alongside each push. The model describes the entities bound to your data, using overrides below for the database and schema segments of its dataset names."
         >
-            <DangerToggleRow
-                id="ossie-enabled-toggle"
-                label="Ossie Export Enabled"
-                beta={isBetaField(schema, 'ossie.enabled')}
-                description={getFieldDescription(schema, 'ossie.enabled') || 'Enable Apache Ossie semantic model export alongside framework pushes'}
-                checked={getFieldValue(config, 'ossie.enabled')}
-                onchange={(checked) => onNestedChange('ossie.enabled', checked)}
-                disabled={!isDangerZoneEnabled}
-            />
-            <ConfigTextField
-                id="ossie-file-input"
-                label="Semantic Model File"
-                value={getFieldValue(config, 'ossie.file') || ''}
-                oninput={(value) => onNestedChange('ossie.file', value)}
-                placeholder="semantic_model.yml (defaults to same directory as data_model.yml)"
-                description={getFieldDescription(schema, 'ossie.file') || 'Path to the Ossie semantic model file (optional, defaults to semantic_model.yml in data model directory)'}
-                disabled={!isDangerZoneEnabled}
-            />
-            <ConfigTextField
-                id="ossie-source-database"
-                label="Database Override"
-                value={getFieldValue(config, 'ossie.source.database') || ''}
-                oninput={(value) => onNestedChange('ossie.source.database', value)}
-                description={getFieldDescription(schema, 'ossie.source.database') || 'Leave empty to omit the database segment. Values from the manifest reflect the target that last ran dbt.'}
-                disabled={!isDangerZoneEnabled}
-            />
-            <ConfigTextField
-                id="ossie-source-schema"
-                label="Schema Override"
-                value={getFieldValue(config, 'ossie.source.schema') || ''}
-                oninput={(value) => onNestedChange('ossie.source.schema', value)}
-                description={getFieldDescription(schema, 'ossie.source.schema') || 'Leave empty to use the schema the adapter reports.'}
-                disabled={!isDangerZoneEnabled}
-            />
+            <ConfigToggle path="ossie.enabled" label="Ossie Export Enabled" disabled={!isDangerZoneEnabled} />
+            <ConfigTextField path="ossie.file" label="Semantic Model File" placeholder="semantic_model.yml (defaults to same directory as data_model.yml)" disabled={!isDangerZoneEnabled} />
+            <ConfigTextField path="ossie.source.database" label="Database Override" disabled={!isDangerZoneEnabled} />
+            <ConfigTextField path="ossie.source.schema" label="Schema Override" disabled={!isDangerZoneEnabled} />
         </DangerFeatureCard>
 
         <DangerFeatureCard
             title="Metric Tree"
             tooltip="Design a metric tree on its own canvas and emit the drafted metrics into the Apache Ossie document on push."
         >
-            <DangerToggleRow
-                id="metrics-enabled-toggle"
-                label="Metric Tree Enabled"
-                beta={isBetaField(schema, 'metrics.enabled')}
-                description={getFieldDescription(schema, 'metrics.enabled') || 'Enable the metric tree canvas and metric emission on push'}
-                checked={getFieldValue(config, 'metrics.enabled')}
-                onchange={(checked) => onNestedChange('metrics.enabled', checked)}
-                disabled={!isDangerZoneEnabled}
-            />
-            <ConfigTextField
-                id="metrics-file-input"
-                label="Metric Tree File"
-                value={getFieldValue(config, 'metrics.file') || ''}
-                oninput={(value) => onNestedChange('metrics.file', value)}
-                placeholder="metric_tree.yml (defaults to same directory as data_model.yml)"
-                description={getFieldDescription(schema, 'metrics.file') || 'Path to the metric tree file (optional, defaults to metric_tree.yml in data model directory)'}
-                disabled={!isDangerZoneEnabled}
-            />
+            <ConfigToggle path="metrics.enabled" label="Metric Tree Enabled" disabled={!isDangerZoneEnabled} />
+            <ConfigTextField path="metrics.file" label="Metric Tree File" placeholder="metric_tree.yml (defaults to same directory as data_model.yml)" disabled={!isDangerZoneEnabled} />
             <ConfigSelectField
                 id="metrics-expression-dialect-select"
                 label="Expression Dialect"

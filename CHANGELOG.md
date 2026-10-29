@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   app layout, the config page, `LineageModal`, `SevenWsForm`, `BusinessEvents`
   and `GenerateEntitiesDialog` now delegate to smaller components, services and
   unit-tested utils. No behaviour or markup changes (#184).
+- **Config page toggles and text fields are shared components:** the Business
+  Events, Apache Ossie and Metric Tree sections now use `ConfigToggle` and
+  `ConfigTextField`, which read the page's config helpers from context and
+  always store a cleared text field as `''`, never `null`. Fallback copy that
+  restated the backend field descriptions is gone; the descriptions come from
+  the config schema. Adds a component test and a Playwright round-trip test for
+  the Ossie section (#164).
+- **Push reads model schemas in one batch:** adapters gain
+  `get_model_schemas`, and the Ossie export uses it instead of one
+  `get_model_schema` per bound entity. A push now scans the Bruin pipeline once
+  and parses each dbt `schema.yml` once, instead of once per entity, and
+  `POST /sync-tests` no longer blocks the event loop while it runs (#162).
 - **Ossie export reads its own inputs:** the push-time adapter reads moved from
   `services/schema.py` into `services/ossie.py` (`export_ossie_for_push`), and
   the metric tree and exporter share one Ossie path function. Output is

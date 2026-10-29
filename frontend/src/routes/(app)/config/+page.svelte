@@ -9,7 +9,8 @@
     import EntityGuidanceSection from '$lib/components/config/EntityGuidanceSection.svelte';
     import ModelingSection from '$lib/components/config/ModelingSection.svelte';
     import DangerZoneSection from '$lib/components/config/DangerZoneSection.svelte';
-    import { getFieldValue as readFieldValue } from '$lib/utils/config-form';
+    import { getFieldValue as readFieldValue, getFieldDescription, isBetaField } from '$lib/utils/config-form';
+    import { setConfigFormContext } from '$lib/utils/config-form-context';
     import { getFrameworkCopy } from '$lib/utils/framework-display';
 
     let loading = $state(true);
@@ -272,6 +273,13 @@
     function getFieldValue(path: string): any {
         return readFieldValue(config, path);
     }
+
+    setConfigFormContext({
+        getFieldValue,
+        handleNestedFieldChange,
+        getFieldMetadata: (path) => schema.fields[path] ?? null,
+        isBetaField: (path) => isBetaField(schema, path),
+    });
 </script>
 
 <svelte:head>
