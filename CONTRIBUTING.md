@@ -194,6 +194,50 @@ uv sync --extra dev
 uv run pytest
 ```
 
+## Backend conventions
+
+### Errors
+Services raise the domain exceptions in `trellis_datamodel/exceptions.py`; route handlers do not catch them and do not raise `HTTPException` for domain conditions (unknown id, invalid input, ...). The global handlers in `server.py` map each exception to a status and a JSON body `{"detail": <message>, "error": <code>}`:
+
+| Exception | Status | `error` |
+| --- | --- | --- |
+| `NotFoundError` | 404 | `not_found` |
+| `ValidationError` | 422 | `validation_error` |
+| `FeatureDisabledError` | 403 (or the `status_code` it carries) | `feature_disabled` |
+| `ConfigurationError` | 400 | `configuration_error` |
+| `FileOperationError` | 500 | `file_operation_error` |
+| any other `DomainError` | 500 | `domain_error` |
+| unhandled exception | 500 | `internal_error` (detail is always `Internal Server Error`) |
+
+Invalid input is 422 everywhere, the same status FastAPI uses for request bodies that fail pydantic validation. Do not map `ValidationError` to 400 in a route.
+
+### Feature flags
+Gate a feature with the shared guard in `trellis_datamodel/routes/dependencies.py`, usually on the router:
+
+```python
+router = APIRouter(
+    prefix="/api",
+    dependencies=[Depends(require_feature(lambda: cfg.LINEAGE_ENABLED, "Lineage is disabled. ..."))],
+)
+```
+
+It raises `FeatureDisabledError` (403). Pass `status_code=404` only where a spec requires a disabled feature to look absent (the metric tree does).
+
+### Request and response models
+Pydantic request/response models live in `trellis_datamodel/models/`, not in route modules.
+
+Every route that answers JSON declares `response_model=`. Write endpoints with nothing else to report return `SuccessResponse` (`{"status": "success"}`); one that reports more subclasses it and adds only the fields the frontend reads (`ReconcileResponse.changed`, `MetricTreeSaveResponse.warnings`, ...). A request that cannot be served is an error status, never a `200` with an `error` field; `/api/config-status` is the exception because it is a status report that onboarding reads.
+
+### Reading and writing project files
+Do not `open()` a YAML file and call `yaml.safe_load`/`safe_dump` yourself; use the shared helpers:
+
+- Plain data (`data_model.yml`, `business_events.yml`, `trellis.yml` values, dbt schema files read for lookups): `trellis_datamodel/utils/structured_data.py`.
+  - `load_yaml_file(path, default)`: an unset or missing path, or an empty document, returns `default`; an unreadable file raises `OSError` and malformed YAML raises `yaml.YAMLError`. The caller translates those into its domain exception (`FileOperationError`, `ConfigurationError`, ...).
+  - `try_load_yaml_file(path, default)`: the same, but a broken file logs a warning and returns `default`. Only for best-effort reads that must not fail the request.
+  - `save_yaml_file(path, data)`: block-style YAML in key order, written atomically.
+- Files edited in place, where comments, quoting and key order must survive (dbt schema files, `trellis.yml`, Bruin assets): `YamlHandler` or `round_trip_yaml()` in `trellis_datamodel/utils/yaml_handler.py`, the one ruamel setup. Pass options (Bruin's representer, duplicate keys) as arguments instead of configuring another `YAML()`.
+- Every file write goes through `atomic_write()` in `trellis_datamodel/utils/atomic_write.py` (temp file in the same directory, then `os.replace`). It re-raises the original error; the caller maps it.
+
 ## Reporting issues
 - Use GitHub issues with clear reproduction steps, expected vs. actual behavior, and environment details.
 

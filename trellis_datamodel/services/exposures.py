@@ -16,7 +16,6 @@ used.
 import logging
 from typing import Any
 
-
 from trellis_datamodel import config as cfg
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.exceptions import FeatureDisabledError
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_data_model() -> dict[str, Any]:
-    """Load data model YAML."""
+    """Load data model YAML; {} if it is missing or unreadable."""
     return load_data_model_file(cfg.DATA_MODEL_PATH)
 
 

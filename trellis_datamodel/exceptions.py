@@ -47,6 +47,14 @@ class FileOperationError(DomainError):
 
 
 class FeatureDisabledError(DomainError):
-    """Raised when a feature is disabled in configuration."""
+    """Raised when a feature is disabled in configuration.
 
-    pass
+    Maps to 403 by default. A feature whose spec says a disabled feature must
+    look absent (the metric tree) passes ``status_code=404``.
+    """
+
+    def __init__(
+        self, message: str, detail: str | None = None, status_code: int = 403
+    ):
+        super().__init__(message, detail)
+        self.status_code = status_code

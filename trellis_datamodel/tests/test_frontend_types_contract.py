@@ -1,7 +1,8 @@
 """Backend responses must match the TypeScript types the frontend declares.
 
-``/config-status`` and ``/config-info`` return plain dicts, so ``ConfigStatus``
-and ``ConfigInfo`` in ``frontend/src/lib/types.ts`` are the only definition of
+``/config-status`` and ``/config-info`` serialize their response models with
+``exclude_unset``, so the keys on the wire depend on the project; ``ConfigStatus``
+and ``ConfigInfo`` in ``frontend/src/lib/types.ts`` are the frontend's side of
 those contracts. This parses the interfaces from ``types.ts`` and compares
 their keys with real responses: every required key must be present and no key
 may be undeclared.

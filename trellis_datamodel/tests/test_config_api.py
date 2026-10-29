@@ -212,8 +212,8 @@ async def test_put_config_validation_error(client: AsyncClient, temp_config_dir)
     assert put_response.status_code == 422
     data = put_response.json()
 
-    assert "error" in data["detail"]
-    assert "validation_error" in data["detail"]["error"]
+    assert data["error"] == "validation_error"
+    assert "framework" in data["detail"]
 
 
 @pytest.mark.asyncio
@@ -479,8 +479,7 @@ async def test_reload_config_missing_file(client: AsyncClient, temp_config_dir, 
     assert reload_response.status_code == 400
     data = reload_response.json()
 
-    assert "error" in data["detail"]
-    assert "configuration_error" in data["detail"]["error"]
+    assert data["error"] == "configuration_error"
 
 
 BRUIN_CONFIG = textwrap.dedent(
@@ -857,7 +856,7 @@ async def test_put_config_rejects_write_paths_that_escape_the_project(
     response = await _put_with(client, mutate)
 
     assert response.status_code == 422, response.text
-    assert field in response.json()["detail"]["message"]
+    assert field in response.json()["detail"]
     assert config_path.read_bytes() == before
 
 

@@ -409,6 +409,8 @@ export interface ConfigGetResponse {
         backup_path?: string;
     };
     trellis_version?: string;
+    // Set by getConfig() when the request fails (the API answers 4xx/5xx);
+    // the API's success body never carries it.
     error?: string;
 }
 

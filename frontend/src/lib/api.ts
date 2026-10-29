@@ -382,6 +382,16 @@ export async function getSourceSystemSuggestions(): Promise<string[]> {
 }
 
 // Config API
+
+// Config errors answer `{detail: <message>, error: <code>}`; the 409 conflict
+// keeps a structured `{detail: {message, ...}}`. apiJson (no errorMessage)
+// uses that detail text as the thrown message.
+
+/**
+ * Load trellis.yml for the config page. Never throws: a missing or unreadable
+ * config (a 400 from the API) comes back as `error` with the server's message
+ * and an empty config.
+ */
 export async function getConfig(): Promise<ConfigGetResponse> {
     try {
         return await apiJson<ConfigGetResponse>('/config');

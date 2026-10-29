@@ -33,7 +33,7 @@ def _write_config(tmp_path: Path, contents: str) -> Path:
     return path
 
 
-def test_lineage_defaults_to_disabled(monkeypatch, tmp_path, capsys):
+def test_lineage_defaults_to_disabled(monkeypatch, tmp_path, caplog):
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -43,12 +43,13 @@ def test_lineage_defaults_to_disabled(monkeypatch, tmp_path, capsys):
         """,
     )
 
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
     cfg.load_config(str(config_path))
-    captured = capsys.readouterr()
+    warnings = caplog.text
 
     assert cfg.LINEAGE_ENABLED is False
     assert cfg.LINEAGE_LAYERS == []
-    assert "lineage_layers" not in captured.out
+    assert "lineage_layers" not in warnings
 
 
 def test_lineage_nested_config(monkeypatch, tmp_path):
@@ -71,7 +72,7 @@ def test_lineage_nested_config(monkeypatch, tmp_path):
     assert cfg.LINEAGE_LAYERS == ["core", "marts"]
 
 
-def test_lineage_legacy_layers_with_warning(monkeypatch, tmp_path, capsys):
+def test_lineage_legacy_layers_with_warning(monkeypatch, tmp_path, caplog):
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -82,15 +83,16 @@ def test_lineage_legacy_layers_with_warning(monkeypatch, tmp_path, capsys):
         """,
     )
 
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
     cfg.load_config(str(config_path))
-    captured = capsys.readouterr()
+    warnings = caplog.text
 
     assert cfg.LINEAGE_ENABLED is False
     assert cfg.LINEAGE_LAYERS == ["legacy"]
-    assert "deprecated" in captured.out
+    assert "deprecated" in warnings
 
 
-def test_lineage_prefers_nested_over_legacy(monkeypatch, tmp_path, capsys):
+def test_lineage_prefers_nested_over_legacy(monkeypatch, tmp_path, caplog):
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -105,15 +107,16 @@ def test_lineage_prefers_nested_over_legacy(monkeypatch, tmp_path, capsys):
         """,
     )
 
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
     cfg.load_config(str(config_path))
-    captured = capsys.readouterr()
+    warnings = caplog.text
 
     assert cfg.LINEAGE_ENABLED is False
     assert cfg.LINEAGE_LAYERS == ["nested"]
-    assert "deprecated" in captured.out
+    assert "deprecated" in warnings
 
 
-def test_exposures_defaults_to_disabled(monkeypatch, tmp_path, capsys):
+def test_exposures_defaults_to_disabled(monkeypatch, tmp_path, caplog):
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -123,12 +126,13 @@ def test_exposures_defaults_to_disabled(monkeypatch, tmp_path, capsys):
         """,
     )
 
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
     cfg.load_config(str(config_path))
-    captured = capsys.readouterr()
+    warnings = caplog.text
 
     assert cfg.EXPOSURES_ENABLED is False
     assert cfg.EXPOSURES_DEFAULT_LAYOUT == "dashboards-as-rows"
-    assert "exposures" not in captured.out
+    assert "exposures" not in warnings
 
 
 def test_exposures_nested_config(monkeypatch, tmp_path):
@@ -149,7 +153,7 @@ def test_exposures_nested_config(monkeypatch, tmp_path):
     assert cfg.EXPOSURES_DEFAULT_LAYOUT == "entities-as-rows"
 
 
-def test_exposures_invalid_layout_fallback(monkeypatch, tmp_path, capsys):
+def test_exposures_invalid_layout_fallback(monkeypatch, tmp_path, caplog):
     _prepare_config(monkeypatch)
     config_path = _write_config(
         tmp_path,
@@ -161,12 +165,13 @@ def test_exposures_invalid_layout_fallback(monkeypatch, tmp_path, capsys):
         """,
     )
 
+    caplog.set_level(logging.WARNING, logger="trellis_datamodel.config")
     cfg.load_config(str(config_path))
-    captured = capsys.readouterr()
+    warnings = caplog.text
 
     assert cfg.EXPOSURES_ENABLED is True
     assert cfg.EXPOSURES_DEFAULT_LAYOUT == "dashboards-as-rows"
-    assert "default_layout" in captured.out and "must be" in captured.out
+    assert "default_layout" in warnings and "must be" in warnings
 
 
 def test_bus_matrix_disabled_by_default_entity_model(monkeypatch, tmp_path):
@@ -182,7 +187,7 @@ def test_bus_matrix_disabled_by_default_entity_model(monkeypatch, tmp_path):
     cfg.load_config(str(config_path))
 
     assert cfg.MODELING_STYLE == "entity_model"
-    assert cfg.Bus_MATRIX_ENABLED is False
+    assert cfg.BUS_MATRIX_ENABLED is False
 
 
 def test_bus_matrix_enabled_with_dimensional_model(monkeypatch, tmp_path):
@@ -199,7 +204,7 @@ def test_bus_matrix_enabled_with_dimensional_model(monkeypatch, tmp_path):
     cfg.load_config(str(config_path))
 
     assert cfg.MODELING_STYLE == "dimensional_model"
-    assert cfg.Bus_MATRIX_ENABLED is True
+    assert cfg.BUS_MATRIX_ENABLED is True
 
 
 def test_bus_matrix_can_disable_in_dimensional_model(monkeypatch, tmp_path):
@@ -218,7 +223,7 @@ def test_bus_matrix_can_disable_in_dimensional_model(monkeypatch, tmp_path):
     cfg.load_config(str(config_path))
 
     assert cfg.MODELING_STYLE == "dimensional_model"
-    assert cfg.Bus_MATRIX_ENABLED is False
+    assert cfg.BUS_MATRIX_ENABLED is False
 
 
 def test_bus_matrix_ignore_enable_when_entity_model(monkeypatch, tmp_path):
@@ -237,7 +242,7 @@ def test_bus_matrix_ignore_enable_when_entity_model(monkeypatch, tmp_path):
     cfg.load_config(str(config_path))
 
     assert cfg.MODELING_STYLE == "entity_model"
-    assert cfg.Bus_MATRIX_ENABLED is False
+    assert cfg.BUS_MATRIX_ENABLED is False
 
 
 def test_inference_patterns_string_format(monkeypatch, tmp_path):

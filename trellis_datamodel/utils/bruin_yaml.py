@@ -17,6 +17,8 @@ from ruamel.yaml.representer import RoundTripRepresenter
 from yaml.nodes import ScalarNode
 from yaml.resolver import Resolver as _PyYamlResolver
 
+from trellis_datamodel.utils.yaml_handler import round_trip_yaml
+
 _STR_TAG = "tag:yaml.org,2002:str"
 
 # PyYAML's own implicit resolver, i.e. the YAML 1.1 rules the parser reads with.
@@ -55,21 +57,13 @@ _BruinRepresenter.add_representer(str, _BruinRepresenter.represent_str)
 
 
 def bruin_yaml() -> YAML:
-    """A ruamel round-trip YAML configured for Bruin's block style.
+    """The shared round-trip YAML (:func:`round_trip_yaml`) set up for Bruin.
 
     ``preserve_quotes`` keeps a user's quoting on scalars that came from a
     round-trip load; the custom representer covers the plain strings that did
     not. Values that cannot be carried as style (they cross the JSON API) are
-    quoted by the representer instead of being silently coerced.
+    quoted by the representer instead of being silently coerced. PyYAML
+    accepts duplicate keys (last one wins), so the reader stays tolerant of
+    files ruamel would otherwise reject.
     """
-    yaml_rt = YAML()
-    yaml_rt.preserve_quotes = True
-    yaml_rt.Representer = _BruinRepresenter
-    # PyYAML accepts duplicate keys (last one wins); keep the reader tolerant
-    # of files ruamel would otherwise reject.
-    yaml_rt.allow_duplicate_keys = True
-    yaml_rt.default_flow_style = False
-    yaml_rt.width = 4096
-    yaml_rt.indent(mapping=2, sequence=4, offset=2)
-    yaml_rt.indentless_sequences = False
-    return yaml_rt
+    return round_trip_yaml(representer=_BruinRepresenter, allow_duplicate_keys=True)

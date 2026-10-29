@@ -6,20 +6,26 @@ with validation, conflict detection, and backup.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 
 from trellis_datamodel import __version__ as trellis_version
 from trellis_datamodel.adapters import get_adapter
 from trellis_datamodel.config import reload_config
-from trellis_datamodel.exceptions import ConfigurationError, ValidationError
 from trellis_datamodel.models.schemas import (
-    ConfigGetResponse,
-    ConfigUpdateRequest,
     ConfigConflictInfo,
+    ConfigFileInfo,
+    ConfigGetResponse,
+    ConfigReloadResponse,
+    ConfigSchemaResponse,
+    ConfigUpdateRequest,
+    ConfigUpdateResponse,
+    ConfigValidateResponse,
 )
 from trellis_datamodel.services.config_service import (
+    _get_file_hash,
+    _get_file_mtime,
     get_schema_metadata,
     read_config,
     require_config_path,
@@ -39,158 +45,82 @@ async def get_config() -> ConfigGetResponse:
 
     Returns the current trellis.yml values, schema metadata for UI rendering,
     and file information for conflict detection.
+
+    Raises:
+        ConfigurationError: No config file, or it cannot be read (400)
     """
-    try:
-        # Load config and file info
-        config, file_info = read_config()
+    config, file_info = read_config()
 
-        # Get schema metadata
-        schema = get_schema_metadata()
-
-        # Add beta flag metadata to response
-        response = ConfigGetResponse(
-            config=config,
-            schema_metadata=schema,
-            file_info=file_info,
-            trellis_version=trellis_version,
-            error=None,
-        )
-
-        return response
-
-    except ConfigurationError as e:
-        # Config file not found or unreadable - return error but don't crash
-        schema = get_schema_metadata()
-        return ConfigGetResponse(
-            config={},
-            schema_metadata=schema,
-            file_info=None,
-            trellis_version=trellis_version,
-            error=str(e),
-        )
-    except Exception as e:
-        logger.error(f"Error loading config: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to load configuration",
-        )
+    return ConfigGetResponse(
+        config=config,
+        schema_metadata=get_schema_metadata(),
+        file_info=file_info,
+        trellis_version=trellis_version,
+    )
 
 
-@config_router.get("/schema")
-async def get_config_schema():
+@config_router.get("/schema", response_model=ConfigSchemaResponse)
+async def get_config_schema() -> ConfigSchemaResponse:
     """
     Get schema metadata for config UI.
 
     Returns field definitions and beta flag list without loading config.
     """
-    try:
-        schema = get_schema_metadata()
-        return schema
-    except Exception as e:
-        logger.error(f"Error loading schema: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to load schema: {e}",
-        )
+    return get_schema_metadata()
 
 
-@config_router.put("")
-async def update_config(request: ConfigUpdateRequest) -> Dict[str, Any]:
+@config_router.put("", response_model=ConfigUpdateResponse)
+async def update_config(request: ConfigUpdateRequest) -> ConfigUpdateResponse:
     """
     Update configuration with validation, conflict detection, and atomic write.
 
     Validates the config, checks for conflicts (mtime/hash), and atomically writes the new config.
 
-    If a conflict is detected, returns 409 with conflict details.
-    If validation fails, returns 422 with validation errors.
+    Raises:
+        HTTPException: 409 with the current and expected file identity
+        ConfigurationError: No config file, or it cannot be read/written (400)
+        ValidationError: The config does not validate (422)
     """
-    try:
-        config_path = require_config_path()
+    config_path = require_config_path()
 
-        # Save config with conflict detection
-        saved_config, conflict_message = save_config(
-            config=request.config,
-            config_path=config_path,
+    saved_config, conflict_message = save_config(
+        config=request.config,
+        config_path=config_path,
+        expected_mtime=request.expected_mtime,
+        expected_hash=request.expected_hash,
+    )
+
+    if conflict_message:
+        # The frontend reads this structured detail to show the conflict, which
+        # the global handlers' {"detail": <message>} shape cannot carry.
+        conflict_info = ConfigConflictInfo(
+            current_mtime=_get_file_mtime(config_path),
+            current_hash=_get_file_hash(config_path),
             expected_mtime=request.expected_mtime,
             expected_hash=request.expected_hash,
         )
-
-        # If there's a conflict, return 409
-        if conflict_message:
-            # Get current file info for conflict response
-            from trellis_datamodel.services.config_service import (
-                _get_file_mtime,
-                _get_file_hash,
-            )
-
-            current_mtime = _get_file_mtime(config_path)
-            current_hash = _get_file_hash(config_path)
-
-            conflict_info = ConfigConflictInfo(
-                current_mtime=current_mtime,
-                current_hash=current_hash,
-                expected_mtime=request.expected_mtime,
-                expected_hash=request.expected_hash,
-            )
-            # Prefer model_dump() to avoid Pydantic v2 dict() deprecation warnings.
-            conflict_dict = (
-                conflict_info.model_dump()
-                if hasattr(conflict_info, "model_dump")
-                else conflict_info.dict()
-            )
-            
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "error": "conflict",
-                    "message": conflict_message,
-                    "conflict": conflict_dict,
-                },
-            )
-
-        # Success - return updated config and new file info
-        from trellis_datamodel.services.config_service import (
-            _get_file_mtime,
-            _get_file_hash,
-        )
-
-        response = {
-            "config": saved_config,
-            "file_info": {
-                "path": config_path,
-                "mtime": _get_file_mtime(config_path),
-                "hash": _get_file_hash(config_path),
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "conflict",
+                "message": conflict_message,
+                "conflict": conflict_info.model_dump(),
             },
-        }
-
-        logger.info(f"Successfully updated config: {config_path}")
-        return response
-
-    except ConfigurationError as e:
-        logger.error(f"Config error: {e}")
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "configuration_error", "message": str(e)},
-        )
-    except ValidationError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(
-            status_code=422,
-            detail={"error": "validation_error", "message": str(e)},
-        )
-    except HTTPException:
-        # Re-raise HTTPException (like 409 conflict)
-        raise
-    except Exception as e:
-        logger.error(f"Error saving config: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "internal_error", "message": str(e)},
         )
 
+    logger.info(f"Successfully updated config: {config_path}")
+    return ConfigUpdateResponse(
+        config=saved_config,
+        file_info=ConfigFileInfo(
+            path=config_path,
+            mtime=_get_file_mtime(config_path),
+            hash=_get_file_hash(config_path),
+        ),
+    )
 
-@config_router.post("/reload")
-async def reload_config_endpoint() -> Dict[str, Any]:
+
+@config_router.post("/reload", response_model=ConfigReloadResponse)
+async def reload_config_endpoint() -> ConfigReloadResponse:
     """
     Reload configuration from trellis.yml at runtime.
 
@@ -198,57 +128,25 @@ async def reload_config_endpoint() -> Dict[str, Any]:
     clearing any cached state that depends on config. Should be called after
     config file changes to apply new settings without restarting the server.
 
-    Returns:
-        Success response with status message.
-
     Raises:
-        HTTPException: If config cannot be reloaded (file not found, invalid, etc.)
+        ConfigurationError: Config file not found or invalid (400)
     """
-    try:
-        # Reload config (updates all global variables)
-        reload_config()
+    reload_config()
 
-        # Reset through a fresh adapter so the shared, framework-neutral
-        # cache boundary is applied after the new configuration is active.
-        adapter = get_adapter()
-        adapter.reset_inference_cache()
+    # Reset through a fresh adapter so the shared, framework-neutral
+    # cache boundary is applied after the new configuration is active.
+    get_adapter().reset_inference_cache()
 
-        logger.info("Configuration reloaded successfully via API")
-        return {
-            "status": "success",
-            "message": "Configuration reloaded successfully",
-        }
-    except ConfigurationError as e:
-        logger.error(f"Config error during reload: {e}")
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "configuration_error", "message": str(e)},
-        )
-    except Exception as e:
-        logger.error(f"Error reloading config: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "internal_error", "message": str(e)},
-        )
+    logger.info("Configuration reloaded successfully via API")
+    return ConfigReloadResponse(message="Configuration reloaded successfully")
 
 
-@config_router.post("/validate")
-async def validate_config_endpoint(config: Dict[str, Any]) -> Dict[str, Any]:
+@config_router.post("/validate", response_model=ConfigValidateResponse)
+async def validate_config_endpoint(config: Dict[str, Any]) -> ConfigValidateResponse:
     """
     Validate a config without saving it.
 
     Useful for client-side validation before applying changes.
     """
-    try:
-        is_valid, error_msg = validate_config(config)
-
-        return {
-            "valid": is_valid,
-            "error": error_msg,
-        }
-    except Exception as e:
-        logger.error(f"Error validating config: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to validate configuration: {e}",
-        )
+    is_valid, error_msg = validate_config(config)
+    return ConfigValidateResponse(valid=is_valid, error=error_msg)

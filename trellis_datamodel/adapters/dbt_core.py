@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import time
-import yaml
 from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, Optional
@@ -34,7 +33,11 @@ from trellis_datamodel.adapters.lineage import (
     source_systems_from_lineage,
     walk_upstream,
 )
-from trellis_datamodel.utils.structured_data import load_data_model_file
+from trellis_datamodel.utils.structured_data import (
+    load_data_model_file,
+    load_yaml_file,
+    try_load_yaml_file,
+)
 from .artifact_snapshot import ArtifactSnapshot, clear_snapshots, get_snapshot
 from . import entity_type_inference
 from .base import (
@@ -498,13 +501,12 @@ class DbtCoreAdapter:
         if not (yml_path and os.path.exists(yml_path)):
             return
         try:
-            with open(yml_path, "r") as f:
-                yml_content = yaml.safe_load(f) or {}
-                for model_entry in yml_content.get("models", []):
-                    yml_name = model_entry.get("name")
-                    if yml_name and yml_name != base_name:
-                        model_to_entity[yml_name] = entity_id
-                        model_to_entity[yml_name.lower()] = entity_id
+            yml_content = load_yaml_file(yml_path, {})
+            for model_entry in yml_content.get("models", []):
+                yml_name = model_entry.get("name")
+                if yml_name and yml_name != base_name:
+                    model_to_entity[yml_name] = entity_id
+                    model_to_entity[yml_name.lower()] = entity_id
         except Exception:
             pass  # Gracefully skip if YAML parsing fails
 
@@ -535,8 +537,7 @@ class DbtCoreAdapter:
         """
         for yml_path in _schema_yml_paths(self.get_model_dirs()):
             try:
-                with open(yml_path, "r") as f:
-                    yml_content = yaml.safe_load(f) or {}
+                yml_content = load_yaml_file(yml_path, {})
                 models_list = yml_content.get("models", [])
                 # A file base name only identifies the model in
                 # single-model files; shared files (schema.yml) do not.
@@ -1073,7 +1074,7 @@ class DbtCoreAdapter:
                     )
                 )
             except Exception as e:
-                print(f"Warning: Could not parse {filepath}: {e}")
+                logger.warning("Could not parse %s: %s", filepath, e)
                 continue
 
         return _dedupe_relationships(relationships)
@@ -1095,8 +1096,7 @@ class DbtCoreAdapter:
         include_unbound: bool,
     ) -> Iterator[Relationship]:
         """Yield the relationship tests one schema yml file declares."""
-        with open(filepath, "r") as f:
-            schema_data = yaml.safe_load(f) or {}
+        schema_data = load_yaml_file(filepath, {})
 
         for model in schema_data.get("models", []):
             base_model_name = model.get("name")
@@ -1709,13 +1709,7 @@ class DbtCoreAdapter:
         if not exposures_path:
             return []
 
-        try:
-            with open(exposures_path, "r") as f:
-                data = yaml.safe_load(f) or {}
-        except Exception as e:
-            logger.warning("Could not read %s: %s", exposures_path, e)
-            return []
-
+        data = try_load_yaml_file(exposures_path, {})
         exposures = data.get("exposures", [])
         return exposures if isinstance(exposures, list) else []
 

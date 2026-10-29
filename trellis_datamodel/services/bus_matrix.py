@@ -17,11 +17,10 @@ Only available when modeling_style is set to "dimensional_model" in trellis.yml.
 import os
 from typing import Any
 
-import yaml
-
 from trellis_datamodel import config as cfg
 from trellis_datamodel.exceptions import ConfigurationError, FileOperationError
 from trellis_datamodel.services.tag_ownership import compute_display_tags
+from trellis_datamodel.utils.structured_data import load_yaml_file
 
 
 def get_bus_matrix(
@@ -45,7 +44,7 @@ def get_bus_matrix(
         FileOperationError: If data model file cannot be read
     """
     # Bus Matrix is only available in dimensional modeling mode
-    if cfg.MODELING_STYLE != "dimensional_model" or not cfg.Bus_MATRIX_ENABLED:
+    if cfg.MODELING_STYLE != "dimensional_model" or not cfg.BUS_MATRIX_ENABLED:
         raise ConfigurationError("Bus Matrix is disabled for entity_model")
 
     if not cfg.DATA_MODEL_PATH:
@@ -59,8 +58,7 @@ def get_bus_matrix(
         )
 
     try:
-        with open(cfg.DATA_MODEL_PATH, "r") as f:
-            data_model = yaml.safe_load(f) or {}
+        data_model = load_yaml_file(cfg.DATA_MODEL_PATH, {})
     except Exception as e:
         raise FileOperationError(f"Error reading data model: {str(e)}") from e
 

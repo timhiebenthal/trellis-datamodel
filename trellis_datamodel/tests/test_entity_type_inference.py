@@ -5,7 +5,7 @@ import os
 import pytest
 from trellis_datamodel.adapters.dbt_core import DbtCoreAdapter
 from trellis_datamodel import config as cfg
-from trellis_datamodel.routes.data_model import _infer_type_from_name, _apply_entity_type_inference
+from trellis_datamodel.services.data_model import _infer_type_from_name, _apply_entity_type_inference
 
 
 class TestEntityTypeInference:
