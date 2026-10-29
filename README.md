@@ -92,7 +92,7 @@ ossie:
   enabled: true
 ```
 
-The document is written to `semantic_model.yml` beside `data_model.yml`. Set `ossie.file` to put it somewhere else, and `ossie.source.database` / `ossie.source.schema` to override the address segments the adapter reports (those reflect whatever target last ran dbt). Only entities bound to a model are exported: draft entities, and relationships that touch them, are skipped and listed as warnings in the Push response.
+The document is written to `semantic_model.yml` beside `data_model.yml`. Set `ossie.file` to put it somewhere else (a relative path resolves against `dbt_project_path` when that is set, otherwise against the directory of `trellis.yml`), and `ossie.source.database` / `ossie.source.schema` to override the address segments the adapter reports (those reflect whatever target last ran dbt). Only entities bound to a model are exported: draft entities, and relationships that touch them, are skipped and listed as warnings in the Push response.
 
 ### Metric tree
 

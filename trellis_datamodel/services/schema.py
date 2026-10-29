@@ -19,7 +19,6 @@ from typing import Any
 
 from trellis_datamodel import config as cfg
 from trellis_datamodel.adapters import get_adapter
-from trellis_datamodel.adapters.base import ModelInfo, ModelSchema, TransformationAdapter
 from trellis_datamodel.exceptions import (
     DomainError,
     FileOperationError,
@@ -27,7 +26,7 @@ from trellis_datamodel.exceptions import (
     ValidationError,
 )
 from trellis_datamodel.models.entity_keys import get_model_ref
-from trellis_datamodel.services.ossie import export_ossie
+from trellis_datamodel.services.ossie import export_ossie_for_push
 from trellis_datamodel.services.tag_ownership import PUSHED_TAGS_KEY
 from trellis_datamodel.utils.path_validation import validate_data_model_path
 from trellis_datamodel.utils.structured_data import load_yaml_file, load_yaml_or_json
@@ -158,14 +157,7 @@ def sync_framework_tests() -> SyncOutcome:
     # Outside the block above on purpose: the framework push already succeeded,
     # so the error must say so rather than reporting a failed sync.
     try:
-        models = adapter.get_models()
-        project_name = adapter.get_project_status()["project_name"]
-        model_schemas, schema_warnings = _ossie_model_schemas(
-            adapter, entities, models
-        )
-        export = export_ossie(
-            entities, relationships, project_name, models, model_schemas
-        )
+        export = export_ossie_for_push(adapter, entities, relationships)
     except Exception as e:
         raise FileOperationError(
             "Framework schema files were updated, but the Ossie file was not "
@@ -176,41 +168,9 @@ def sync_framework_tests() -> SyncOutcome:
         updated_files.append(export.path)
     return SyncOutcome(
         files=updated_files,
-        warnings=schema_warnings + export.warnings,
+        warnings=export.warnings,
         ossie_path=export.path,
     )
-
-
-def _ossie_model_schemas(
-    adapter: TransformationAdapter,
-    entities: list[dict[str, Any]],
-    models: list[ModelInfo],
-) -> tuple[dict[str, ModelSchema], list[str]]:
-    """Read key metadata for the models bound entities actually name.
-
-    Unreadable schemas are only a warning: the dataset is still exported, it
-    just loses key inference, and one broken schema file must not fail a push.
-    """
-    wanted = {
-        model_ref for model_ref in (get_model_ref(e) for e in entities) if model_ref
-    }
-    schemas: dict[str, ModelSchema] = {}
-    warnings: list[str] = []
-
-    for model in models:
-        unique_id = model.get("unique_id") or ""
-        if not unique_id or unique_id not in wanted:
-            continue
-        try:
-            schemas[unique_id] = adapter.get_model_schema(
-                model["name"], version=model.get("version")
-            )
-        except Exception as e:
-            warnings.append(
-                f'model "{model.get("name")}" schema could not be read, so its '
-                f"key metadata was skipped: {e}"
-            )
-    return schemas, warnings
 
 
 def _persist_pushed_tags(

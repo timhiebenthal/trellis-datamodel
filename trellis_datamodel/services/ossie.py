@@ -21,6 +21,7 @@ from trellis_datamodel.adapters.base import (
     ColumnSchema,
     ModelInfo,
     ModelSchema,
+    TransformationAdapter,
 )
 from trellis_datamodel.models.entity_keys import (
     get_model_ref,
@@ -320,8 +321,13 @@ def _endpoint_problem(
     label: str,
     emitted: dict[str, str],
     entities_by_id: dict[str, dict[str, Any]],
+    not_exported: dict[str, str],
 ) -> str | None:
-    """Why a relationship endpoint produced no dataset, or None when it did."""
+    """Why a relationship endpoint produced no dataset, or None when it did.
+
+    `not_exported` carries the reason the exporter recorded when it dropped a
+    bound entity, so the cause is reported as it was found, not re-derived.
+    """
     if entity_id in emitted:
         return None
     entity = entities_by_id.get(entity_id)
@@ -329,16 +335,13 @@ def _endpoint_problem(
         return (
             f'{label} skipped: {role} entity "{entity_id}" is not in the data model'
         )
-    model_ref = get_model_ref(entity)
-    if not model_ref:
+    if not get_model_ref(entity):
         return (
             f'{label} skipped: {role} entity "{entity_id}" is a draft entity '
             "(no model_ref)"
         )
-    return (
-        f'{label} skipped: {role} entity "{entity_id}" references model '
-        f'"{model_ref}", which the adapter does not report'
-    )
+    reason = not_exported.get(entity_id, "was not exported")
+    return f'{label} skipped: {role} entity "{entity_id}" {reason}'
 
 
 def _build_relationships(
@@ -346,6 +349,7 @@ def _build_relationships(
     relationships: list[dict],
     emitted: dict[str, str],
     field_names: dict[str, set[str]],
+    not_exported: dict[str, str],
 ) -> tuple[list[dict[str, Any]], list[str], dict[str, str]]:
     """Orient, filter, deduplicate and name every relationship worth emitting.
 
@@ -374,10 +378,12 @@ def _build_relationships(
         source = (relationship.get("source") or "").strip()
         target = (relationship.get("target") or "").strip()
 
-        problem = _endpoint_problem(source, "source", label, emitted, entities_by_id)
+        problem = _endpoint_problem(
+            source, "source", label, emitted, entities_by_id, not_exported
+        )
         if problem is None:
             problem = _endpoint_problem(
-                target, "target", label, emitted, entities_by_id
+                target, "target", label, emitted, entities_by_id, not_exported
             )
         if problem is not None:
             warnings.append(problem)
@@ -505,19 +511,6 @@ def _resolve_name(project_name: str) -> str:
         if stem:
             return stem
     return "semantic_model"
-
-
-def _output_path() -> Path:
-    """The configured Ossie file, or the default beside data_model.yml."""
-    configured = (cfg.OSSIE_CONFIG.file or "").strip()
-    if configured:
-        return Path(configured)
-    data_model_path = (getattr(cfg, "DATA_MODEL_PATH", "") or "").strip()
-    if data_model_path:
-        return Path(data_model_path).parent / DEFAULT_FILENAME
-    # An absolute path: `YamlHandler.save_file` creates the parent directory and
-    # a bare filename gives it an empty one to create.
-    return Path.cwd() / DEFAULT_FILENAME
 
 
 def _metric_expression(expression: str) -> dict[str, Any]:
@@ -659,6 +652,7 @@ def export_ossie(
     emitted: dict[str, str] = {}
     field_names: dict[str, set[str]] = {}
     dataset_owners: dict[str, str] = {}
+    not_exported: dict[str, str] = {}
     for entity in entities:
         entity_id = (entity.get("id") or "").strip()
         model_ref = get_model_ref(entity)
@@ -670,6 +664,9 @@ def export_ossie(
 
         model = model_index.get(model_ref)
         if model is None:
+            not_exported[entity_id] = (
+                f'references model "{model_ref}", which the adapter does not report'
+            )
             warnings.append(
                 f'entity "{entity_id}" references model "{model_ref}", which the '
                 "adapter does not report; dbt_model_paths / bruin_asset_paths "
@@ -682,6 +679,10 @@ def export_ossie(
         if owner is not None:
             # A dataset name keys every relationship, so a second dataset with
             # the same name would make every reference to it ambiguous.
+            not_exported[entity_id] = (
+                f'maps to dataset "{dataset_name}", already exported for '
+                f'entity "{owner}" (a dataset name must be unique)'
+            )
             warnings.append(
                 f'entities "{owner}" and "{entity_id}" both map to dataset '
                 f'"{dataset_name}"; only "{owner}" was exported '
@@ -704,7 +705,9 @@ def export_ossie(
         return OssieExport(path=None, warnings=warnings)
 
     relationship_entries, relationship_warnings, key_evidence = (
-        _build_relationships(entities, relationships, emitted, field_names)
+        _build_relationships(
+            entities, relationships, emitted, field_names, not_exported
+        )
     )
     warnings.extend(relationship_warnings)
 
@@ -725,7 +728,7 @@ def export_ossie(
 
     datasets.sort(key=lambda dataset: dataset["name"])
 
-    path = _output_path()
+    path = Path(cfg.ossie_file_path())
     # Off means off: no tree is read while the feature is disabled, but metrics
     # the file already had still survive the rewrite.
     tree = MetricTreeFile()
@@ -747,3 +750,54 @@ def export_ossie(
 
     YamlHandler().save_file(str(path), document)
     return OssieExport(path=path, warnings=warnings)
+
+
+def collect_model_schemas(
+    adapter: TransformationAdapter,
+    entities: list[dict[str, Any]],
+    models: list[ModelInfo],
+) -> tuple[dict[str, ModelSchema], list[str]]:
+    """Read key metadata for the models bound entities actually name.
+
+    Unreadable schemas are only a warning: the dataset is still exported, it
+    just loses key inference, and one broken schema file must not fail a push.
+    """
+    wanted = {
+        model_ref for model_ref in (get_model_ref(e) for e in entities) if model_ref
+    }
+    schemas: dict[str, ModelSchema] = {}
+    warnings: list[str] = []
+
+    for model in models:
+        unique_id = model.get("unique_id") or ""
+        if not unique_id or unique_id not in wanted:
+            continue
+        try:
+            schemas[unique_id] = adapter.get_model_schema(
+                model["name"], version=model.get("version")
+            )
+        except Exception as e:
+            warnings.append(
+                f'model "{model.get("name")}" schema could not be read, so its '
+                f"key metadata was skipped: {e}"
+            )
+    return schemas, warnings
+
+
+def export_ossie_for_push(
+    adapter: TransformationAdapter,
+    entities: list[dict[str, Any]],
+    relationships: list[dict[str, Any]],
+) -> OssieExport:
+    """Export the Ossie document for a push, reading everything from `adapter`.
+
+    `export_ossie` itself never calls an adapter; this is the one place that
+    does it on its behalf. Schema-read warnings come before the export's own.
+    """
+    models = adapter.get_models()
+    project_name = adapter.get_project_status()["project_name"]
+    model_schemas, schema_warnings = collect_model_schemas(adapter, entities, models)
+    export = export_ossie(
+        entities, relationships, project_name, models, model_schemas
+    )
+    return OssieExport(path=export.path, warnings=schema_warnings + export.warnings)
