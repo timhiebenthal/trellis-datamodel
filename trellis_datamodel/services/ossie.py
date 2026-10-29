@@ -727,19 +727,22 @@ def collect_model_schemas(
     schemas: dict[str, ModelSchema] = {}
     warnings: list[str] = []
 
-    for model in models:
-        unique_id = model.get("unique_id") or ""
-        if not unique_id or unique_id not in wanted:
-            continue
-        try:
-            schemas[unique_id] = adapter.get_model_schema(
-                model["name"], version=model.get("version")
-            )
-        except Exception as e:
+    bound = [
+        model
+        for model in models
+        if (model.get("unique_id") or "") in wanted
+    ]
+    results = adapter.get_model_schemas(
+        [(model["name"], model.get("version")) for model in bound]
+    )
+    for model, result in zip(bound, results):
+        if isinstance(result, Exception):
             warnings.append(
                 f'model "{model.get("name")}" schema could not be read, so its '
-                f"key metadata was skipped: {e}"
+                f"key metadata was skipped: {result}"
             )
+        else:
+            schemas[model["unique_id"]] = result
     return schemas, warnings
 
 

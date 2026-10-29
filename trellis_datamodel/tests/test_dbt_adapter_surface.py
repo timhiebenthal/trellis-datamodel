@@ -420,3 +420,83 @@ class TestOssieExportSurface:
         # test names reaching the exporter, no key entry appears at all.
         assert dataset["primary_key"] == ["customer_id"]
 
+
+
+class TestGetModelSchemas:
+    @pytest.fixture
+    def shared_schema_adapter(self, tmp_path):
+        """Three models, two of them documented in the same schema.yml."""
+        project = tmp_path / "dbt_project"
+        models_dir = project / "models" / "3_core"
+        models_dir.mkdir(parents=True)
+        (models_dir / "schema.yml").write_text(
+            yaml.safe_dump(
+                {
+                    "models": [
+                        {"name": "dim__a", "columns": [{"name": "a_id"}]},
+                        {"name": "dim__b", "columns": [{"name": "b_id"}]},
+                    ]
+                }
+            )
+        )
+        (models_dir / "dim__c.yml").write_text(
+            yaml.safe_dump({"models": [{"name": "dim__c", "columns": []}]})
+        )
+        nodes = {
+            f"model.proj.{name}": {
+                "unique_id": f"model.proj.{name}",
+                "resource_type": "model",
+                "name": name,
+                "original_file_path": f"models/3_core/{name}.sql",
+                "patch_path": f"proj://models/3_core/{patch}",
+                "depends_on": {"nodes": []},
+            }
+            for name, patch in (
+                ("dim__a", "schema.yml"),
+                ("dim__b", "schema.yml"),
+                ("dim__c", "dim__c.yml"),
+            )
+        }
+        manifest_path = project / "target" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text(
+            json.dumps({"metadata": {"project_name": "proj"}, "nodes": nodes})
+        )
+        return DbtCoreAdapter(
+            manifest_path=str(manifest_path),
+            catalog_path=str(project / "target" / "catalog.json"),
+            project_path=str(project),
+            data_model_path=str(tmp_path / "data_model.yml"),
+            model_paths=["3_core"],
+        )
+
+    def test_matches_single_reads(self, shared_schema_adapter):
+        names = ["dim__a", "dim__b", "dim__c"]
+
+        batch = shared_schema_adapter.get_model_schemas([(n, None) for n in names])
+
+        assert batch == [shared_schema_adapter.get_model_schema(n) for n in names]
+
+    def test_parses_each_schema_file_once(self, shared_schema_adapter, monkeypatch):
+        loaded: list[str] = []
+        real_load = shared_schema_adapter.yaml_handler.load_file
+        monkeypatch.setattr(
+            shared_schema_adapter.yaml_handler,
+            "load_file",
+            lambda path: loaded.append(path) or real_load(path),
+        )
+
+        shared_schema_adapter.get_model_schemas(
+            [("dim__a", None), ("dim__b", None), ("dim__c", None)]
+        )
+
+        assert len(loaded) == 2
+        assert len(set(loaded)) == 2
+
+    def test_unknown_model_is_returned_not_raised(self, shared_schema_adapter):
+        results = shared_schema_adapter.get_model_schemas(
+            [("nope", None), ("dim__a", None)]
+        )
+
+        assert isinstance(results[0], ValueError)
+        assert results[1]["model_name"] == "dim__a"

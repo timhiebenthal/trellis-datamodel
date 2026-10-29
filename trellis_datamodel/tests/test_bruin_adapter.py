@@ -114,6 +114,50 @@ class TestGetModels:
         assert adapter.get_models() == []
 
 
+class TestGetModelSchemas:
+    def test_matches_single_reads(self, adapter):
+        names = ["dim__customer", "core.dim__product", "fct__order"]
+
+        batch = adapter.get_model_schemas([(n, None) for n in names])
+
+        assert batch == [adapter.get_model_schema(n) for n in names]
+
+    def test_scans_the_pipeline_once_for_all_models(self, adapter, monkeypatch):
+        from trellis_datamodel.adapters import bruin
+
+        scans = []
+        real_scan = bruin.scan_pipeline_assets
+        monkeypatch.setattr(
+            bruin,
+            "scan_pipeline_assets",
+            lambda *args: scans.append(args) or real_scan(*args),
+        )
+
+        results = adapter.get_model_schemas(
+            [("dim__customer", None), ("dim__product", None), ("fct__order", None)]
+        )
+
+        assert len(scans) == 1
+        assert not any(isinstance(r, Exception) for r in results)
+
+    def test_unknown_model_is_returned_not_raised(self, adapter):
+        results = adapter.get_model_schemas([("nope", None), ("dim__customer", None)])
+
+        assert isinstance(results[0], ValueError)
+        assert results[1]["model_name"] == "dim__customer"
+
+    def test_no_requests_does_not_scan(self, adapter, monkeypatch):
+        from trellis_datamodel.adapters import bruin
+
+        monkeypatch.setattr(
+            bruin,
+            "scan_pipeline_assets",
+            lambda *args: pytest.fail("scanned for an empty batch"),
+        )
+
+        assert adapter.get_model_schemas([]) == []
+
+
 class TestGetModelSchema:
     def test_by_short_name(self, adapter):
         schema = adapter.get_model_schema("dim__customer")
