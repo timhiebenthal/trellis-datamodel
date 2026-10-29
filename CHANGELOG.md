@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`business_events.yml` is written atomically:** like `data_model.yml`,
   `trellis.yml` and Bruin assets, a failed save now leaves the previous file in
   place instead of a partially written one (#179).
+- **One SQL type vocabulary for reconciliation and the Ossie export (#163):** both now read the same table in `utils/sql_types.py`, so supporting a new warehouse type is a single edit.
 
 ### Fixed
 - **Config page showed the entity creation wizard as off by default:** with
@@ -77,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a 422. The dbt adapter also refuses a default `<model>.yml` path that
   resolves outside the models directory, which covers entity ids read from
   `data_model.yml` during `POST /api/sync-tests`.
+- **Ossie export keeps `uuid`, `money`, `tinyint`, `serial`, `nvarchar` and `bignumeric` types (#163):** these columns used to lose `datatype` in the exported document because the exporter's own type table had drifted from reconciliation's. `interval` is no longer bucketed as an integer.
 
 ## [0.26.0] - 2026-10-28
 
