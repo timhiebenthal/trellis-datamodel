@@ -1,6 +1,6 @@
 <script lang="ts">
     import ConfigCard from './ConfigCard.svelte';
-    import ConfigTextField from './ConfigTextField.svelte';
+    import ConfigTextInput from './ConfigTextInput.svelte';
     import ConfigPathList from './ConfigPathList.svelte';
     import { getFieldDescription, getFieldValue, type ConfigFormBinding } from '$lib/utils/config-form';
 
@@ -28,7 +28,7 @@
 >
     <div class="space-y-4">
         {#if selectedFramework === 'dbt-core'}
-            <ConfigTextField
+            <ConfigTextInput
                 id="dbt-project-path-input"
                 label="dbt Project Path"
                 value={getFieldValue(config, 'dbt_project_path')}
@@ -37,7 +37,7 @@
                 description={getFieldDescription(schema, 'dbt_project_path')}
                 error={validationErrors['dbt_project_path']}
             />
-            <ConfigTextField
+            <ConfigTextInput
                 id="dbt-manifest-path-input"
                 label="Manifest Path"
                 value={getFieldValue(config, 'dbt_manifest_path')}
@@ -46,7 +46,7 @@
                 description={getFieldDescription(schema, 'dbt_manifest_path')}
                 error={validationErrors['dbt_manifest_path']}
             />
-            <ConfigTextField
+            <ConfigTextInput
                 id="dbt-catalog-path-input"
                 label="Catalog Path"
                 value={getFieldValue(config, 'dbt_catalog_path')}
@@ -58,7 +58,7 @@
         {/if}
 
         {#if selectedFramework === 'bruin'}
-            <ConfigTextField
+            <ConfigTextInput
                 id="bruin-pipeline-path-input"
                 label="Bruin Pipeline Path"
                 value={getFieldValue(config, 'bruin_pipeline_path')}
@@ -67,7 +67,7 @@
                 description={getFieldDescription(schema, 'bruin_pipeline_path') || 'Directory holding pipeline.yml and assets/'}
                 error={validationErrors['bruin_pipeline_path']}
             />
-            <ConfigTextField
+            <ConfigTextInput
                 id="bruin-default-asset-type-input"
                 label="Default Asset Type"
                 value={getFieldValue(config, 'bruin_default_asset_type')}
@@ -75,7 +75,7 @@
                 placeholder="duckdb.sql"
             >
                 Type used when Trellis creates a new asset for a drafted entity. Platform-specific, e.g. <code>duckdb.sql</code>, <code>bq.sql</code>, <code>sf.sql</code>.
-            </ConfigTextField>
+            </ConfigTextInput>
             <ConfigPathList
                 idPrefix="bruin-asset-paths"
                 label="Bruin Asset Paths"
@@ -86,7 +86,7 @@
             />
         {/if}
 
-        <ConfigTextField
+        <ConfigTextInput
             id="data-model-file-input"
             label="Data Model File"
             value={getFieldValue(config, 'data_model_file')}
@@ -97,7 +97,7 @@
         />
 
         {#if selectedFramework === 'dbt-core'}
-            <ConfigTextField
+            <ConfigTextInput
                 id="dbt-company-dummy-path-input"
                 label="dbt Company Dummy Path"
                 value={getFieldValue(config, 'dbt_company_dummy_path') || ''}

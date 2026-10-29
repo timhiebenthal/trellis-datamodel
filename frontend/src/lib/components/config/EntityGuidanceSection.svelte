@@ -1,6 +1,6 @@
 <script lang="ts">
     import ConfigCard from './ConfigCard.svelte';
-    import ConfigTextField from './ConfigTextField.svelte';
+    import ConfigTextInput from './ConfigTextInput.svelte';
     import ConfigToggleSwitch from './ConfigToggleSwitch.svelte';
     import { getFieldDescription, getFieldValue, type ConfigFormBinding } from '$lib/utils/config-form';
 
@@ -51,7 +51,7 @@
             />
         </div>
 
-        <ConfigTextField
+        <ConfigTextInput
             id="entity-guidance-min-description"
             label="Min Description Length"
             type="number"

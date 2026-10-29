@@ -1,6 +1,6 @@
 <script lang="ts">
     import ConfigCard from './ConfigCard.svelte';
-    import ConfigTextField from './ConfigTextField.svelte';
+    import ConfigTextInput from './ConfigTextInput.svelte';
     import { getFieldDescription, getFieldValue, type ConfigFormBinding } from '$lib/utils/config-form';
 
     let {
@@ -19,7 +19,7 @@
         tooltip="Configure naming prefixes for dimensional models. trellis uses these patterns to automatically classify models as dimensions or facts."
     >
         <div class="space-y-4">
-            <ConfigTextField
+            <ConfigTextInput
                 id="dimension-prefix-input"
                 label="Dimension Prefix"
                 value={getFieldValue(config, 'dimensional_modeling.inference_patterns.dimension_prefix') || ''}
@@ -27,7 +27,7 @@
                 placeholder="dim_"
                 description={getFieldDescription(schema, 'dimensional_modeling.inference_patterns.dimension_prefix')}
             />
-            <ConfigTextField
+            <ConfigTextInput
                 id="fact-prefix-input"
                 label="Fact Prefix"
                 value={getFieldValue(config, 'dimensional_modeling.inference_patterns.fact_prefix') || ''}
@@ -45,7 +45,7 @@
         tooltip="Set the naming prefix for entity models. trellis uses this pattern to identify and classify entity models in your data model."
     >
         <div class="space-y-4">
-            <ConfigTextField
+            <ConfigTextInput
                 id="entity-prefix-input"
                 label="Entity Prefix"
                 value={getFieldValue(config, 'entity_modeling.inference_patterns.prefix') || ''}

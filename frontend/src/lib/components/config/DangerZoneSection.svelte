@@ -2,7 +2,7 @@
     import Icon from '$lib/components/Icon.svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
     import DangerFeatureCard from './DangerFeatureCard.svelte';
-    import DangerToggleRow from './DangerToggleRow.svelte';
+    import ConfigToggleRow from './ConfigToggleRow.svelte';
     import ConfigSelectField from './ConfigSelectField.svelte';
     import ConfigToggle from '$lib/components/ConfigToggle.svelte';
     import ConfigTextField from '$lib/components/ConfigTextField.svelte';
@@ -61,7 +61,7 @@
 
     <div class="space-y-6 {isDangerZoneEnabled ? '' : 'opacity-50 pointer-events-none'}">
         <DangerFeatureCard title="Lineage" tooltip={lineageTooltip}>
-            <DangerToggleRow
+            <ConfigToggleRow
                 id="lineage-enabled-toggle"
                 label="Lineage Enabled"
                 beta={isBetaField(schema, 'lineage.enabled')}
@@ -123,7 +123,7 @@
             title="Exposures"
             tooltip="Track downstream consumption of your data models. Connect dashboards and reports to entities to understand data usage across your organization."
         >
-            <DangerToggleRow
+            <ConfigToggleRow
                 id="exposures-enabled-toggle"
                 label="Exposures Enabled"
                 beta={isBetaField(schema, 'exposures.enabled')}
