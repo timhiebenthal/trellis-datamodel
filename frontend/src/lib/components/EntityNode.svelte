@@ -10,56 +10,52 @@
         frameworkModels,
         nodes,
         edges,
-        draggingField,
-        exposureEntityFilter,
         modelingStyle,
         labelPrefixes,
         dimensionPrefixes,
         factPrefixes,
         sourceColors,
         openSourceEditorModal,
-        closeSourceEditorModal,
-        openDeleteConfirmModal,
         closeDeleteConfirmModal,
         activeFramework,
     } from "$lib/stores";
     import type { ModelInfo, DraftedField, EntityFlowNode } from "$lib/types";
     import { isEntityNode } from "$lib/types";
-    import {
-        inferRelationships,
-        getLineage,
-        getModelSchema,
-    } from "$lib/api";
-    import { getParallelOffset } from "$lib/utils/edge-calculations";
+    import { inferRelationships } from "$lib/api";
     import { generateSlug } from "$lib/utils/slug";
     import { mergeRelationshipIntoEdges } from "$lib/utils/relationship-edges";
-    import { detectFieldSemantics } from "$lib/utils/field-semantics";
     import { formatModelNameForLabel, extractModelNameFromUniqueId, toTitleCase, classifyModelTypeFromPrefixes } from "$lib/utils/model-naming";
-    import { mergeFields } from "$lib/utils/merged-fields";
-    import { getEntityTypeStyle } from "$lib/utils/entity-type-style";
-    import type { MergedField } from "$lib/utils/merged-fields";
     import { normalizeTags, computeUiTagsAfterEdit } from "$lib/utils/entity-tags";
-    import { getFrameworkCopy, formatModelHint } from "$lib/utils/framework-display";
+    import { getFrameworkCopy } from "$lib/utils/framework-display";
     import { readModelRef, readFrameworkTags } from "$lib/utils/entity-compat";
+    import {
+        buildModelToEntityMap,
+        modelShortName as getModelShortName,
+        remapInferredRelationships,
+        renameNode,
+        renameNodeInEdges,
+    } from "$lib/utils/entity-binding";
+    import { getSourceChipStyle } from "$lib/utils/source-chip-style";
+    import { uniqueRoleNames } from "$lib/utils/entity-roles";
+    import {
+        DEFAULT_NODE_WIDTH,
+        DEFAULT_PANEL_HEIGHT,
+        computeResizePatch,
+        type ResizeDimension,
+    } from "$lib/utils/node-dimensions";
     import { getContext } from "svelte";
-    import { goto } from "$app/navigation";
-    import TagEditor from "./TagEditor.svelte";
-    import { openLineageModal } from "$lib/stores";
     import Icon from "@iconify/svelte";
     import { readable, type Readable } from "svelte/store";
     import { SchemaManager, type SchemaState } from "$lib/services/schema-manager";
-
-    function openExposuresView(event: MouseEvent) {
-        event.stopPropagation(); // Prevent collapse toggle
-        exposureEntityFilter.set(id);
-        viewMode.set('exposures');
-        goto('/exposures');
-    }
+    import EntityNodeHeader from "./entity-node/EntityNodeHeader.svelte";
+    import EntityNodeFields from "./entity-node/EntityNodeFields.svelte";
+    import EntityNodeTags from "./entity-node/EntityNodeTags.svelte";
+    import EntityNodeRoles from "./entity-node/EntityNodeRoles.svelte";
+    import BatchEditBanner from "./entity-node/BatchEditBanner.svelte";
 
     let { data, id, selected }: NodeProps<EntityFlowNode> = $props();
 
     const { updateNodeData } = useSvelteFlow();
-    let showEntityTypeMenu = $state(false);
     // Delete and SourceEditor modals are rendered at page-level (outside SvelteFlow) via global stores
 
     // Batch editing support
@@ -75,13 +71,6 @@
     const exposuresEnabledStore =
         getContext<Readable<boolean>>("exposuresEnabled") ?? readable(false);
     let exposuresEnabled = $derived($exposuresEnabledStore);
-
-    function handleLineageClick(event: MouseEvent) {
-        event.stopPropagation();
-        if (boundModelName) {
-            openLineageModal(boundModelName);
-        }
-    }
 
     // Entity type controls only for dimensional modeling
     let isDimensionalModeling = $derived($modelingStyle === "dimensional_model");
@@ -101,15 +90,8 @@
     let isBound = $derived(!!boundModelName);
     let isCollapsed = $derived(data.collapsed ?? false);
     let frameworkCopy = $derived(getFrameworkCopy($activeFramework));
-    const DEFAULT_WIDTH = 320;
-    const DEFAULT_PANEL_HEIGHT = 200;
-    const MIN_WIDTH = 280;
-    const MAX_WIDTH = 600;
-    const MIN_PANEL_HEIGHT = 120;
-    const MAX_PANEL_HEIGHT = 600;
-    let nodeWidth = $derived(data.width ?? DEFAULT_WIDTH);
+    let nodeWidth = $derived(data.width ?? DEFAULT_NODE_WIDTH);
     let columnPanelHeight = $derived(data.panelHeight ?? DEFAULT_PANEL_HEIGHT);
-
     // Find model details by unique_id (e.g. "model.elmo.entity_booking")
     let modelDetails = $derived(
         activeModelId ? $frameworkModels.find((m) => m.unique_id === activeModelId) : null,
@@ -259,10 +241,6 @@
         }
     }
 
-    function getModelShortName(modelId: string): string {
-        return modelId.includes(".") ? modelId.split(".").pop()! : modelId;
-    }
-
     function updateLabel(e: Event) {
         const label = (e.target as HTMLInputElement).value.trim();
         // Just update the label without changing ID (for real-time typing)
@@ -288,36 +266,10 @@
         const label = toTitleCase(rawLabel);
         const newId = generateSlug(label, $nodes.map((n) => n.id), id);
 
-        // If ID changes, update the node and all relationships
+        // If ID changes, update the node and all relationships (edge IDs stay stable)
         if (newId !== id) {
-            // Update all edges that reference this node
-            $edges = $edges.map((edge) => {
-                let updatedEdge = { ...edge };
-                if (edge.source === id) {
-                    updatedEdge.source = newId;
-                }
-                if (edge.target === id) {
-                    updatedEdge.target = newId;
-                }
-                // Update edge ID if it was based on source-target pattern
-                // FIXED: Do NOT update edge ID. Changing IDs causes duplicates on reload because
-                // the backend saves the new ID, but might also keep the old one if not handled perfectly,
-                // or more likely, the "baseId" logic in Canvas/Page creates collisions.
-                // Keeping the ID stable is safer.
-                return updatedEdge;
-            });
-
-            // Update the node itself with new ID
-            $nodes = $nodes.map((node) => {
-                if (node.id === id) {
-                    return {
-                        ...node,
-                        id: newId,
-                        data: { ...node.data, label },
-                    };
-                }
-                return node;
-            });
+            $edges = renameNodeInEdges($edges, id, newId);
+            $nodes = renameNode($nodes, id, newId, { label });
         }
     }
 
@@ -379,34 +331,11 @@
                     
                     // If ID changes, update edges and node
                     if (newId !== id) {
-                        // Update all edges that reference this node
-                        $edges = $edges.map((edge) => {
-                            let updatedEdge = { ...edge };
-                            if (edge.source === id) {
-                                updatedEdge.source = newId;
-                            }
-                            if (edge.target === id) {
-                                updatedEdge.target = newId;
-                            }
-                            // Do NOT update edge ID (see comment at line 310-313)
-                            return updatedEdge;
-                        });
-                        
-                        // Update the node itself with new ID - include ALL updates (model_ref, description, label)
-                        $nodes = $nodes.map((node) => {
-                            if (node.id === id) {
-                                const updatedData = {
-                                    ...node.data,
-                                    label: formattedLabel,
-                                    ...updates // Include model_ref and description from updates
-                                };
-                                return {
-                                    ...node,
-                                    id: newId,
-                                    data: updatedData,
-                                };
-                            }
-                            return node;
+                        $edges = renameNodeInEdges($edges, id, newId);
+                        // Include ALL updates (model_ref, description, label) on the renamed node
+                        $nodes = renameNode($nodes, id, newId, {
+                            label: formattedLabel,
+                            ...updates,
                         });
                         
                         // Use new ID for updateNodeData call
@@ -429,88 +358,26 @@
         try {
             const inferred = await inferRelationships();
 
-            // Build model name -> entity ID map from current canvas state
-            // Include the model we just bound (since data model hasn't saved yet)
-            const modelToEntity: Record<string, string> = {};
-            for (const node of $nodes) {
-                let boundModels: string[] = [];
-                // Use finalId to match the renamed node
-                const nodeIdToMatch = node.id === id || node.id === finalId ? finalId : node.id;
-                if (node.id === id || node.id === finalId) {
-                    // Current node: include the model we just added
-                    if (boundModelName) {
-                        const currentAdditional = (data.additional_models as string[]) || [];
-                        boundModels = [boundModelName, ...currentAdditional];
-                        if (newlyAddedModelId) {
-                            boundModels.push(newlyAddedModelId);
-                        }
-                    } else {
-                        boundModels = [model.unique_id];
-                    }
-                } else {
-                    // Other nodes: get all bound models
-                    const primary = isEntityNode(node) ? readModelRef(node.data) : undefined;
-                    const additional = (node.data?.additional_models as string[]) || [];
-                    if (primary) {
-                        boundModels = [primary, ...additional];
-                    }
+            // Current node: include the model we just bound (data model hasn't saved yet)
+            let currentNodeModels: string[];
+            if (boundModelName) {
+                const currentAdditional = (data.additional_models as string[]) || [];
+                currentNodeModels = [boundModelName, ...currentAdditional];
+                if (newlyAddedModelId) {
+                    currentNodeModels.push(newlyAddedModelId);
                 }
-                
-                for (const boundModel of boundModels) {
-                    if (boundModel && typeof boundModel === "string") {
-                        // Extract model name from unique_id, handling versioned models:
-                        // "model.project.name" -> maps "name"
-                        // "model.project.name.v1" -> maps "name" (base name used by backend)
-                        const parts = boundModel.split(".");
-                        if (parts.length >= 3 && parts[0] === "model") {
-                            const lastPart = parts[parts.length - 1];
-                            const isVersioned = /^v\d+$/.test(lastPart);
-                            
-                            if (isVersioned && parts.length >= 4) {
-                                // Versioned model: map base name (backend returns base_model_name)
-                                const baseName = parts[parts.length - 2];
-                                modelToEntity[baseName] = nodeIdToMatch;
-                            } else {
-                                modelToEntity[lastPart] = nodeIdToMatch;
-                            }
-                        } else {
-                            const modelName = boundModel.includes(".")
-                                ? boundModel.split(".").pop()!
-                                : boundModel;
-                            modelToEntity[modelName] = nodeIdToMatch;
-                        }
-                    }
-                }
-                // Also map entity ID to itself
-                modelToEntity[nodeIdToMatch] = nodeIdToMatch;
+            } else {
+                currentNodeModels = [model.unique_id];
             }
+            const modelToEntity = buildModelToEntityMap($nodes, id, finalId, currentNodeModels);
 
-            for (const rel of inferred) {
-                // Remap source/target using current canvas bindings
-                const sourceEntityId = modelToEntity[rel.source] || rel.source;
-                const targetEntityId = modelToEntity[rel.target] || rel.target;
-
-                // Check if this relationship involves the current entity (use finalId)
-                if (sourceEntityId !== finalId && targetEntityId !== finalId) continue;
-
-                // Check if both entities exist on the canvas
-                const sourceExists = $nodes.some(
-                    (n) => n.id === sourceEntityId,
-                );
-                const targetExists = $nodes.some(
-                    (n) => n.id === targetEntityId,
-                );
-                if (!sourceExists || !targetExists) {
-                    continue;
-                }
-
-                // Remap the relationship to use entity IDs
-                const remappedRel = {
-                    ...rel,
-                    source: sourceEntityId,
-                    target: targetEntityId,
-                };
-
+            const relationships = remapInferredRelationships(
+                inferred,
+                modelToEntity,
+                finalId,
+                $nodes.map((n) => n.id),
+            );
+            for (const remappedRel of relationships) {
                 // Merge relationship into edges (will aggregate by entity pair)
                 $edges = mergeRelationshipIntoEdges($edges, remappedRel);
             }
@@ -535,9 +402,10 @@
         isDragOver = false;
     }
 
+
     function startDimensionResize(
         event: PointerEvent,
-        type: "width" | "height",
+        type: ResizeDimension,
     ) {
         event.stopPropagation();
         event.preventDefault();
@@ -549,19 +417,9 @@
 
         function onMove(moveEvent: PointerEvent) {
             if (type === "width") {
-                const delta = moveEvent.clientX - startX;
-                const next = Math.min(
-                    MAX_WIDTH,
-                    Math.max(MIN_WIDTH, initialWidth + delta),
-                );
-                updateNodeData(id, { width: next });
+                updateNodeData(id, computeResizePatch(type, initialWidth, moveEvent.clientX - startX));
             } else {
-                const delta = moveEvent.clientY - startY;
-                const next = Math.min(
-                    MAX_PANEL_HEIGHT,
-                    Math.max(MIN_PANEL_HEIGHT, initialHeight + delta),
-                );
-                updateNodeData(id, { panelHeight: next });
+                updateNodeData(id, computeResizePatch(type, initialHeight, moveEvent.clientY - startY));
             }
         }
 
@@ -594,28 +452,8 @@
         );
     }
 
-    function toggleCollapse(event: Event) {
-        // Only toggle if clicking on the header background, not on the input
-        if ((event.target as HTMLElement).tagName === "INPUT") {
-            return;
-        }
+    function toggleCollapse() {
         updateNodeData(id, { collapsed: !isCollapsed });
-    }
-
-    function handleHeaderKeydown(event: KeyboardEvent) {
-        // Only handle keyboard events if the target is not an input field
-        if ((event.target as HTMLElement).tagName === "INPUT") {
-            return;
-        }
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            toggleCollapse(event);
-        }
-    }
-
-    function handleDeleteClick(event: MouseEvent) {
-        event.stopPropagation(); // Prevent collapse toggle
-        openDeleteConfirmModal(data.label || "Entity", [id]);
     }
 
     function deleteEntity() {
@@ -636,24 +474,8 @@
         }
     }
 
-    // Entity type menu functionality
-    function toggleEntityTypeMenu() {
-        showEntityTypeMenu = !showEntityTypeMenu;
-    }
-
-    function closeEntityTypeMenu() {
-        showEntityTypeMenu = false;
-    }
-
-    async function setEntityType(newType: "fact" | "dimension" | "unclassified") {
-        try {
-            // Update node data locally
-            updateNodeData(id, { entity_type: newType });
-            closeEntityTypeMenu();
-        } catch (error) {
-            console.error("Failed to update entity type:", error);
-            alert("Failed to update entity type. Please try again.");
-        }
+    function setEntityType(newType: "fact" | "dimension" | "unclassified") {
+        updateNodeData(id, { entity_type: newType });
     }
 
     // Tag editing functionality
@@ -671,20 +493,8 @@
     // doesn't own. Only meaningful for bound entities.
     let readOnlyTags = $derived(isBound ? normalizeTags(readFrameworkTags(data)) : []);
 
-    // Roles display (for dimensions)
-    // EntityRole is an object with { role, label, source } — extract the role string
-    // Deduplicate case-insensitively (e.g., "Creation Date" and "creation date" should be one)
-    let entityRoles = $derived.by(() => {
-        const roles = (data.roles || []).map((r) => r.role || r.label || '');
-        const seen = new Set<string>();
-        return roles.filter((role) => {
-            if (!role) return false;
-            const key = role.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
-    });
+    // Roles display (for dimensions): role strings, deduplicated case-insensitively
+    let entityRoles = $derived(uniqueRoleNames(data.roles));
 
     function handleTagsUpdate(newTags: string[]) {
         const allSelectedIds = isBatchEditing ? [id, ...selectedEntityNodes.map((n) => n.id)] : [id];
@@ -722,303 +532,11 @@
         });
     }
 
-    // Get source chip style from source_colors config or generate deterministic fallback
-    function getSourceChipStyle(sourceSystem: string): string {
-        // Check if custom color is defined in canvas_layout.yml
-        const customColor = $sourceColors[sourceSystem];
-        if (customColor) {
-            return `background-color: ${customColor}; color: white; border: 1px solid ${customColor};`;
-        }
-
-        // Generate deterministic fallback color based on source name
-        const colors = [
-            '#3B82F6', // blue-500
-            '#8B5CF6', // violet-500
-            '#EC4899', // pink-500
-            '#F59E0B', // amber-500
-            '#10B981', // emerald-500
-            '#EF4444', // red-500
-            '#06B6D4', // cyan-500
-            '#6366F1', // indigo-500
-        ];
-
-        // Simple hash for consistent color selection
-        let hash = 0;
-        for (let i = 0; i < sourceSystem.length; i++) {
-            hash = sourceSystem.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const index = Math.abs(hash) % colors.length;
-        const bgColor = colors[index];
-
-        return `background-color: ${bgColor}20; color: ${bgColor}; border: 1px solid ${bgColor}40;`;
-    }
-
     // Field drafting functionality
     let draftedFields = $derived((data.drafted_fields || []) as DraftedField[]);
-    let mergedFields = $derived(mergeFields(modelDetails?.columns, draftedFields));
 
-    function addDraftedField() {
-        const newField: DraftedField = {
-            name: "",
-            datatype: "text",
-        };
-        const updatedFields = [...draftedFields, newField];
+    function setDraftedFields(updatedFields: DraftedField[]) {
         updateNodeData(id, { drafted_fields: updatedFields });
-    }
-
-    function updateDraftedField(index: number, updates: Partial<DraftedField>) {
-        const updatedFields = draftedFields.map((field, i) =>
-            i === index ? { ...field, ...updates } : field,
-        );
-        updateNodeData(id, { drafted_fields: updatedFields });
-    }
-
-    function deleteDraftedField(index: number) {
-        const updatedFields = draftedFields.filter((_, i) => i !== index);
-        updateNodeData(id, { drafted_fields: updatedFields });
-    }
-
-    // Drag-and-drop for field linking
-    function onFieldDragStart(fieldName: string, e: DragEvent) {
-        e.stopPropagation(); // Prevent node drag
-        if (!e.dataTransfer) return;
-        e.dataTransfer.effectAllowed = "link";
-        e.dataTransfer.setData("text/plain", fieldName); // Required for drag to work
-
-        $draggingField = {
-            nodeId: id,
-            fieldName: fieldName,
-            nodeLabel: data.label || id,
-        };
-    }
-
-    function onFieldDragEnd(e: DragEvent) {
-        e.stopPropagation();
-        $draggingField = null;
-    }
-
-    function onFieldDragOver(e: DragEvent) {
-        if (!$draggingField) return;
-        if ($draggingField.nodeId === id) return; // Same entity, no link
-        e.preventDefault();
-        e.stopPropagation(); // Prevent bubble to canvas
-        if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = "link";
-        }
-    }
-
-    async function onFieldDrop(targetFieldName: string, e: DragEvent) {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent bubble to canvas
-        if (!$draggingField || $draggingField.nodeId === id) return;
-
-        // Find or create an edge between the two entities
-        const sourceNodeId = $draggingField.nodeId;
-        const targetNodeId = id;
-
-        // Check for existing edge with same source, target, and fields
-        const exists = $edges.some(
-            (e) =>
-                e.source === sourceNodeId &&
-                e.target === targetNodeId &&
-                e.data?.source_field === $draggingField?.fieldName &&
-                e.data?.target_field === targetFieldName,
-        );
-
-        if (exists) {
-            console.warn("Blocked duplicate field connection");
-            $draggingField = null;
-            return;
-        }
-
-        // Check for generic edge to reuse (any direction)
-        // A generic edge has no source_field/target_field defined
-        const genericEdge = $edges.find(
-            (e) =>
-                ((e.source === sourceNodeId && e.target === targetNodeId) ||
-                    (e.source === targetNodeId && e.target === sourceNodeId)) &&
-                !e.data?.source_field &&
-                !e.data?.target_field,
-        );
-
-        if (genericEdge) {
-            // Reuse this edge, enforcing the direction of the field drag
-            $edges = $edges.map((e) => {
-                if (e.id === genericEdge.id) {
-                    return {
-                        ...e,
-                        source: sourceNodeId,
-                        target: targetNodeId,
-                        data: {
-                            ...e.data,
-                            source_field: $draggingField!.fieldName,
-                            target_field: targetFieldName,
-                        },
-                    };
-                }
-                return e;
-            });
-            $draggingField = null;
-            return;
-        }
-
-        // Get active model information for source and target nodes (prefer ephemeral active model data)
-        const sourceNodeData = $nodes.find((n): n is EntityFlowNode => isEntityNode(n) && n.id === sourceNodeId)?.data;
-        const targetNodeData = $nodes.find((n): n is EntityFlowNode => isEntityNode(n) && n.id === targetNodeId)?.data;
-        
-        const sourceActiveModel = (() => {
-            if (sourceNodeData?._activeModelName) {
-                return {
-                    name: sourceNodeData._activeModelName as string,
-                    version: sourceNodeData._activeModelVersion as number | null | undefined,
-                };
-            }
-            const primaryModelRef = readModelRef(sourceNodeData ?? {});
-            if (primaryModelRef) {
-                return $frameworkModels.find(m => m.unique_id === primaryModelRef) || null;
-            }
-            const firstAdditional = (sourceNodeData?.additional_models as string[] | undefined)?.[0] || null;
-            if (firstAdditional) {
-                return $frameworkModels.find(m => m.unique_id === firstAdditional) || null;
-            }
-            return null;
-        })();
-        
-        const targetActiveModel = (() => {
-            if (targetNodeData?._activeModelName) {
-                return {
-                    name: targetNodeData._activeModelName as string,
-                    version: targetNodeData._activeModelVersion as number | null | undefined,
-                };
-            }
-            const primaryModelRef = readModelRef(targetNodeData ?? {});
-            if (primaryModelRef) {
-                return $frameworkModels.find(m => m.unique_id === primaryModelRef) || null;
-            }
-            const firstAdditional = (targetNodeData?.additional_models as string[] | undefined)?.[0] || null;
-            if (firstAdditional) {
-                return $frameworkModels.find(m => m.unique_id === firstAdditional) || null;
-            }
-            return null;
-        })();
-        
-        /**
-         * Relationship Direction Rules:
-         * 
-         * Relationships must always be named from the "1" side to the "*" side (parent → child).
-         * - one_to_many: source = 1 (parent), target = * (child)
-         * - many_to_one: source = * (child), target = 1 (parent)
-         * - one_to_one: source = FK holder, target = referenced table
-         * 
-         * Auto-Detection from dbt:
-         * When both entities have bound dbt models, we detect FK/PK semantics to determine parent/child:
-         * - If source field is FK and target field is PK → flip direction (FK points to PK, so PK is parent)
-         * - If source field is PK and target field is FK → keep direction (PK is parent, FK is child)
-         * - Otherwise → use drag direction as fallback
-         * 
-         * Manual Override:
-         * Users can manually swap direction using the swap button in the relationship editor.
-         */
-        
-        // Detect FK/PK semantics if both models are bound
-        let finalSource = sourceNodeId;
-        let finalTarget = targetNodeId;
-        let finalSourceField = $draggingField.fieldName;
-        let finalTargetField = targetFieldName;
-        let relationshipType: 'one_to_many' | 'many_to_one' | 'one_to_one' | 'many_to_many' = 'one_to_many';
-        const sourceEntityType = (sourceNodeData?.entity_type as string | undefined) || 'unclassified';
-        const targetEntityType = (targetNodeData?.entity_type as string | undefined) || 'unclassified';
-        
-        if (sourceActiveModel && targetActiveModel) {
-            try {
-                // Fetch schemas for both models to detect FK/PK semantics
-                const sourceSchema = await getModelSchema(
-                    sourceActiveModel.name,
-                    sourceActiveModel.version ?? undefined
-                );
-                const targetSchema = await getModelSchema(
-                    targetActiveModel.name,
-                    targetActiveModel.version ?? undefined
-                );
-                
-                if (sourceSchema && targetSchema) {
-                    // Build map of model schemas for FK/PK detection
-                    const modelSchemas = new Map<string, any>();
-                    modelSchemas.set(sourceActiveModel.name, sourceSchema);
-                    modelSchemas.set(targetActiveModel.name, targetSchema);
-                    
-                    // Detect semantics for both fields
-                    const sourceSemantics = detectFieldSemantics(
-                        sourceActiveModel.name,
-                        finalSourceField,
-                        targetActiveModel.name,
-                        modelSchemas
-                    );
-                    const targetSemantics = detectFieldSemantics(
-                        targetActiveModel.name,
-                        finalTargetField,
-                        sourceActiveModel.name,
-                        modelSchemas
-                    );
-                    
-                    // Determine if direction needs to be flipped to maintain 1 → * rule
-                    // Rule: Relationships always go from parent (PK holder) to child (FK holder)
-                    if (sourceSemantics === 'fk' && targetSemantics === 'pk') {
-                        // Flip direction: FK → PK becomes PK → FK (parent → child)
-                        // The FK field is on the child side, PK field is on the parent side
-                        finalSource = targetNodeId;
-                        finalTarget = sourceNodeId;
-                        finalSourceField = targetFieldName;
-                        finalTargetField = $draggingField.fieldName;
-                        relationshipType = 'one_to_many'; // PK → FK = one_to_many (parent → child)
-                    } else if (sourceSemantics === 'pk' && targetSemantics === 'fk') {
-                        // Keep direction: PK → FK is already correct (parent → child)
-                        relationshipType = 'one_to_many';
-                    } else {
-                        // Unknown semantics or both PKs/FKs: use drag direction as fallback
-                        // This handles edge cases like:
-                        // - Both fields are PKs (likely many-to-many or one-to-one)
-                        // - Both fields are FKs (unusual case)
-                        // - No FK/PK information available
-                        relationshipType = 'one_to_many';
-                    }
-                }
-            } catch (error) {
-                // Fall back to drag direction on error (e.g., schema fetch fails, network error)
-                // This ensures relationship creation doesn't fail even if FK/PK detection fails
-                console.warn('Error detecting FK/PK semantics, using drag direction:', error);
-            }
-        }
-        // If models aren't bound (greenfield), use drag direction - user can manually swap if needed
-        if (!sourceActiveModel || !targetActiveModel) {
-            // Prefer dimensional typing when available:
-            // - fact -> dimension typically means FK is on source (many_to_one)
-            // - dimension -> fact typically means FK is on target (one_to_many)
-            if (sourceEntityType === 'fact' && targetEntityType === 'dimension') {
-                relationshipType = 'many_to_one';
-            } else if (sourceEntityType === 'dimension' && targetEntityType === 'fact') {
-                relationshipType = 'one_to_many';
-            }
-        }
-        
-        // Create relationship object
-        const relationship = {
-            source: finalSource,
-            target: finalTarget,
-            label: "",
-            type: relationshipType,
-            source_field: finalSourceField,
-            target_field: finalTargetField,
-            source_model_name: finalSource === sourceNodeId ? sourceActiveModel?.name : targetActiveModel?.name,
-            source_model_version: finalSource === sourceNodeId ? (sourceActiveModel?.version ?? null) : (targetActiveModel?.version ?? null),
-            target_model_name: finalTarget === targetNodeId ? targetActiveModel?.name : sourceActiveModel?.name,
-            target_model_version: finalTarget === targetNodeId ? (targetActiveModel?.version ?? null) : (sourceActiveModel?.version ?? null),
-        };
-        
-        // Merge relationship into edges (will aggregate by entity pair)
-        $edges = mergeRelationshipIntoEdges($edges, relationship);
-
-        $draggingField = null;
     }
 </script>
 
@@ -1056,158 +574,23 @@
         <Icon icon="mdi:arrow-down" class="w-3 h-3 pointer-events-none" />
     </Handle>
 
-    <!-- Header -->
-    <div
-        class="p-2.5 border-b border-gray-100 bg-gray-50/50 rounded-t-lg flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
-        onclick={toggleCollapse}
-        onkeydown={handleHeaderKeydown}
-        role="button"
-        tabindex="0"
-        title={isCollapsed ? "Click to expand" : "Click to collapse"}
-    >
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-            <span
-                class="text-gray-400 text-[10px] flex-shrink-0 select-none transition-transform duration-200"
-            >
-                {#if isCollapsed}
-                    <Icon icon="lucide:chevron-right" class="w-4 h-4" />
-                {:else}
-                    <Icon icon="lucide:chevron-down" class="w-4 h-4" />
-                {/if}
-            </span>
-            <!-- Entity Type Badge (only shown in dimensional_model mode) -->
-            {#if isDimensionalModeling && data.entity_type}
-                <button
-                    type="button"
-                    class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 border-0 cursor-pointer {getEntityTypeStyle(data.entity_type).badge}"
-                    class:opacity-80={true}
-                    onclick={(e) => { e.stopPropagation(); toggleEntityTypeMenu(); }}
-                    title={data.entity_type === 'fact'
-                        ? 'Fact: Transaction table containing measures and keys (click to change)'
-                        : data.entity_type === 'dimension'
-                        ? 'Dimension: Descriptive table with attributes (click to change)'
-                        : 'Unclassified: Generic entity (click to change)'}
-                >
-                    <Icon
-                        icon={getEntityTypeStyle(data.entity_type).icon}
-                        class="w-3 h-3"
-                    />
-                </button>
-            {/if}
-            <input
-                type="text"
-                value={data.label}
-                onfocus={handleLabelFocus}
-                oninput={updateLabel}
-                onblur={updateIdFromLabel}
-                onclick={(e) => e.stopPropagation()}
-                ondblclick={(e) => e.stopPropagation()}
-                onkeydown={(e) => e.stopPropagation()}
-                onkeyup={(e) => e.stopPropagation()}
-                class="font-bold inline-input bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary-500 rounded px-1.5 py-0.5 text-sm min-w-0 max-w-full flex-shrink"
-                style={`width: ${Math.max((data.label?.length ?? 0) + 2, 8)}ch`}
-                placeholder="Entity Name"
-            />
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-            {#if isBound}
-                <div
-                    class="w-2 h-2 rounded-full bg-primary-500"
-                    title="Bound to {boundModelName}"
-                ></div>
-                {#if lineageEnabled && boundModelName}
-                    <button
-                        onclick={handleLineageClick}
-                        aria-label="Show lineage for {boundModelName}"
-                        class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        title="Show lineage"
-                    >
-                        <Icon icon="lucide:git-branch" class="w-4 h-4" />
-                    </button>
-                {/if}
-                {#if exposuresEnabled && hasExposuresData}
-                    <button
-                        onclick={openExposuresView}
-                        aria-label="Show exposures for {data.label}"
-                        class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        title="Show exposures"
-                    >
-                        <Icon icon="mdi:application-export" class="w-4 h-4" />
-                    </button>
-                {/if}
-            {:else}
-                <div
-                    class="w-2 h-2 rounded-full bg-amber-500"
-                    title={frameworkCopy.unboundHint}
-                ></div>
-                {#if exposuresEnabled && hasExposuresData}
-                    <button
-                        onclick={openExposuresView}
-                        aria-label="Show exposures for {data.label}"
-                        class="text-gray-400 hover:text-primary-600 transition-colors px-1.5 py-0.5 rounded hover:bg-primary-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        title="Show exposures"
-                    >
-                        <Icon icon="mdi:application-export" class="w-4 h-4" />
-                    </button>
-                {/if}
-            {/if}
-            <button
-                onclick={handleDeleteClick}
-                aria-label="Delete entity {data.label}"
-                class="text-gray-400 hover:text-danger-600 transition-colors px-1.5 py-0.5 rounded hover:bg-danger-50 focus:outline-none focus:ring-1 focus:ring-danger-500"
-                title="Delete entity"
-            >
-                <Icon icon="lucide:x" class="w-4 h-4" />
-            </button>
-        </div>
-    </div>
-
-    <!-- Entity Type Dropdown Menu (only shown in dimensional_model mode) -->
-    {#if showEntityTypeMenu && isDimensionalModeling}
-        <div
-            class="absolute z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px] text-sm transition-all duration-200 ease-in-out"
-            style="top: 45px; right: 10px;"
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
-            onfocusout={() => {
-                // Allow focus to move to menu items before closing
-                queueMicrotask(() => {
-                    const focused = document.activeElement;
-                    const container = focused?.closest('[role="menu"]');
-                    if (!container) {
-                        closeEntityTypeMenu();
-                    }
-                });
-            }}
-            role="menu"
-            tabindex="-1"
-        >
-            <button
-                onclick={() => setEntityType('fact')}
-                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-50 text-left transition-colors"
-                role="menuitem"
-            >
-                <Icon icon={getEntityTypeStyle('fact').icon} class="w-4 h-4 {getEntityTypeStyle('fact').iconClass}" />
-                <span class="text-gray-700">Set as Fact</span>
-            </button>
-            <button
-                onclick={() => setEntityType('dimension')}
-                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-green-50 text-left transition-colors"
-                role="menuitem"
-            >
-                <Icon icon={getEntityTypeStyle('dimension').icon} class="w-4 h-4 {getEntityTypeStyle('dimension').iconClass}" />
-                <span class="text-gray-700">Set as Dimension</span>
-            </button>
-            <button
-                onclick={() => setEntityType('unclassified')}
-                class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left transition-colors"
-                role="menuitem"
-            >
-                <Icon icon={getEntityTypeStyle('unclassified').icon} class="w-4 h-4 {getEntityTypeStyle('unclassified').iconClass}" />
-                <span class="text-gray-700">Set as Unclassified</span>
-            </button>
-        </div>
-    {/if}
+    <EntityNodeHeader
+        {id}
+        {data}
+        {isCollapsed}
+        {isBound}
+        {boundModelName}
+        {isDimensionalModeling}
+        {lineageEnabled}
+        {exposuresEnabled}
+        {hasExposuresData}
+        unboundHint={frameworkCopy.unboundHint}
+        onToggleCollapse={toggleCollapse}
+        onLabelFocus={handleLabelFocus}
+        onLabelInput={updateLabel}
+        onLabelBlur={updateIdFromLabel}
+        onSetEntityType={setEntityType}
+    />
 
     <!-- Body -->
     {#if !isCollapsed}
@@ -1247,7 +630,7 @@
                                     {#each data.source_system as sourceSystem}
                                         <span
                                             class:source-chip={true}
-                                            style={getSourceChipStyle(sourceSystem)}
+                                            style={getSourceChipStyle(sourceSystem, $sourceColors)}
                                         >
                                             {sourceSystem}
                                         </span>
@@ -1315,195 +698,29 @@
                         </div>
                     {/if}
 
-                    <!-- Tags Editor -->
-                    <div class="mb-2.5">
-                        {#if isBatchEditing}
-                            <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
-                                <Icon icon="lucide:layers" class="w-3 h-3" />
-                                Batch editing {selectedEntityNodes.length + 1} entities
-                            </div>
-                        {/if}
-                        <div class="flex items-center gap-2 flex-wrap mb-1">
-                            <span
-                                class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                            >Tags</span>
-                            <TagEditor
-                                tags={entityTags}
-                                readOnlyTags={readOnlyTags}
-                                canEdit={true}
-                                isBatchMode={isBatchEditing}
-                                onUpdate={(newTags) => handleTagsUpdate(newTags)}
-                            ></TagEditor>
-                        </div>
-                    </div>
+                    <EntityNodeTags
+                        wrapperClass="mb-2.5"
+                        tags={entityTags}
+                        readOnlyTags={readOnlyTags}
+                        isBatchEditing={isBatchEditing}
+                        batchCount={selectedEntityNodes.length + 1}
+                        onUpdate={handleTagsUpdate}
+                    />
                     
-                    <!-- Roles Display (for dimensions only, read-only in node view) -->
                     {#if entityRoles && entityRoles.length > 0}
-                        <div class="mb-2.5">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <span
-                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                    >Roles</span>
-                                <div class="flex flex-wrap gap-1.5">
-                                    {#each entityRoles as role}
-                                        <span
-                                            class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-semibold border border-green-200"
-                                            title="Role: {role}"
-                                        >
-                                            {role}
-                                        </span>
-                                    {/each}
-                                </div>
-                            </div>
-                        </div>
+                        <EntityNodeRoles wrapperClass="mb-2.5" roles={entityRoles} />
                     {/if}
 
-                    <div
-                        class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
-                        style={`max-height:${columnPanelHeight}px`}
-                    >
-                        {#if mergedFields.length > 0}
-                            {#each mergedFields as field (field.name)}
-                                <div
-                                    class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
-                                    class:bg-blue-50={$draggingField?.nodeId !==
-                                        id && $draggingField !== null}
-                                    class:ring-2={$draggingField?.nodeId !==
-                                        id && $draggingField !== null}
-                                    class:ring-blue-300={$draggingField?.nodeId !==
-                                        id && $draggingField !== null}
-                                    ondragover={onFieldDragOver}
-                                    ondrop={(e) => onFieldDrop(field.name, e)}
-                                    role="presentation"
-                                >
-                                    <div
-                                        class="flex gap-1.5 mb-1 items-center"
-                                    >
-                                        <span
-                                            class="inline-block h-2 w-2 rounded-full border border-primary-500 flex-shrink-0"
-                                            class:bg-primary-500={field.origin === 'dbt'}
-                                            data-origin={field.origin}
-                                            aria-label={field.origin === 'dbt'
-                                                ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
-                                                : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
-                                            title={field.origin === 'dbt'
-                                                ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
-                                                : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
-                                            role="img"
-                                        ></span>
-
-                                        {#if field.origin === 'dbt'}
-                                            <span
-                                                class="text-gray-400 text-xs select-none w-3 h-3"
-                                                draggable="true"
-                                                ondragstart={(e) => onFieldDragStart(field.name, e)}
-                                                ondragend={onFieldDragEnd}
-                                                role="presentation"
-                                                aria-hidden="true"
-                                                tabindex="-1"
-                                            >
-                                                <Icon icon="lucide:link" class="w-3 h-3" />
-                                            </span>
-                                            <div class="flex-1 flex flex-col gap-1">
-                                                <div class="flex items-center gap-1">
-                                                    <span class="flex-1 px-1.5 py-0.5 text-xs font-medium text-gray-700">{field.name}</span>
-                                                    <span class="w-20 px-1 py-0.5 text-[10px] uppercase text-gray-500 font-mono">{field.datatype ?? '—'}</span>
-                                                </div>
-                                                {#if field.description}
-                                                    <span class="w-full px-0 text-[10px] text-gray-400">{field.description}</span>
-                                                {/if}
-                                            </div>
-                                        {:else}
-                                            <span
-                                                class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
-                                                draggable="true"
-                                                onmousedown={(e) => e.stopPropagation()}
-                                                onpointerdown={(e) => e.stopPropagation()}
-                                                ondragstart={(e) => onFieldDragStart(field.name, e)}
-                                                ondragend={onFieldDragEnd}
-                                                class:cursor-grabbing={$draggingField?.nodeId === id &&
-                                                    $draggingField?.fieldName === field.name}
-                                                title="Drag to link to another field"
-                                                role="presentation"
-                                                aria-hidden="true"
-                                                tabindex="-1"
-                                            >
-                                                <Icon icon="lucide:link" class="w-3 h-3" />
-                                            </span>
-                                            <div class="flex-1 flex flex-col gap-1">
-                                                <div class="flex items-center gap-1">
-                                                    <input
-                                                        type="text"
-                                                        value={field.name}
-                                                        oninput={(e) =>
-                                                            updateDraftedField(
-                                                                field.draftIndex,
-                                                                {
-                                                                    name: (e.target as HTMLInputElement).value,
-                                                                },
-                                                            )}
-                                                        class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
-                                                        placeholder="field_name"
-                                                    />
-                                                    <select
-                                                        value={field.datatype}
-                                                        onchange={(e) =>
-                                                            updateDraftedField(
-                                                                field.draftIndex,
-                                                                {
-                                                                    datatype: (e.target as HTMLSelectElement).value as DraftedField['datatype'],
-                                                                },
-                                                            )}
-                                                        class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
-                                                    >
-                                                        <option value="text">text</option>
-                                                        <option value="int">int</option>
-                                                        <option value="float">float</option>
-                                                        <option value="bool">bool</option>
-                                                        <option value="date">date</option>
-                                                        <option value="timestamp">timestamp</option>
-                                                    </select>
-                                                    <button
-                                                        onclick={() => deleteDraftedField(field.draftIndex)}
-                                                        class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
-                                                        title="Delete field"
-                                                    >
-                                                        <Icon icon="lucide:x" class="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    value={field.description ?? ''}
-                                                    oninput={(e) =>
-                                                        updateDraftedField(
-                                                            field.draftIndex,
-                                                            {
-                                                                description: (e.target as HTMLInputElement).value,
-                                                            },
-                                                        )}
-                                                    class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
-                                                    placeholder="Description (optional)"
-                                                />
-                                            </div>
-                                        {/if}
-                                    </div>
-                                </div>
-                            {/each}
-                        {:else}
-                            <div
-                                class="text-center text-gray-400 py-4 text-[10px] italic"
-                            >
-                                No fields defined
-                            </div>
-                        {/if}
-                    </div>
-
-                    <button
-                        onclick={addDraftedField}
-                        class="mt-2 w-full text-xs text-primary-600 hover:bg-primary-50 p-1.5 rounded border border-primary-200 transition-colors font-medium flex items-center justify-center gap-1"
-                    >
-                        <Icon icon="lucide:plus" class="w-3 h-3" /> Add Field
-                    </button>
+                    <EntityNodeFields
+                        {id}
+                        nodeLabel={data.label || id}
+                        columns={modelDetails?.columns}
+                        {draftedFields}
+                        {columnPanelHeight}
+                        {frameworkCopy}
+                        modelName={modelDetails?.name}
+                        onDraftedFieldsChange={setDraftedFields}
+                    />
 
                     {#if schemaState.error}
                         <div
@@ -1537,56 +754,23 @@
                             Generic datatypes (draft mode)
                         </div>
 
-                        <!-- Tags Editor for Unbound Entities -->
-                        <div class="mb-2.5">
-                            {#if isBatchEditing}
-                                <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
-                                    <Icon icon="lucide:layers" class="w-3 h-3" />
-                                    Batch editing {selectedEntityNodes.length + 1} entities
-                                </div>
-                            {/if}
-                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                <span
-                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                >Tags</span>
-                                <TagEditor
-                                    tags={entityTags}
-                                    canEdit={true}
-                                    isBatchMode={isBatchEditing}
-                                    onUpdate={(newTags) => handleTagsUpdate(newTags)}
-                                ></TagEditor>
-                            </div>
-                        </div>
+                        <EntityNodeTags
+                            wrapperClass="mb-2.5"
+                            tags={entityTags}
+                            isBatchEditing={isBatchEditing}
+                            batchCount={selectedEntityNodes.length + 1}
+                            onUpdate={handleTagsUpdate}
+                        />
                         
-                        <!-- Roles Display (for dimensions only, read-only in node view) -->
                         {#if entityRoles && entityRoles.length > 0}
-                            <div class="mb-2.5">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <span
-                                        class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                        >Roles</span>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        {#each entityRoles as role}
-                                            <span
-                                                class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-semibold border border-green-200"
-                                                title="Role: {role}"
-                                            >
-                                                {role}
-                                            </span>
-                                        {/each}
-                                    </div>
-                                </div>
-                            </div>
+                            <EntityNodeRoles wrapperClass="mb-2.5" roles={entityRoles} />
                         {/if}
 
                         <!-- Source Systems Editor for Unbound Entities (Logical View Only) -->
                         {#if $viewMode === "logical" && !isBound}
                             <div class="mb-2.5">
                                 {#if isBatchEditing}
-                                    <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
-                                        <Icon icon="lucide:layers" class="w-3 h-3" />
-                                        Batch editing {selectedEntityNodes.length + 1} entities
-                                    </div>
+                                    <BatchEditBanner count={selectedEntityNodes.length + 1} />
                                 {/if}
                                 <div class="flex items-center gap-2 flex-wrap mb-1">
                                     <span
@@ -1597,7 +781,7 @@
                                         {#each (data.source_system || []) as sourceSystem}
                                             <span
                                                 class:source-chip={true}
-                                                style={getSourceChipStyle(sourceSystem)}
+                                                style={getSourceChipStyle(sourceSystem, $sourceColors)}
                                             >
                                                 {sourceSystem}
                                             </span>
@@ -1616,155 +800,16 @@
                             </div>
                         {/if}
 
-                        <div
-                            class="overflow-y-auto border border-gray-200 rounded-md bg-white p-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent nodrag"
-                            style={`max-height:${columnPanelHeight}px`}
-                        >
-                            {#if mergedFields.length > 0}
-                                {#each mergedFields as field (field.name)}
-                                    <div
-                                        class="p-1.5 border-b border-gray-100 last:border-0 bg-white rounded mb-1 relative group hover:bg-gray-50"
-                                        class:bg-blue-50={$draggingField?.nodeId !==
-                                            id && $draggingField !== null}
-                                        class:ring-2={$draggingField?.nodeId !==
-                                            id && $draggingField !== null}
-                                        class:ring-blue-300={$draggingField?.nodeId !==
-                                            id && $draggingField !== null}
-                                        ondragover={onFieldDragOver}
-                                        ondrop={(e) => onFieldDrop(field.name, e)}
-                                        role="presentation"
-                                    >
-                                        <div
-                                            class="flex gap-1.5 mb-1 items-center"
-                                        >
-                                            <!-- Origin indicator -->
-                                            <span
-                                                class="inline-block h-2 w-2 rounded-full border border-primary-500 flex-shrink-0"
-                                                class:bg-primary-500={field.origin === 'dbt'}
-                                                data-origin={field.origin}
-                                                aria-label={field.origin === 'dbt'
-                                                    ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
-                                                    : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
-                                                title={field.origin === 'dbt'
-                                                    ? formatModelHint(frameworkCopy.materializedHint, modelDetails?.name ?? '')
-                                                    : formatModelHint(frameworkCopy.unmaterializedHint, modelDetails?.name ?? '')}
-                                                role="img"
-                                            ></span>
-
-                                            {#if field.origin === 'dbt'}
-                                                <!-- Read-only row for dbt-sourced columns -->
-                                                <span
-                                                    class="text-gray-400 text-xs select-none w-3 h-3"
-                                                    draggable="true"
-                                                    ondragstart={(e) => onFieldDragStart(field.name, e)}
-                                                    ondragend={onFieldDragEnd}
-                                                    role="presentation"
-                                                    aria-hidden="true"
-                                                    tabindex="-1"
-                                                >
-                                                    <Icon icon="lucide:link" class="w-3 h-3" />
-                                                </span>
-                                                <div class="flex-1 flex flex-col gap-1">
-                                                    <div class="flex items-center gap-1">
-                                                        <span class="flex-1 px-1.5 py-0.5 text-xs font-medium text-gray-700">{field.name}</span>
-                                                        <span class="w-20 px-1 py-0.5 text-[10px] uppercase text-gray-500 font-mono">{field.datatype ?? '—'}</span>
-                                                    </div>
-                                                    {#if field.description}
-                                                        <span class="w-full px-0 text-[10px] text-gray-400">{field.description}</span>
-                                                    {/if}
-                                                </div>
-                                            {:else}
-                                                <!-- Editable row for drafted fields -->
-                                                <span
-                                                    class="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs select-none cursor-grab nodrag hover:text-primary-500 pt-1"
-                                                    draggable="true"
-                                                    onmousedown={(e) => e.stopPropagation()}
-                                                    onpointerdown={(e) => e.stopPropagation()}
-                                                    ondragstart={(e) => onFieldDragStart(field.name, e)}
-                                                    ondragend={onFieldDragEnd}
-                                                    class:cursor-grabbing={$draggingField?.nodeId === id &&
-                                                        $draggingField?.fieldName === field.name}
-                                                    title="Drag to link to another field"
-                                                    role="presentation"
-                                                    aria-hidden="true"
-                                                    tabindex="-1"
-                                                >
-                                                    <Icon icon="lucide:link" class="w-3 h-3" />
-                                                </span>
-                                                <div class="flex-1 flex flex-col gap-1">
-                                                    <div class="flex items-center gap-1">
-                                                        <input
-                                                            type="text"
-                                                            value={field.name}
-                                                            oninput={(e) =>
-                                                                updateDraftedField(
-                                                                    field.draftIndex,
-                                                                    {
-                                                                        name: (e.target as HTMLInputElement).value,
-                                                                    },
-                                                                )}
-                                                            class="flex-1 inline-input px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
-                                                            placeholder="field_name"
-                                                        />
-                                                        <select
-                                                            value={field.datatype}
-                                                            onchange={(e) =>
-                                                                updateDraftedField(
-                                                                    field.draftIndex,
-                                                                    {
-                                                                        datatype: (e.target as HTMLSelectElement).value as DraftedField['datatype'],
-                                                                    },
-                                                                )}
-                                                            class="w-20 px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase text-gray-600 font-mono"
-                                                        >
-                                                            <option value="text">text</option>
-                                                            <option value="int">int</option>
-                                                            <option value="float">float</option>
-                                                            <option value="bool">bool</option>
-                                                            <option value="date">date</option>
-                                                            <option value="timestamp">timestamp</option>
-                                                        </select>
-                                                        <button
-                                                            onclick={() => deleteDraftedField(field.draftIndex)}
-                                                            class="text-gray-400 hover:text-danger-600 p-1 rounded hover:bg-danger-50"
-                                                            title="Delete field"
-                                                        >
-                                                            <Icon icon="lucide:x" class="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                    <input
-                                                        type="text"
-                                                        value={field.description ?? ''}
-                                                        oninput={(e) =>
-                                                            updateDraftedField(
-                                                                field.draftIndex,
-                                                                {
-                                                                    description: (e.target as HTMLInputElement).value,
-                                                                },
-                                                            )}
-                                                        class="w-full px-0 text-[10px] text-gray-500 bg-transparent focus:outline-none border-none placeholder:text-gray-300"
-                                                        placeholder="Description (optional)"
-                                                    />
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                {/each}
-                            {:else}
-                                <div
-                                    class="text-center text-gray-400 py-4 text-[10px] italic"
-                                >
-                                    No fields defined
-                                </div>
-                            {/if}
-                        </div>
-
-                        <button
-                            onclick={addDraftedField}
-                            class="mt-2 w-full text-xs text-primary-600 hover:bg-primary-50 p-1.5 rounded border border-primary-200 transition-colors font-medium flex items-center justify-center gap-1"
-                        >
-                            <Icon icon="lucide:plus" class="w-3 h-3" /> Add Field
-                        </button>
+                        <EntityNodeFields
+                            {id}
+                            nodeLabel={data.label || id}
+                            columns={modelDetails?.columns}
+                            {draftedFields}
+                            {columnPanelHeight}
+                            {frameworkCopy}
+                            modelName={modelDetails?.name}
+                            onDraftedFieldsChange={setDraftedFields}
+                        />
                     </div>
                 {:else}
                     <!-- Conceptual View -->
@@ -1775,47 +820,17 @@
                         placeholder="Description..."
                     ></textarea>
 
-                    <!-- Tags Editor for Unbound Entities (Conceptual View) -->
-                    <div class="mt-2.5">
-                        {#if isBatchEditing}
-                            <div class="mb-1 px-1.5 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-700 flex items-center gap-1">
-                                <Icon icon="lucide:layers" class="w-3 h-3" />
-                                Batch editing {selectedEntityNodes.length + 1} entities
-                            </div>
-                        {/if}
-                        <div class="flex items-center gap-2 flex-wrap mb-1">
-                            <span
-                                class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                >Tags</span>
-                            <TagEditor
-                                tags={entityTags}
-                                readOnlyTags={readOnlyTags}
-                                canEdit={true}
-                                isBatchMode={isBatchEditing}
-                                onUpdate={(newTags) => handleTagsUpdate(newTags)}
-                            ></TagEditor>
-                        </div>
-                    </div>
+                    <EntityNodeTags
+                        wrapperClass="mt-2.5"
+                        tags={entityTags}
+                        readOnlyTags={readOnlyTags}
+                        isBatchEditing={isBatchEditing}
+                        batchCount={selectedEntityNodes.length + 1}
+                        onUpdate={handleTagsUpdate}
+                    />
                     
-                    <!-- Roles Display (for dimensions only, read-only in node view) -->
                     {#if entityRoles && entityRoles.length > 0}
-                        <div class="mt-2.5">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <span
-                                    class="font-medium text-[10px] uppercase tracking-wider text-gray-500"
-                                    >Roles</span>
-                                <div class="flex flex-wrap gap-1.5">
-                                    {#each entityRoles as role}
-                                        <span
-                                            class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-semibold border border-green-200"
-                                            title="Role: {role}"
-                                        >
-                                            {role}
-                                        </span>
-                                    {/each}
-                                </div>
-                            </div>
-                        </div>
+                        <EntityNodeRoles wrapperClass="mt-2.5" roles={entityRoles} />
                     {/if}
                     {#if isBound}
                         <div class="mt-2 space-y-1.5">
