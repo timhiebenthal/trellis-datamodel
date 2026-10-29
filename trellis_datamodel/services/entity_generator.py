@@ -18,7 +18,7 @@ from trellis_datamodel.models.business_event import (
     AnnotationEntry,
     GeneratedEntitiesResult,
 )
-from trellis_datamodel.services.business_events_service import load_business_events
+from trellis_datamodel.services.business_events import load_business_events
 from trellis_datamodel.services.data_model import merge_roles
 from trellis_datamodel.utils.structured_data import load_yaml_file
 

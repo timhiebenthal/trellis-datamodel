@@ -5,7 +5,8 @@ import yaml
 import pytest
 from datetime import datetime
 
-from trellis_datamodel.services import business_events_service
+from trellis_datamodel.services import business_events as business_events_service
+from trellis_datamodel.services.business_events import storage as _storage
 from trellis_datamodel.models.business_event import (
     BusinessEvent,
     BusinessEventType,
@@ -70,7 +71,7 @@ class TestBusinessEventYamlRoundTrip:
     def test_annotation_with_role_serializes_correctly(self, temp_dir, monkeypatch):
         """Test that annotation entries with role field serialize to YAML correctly."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create event
         event = business_events_service.create_event(
@@ -102,7 +103,7 @@ class TestBusinessEventYamlRoundTrip:
     def test_annotation_without_role_deserializes_correctly(self, temp_dir, monkeypatch):
         """Test that old YAML files without role field load correctly (backward compatibility)."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create YAML without role field (old format)
         old_format_yaml = """
@@ -144,7 +145,7 @@ events:
     def test_yaml_round_trip_preserves_role(self, temp_dir, monkeypatch):
         """Test that role field is preserved through save/load cycle."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create YAML with role field
         yaml_with_role = """
@@ -225,7 +226,7 @@ class TestBackwardCompatibility:
     def test_load_events_without_role_field(self, temp_dir, monkeypatch):
         """Test loading events from YAML files that don't have role field."""
         events_path = os.path.join(temp_dir, "business_events.yml")
-        monkeypatch.setattr(business_events_service, "_get_business_events_path", lambda: events_path)
+        monkeypatch.setattr(_storage, "_get_business_events_path", lambda: events_path)
 
         # Create old-format YAML
         old_yaml = """

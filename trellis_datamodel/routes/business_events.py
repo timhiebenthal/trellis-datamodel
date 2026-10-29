@@ -24,7 +24,7 @@ from trellis_datamodel.models.business_event_requests import (
     UpdateProcessRequest,
 )
 from trellis_datamodel.routes.dependencies import require_feature
-from trellis_datamodel.services.business_events_service import (
+from trellis_datamodel.services.business_events import (
     load_business_events,
     create_event,
     update_event,
