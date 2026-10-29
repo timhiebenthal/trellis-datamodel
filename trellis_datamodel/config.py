@@ -564,6 +564,20 @@ def _resolve_ossie_file_path(
     )
 
 
+def ossie_file_path() -> str:
+    """The Ossie document path in effect.
+
+    `OSSIE_CONFIG.file` is already resolved by `load_config`; the fallbacks cover
+    a config that was never loaded, e.g. a bare `OssieConfig()` in a test.
+    """
+    configured = (OSSIE_CONFIG.file or "").strip()
+    if configured:
+        return configured
+    data_model_path = (DATA_MODEL_PATH or "").strip()
+    base_dir = os.path.dirname(data_model_path) if data_model_path else os.getcwd()
+    return os.path.abspath(os.path.join(base_dir, "semantic_model.yml"))
+
+
 def _resolve_metrics_file_path(
     config_path: str,
     project_path: str,

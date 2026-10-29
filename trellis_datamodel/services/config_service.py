@@ -258,7 +258,7 @@ _FIELD_DEFINITIONS: Dict[str, ConfigFieldMetadata] = {
         type="string",
         default=_schema_default("ossie.file"),
         required=False,
-        description="Path to the Ossie semantic model file (defaults to semantic_model.yml beside the data model)",
+        description="Path to the Ossie semantic model file (defaults to semantic_model.yml beside the data model; a relative path resolves against dbt_project_path when set, otherwise the trellis.yml directory)",
         beta=True,
     ),
     "ossie.source.database": ConfigFieldMetadata(
