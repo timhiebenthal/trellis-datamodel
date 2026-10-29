@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Business events service split into a package:** the 1.4k-line
   `services/business_events_service.py` is now `services/business_events/`
   (storage, events, annotations, processes, supersets, role sync) with the same
-  public functions; behaviour is unchanged (#179).
+  public functions; behaviour is unchanged (#179). `services/entity_generator.py`
+  is split the same way into `services/entity_generator/` (common,
+  dimensional, entity_model).
 - **`trellis init` writes the config through the same round-trip writer as the
   config page:** values are unchanged, but the generated `trellis.yml` now
   carries the template's per-key comments and commented documentation blocks,
