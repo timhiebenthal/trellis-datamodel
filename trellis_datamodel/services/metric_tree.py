@@ -8,7 +8,6 @@ The catalog is resolved the way the exporter names datasets: entity
 """
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from trellis_datamodel import config as cfg
@@ -27,9 +26,6 @@ from trellis_datamodel.utils.yaml_handler import YamlHandler
 
 logger = logging.getLogger(__name__)
 
-# Ossie's default document name, beside data_model.yml.
-DEFAULT_OSSIE_FILENAME = "semantic_model.yml"
-
 _DOCUMENT_SCOPE_REASON = (
     "document-level metric: cross-dataset scope, so it has no single entity"
 )
@@ -43,20 +39,9 @@ def load_metric_tree(path: str) -> MetricTreeFile:
     return _annotate_unresolved(MetricTreeFile.model_validate(data))
 
 
-def _ossie_path() -> Path:
-    """The configured Ossie document, or the default beside data_model.yml."""
-    configured = (cfg.OSSIE_CONFIG.file or "").strip()
-    if configured:
-        return Path(configured)
-    data_model_path = (getattr(cfg, "DATA_MODEL_PATH", "") or "").strip()
-    if data_model_path:
-        return Path(data_model_path).parent / DEFAULT_OSSIE_FILENAME
-    return Path(DEFAULT_OSSIE_FILENAME)
-
-
 def _ossie_document() -> dict[str, Any]:
     """The Ossie document as a plain mapping; an empty one when unreadable."""
-    document = YamlHandler().load_file(str(_ossie_path()))
+    document = YamlHandler().load_file(cfg.ossie_file_path())
     return document if isinstance(document, dict) else {}
 
 

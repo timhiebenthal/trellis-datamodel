@@ -102,7 +102,9 @@ dbt_company_dummy_path: "./dbt_company_dummy"
 # relationships.
 #ossie:
 #  enabled: false  # Set to true to write the semantic model on every push
-#  file: ""  # Output path; defaults to semantic_model.yml beside the data model
+#  file: ""  # Output path; defaults to semantic_model.yml beside the data model.
+#            # A relative path resolves against dbt_project_path when set,
+#            # otherwise against the directory of this file.
 #  source:
 #    database: ""  # Database segment of dataset names. Leave empty to omit it.
 #                  # Adapter-derived values reflect the target that last ran dbt,
