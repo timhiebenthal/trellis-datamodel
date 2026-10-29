@@ -1,6 +1,7 @@
 <script lang="ts">
     import Icon from "@iconify/svelte";
     import Modal from "./Modal.svelte";
+    import DimensionCreateInline from "./DimensionCreateInline.svelte";
     import type { BusinessEvent, BusinessEventAnnotations, AnnotationType, AnnotationEntry, Dimension, EntityRole } from "$lib/types";
     import { onMount, untrack } from "svelte";
     import { get } from "svelte/store";
@@ -1054,71 +1055,26 @@
 
                                                 <!-- Inline create entity form (entity_model only) -->
                                                 {#if $modelingStyle === 'entity_model' && creatingDimensionForEntry === entry.id}
-                                                    <div class="mt-2 space-y-1 border-l-2 border-blue-200 pl-3">
-                                                        <label class="text-xs font-medium text-gray-600">Create new entity</label>
-                                                        <div class="flex items-center gap-2">
-                                                            <input
-                                                                type="text"
-                                                                bind:value={newDimensionName}
-                                                                placeholder="e.g., Employee, Project"
-                                                                class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                                                disabled={loading}
-                                                                onkeydown={(e) => {
-                                                                    if (e.key === 'Enter') submitCreateDimension(annotationType.type, entry.id);
-                                                                    else if (e.key === 'Escape') cancelCreateDimension();
-                                                                }}
-                                                            />
-                                                            <button type="button" onclick={() => submitCreateDimension(annotationType.type, entry.id)} disabled={!newDimensionName.trim() || loading} class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Create</button>
-                                                            <button type="button" onclick={cancelCreateDimension} class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" disabled={loading}>Cancel</button>
-                                                        </div>
-                                                    </div>
+                                                    <DimensionCreateInline
+                                                        variant="entity"
+                                                        bind:name={newDimensionName}
+                                                        {loading}
+                                                        onSubmit={() => submitCreateDimension(annotationType.type, entry.id)}
+                                                        onCancel={cancelCreateDimension}
+                                                    />
                                                 {/if}
 
                                                 <!-- Collapsible Dimension Link (generalization) — dimensional_model only -->
                                                 {#if $modelingStyle !== 'entity_model' && showGeneralizeForEntry.has(entry.id) && entry.text.trim()}
                                                     <div class="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
                                                         {#if creatingDimensionForEntry === entry.id}
-                                                            <!-- Create new dimension inline -->
-                                                            <div class="space-y-2">
-                                                                <label class="text-xs font-medium text-gray-600">
-                                                                    Create new dimension
-                                                                </label>
-                                                                <div class="flex items-center gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        bind:value={newDimensionName}
-                                                                        placeholder="e.g., Employee, Date, Location"
-                                                                        class="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                                                        disabled={loading}
-                                                                        onkeydown={(e) => {
-                                                                            if (e.key === 'Enter') {
-                                                                                submitCreateDimension(annotationType.type, entry.id);
-                                                                            } else if (e.key === 'Escape') {
-                                                                                cancelCreateDimension();
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <button
-                                                                        type="button"
-                                                                        onclick={() => submitCreateDimension(annotationType.type, entry.id)}
-                                                                        disabled={!newDimensionName.trim() || loading}
-                                                                        class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                    >
-                                                                        Create
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onclick={cancelCreateDimension}
-                                                                        class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-                                                                        disabled={loading}
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                </div>
-                                                                <p class="text-xs text-gray-500 italic">
-                                                                    Press Enter to create, Escape to cancel
-                                                                </p>
-                                                            </div>
+                                                            <DimensionCreateInline
+                                                                variant="dimension"
+                                                                bind:name={newDimensionName}
+                                                                {loading}
+                                                                onSubmit={() => submitCreateDimension(annotationType.type, entry.id)}
+                                                                onCancel={cancelCreateDimension}
+                                                            />
                                                         {:else}
                                                             <!-- Normal dimension selection -->
                                                             <div class="flex items-center gap-2">
