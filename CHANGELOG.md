@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Giant frontend components split up:** `EntityNode`, `EntityDetailModal`, the
+  app layout, the config page, `LineageModal`, `SevenWsForm`, `BusinessEvents`
+  and `GenerateEntitiesDialog` now delegate to smaller components, services and
+  unit-tested utils. No behaviour or markup changes (#184).
 - **Config page toggles and text fields are shared components:** the Business
   Events, Apache Ossie and Metric Tree sections now use `ConfigToggle` and
   `ConfigTextField`, which read the page's config helpers from context and
@@ -78,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One SQL type vocabulary for reconciliation and the Ossie export (#163):** both now read the same table in `utils/sql_types.py`, so supporting a new warehouse type is a single edit.
 
 ### Fixed
+- **Dragging a foreign-key field onto a primary-key field keeps both field names:** the
+  flipped relationship used to end up with the same field on both sides (#184).
 - **Config page showed the entity creation wizard as off by default:** with
   `entity_creation_guidance.enabled` unset the wizard was on at runtime but the
   config API and page reported it as `false`. They now report `true` (#178).

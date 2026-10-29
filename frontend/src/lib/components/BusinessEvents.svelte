@@ -14,6 +14,20 @@ import type {
     BusinessEventAnnotations,
 } from '$lib/types';
 import { toTitleCase } from '$lib/utils/model-naming';
+import {
+    UNASSIGNED_DOMAIN_KEY,
+    buildDomainGroups,
+    buildProcessCanvasUrl,
+    createEmptyAnnotations,
+    describeAnnotationSaveError,
+    describeEventsLoadError,
+    filterEvents,
+    getDomainLabel,
+    mapProcessToEvent,
+    planEventRemoval,
+    reorderIds,
+    type ProcessGroup,
+} from '$lib/utils/business-events';
 import { getCanvasFilterEntityIdsForProcessGroup } from '$lib/businessEventCanvasFilter';
 import { modelingStyle } from '$lib/stores';
     import { onMount } from 'svelte';
@@ -43,21 +57,6 @@ import { modelingStyle } from '$lib/stores';
     let selectedEventIds = $state<Set<string>>(new Set());
     let showProcessGroupModal = $state(false);
 
-const UNASSIGNED_DOMAIN_KEY = 'unassigned';
-
-type ProcessGroup = {
-    process: BusinessEventProcess;
-    events: BusinessEvent[];
-};
-
-type DomainGroup = {
-    domainKey: string;
-    domainLabel: string;
-    processes: ProcessGroup[];
-    ungroupedEvents: BusinessEvent[];
-    totalEvents: number;
-};
-
 let domainCollapseState = $state<Record<string, boolean>>({});
 let processCollapseState = $state<Record<string, boolean>>({});
 let processActionError = $state<string | null>(null);
@@ -84,30 +83,11 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
     // Filter events based on selected type and domain (combined filters)
     let filteredEvents = $derived.by(() => {
-        let result = events;
-
-        // Apply type filter
-        if (selectedFilter !== 'all') {
-            result = result.filter((event) => event.type === selectedFilter);
-        }
-
-        // Apply domain filter
-        if (selectedDomain !== null) {
-            if (selectedDomain === 'unassigned') {
-                result = result.filter((event) => !event.domain);
-            } else {
-                result = result.filter((event) => event.domain === selectedDomain);
-            }
-        }
-
-        // Apply process filter
-        if (selectedProcess !== null) {
-            if (selectedProcess === 'ungrouped') {
-                result = result.filter((event) => !event.process_id);
-            } else {
-                result = result.filter((event) => event.process_id === selectedProcess);
-            }
-        }
+        let result = filterEvents(events, {
+            type: selectedFilter,
+            domain: selectedDomain,
+            process: selectedProcess,
+        });
 
         // Clear selection if filtered events don't include selected items
         const filteredIds = new Set(result.map(e => e.id));
@@ -119,71 +99,14 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         return result;
     });
 
-    function getDomainLabel(domainKey: string) {
-        return domainKey === UNASSIGNED_DOMAIN_KEY ? 'Unassigned' : toTitleCase(domainKey);
-    }
-
     const activeProcesses = $derived.by(() =>
         processes.filter((process) => !process.resolved_at)
     );
     const hasActiveProcesses = $derived(() => activeProcesses.length > 0);
 
-    const domainGroups = $derived.by(() => {
-        const processLookup = new Map(activeProcesses.map((proc) => [proc.id, proc]));
-        // Use ALL events for process lookup, not just filtered ones
-        // This ensures events in processes are always visible regardless of filters
-        const eventsById = new Map(events.map((event) => [event.id, event]));
-
-        const groupsMap = new Map<string, DomainGroup>();
-
-        function ensureGroup(key: string): DomainGroup {
-            const existing = groupsMap.get(key);
-            if (existing) return existing;
-            const group: DomainGroup = {
-                domainKey: key,
-                domainLabel: getDomainLabel(key),
-                processes: [],
-                ungroupedEvents: [],
-                totalEvents: 0,
-            };
-            groupsMap.set(key, group);
-            return group;
-        }
-
-        activeProcesses.forEach((process) => {
-            const domainKey = process.domain ?? UNASSIGNED_DOMAIN_KEY;
-            const eventsForProcess = process.event_ids
-                .map((eventId) => eventsById.get(eventId))
-                .filter((event): event is BusinessEvent => Boolean(event));
-            
-            if (eventsForProcess.length === 0) {
-                return;
-            }
-            const group = ensureGroup(domainKey);
-            group.processes.push({ process, events: eventsForProcess });
-        });
-
-        filteredEvents.forEach((event) => {
-            const domainKey = event.domain ?? UNASSIGNED_DOMAIN_KEY;
-            if (event.process_id && processLookup.has(event.process_id)) {
-                return;
-            }
-            const group = ensureGroup(domainKey);
-            group.ungroupedEvents.push(event);
-        });
-
-        const groups = Array.from(groupsMap.values())
-            .map((group) => ({
-                ...group,
-                totalEvents:
-                    group.ungroupedEvents.length +
-                    group.processes.reduce((sum, procGroup) => sum + procGroup.events.length, 0),
-            }))
-            .filter((group) => group.totalEvents > 0)
-            .sort((a, b) => a.domainLabel.localeCompare(b.domainLabel));
-
-        return groups;
-    });
+    const domainGroups = $derived.by(() =>
+        buildDomainGroups(events, filteredEvents, activeProcesses)
+    );
 
     function toggleDomainCollapse(domainKey: string) {
         domainCollapseState = {
@@ -205,32 +128,6 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
 
     function isProcessExpanded(processId: string) {
         return processCollapseState[processId] !== false;
-    }
-
-    function createEmptyAnnotations(): BusinessEventAnnotations {
-        return {
-            who: [],
-            what: [],
-            when: [],
-            where: [],
-            how: [],
-            how_many: [],
-            why: [],
-        };
-    }
-
-    function mapProcessToEvent(process: BusinessEventProcess): BusinessEvent {
-        return {
-            id: process.id,
-            text: process.name,
-            description: process.description ?? undefined,
-            type: process.type,
-            domain: process.domain ?? undefined,
-            created_at: process.created_at,
-            updated_at: process.updated_at,
-            annotations: process.annotations_superset ?? createEmptyAnnotations(),
-            derived_entities: [],
-        };
     }
 
     function handleProcessAnnotate(process: BusinessEventProcess) {
@@ -280,16 +177,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
     }
 
     function handleProcessCanvasLink(process: BusinessEventProcess, derivedIds?: string[]) {
-        const params: string[] = [];
-        if (derivedIds && derivedIds.length > 0) {
-            const entityParam = derivedIds.map(encodeURIComponent).join(',');
-            params.push(`entities=${entityParam}`);
-        }
-        params.push(`processId=${encodeURIComponent(process.id)}`);
-        params.push(`processName=${encodeURIComponent(process.name)}`);
-
-        const canvasUrl = `/canvas?${params.join('&')}`;
-        goto(canvasUrl);
+        goto(buildProcessCanvasUrl(process, derivedIds));
     }
 
     async function handleProcessResolve(processId: string) {
@@ -301,18 +189,6 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             const errorMessage = e instanceof Error ? e.message : 'Failed to resolve process';
             processActionError = errorMessage;
         }
-    }
-
-    function reorderIds(ids: string[], fromId: string, toId: string): string[] {
-        const fromIndex = ids.indexOf(fromId);
-        const toIndex = ids.indexOf(toId);
-        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
-            return ids;
-        }
-        const next = [...ids];
-        const [moved] = next.splice(fromIndex, 1);
-        next.splice(toIndex, 0, moved);
-        return next;
     }
 
     function handleEventDragStart(
@@ -458,15 +334,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         try {
             processActionError = null;
             if (sourceProcessId) {
-                const sourceProcess = processes.find((proc) => proc.id === sourceProcessId);
-                if (sourceProcess) {
-                    const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
-                    if (nextSourceIds.length > 0) {
-                        await updateBusinessEventProcess(sourceProcessId, { event_ids: nextSourceIds });
-                    } else {
-                        await resolveBusinessEventProcess(sourceProcessId);
-                    }
-                }
+                await detachEventFromProcess(sourceProcessId, eventId);
             }
 
             const targetProcess = processes.find((proc) => proc.id === targetProcessId);
@@ -504,9 +372,9 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
         if (!sourceProcess) {
             return;
         }
-        const nextSourceIds = sourceProcess.event_ids.filter((id) => id !== eventId);
-        if (nextSourceIds.length > 0) {
-            await updateBusinessEventProcess(processId, { event_ids: nextSourceIds });
+        const plan = planEventRemoval(sourceProcess, eventId);
+        if (plan.kind === 'update') {
+            await updateBusinessEventProcess(processId, { event_ids: plan.eventIds });
         } else {
             await resolveBusinessEventProcess(processId);
         }
@@ -542,21 +410,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             try {
                 events = await getBusinessEvents();
             } catch (e) {
-                const errorMessage = e instanceof Error ? e.message : String(e);
-                const statusCode = (e as any)?.status;
-                
-                // Check for specific error types by status code first, then message
-                if (statusCode === 403 || errorMessage.includes('403') || errorMessage.includes('feature_disabled') || errorMessage.includes('disabled')) {
-                    error = 'Business events feature is disabled. Enable it in trellis.yml by setting business_events.enabled: true';
-                } else if (statusCode === 400 || errorMessage.includes('400') || errorMessage.includes('configuration')) {
-                    error = 'Configuration error. Please check your trellis.yml file.';
-                } else if (statusCode === 404 || errorMessage.includes('404') || errorMessage.includes('not found')) {
-                    error = 'Business events file not found. Create your first event to get started.';
-                } else if (statusCode === 500 || errorMessage.includes('500') || errorMessage.includes('parse') || errorMessage.includes('YAML')) {
-                    error = 'Invalid business events file format. Please check the file or contact support.';
-                } else {
-                    error = 'Failed to load business events. Please try again later.';
-                }
+                error = describeEventsLoadError(e, 'Failed to load business events. Please try again later.');
                 console.error('Error loading business events:', e);
                 // Still try to load domains even if events fail
                 events = [];
@@ -648,21 +502,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             try {
                 events = await getBusinessEvents();
             } catch (e) {
-                const errorMessage = e instanceof Error ? e.message : String(e);
-                const statusCode = (e as any)?.status;
-                
-                // Check for specific error types
-                if (statusCode === 403 || errorMessage.includes('403') || errorMessage.includes('feature_disabled') || errorMessage.includes('disabled')) {
-                    error = 'Business events feature is disabled. Enable it in trellis.yml by setting business_events.enabled: true';
-                } else if (statusCode === 400 || errorMessage.includes('400') || errorMessage.includes('configuration')) {
-                    error = 'Configuration error. Please check your trellis.yml file.';
-                } else if (statusCode === 404 || errorMessage.includes('404') || errorMessage.includes('not found')) {
-                    error = 'Business events file not found. Create your first event to get started.';
-                } else if (statusCode === 500 || errorMessage.includes('500') || errorMessage.includes('parse') || errorMessage.includes('YAML')) {
-                    error = 'Invalid business events file format. Please check the file or contact support.';
-                } else {
-                    error = 'Failed to reload events. Please try again.';
-                }
+                error = describeEventsLoadError(e, 'Failed to reload events. Please try again.');
                 console.error('Error reloading events:', e);
                 events = [];
             }
@@ -734,17 +574,7 @@ let dropIndicatorPosition = $state<'before' | 'after' | null>(null);
             sevenWsEvent = null;
             reloadEvents();
         } catch (e) {
-            const errorMessage = e instanceof Error ? e.message : "Failed to save annotations";
-            // Handle annotation specific errors
-            if (errorMessage.includes('annotation_type') || errorMessage.includes('Invalid annotation_type')) {
-                error = "Invalid annotation category. Please check your entries.";
-            } else if (errorMessage.includes('Duplicate entry IDs') || errorMessage.includes('duplicate')) {
-                error = "Duplicate entries detected. Please check for duplicate entries.";
-            } else if (errorMessage.includes('400') || errorMessage.includes('validation')) {
-                error = "Invalid annotation data. Please check your entries.";
-            } else {
-                error = errorMessage;
-            }
+            error = describeAnnotationSaveError(e);
             console.error('Error saving annotations:', e);
         }
     }
