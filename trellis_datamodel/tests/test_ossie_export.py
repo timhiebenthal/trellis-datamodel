@@ -836,6 +836,39 @@ class TestDatasetNaming:
             "was exported (a dataset name must be unique)"
         ]
 
+    def test_relationship_to_a_duplicate_dataset_blames_the_duplicate(
+        self, tmp_path, monkeypatch
+    ):
+        """The adapter did report the model, so the warning must not say it didn't."""
+        configure(monkeypatch, tmp_path / DEFAULT_FILENAME)
+        entities = [
+            {"id": "a", "model_ref": "model.company.dim_customer"},
+            {"id": "b", "model_ref": "model.company.dim_customer"},
+        ]
+        relationships = [
+            {
+                "source": "a",
+                "target": "b",
+                "type": "one_to_many",
+                "source_field": "customer_id",
+                "target_field": "customer_id",
+            }
+        ]
+        models = [
+            model(
+                unique_id="model.company.dim_customer",
+                name="dim_customer",
+                columns=[column("customer_id", "varchar")],
+            )
+        ]
+
+        result = export_ossie(entities, relationships, "company", models)
+
+        skipped = [w for w in result.warnings if "skipped" in w]
+        assert len(skipped) == 1
+        assert 'target entity "b" maps to dataset "dim_customer"' in skipped[0]
+        assert "does not report" not in skipped[0]
+
     def test_versioned_model_names_the_dataset_with_the_version(
         self, validator, tmp_path, monkeypatch
     ):
@@ -1692,7 +1725,7 @@ class TestPushIntegration:
         def boom(*args, **kwargs):
             raise AssertionError("the exporter must not run while disabled")
 
-        monkeypatch.setattr(schema_service, "export_ossie", boom)
+        monkeypatch.setattr(schema_service, "export_ossie_for_push", boom)
         write_data_model(temp_data_model_path, [dict(CUSTOMER_ENTITY)])
 
         result = schema_service.sync_framework_tests()
@@ -1729,7 +1762,7 @@ class TestPushIntegration:
         def boom(*args, **kwargs):
             raise RuntimeError("disk full")
 
-        monkeypatch.setattr(schema_service, "export_ossie", boom)
+        monkeypatch.setattr(schema_service, "export_ossie_for_push", boom)
 
         with pytest.raises(FileOperationError) as excinfo:
             schema_service.sync_framework_tests()

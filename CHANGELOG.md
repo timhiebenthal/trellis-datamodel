@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Ossie export reads its own inputs:** the push-time adapter reads moved from
+  `services/schema.py` into `services/ossie.py` (`export_ossie_for_push`), and
+  the metric tree and exporter share one Ossie path function. Output is
+  unchanged, except that a relationship pointing at an entity dropped for a
+  duplicate dataset name now says so instead of claiming the adapter does not
+  report the model (#165). The `ossie.file` docs now state how a relative path
+  resolves.
 - **Business events service split into a package:** the 1.4k-line
   `services/business_events_service.py` is now `services/business_events/`
   (storage, events, annotations, processes, supersets, role sync) with the same
