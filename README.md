@@ -1,63 +1,56 @@
-# trellis Data
+# trellis
 
 <p align="center">
   <img src="resources/trellis_with_text.png" alt="trellis Data" width="420" />
 </p>
 
-**trellis** is a lightweight, local-first app that connects **conceptual** and **logical** data modeling with how you actually build the warehouse today—**dbt-core** first, with a live canvas that stays aligned to your project.
+Trellis gives your dbt project a visual data model that connects business entities to the models, fields, and relationships in your warehouse. Work in a local canvas, keep the model in version-controlled YAML beside your dbt project, and sync descriptions, tags, and relationship tests with dbt.
 
-## Why trellis
+## See it in action
 
-**Typical pain**
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/d30406c2-13e0-46aa-9288-a0414c6688cf">
+    <img src="resources/readme-canvas-review.png" alt="Trellis canvas showing four entities, labeled relationships, and the Sale model's fields" width="960" />
+  </a>
+</p>
 
-- ERDs live in separate tools and go stale on real projects.
-- Transformations drift from the story the business understands.
-- Stakeholders can’t see structure without wading through SQL and YAML.
-- “All-in-one” warehouse designers rarely meet teams where they are (dbt, git, the modern stack).
+[Watch the walkthrough: create relationships and push them to dbt](https://github.com/user-attachments/assets/d30406c2-13e0-46aa-9288-a0414c6688cf).
 
-**What you get with trellis**
+## Why Trellis
 
-- **Small PyPI install, local web app** — run it beside your dbt project; the canvas and model files (`data_model.yml`, dbt YAML) stay **in version control**, so names, relationships, and descriptions evolve like the rest of your code—not a one-off diagram export.
-- One place to **see** entities, fields, relationships, and descriptions—tied to your repo, not a dead export.
-- **Conceptual** view for names and meaning; **Logical** view for columns, types, and materialization detail—switch without losing context.
-- **Greenfield**: sketch entities and attributes, then push structured artifacts into dbt.
-- **Brownfield**: load what you already modeled in dbt, infer links from relationship tests, and push descriptions and tags back into the project.
+ERDs and business definitions often live outside the dbt project, so they drift as models change. Trellis keeps the conceptual view and the logical details in the same model files, in the same repo as the transformations. Analysts can review the business structure without reading SQL, and developers can work with fields, types, and dbt metadata.
+
+## Quick start
+
+```bash
+uv tool install trellis-datamodel
+```
+
+In your dbt project, generate the artifacts and start Trellis:
+
+```bash
+cd /path/to/your/dbt-project
+dbt docs generate
+trellis init
+trellis run
+```
+
+Trellis opens at <http://localhost:8089>. `trellis init` creates `trellis.yml`; edit it to set your project and artifact paths.
 
 ## What you can do
 
-- **Visualize your data model** — canvas layout, conceptual vs logical views, less manual “diagram maintenance.”
-- **Work with your dbt project** — point at `manifest.json` / `catalog.json`, keep the diagram honest, round-trip descriptions and tags, and generate **relationship** tests from drawn links.
-- **Optional — Kimball-style modeling** — classify facts and dimensions, sensible default placement, and a **Bus Matrix** when your team thinks in stars/snowflakes; you can stay on plain entities if you prefer.
-- **Optional — business events & processes** — capture events with 7W-style annotations and group them into processes; most useful for **greenfield** and **dimensional** workflows. Skip this entirely if it’s not your methodology.
+- Switch between a **Conceptual** view of entities and relationships and a **Logical** view of fields, types, and materialization.
+- Pull models and metadata from dbt, then push descriptions and tags back to your project.
+- Draw relationships and generate dbt relationship tests from them.
+- Optionally classify facts and dimensions, build a Bus Matrix, or document business events and processes.
 
-## Getting started
-
-**Install**
-
-```bash
-pip install trellis-datamodel
-# or: uv pip install trellis-datamodel
-```
-
-**Run next to your dbt project**
-
-1. `cd /path/to/your/dbt-project`
-2. `trellis init` — creates `trellis.yml` (point it at your dbt paths and artifacts).
-3. `trellis run` — opens **http://localhost:8089** (use `trellis run --help` for port and config path).
-
-Generate **`manifest.json`** and **`catalog.json`** with `dbt docs generate` in your dbt project so trellis can load models; without them, the UI may start but show no dbt-backed entities.
-
-Install from source or hack on the app: see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Examples & walkthroughs
-
-Short video walkthroughs:
+## Examples and walkthroughs
 
 | | |
 | --- | --- |
-| [Getting started](examples/1%20-%20Getting%20Started.md) | Init, settings in the UI, conceptual vs logical, relationships, push to dbt. |
-| [dbt integration](examples/3%20-%20dbt%20integration.md) | Link a project, mock data, bind entities to models, stay in sync with artifacts. |
-| [Documenting business processes](examples/2%20-%20Documenting%20Business%20Processes.md) | **Optional / experimental:** events, 7Ws, processes—enable in config or UI first. |
+| [Getting started](examples/1%20-%20Getting%20Started.md) | Initialize a project, edit entities, draw relationships, and push changes to dbt. |
+| [dbt integration](examples/3%20-%20dbt%20integration.md) | Load dbt models, bind them to entities, and infer relationships from tests. |
+| [Documenting business processes](examples/2%20-%20Documenting%20Business%20Processes.md) | Optional workflow for events, annotations, and processes. |
 
 More narrative walkthroughs and context: [full tutorial](https://app.capacities.io/home/667ad256-ca68-4dfd-8231-e77d83127dcf) · [general information](https://app.capacities.io/home/8b7546f6-9028-4209-a383-c4a9ba9be42a).
 
@@ -110,10 +103,6 @@ The `/metrics-tree` page holds two kinds of metric. A **draft metric** is author
 Set `metrics.file` to move it, and `metrics.expression_dialect` (`ANSI_SQL` by default) to pick the dialect label written onto emitted expressions. It is a label, not a parser: Trellis does not validate the SQL.
 
 Pushing with `ossie.enabled: true` emits the drafts into the Ossie document: a draft whose `dataset_ref` names an exported dataset (for example `fct_sale`) lands under that dataset's `metrics`; one without, or naming a dataset that is not exported, lands at the document root. Metrics Trellis did not author are preserved at both levels, including their `custom_extensions` and `ai_context`. Turning the feature off stops the emission and leaves the existing `metric_tree.yml` untouched, but the push still preserves whatever metrics are already in the Ossie document.
-
-## Vision
-
-trellis is built and tested around **dbt-core** today. The longer-term idea is to stay **tool-agnostic**—concepts outlive any one framework. Possible directions include dbt Fusion, Pydantic-flavored exports, or adapters for tools like [SQLMesh](https://github.com/TobikoData/sqlmesh) or [Bruin](https://github.com/bruin-data/bruin) where it makes sense. For now, the focus is a great experience with dbt-core.
 
 ## Contributing
 
