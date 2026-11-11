@@ -96,6 +96,12 @@ metrics:
   enabled: true
 ```
 
+A small revenue tree makes the chain visible: gross revenue and refunds drive net revenue, while order count and average order value explain gross revenue.
+
+<p align="center">
+  <img src="resources/readme-metric-tree.png" alt="Metric tree canvas showing the drivers of net revenue, with its draft expression open" width="960" />
+</p>
+
 The `/metrics-tree` page holds two kinds of metric. A **draft metric** is authored in Trellis and carries a label, description and expression. A **bound metric** is a reference to a metric already defined in `semantic_model.yml`: it stores `{dataset, name}` and no copy of the definition, so the tree cannot drift from the semantic model. Draw an arrow from a node's right handle onto another node to record an influence from the driver to the metric it moves. An influence is a claim about direction, not a formula.
 
 `metric_tree.yml` is written beside `data_model.yml` with the metrics and the influence edges, sorted so an unchanged graph saves byte for byte; node positions are computed deterministically from the tree hierarchy.
