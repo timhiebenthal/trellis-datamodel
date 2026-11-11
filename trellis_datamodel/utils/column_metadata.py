@@ -1,7 +1,7 @@
 """Single source of truth for decoding a column's origin.
 
 A column's origin can reach us from three places:
-  1. structured ``meta.origin`` (what push writes to schema.yml),
+  1. structured ``config.meta.origin`` or legacy ``meta.origin``,
   2. an already-resolved ``origin`` key (e.g. a column from ``get_models()``),
   3. legacy text embedded in the description: ``"desc | Origin: value"`` or
      ``"Origin: value"``.
@@ -61,8 +61,8 @@ def resolve_column_metadata(
     """Return (clean_description, origin) for a column.
 
     ``description`` defaults to ``col["description"]``. Origin precedence:
-    structured ``meta.origin`` -> already-resolved ``col["origin"]`` ->
-    origin embedded in the description. Origin is the list format of
+    ``config.meta.origin`` -> legacy ``meta.origin`` -> resolved
+    ``col["origin"]`` -> origin embedded in the description. Origin is the list format of
     ``utils/origin.py``, or None when no source carries one. The returned
     description never contains embedded origin text.
     """
@@ -70,8 +70,11 @@ def resolve_column_metadata(
         description = col.get("description")
     clean_desc, embedded = split_description_origin(description)
 
+    config_meta = (col.get("config") or {}).get("meta") or {}
     meta = col.get("meta") or {}
-    origin = parse_origin(_as_parseable(meta.get("origin")))
+    origin = parse_origin(_as_parseable(config_meta.get("origin")))
+    if not origin:
+        origin = parse_origin(_as_parseable(meta.get("origin")))
     if not origin:
         origin = parse_origin(_as_parseable(col.get("origin")))
     if not origin and embedded:
