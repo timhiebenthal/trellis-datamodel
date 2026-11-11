@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-11
+
+### Added
+- dbt v2 YAML writes now place column metadata and updated model tags under
+  `config`, using the dbt version in the manifest while retaining v1 write syntax.
+  Column origin readers accept both metadata locations, and pushes preserve
+  unrelated metadata. Added real dbt 2.0.11 manifest regressions and opt-in parser
+  verification against both dbt and dbt-oss 2.0.11. Documented JSON artifact
+  generation and verification limits.
+
 ## [0.27.0] - 2026-10-29
 
 ### Changed

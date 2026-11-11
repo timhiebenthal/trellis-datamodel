@@ -30,10 +30,14 @@ In your dbt project, generate the artifacts and start Trellis:
 
 ```bash
 cd /path/to/your/dbt-project
-dbt docs generate
+dbt build --write-catalog  # dbt v2; for dbt v1 use: dbt docs generate
 trellis init
 trellis run
 ```
+
+Trellis reads `manifest.json` and optional `catalog.json`. With dbt v2, `dbt parse`
+is enough for declared columns; add `--write-catalog` to a build for warehouse
+column types. See [dbt v2 compatibility and verification](docs/dbt-v2-compatibility.md).
 
 Trellis opens at <http://localhost:8089>. `trellis init` creates `trellis.yml`; edit it to set your project and artifact paths.
 

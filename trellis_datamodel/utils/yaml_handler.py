@@ -13,7 +13,10 @@ from ruamel.yaml.representer import RoundTripRepresenter
 
 from trellis_datamodel.services.tag_ownership import plan_tag_push
 from trellis_datamodel.utils.atomic_write import atomic_write
-from trellis_datamodel.utils.column_metadata import split_description_origin
+from trellis_datamodel.utils.column_metadata import (
+    resolve_column_origin,
+    split_description_origin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,9 @@ def round_trip_yaml(
 class YamlHandler:
     """Handler for reading and writing DBT schema YAML files with round-trip capabilities."""
 
-    def __init__(self):
+    def __init__(self, *, dbt_v2: bool = False):
         self.yaml = round_trip_yaml()
+        self.dbt_v2 = dbt_v2
 
     def load_file(self, file_path: str) -> Optional[Dict]:
         """
@@ -248,7 +252,8 @@ class YamlHandler:
     def update_model_tags(self, model: CommentedMap, tags: List[str]) -> None:
         """Replace the tags list for a model, preserving the original location.
 
-        Priority: 1) existing config.tags, 2) existing top-level tags, 3) config.tags (default)
+        v1 priority: existing config.tags, then existing top-level tags.
+        v2 always uses config.tags. New entries default to config.tags.
         Ensures tags are only in one location to avoid confusion.
         Skips writing empty tags arrays.
         """
@@ -270,7 +275,7 @@ class YamlHandler:
             # Remove top-level tags if present to avoid duplication
             if has_top_level_tags:
                 del model["tags"]
-        elif has_top_level_tags:
+        elif has_top_level_tags and not self.dbt_v2:
             # Update existing top-level tags
             model["tags"] = tags
         else:
@@ -285,6 +290,8 @@ class YamlHandler:
                     model["config"] = config
                 config = model["config"]
             config["tags"] = tags
+            if has_top_level_tags:
+                del model["tags"]
 
     def merge_model_tags(
         self,
@@ -528,7 +535,7 @@ class YamlHandler:
                 description=col_data.get("description"),
             )
             if "meta" in col_data:
-                col["meta"] = col_data["meta"]
+                self._update_column_meta(col, col_data["meta"])
             placed.add(col_data["name"])
             return col
 
@@ -549,6 +556,30 @@ class YamlHandler:
             new_columns.append(apply(col, col_data))
 
         model["columns"] = new_columns
+
+    def _update_column_meta(self, column: CommentedMap, meta: Dict[str, Any]) -> None:
+        """Merge Trellis metadata without discarding user keys.
+
+        dbt v2 requires column metadata under config. Keep legacy placement
+        for v1 projects, but respect config.meta when it already exists.
+        """
+        config = column.get("config")
+        if self.dbt_v2 or (config is not None and "meta" in config):
+            if config is None:
+                config = CommentedMap()
+                column["config"] = config
+            legacy = column.pop("meta", None) or CommentedMap()
+            merged = config.get("meta")
+            if merged is None:
+                merged = legacy
+            for key, value in legacy.items():
+                merged.setdefault(key, value)
+            merged.update(meta or {})
+            config["meta"] = merged
+        else:
+            existing = column.get("meta") or CommentedMap()
+            existing.update(meta or {})
+            column["meta"] = existing
 
     @staticmethod
     def _resolve_data_type(
@@ -607,7 +638,7 @@ class YamlHandler:
                 description=col_data.get("description"),
             )
             if "meta" in col_data:
-                col["meta"] = col_data["meta"]
+                self._update_column_meta(col, col_data["meta"])
             new_columns.append(col)
 
         incoming_set = set(incoming_names)
@@ -639,8 +670,13 @@ class YamlHandler:
                 "data_type": col.get("data_type"),
                 "description": description,
             }
-            if origin is not None:
-                col_dict["origin"] = origin
+            structured_origin = resolve_column_origin({
+                "config": col.get("config"),
+                "meta": col.get("meta"),
+                "origin": col.get("origin"),
+            })
+            if structured_origin is not None or origin is not None:
+                col_dict["origin"] = structured_origin or origin
 
             # Extract tests (supports both dbt's tests and data_tests keys).
             # A bare test name is dbt's canonical spelling; normalise it to the

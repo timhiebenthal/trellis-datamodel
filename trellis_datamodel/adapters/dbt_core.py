@@ -292,7 +292,14 @@ class DbtCoreAdapter:
             with open(self.manifest_path, "r") as f:
                 content = f.read()
         with timed_phase("artifact_parse"):
-            return json.loads(content)
+            manifest = json.loads(content)
+        self._configure_yaml_handler(manifest)
+        return manifest
+
+    def _configure_yaml_handler(self, manifest: Mapping[str, Any]) -> None:
+        """Choose write syntax from dbt's version, never its manifest schema."""
+        major = str(manifest.get("metadata", {}).get("dbt_version", "")).split(".")[0]
+        self.yaml_handler.dbt_v2 = major.isdigit() and int(major) >= 2
 
     def _load_data_model(self) -> dict:
         """Load data model YAML if it exists."""
@@ -1236,6 +1243,8 @@ class DbtCoreAdapter:
 
     def _load_schema_data(self, yml_path: str) -> Any:
         """Load a schema yml file, or start an empty one."""
+        if os.path.exists(self.manifest_path):
+            self._configure_yaml_handler(self._get_artifact_snapshot().manifest)
         data = self.yaml_handler.load_file(yml_path)
         if not data:
             data = {"version": 2, "models": []}
@@ -1836,7 +1845,7 @@ class DbtCoreAdapter:
                     "label": "catalog.json",
                     "path": self.catalog_path,
                     "exists": catalog_exists,
-                    "hint": "Run 'dbt docs generate' to create catalog.json.",
+                    "hint": "dbt v2: run 'dbt build --write-catalog'. dbt v1: run 'dbt docs generate'.",
                 },
             },
             project_path=self.project_path,

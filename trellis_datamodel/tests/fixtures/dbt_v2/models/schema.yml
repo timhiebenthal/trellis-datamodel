@@ -1,0 +1,21 @@
+version: 2
+models:
+  - name: customers
+    config:
+      tags: [dimension]
+    columns:
+      - name: id
+        data_type: integer
+        config:
+          meta:
+            origin: [{System: CRM}]
+        data_tests: [unique, not_null]
+  - name: orders
+    columns:
+      - name: customer_id
+        data_type: integer
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('customers')
+                field: id
